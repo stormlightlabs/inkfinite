@@ -47,14 +47,12 @@ Goal: a monorepo that can run a blank canvas in web + desktop.
 
 Goal: a correct, testable camera transform (world <-> screen).
 
-Core primitives (/packages/core/src/math):
-[ ] Define Vec2 { x, y } + helpers:
+Core primitives (/packages/core/src/math.ts):
+[x] Define Vec2 { x, y } + helpers:
     - add, sub, mulScalar, len, normalize, dot
-
-[ ] Define Box2 { min: Vec2, max: Vec2 }:
+[x] Define Box2 { min: Vec2, max: Vec2 }:
     - fromPoints, containsPoint, intersectsBox
-
-[ ] Define Mat3 (2D affine) or equivalent:
+[x] Define Mat3 (2D affine) or equivalent:
     - identity
     - translate(tx, ty)
     - scale(sx, sy)

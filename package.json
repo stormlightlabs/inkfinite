@@ -3,9 +3,22 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {},
-  "devDependencies": { "dprint": "^0.50.2" },
-  "engines": { "node": ">=18.0.0", "pnpm": ">=8.0.0" },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "dprint": "^0.50.2",
+    "eslint": "^9.39.2",
+    "eslint-plugin-unicorn": "^62.0.0",
+    "globals": "^16.5.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.50.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
   "packageManager": "pnpm@10.26.1"
 }

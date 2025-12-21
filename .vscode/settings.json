@@ -1,6 +1,14 @@
 {
   "[json]": { "editor.formatOnSave": true, "editor.defaultFormatter": "dprint.dprint" },
   "[jsonc]": { "editor.formatOnSave": true, "editor.defaultFormatter": "dprint.dprint" },
-  "[javascript]": { "editor.formatOnSave": true, "editor.defaultFormatter": "dprint.dprint" },
-  "[typescript]": { "editor.formatOnSave": true, "editor.defaultFormatter": "dprint.dprint" }
+  "[javascript]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "dprint.dprint",
+    "editor.codeActionsOnSave": { "source.fixAll.eslint": "always" }
+  },
+  "[typescript]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "dprint.dprint",
+    "editor.codeActionsOnSave": { "source.fixAll.eslint": "always" }
+  }
 }

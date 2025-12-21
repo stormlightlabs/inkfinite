@@ -1,28 +1,18 @@
 {
-  "name": "tsdown-starter",
+  "name": "inkfinite-core",
   "type": "module",
   "version": "0.0.0",
   "description": "A starter for creating a TypeScript package.",
   "author": "Author Name <author.name@mail.com>",
   "license": "MIT",
   "homepage": "https://github.com/author/library#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/author/library.git"
-  },
-  "bugs": {
-    "url": "https://github.com/author/library/issues"
-  },
-  "exports": {
-    ".": "./dist/index.mjs",
-    "./package.json": "./package.json"
-  },
+  "repository": { "type": "git", "url": "git+https://github.com/author/library.git" },
+  "bugs": { "url": "https://github.com/author/library/issues" },
+  "exports": { ".": "./dist/index.mjs", "./package.json": "./package.json" },
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
