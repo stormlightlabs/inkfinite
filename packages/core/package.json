@@ -6,13 +6,23 @@
   "author": "Author Name <author.name@mail.com>",
   "license": "MIT",
   "homepage": "https://github.com/author/library#readme",
-  "repository": { "type": "git", "url": "git+https://github.com/author/library.git" },
-  "bugs": { "url": "https://github.com/author/library/issues" },
-  "exports": { ".": "./dist/index.mjs", "./package.json": "./package.json" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/author/library.git"
+  },
+  "bugs": {
+    "url": "https://github.com/author/library/issues"
+  },
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
@@ -26,5 +36,8 @@
     "tsdown": "^0.18.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.16"
+  },
+  "dependencies": {
+    "uuid": "^13.0.0"
   }
 }

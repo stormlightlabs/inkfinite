@@ -40,7 +40,6 @@ Goal: a monorepo that can run a blank canvas in web + desktop.
 - `pnpm dev:desktop` launches a Tauri window that shows the same canvas.
 - `pnpm test` runs at least 1 passing core test.
 
-
 ==============================================================================
 2. Milestone B: Math + coordinate systems                            *wb-B*
 ==============================================================================
@@ -60,21 +59,20 @@ Core primitives (/packages/core/src/math.ts):
     - multiply(a, b)
     - transformPoint(m, p)
 
-Camera (/packages/core/src/camera):
-[ ] Define Camera { x, y, zoom } (world origin + scale)
-[ ] Implement worldToScreen(camera, p)
-[ ] Implement screenToWorld(camera, p)
-[ ] Implement cameraPan(camera, deltaScreen) -> camera'
-[ ] Implement cameraZoomAt(camera, factor, anchorScreenPoint) -> camera'
+Camera (/packages/core/src/camera.ts):
+[x] Define Camera { x, y, zoom } (world origin + scale)
+[x] Implement worldToScreen(camera, p)
+[x] Implement screenToWorld(camera, p)
+[x] Implement cameraPan(camera, deltaScreen) -> camera'
+[x] Implement cameraZoomAt(camera, factor, anchorScreenPoint) -> camera'
 
-Tests (/packages/core/test):
-[ ] worldToScreen(screenToWorld(p)) round-trip within epsilon
-[ ] zoomAt keeps anchor point stable (screen position unchanged)
-[ ] pan moves world under cursor as expected
+Tests (/packages/core/tests/camera.test.ts):
+[x] worldToScreen(screenToWorld(p)) round-trip within epsilon
+[x] zoomAt keeps anchor point stable (screen position unchanged)
+[x] pan moves world under cursor as expected
 
 (DoD):
 - All math/camera functions are unit-tested and pass.
-
 
 ==============================================================================
 3. Milestone C: Document model (records)                              *wb-C*
@@ -82,11 +80,8 @@ Tests (/packages/core/test):
 
 Goal: define the minimal data model that can represent a drawing.
 
-IDs (/packages/core/src/id):
-[ ] Implement createId(prefix) -> string (stable, unique enough for offline)
-[ ] Add test: ids are unique across 10k calls
-
-Records (/packages/core/src/model):
+Records & ID (/packages/core/src/model):
+[ ] Implement createId(prefix) -> uuid (v4)
 [ ] Define PageRecord { id, name, shapeIds: string[] }
 [ ] Define ShapeRecord base:
     - id, type, pageId
@@ -113,7 +108,6 @@ Validation:
 
 (DoD):
 - You can serialize a doc with a page + 1 shape to JSON and validate it.
-
 
 ==============================================================================
 4. Milestone D: Store + selectors (reactive core)                      *wb-D*
