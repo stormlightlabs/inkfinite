@@ -81,21 +81,21 @@ Tests (/packages/core/tests/camera.test.ts):
 Goal: define the minimal data model that can represent a drawing.
 
 Records & ID (/packages/core/src/model):
-[ ] Implement createId(prefix) -> uuid (v4)
-[ ] Define PageRecord { id, name, shapeIds: string[] }
-[ ] Define ShapeRecord base:
+[x] Implement createId(prefix) -> uuid (v4)
+[x] Define PageRecord { id, name, shapeIds: string[] }
+[x] Define ShapeRecord base:
     - id, type, pageId
     - x, y, rot
     - props: object (type-specific)
 
-[ ] Define shape types (minimal):
+[x] Define shape types (minimal):
     - rect: { w, h, fill, stroke, radius }
     - ellipse: { w, h, fill, stroke }
     - line: { a: Vec2, b: Vec2, stroke, width }
     - arrow: { a: Vec2, b: Vec2, stroke, width }
     - text: { text, fontSize, fontFamily, color, w? }
 
-[ ] Define BindingRecord (for arrow endpoints):
+[x] Define BindingRecord (for arrow endpoints):
     - id, type: "arrow-end"
     - fromShapeId (arrow id)
     - toShapeId (target shape id)
@@ -103,8 +103,7 @@ Records & ID (/packages/core/src/model):
     - anchor: e.g. { kind: "center" } for v0
 
 Validation:
-[ ] validateDoc(doc) -> { ok | errors[] }
-[ ] Add test: invalid binding to missing shape returns error
+[x] validateDoc(doc) -> { ok | errors[] }
 
 (DoD):
 - You can serialize a doc with a page + 1 shape to JSON and validate it.
@@ -113,35 +112,50 @@ Validation:
 4. Milestone D: Store + selectors (reactive core)                      *wb-D*
 ==============================================================================
 
-Goal: a fast, deterministic state container for the editor.
+Goal: a fast, deterministic state container for the editor using RxJS
 
-Store (/packages/core/src/store):
+Store (/packages/core/src/store) - RxJS + SvelteKit (runes) friendly
+
+Core types:
 [ ] Define EditorState:
-    - doc (pages, shapes, bindings)
-    - ui: { currentPageId, selectionIds[], toolId }
-    - camera
+    - doc: { pages, shapes, bindings }
+    - ui: { currentPageId, selectionIds: string[], toolId: ToolId }
+    - camera: { x, y, zoom }
 
-[ ] Implement Store with:
-    - getState()
-    - setState(updater)
-    - subscribe(listener) -> unsubscribe
+RxJS store (BehaviorSubject-backed):
+[ ] Implement createEditorStore(initial: EditorState) that exposes:
+    - state$: Observable<EditorState>         (read stream)
+    - getState(): EditorState                (sync snapshot)
+    - setState(updater: (s) => s): void      (mutation API)
+    - subscribe(listener): () => void        (Svelte-compatible subscribe)
+    - select(selector, eq?): Observable<T>   (derived streams)
 
-[ ] Implement selectors (pure functions):
+    Notes:
+    - Use BehaviorSubject so new subscribers immediately get the current value.
+    - subscribe must return an unsubscribe function.
+
+Selectors (pure functions, no RxJS):
+[ ] Implement selectors in /packages/core/src/store/selectors.ts:
     - getCurrentPage(state)
     - getShapesOnCurrentPage(state)
     - getSelectedShapes(state)
 
-[ ] Implement invariants:
-    - selectionIds only reference existing shapes
-    - currentPageId must exist
+Invariants (pick “repair” and test it):
+[ ] Implement enforceInvariants(state): EditorState (repair strategy):
+    - selectionIds := selectionIds filtered to existing shapes
+    - currentPageId must exist:
+        - if missing, set to first existing page
+        - if no pages exist, create a default page and set it
+[ ] Ensure setState always runs enforceInvariants before publishing next state
 
-Tests:
-[ ] subscribe fires exactly once per setState
-[ ] invariants enforced (reject or repair, pick one and test it)
+Tests (vitest):
+[ ] subscribe immediately receives current state upon subscription (BehaviorSubject behavior)
+[ ] subscribe fires exactly once per setState call
+[ ] invariants are enforced on any update (selection filtered, page fixed/created)
 
 (DoD):
-- Renderer can subscribe and redraw on any state change.
-
+- Renderer can subscribe to state$ (or subscribe()) and redraw on any change.
+- SvelteKit can bridge to runes with $effect unsubscribe cleanup.
 
 ==============================================================================
 5. Milestone E: Canvas renderer (read-only)                            *wb-E*
@@ -336,7 +350,7 @@ Live update:
 
 Tests:
 [ ] moving bound shape changes resolved endpoint
-[ ] binding to missing target is ignored (or removed)—pick one and test
+[ ] binding to missing target is ignored (or removed)-pick one and test
 
 (DoD):
 - Arrows remain connected to moved shapes (center-to-center is fine for v0).
@@ -429,7 +443,7 @@ Goal: export drawings as shareable artifacts.
 [ ] Implement exportSelectionToPNG (render selection bounds)
 [ ] Implement SVG export for basic shapes:
     - rect/ellipse/line/arrow/text
-    - camera transform baked into output or removed—pick one and document
+    - camera transform baked into output or removed-pick one and document
 
 Tests:
 [ ] exported SVG parses and contains expected elements

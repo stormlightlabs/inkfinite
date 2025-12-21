@@ -10,6 +10,9 @@ export default defineConfig(
   tseslint.configs.recommended,
   eslintPluginUnicorn.configs.recommended,
   [{
-    rules: { "unicorn/no-null": "off", "unicorn/prevent-abbreviations": ["error", { "replacements": { "i": false } }] },
+    rules: {
+      "unicorn/no-null": "off",
+      "unicorn/prevent-abbreviations": ["error", { "replacements": { "i": false, "props": false, "doc": false } }],
+    },
   }],
 );
