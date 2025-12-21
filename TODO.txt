@@ -18,7 +18,7 @@ Goal: a monorepo that can run a blank canvas in web + desktop.
     - /apps/web (SvelteKit)
     - /apps/desktop (Tauri wrapper)
     - /packages/core (pure TS engine)
-    - /packages/renderer-canvas2d (Canvas2D renderer)
+    - /packages/renderer (Canvas2D renderer)
 
 [ ] Add TypeScript config(s):
     - one shared tsconfig.base.json
@@ -114,16 +114,16 @@ Validation:
 
 Goal: a fast, deterministic state container for the editor using RxJS
 
-Store (/packages/core/src/store) - RxJS + SvelteKit (runes) friendly
+Store (/packages/core/src/reactivity.ts) - RxJS + SvelteKit (runes) friendly
 
 Core types:
-[ ] Define EditorState:
+[x] Define EditorState:
     - doc: { pages, shapes, bindings }
     - ui: { currentPageId, selectionIds: string[], toolId: ToolId }
     - camera: { x, y, zoom }
 
 RxJS store (BehaviorSubject-backed):
-[ ] Implement createEditorStore(initial: EditorState) that exposes:
+[x] Implement createEditorStore(initial: EditorState) that exposes:
     - state$: Observable<EditorState>         (read stream)
     - getState(): EditorState                (sync snapshot)
     - setState(updater: (s) => s): void      (mutation API)
@@ -135,23 +135,23 @@ RxJS store (BehaviorSubject-backed):
     - subscribe must return an unsubscribe function.
 
 Selectors (pure functions, no RxJS):
-[ ] Implement selectors in /packages/core/src/store/selectors.ts:
+[x] Implement selectors
     - getCurrentPage(state)
     - getShapesOnCurrentPage(state)
     - getSelectedShapes(state)
 
 Invariants (pick “repair” and test it):
-[ ] Implement enforceInvariants(state): EditorState (repair strategy):
+[x] Implement enforceInvariants(state): EditorState (repair strategy):
     - selectionIds := selectionIds filtered to existing shapes
     - currentPageId must exist:
         - if missing, set to first existing page
         - if no pages exist, create a default page and set it
-[ ] Ensure setState always runs enforceInvariants before publishing next state
+[x] Ensure setState always runs enforceInvariants before publishing next state
 
-Tests (vitest):
-[ ] subscribe immediately receives current state upon subscription (BehaviorSubject behavior)
-[ ] subscribe fires exactly once per setState call
-[ ] invariants are enforced on any update (selection filtered, page fixed/created)
+Tests
+[x] subscribe immediately receives current state upon subscription (BehaviorSubject behavior)
+[x] subscribe fires exactly once per setState call
+[x] invariants are enforced on any update (selection filtered, page fixed/created)
 
 (DoD):
 - Renderer can subscribe to state$ (or subscribe()) and redraw on any change.
@@ -163,7 +163,7 @@ Tests (vitest):
 
 Goal: draw the document from state, no interactivity yet.
 
-Renderer (/packages/renderer-canvas2d):
+Renderer (/packages/renderer):
 [ ] createRenderer(canvas, store) -> { dispose() }
 [ ] Implement render loop strategy:
     - requestAnimationFrame redraw on "dirty" flag
@@ -551,7 +551,7 @@ packages/core/src/
   store/
   tools/
 
-packages/renderer-canvas2d/src/
+packages/renderer/src/
   renderer.ts
   draw/
   text/
