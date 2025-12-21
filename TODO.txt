@@ -1,0 +1,585 @@
+=============================================================================
+Author intent:
+- Build a Svelte-native editor core (TS) + renderer + UI.
+- Keep the "engine" framework-agnostic so Web + Tauri share it.
+- Defer collaboration until single-player is correct.
+
+Conventions:
+- [ ] Task
+- (DoD) Definition of Done for the milestone
+- Files shown are ideas, not requirements
+==============================================================================
+1. Milestone A: Repo skeleton + dev loop                            *wb-A*
+==============================================================================
+
+Goal: a monorepo that can run a blank canvas in web + desktop.
+
+[ ] Create workspace:
+    - /apps/web (SvelteKit)
+    - /apps/desktop (Tauri wrapper)
+    - /packages/core (pure TS engine)
+    - /packages/renderer-canvas2d (Canvas2D renderer)
+
+[ ] Add TypeScript config(s):
+    - one shared tsconfig.base.json
+    - package-level tsconfig.json extends base
+
+[ ] Add lint/format:
+    - eslint + prettier
+    - one command: pnpm lint / pnpm fmt
+
+[ ] Add test runner for core:
+    - vitest in /packages/core
+    - one command: pnpm test
+
+[ ] Add CI:
+    - install, lint, test (core only)
+
+(DoD):
+- `pnpm dev:web` shows an empty page with a <canvas>.
+- `pnpm dev:desktop` launches a Tauri window that shows the same canvas.
+- `pnpm test` runs at least 1 passing core test.
+
+
+==============================================================================
+2. Milestone B: Math + coordinate systems                            *wb-B*
+==============================================================================
+
+Goal: a correct, testable camera transform (world <-> screen).
+
+Core primitives (/packages/core/src/math):
+[ ] Define Vec2 { x, y } + helpers:
+    - add, sub, mulScalar, len, normalize, dot
+
+[ ] Define Box2 { min: Vec2, max: Vec2 }:
+    - fromPoints, containsPoint, intersectsBox
+
+[ ] Define Mat3 (2D affine) or equivalent:
+    - identity
+    - translate(tx, ty)
+    - scale(sx, sy)
+    - rotate(theta)
+    - multiply(a, b)
+    - transformPoint(m, p)
+
+Camera (/packages/core/src/camera):
+[ ] Define Camera { x, y, zoom } (world origin + scale)
+[ ] Implement worldToScreen(camera, p)
+[ ] Implement screenToWorld(camera, p)
+[ ] Implement cameraPan(camera, deltaScreen) -> camera'
+[ ] Implement cameraZoomAt(camera, factor, anchorScreenPoint) -> camera'
+
+Tests (/packages/core/test):
+[ ] worldToScreen(screenToWorld(p)) round-trip within epsilon
+[ ] zoomAt keeps anchor point stable (screen position unchanged)
+[ ] pan moves world under cursor as expected
+
+(DoD):
+- All math/camera functions are unit-tested and pass.
+
+
+==============================================================================
+3. Milestone C: Document model (records)                              *wb-C*
+==============================================================================
+
+Goal: define the minimal data model that can represent a drawing.
+
+IDs (/packages/core/src/id):
+[ ] Implement createId(prefix) -> string (stable, unique enough for offline)
+[ ] Add test: ids are unique across 10k calls
+
+Records (/packages/core/src/model):
+[ ] Define PageRecord { id, name, shapeIds: string[] }
+[ ] Define ShapeRecord base:
+    - id, type, pageId
+    - x, y, rot
+    - props: object (type-specific)
+
+[ ] Define shape types (minimal):
+    - rect: { w, h, fill, stroke, radius }
+    - ellipse: { w, h, fill, stroke }
+    - line: { a: Vec2, b: Vec2, stroke, width }
+    - arrow: { a: Vec2, b: Vec2, stroke, width }
+    - text: { text, fontSize, fontFamily, color, w? }
+
+[ ] Define BindingRecord (for arrow endpoints):
+    - id, type: "arrow-end"
+    - fromShapeId (arrow id)
+    - toShapeId (target shape id)
+    - handle: "start" | "end"
+    - anchor: e.g. { kind: "center" } for v0
+
+Validation:
+[ ] validateDoc(doc) -> { ok | errors[] }
+[ ] Add test: invalid binding to missing shape returns error
+
+(DoD):
+- You can serialize a doc with a page + 1 shape to JSON and validate it.
+
+
+==============================================================================
+4. Milestone D: Store + selectors (reactive core)                      *wb-D*
+==============================================================================
+
+Goal: a fast, deterministic state container for the editor.
+
+Store (/packages/core/src/store):
+[ ] Define EditorState:
+    - doc (pages, shapes, bindings)
+    - ui: { currentPageId, selectionIds[], toolId }
+    - camera
+
+[ ] Implement Store with:
+    - getState()
+    - setState(updater)
+    - subscribe(listener) -> unsubscribe
+
+[ ] Implement selectors (pure functions):
+    - getCurrentPage(state)
+    - getShapesOnCurrentPage(state)
+    - getSelectedShapes(state)
+
+[ ] Implement invariants:
+    - selectionIds only reference existing shapes
+    - currentPageId must exist
+
+Tests:
+[ ] subscribe fires exactly once per setState
+[ ] invariants enforced (reject or repair, pick one and test it)
+
+(DoD):
+- Renderer can subscribe and redraw on any state change.
+
+
+==============================================================================
+5. Milestone E: Canvas renderer (read-only)                            *wb-E*
+==============================================================================
+
+Goal: draw the document from state, no interactivity yet.
+
+Renderer (/packages/renderer-canvas2d):
+[ ] createRenderer(canvas, store) -> { dispose() }
+[ ] Implement render loop strategy:
+    - requestAnimationFrame redraw on "dirty" flag
+    - mark dirty on store updates
+
+[ ] Implement draw pipeline:
+    - clear canvas
+    - apply camera transform
+    - draw shapes (rect/ellipse/line/arrow/text)
+    - draw selection outline if selectionIds non-empty
+
+[ ] Implement text measurement fallback:
+    - if text shape has w? else measureText and derive bounds
+
+[ ] Implement pixel ratio handling:
+    - set canvas width/height by devicePixelRatio
+    - scale context accordingly
+
+(DoD):
+- With a hardcoded doc in the store, shapes appear at correct coordinates
+  and stay stable while resizing the browser window.
+
+
+==============================================================================
+6. Milestone F: Hit testing (picking)                                  *wb-F*
+==============================================================================
+
+Goal: determine what the cursor is over.
+
+Geometry (/packages/core/src/geom):
+[ ] shapeBounds(shape) -> Box2
+[ ] pointInRect(p, rectShape) -> bool
+[ ] pointInEllipse(p, ellipseShape) -> bool
+[ ] pointNearSegment(p, a, b, tolerance) -> bool
+[ ] hitTestPoint(state, worldPoint) -> shapeId? (topmost wins)
+
+Layering:
+[ ] Define draw order = page.shapeIds order
+[ ] hitTest uses reverse order for topmost selection
+
+Tests:
+[ ] hitTestPoint returns expected shapeId for overlapping shapes
+[ ] tolerance works for line/arrow selection
+
+(DoD):
+- You can hover shapes and log the hit shape id (no selection yet).
+
+
+==============================================================================
+7. Milestone G: Input system (pointer + keyboard)                      *wb-G*
+==============================================================================
+
+Goal: normalize events into editor actions.
+
+Input adapter (/apps/web/src/lib/input):
+[ ] Capture pointerdown/move/up
+[ ] Convert screen coords -> world coords using camera
+[ ] Track pointer state: isDown, startWorld, lastWorld, buttons
+
+Keyboard:
+[ ] Capture keydown/keyup
+[ ] Normalize modifiers (ctrl/cmd, shift, alt)
+
+Action bus (/packages/core/src/actions):
+[ ] Define Action union:
+    - PointerDown, PointerMove, PointerUp
+    - KeyDown, KeyUp
+    - Wheel (for zoom)
+[ ] dispatch(action) -> store updates via tool state machine (next milestone)
+
+(DoD):
+- You can pan/zoom camera via wheel/drag with a temporary "camera tool"
+  (even before selection tool exists).
+
+
+==============================================================================
+8. Milestone H: Tool state machine (foundation)                        *wb-H*
+==============================================================================
+
+Goal: tools are explicit, testable state machines.
+
+Tools (/packages/core/src/tools):
+[ ] Define ToolId: "select" | "rect" | "ellipse" | "line" | "arrow" | "text" | "pen"
+[ ] Define Tool interface:
+    - id
+    - onEnter(state)
+    - onAction(state, action) -> newState
+    - onExit(state)
+
+Tool router:
+[ ] routeAction(state, action) -> newState (delegates to active tool)
+
+Tests:
+[ ] Switching tools calls onExit/onEnter in correct order
+[ ] Tool ignores actions it doesn't care about
+
+(DoD):
+- A dummy tool can consume pointer events and update state deterministically.
+
+
+==============================================================================
+9. Milestone I: Select/move tool (MVP interaction)                     *wb-I*
+==============================================================================
+
+Goal: select shapes and drag them.
+
+Selection:
+[ ] PointerDown:
+    - if hit shape: selection = [shapeId] (or add with shift)
+    - else selection = []
+[ ] PointerMove while dragging selected:
+    - translate selected shapes by deltaWorld
+[ ] PointerUp:
+    - end drag
+
+Marquee select (smallest slices):
+[ ] Implement marquee start (on empty canvas pointerdown)
+[ ] Render marquee rectangle overlay
+[ ] On pointerup, select shapes whose bounds intersect marquee
+
+UX:
+[ ] Escape clears selection
+[ ] Delete removes selected shapes
+
+Tests:
+[ ] drag moves exactly by delta
+[ ] shift-click toggles membership
+[ ] delete removes and clears selection
+
+(DoD):
+- You can select and move shapes reliably.
+
+
+==============================================================================
+10. Milestone J: Create basic shapes via tools                         *wb-J*
+==============================================================================
+
+Goal: place shapes with dedicated tools.
+
+Rect tool (repeat pattern for others):
+[ ] PointerDown on canvas:
+    - create a draft rect shape with w/h=0 at startWorld
+    - selection = [newId]
+[ ] PointerMove:
+    - update w/h based on currentWorld - startWorld
+[ ] PointerUp:
+    - if too small, delete it (click-cancel behavior)
+    - else finalize
+
+[ ] Implement ellipse tool (same mechanics)
+[ ] Implement line tool (a=startWorld, b=currentWorld)
+[ ] Implement arrow tool (same as line but type="arrow")
+[ ] Implement text tool:
+    - click to create text shape
+    - open in-place editor overlay (contenteditable) in Svelte
+
+Tests:
+[ ] shape creation creates one record with correct props
+[ ] click-cancel removes zero-area shapes
+
+(DoD):
+- You can draw rect/ellipse/line/arrow/text on the canvas.
+
+
+==============================================================================
+11. Milestone K: Bindings for arrows (v0)                              *wb-K*
+==============================================================================
+
+Goal: arrow endpoints can “stick” to shapes.
+
+Binding creation:
+[ ] On arrow finalize:
+    - hit test start/end points
+    - if point hits a target shape, create binding record for that handle
+
+Binding resolution:
+[ ] resolveArrowEndpoints(state, arrowId) -> { a, b } in world coords
+    - if bound, compute endpoint at target shape bounds center (v0)
+    - else use arrow props a/b
+
+Live update:
+[ ] When a target shape moves, bound arrow rerenders automatically
+    - no mutation required if resolve happens during render
+
+Tests:
+[ ] moving bound shape changes resolved endpoint
+[ ] binding to missing target is ignored (or removed)—pick one and test
+
+(DoD):
+- Arrows remain connected to moved shapes (center-to-center is fine for v0).
+
+
+==============================================================================
+12. Milestone L: History (undo/redo)                                   *wb-L*
+==============================================================================
+
+Goal: every user-visible change is undoable.
+
+History model (/packages/core/src/history):
+[ ] Define Command:
+    - do(state) -> state
+    - undo(state) -> state
+
+[ ] Wrap mutations as commands:
+    - CreateShapeCommand
+    - UpdateShapeCommand (with before/after snapshot)
+    - DeleteShapesCommand
+    - SetSelectionCommand
+    - SetCameraCommand
+
+[ ] Implement stacks:
+    - undoStack, redoStack
+
+[ ] Wire shortcuts:
+    - Ctrl/Cmd+Z undo
+    - Ctrl/Cmd+Shift+Z redo
+
+Tests:
+[ ] round-trip: do -> undo returns to identical state (deep equal)
+[ ] redo re-applies exactly
+
+(DoD):
+- Undo/redo works for create/move/delete and camera changes.
+
+
+==============================================================================
+13. Milestone M: Persistence (web)                                     *wb-M*
+==============================================================================
+
+Goal: save/load documents locally.
+
+Serialization:
+[ ] serialize(state.doc) -> JSON string
+[ ] deserialize(json) -> doc (validate)
+
+Web storage:
+[ ] Implement autosave to IndexedDB (or localStorage v0)
+[ ] Implement "New / Save / Load" UI:
+    - New resets doc
+    - Save exports .json
+    - Load imports .json and validates
+
+Tests:
+[ ] load(save(doc)) yields equivalent doc
+
+(DoD):
+- You can close the tab, reopen, and recover your last drawing.
+
+
+==============================================================================
+14. Milestone N: Desktop packaging (Tauri)                             *wb-N*
+==============================================================================
+
+Goal: same app works as a desktop app with filesystem access.
+
+Tauri + SvelteKit integration:
+[ ] Configure SvelteKit for static/SPA output
+[ ] Ensure SSR is disabled for desktop build
+[ ] Configure Tauri to load the built assets
+
+File dialogs + FS:
+[ ] Implement "Save As…" using Tauri dialog + fs APIs
+[ ] Implement "Open…" using Tauri dialog + fs APIs
+[ ] Add recent files list (v0: store paths in Tauri local storage)
+
+(DoD):
+- Desktop app opens/saves JSON files on disk and reopens them correctly.
+
+
+==============================================================================
+15. Milestone O: Export (PNG/SVG)                                      *wb-O*
+==============================================================================
+
+Goal: export drawings as shareable artifacts.
+
+[ ] Implement exportViewportToPNG(canvas) (screen export)
+[ ] Implement exportSelectionToPNG (render selection bounds)
+[ ] Implement SVG export for basic shapes:
+    - rect/ellipse/line/arrow/text
+    - camera transform baked into output or removed—pick one and document
+
+Tests:
+[ ] exported SVG parses and contains expected elements
+
+(DoD):
+- One-click export works in both web and desktop.
+
+
+==============================================================================
+16. Milestone P: Performance + big docs (pragmatic)                    *wb-P*
+==============================================================================
+
+Goal: the editor stays responsive with many shapes.
+
+[ ] Add spatial index (v0: simple grid buckets):
+    - rebuild index on doc changes
+    - query nearby shapes for hit testing
+
+[ ] Add view culling:
+    - compute viewport bounds in world space
+    - render only shapes whose bounds intersect viewport
+
+[ ] Reduce redraw frequency:
+    - rAF only while dirty
+    - optionally batch multiple store updates into one redraw
+
+[ ] Add microbench harness:
+    - generate 10k shapes doc
+    - measure hit test and render time
+
+(DoD):
+- 10k simple shapes pans/zooms smoothly on a typical machine.
+
+
+==============================================================================
+17. Milestone Q: Collaboration (optional, after v1)                    *wb-Q*
+==============================================================================
+
+Goal: real-time multiplayer without breaking the core model.
+
+Approach A (recommended): CRDT document (Yjs)
+[ ] Map doc model to Y.Map / Y.Array:
+    - pages (Y.Map)
+    - shapes (Y.Map)
+    - bindings (Y.Map)
+    - ordering (Y.Array of ids)
+
+[ ] Implement doc<->store bridge:
+    - local store updates write to Yjs
+    - Yjs remote updates update store
+    - avoid feedback loops (transaction origin tagging)
+
+[ ] Add presence:
+    - user cursors (id, name, color, world pos)
+    - selections (ids[])
+
+[ ] Add provider:
+    - websocket provider (self-host)
+    - awareness / presence channel
+
+(DoD):
+- Two clients can draw, select, and see each other’s cursors live.
+
+
+==============================================================================
+18. Milestone R: Quality polish (what makes it feel "real")            *wb-R*
+==============================================================================
+
+Goal: the UX crosses the “this is legit” threshold.
+
+[ ] Snapping:
+    - snap move to grid
+    - snap to other shape edges/centers (basic)
+
+[ ] Handles:
+    - resize handles for rect/ellipse
+    - rotate handle
+    - cursor affordances
+
+[ ] Keyboard affordances:
+    - nudge with arrow keys
+    - duplicate (Ctrl/Cmd+D)
+    - bring forward/back
+
+[ ] Accessibility:
+    - tool buttons navigable with keyboard
+    - visible focus states
+    - ARIA labels for controls
+
+(DoD):
+- A user can comfortably draw and edit without surprises.
+
+
+==============================================================================
+Appendix: Suggested file layout                                   *wb-files*
+==============================================================================
+
+packages/core/src/
+  actions/
+  camera/
+  geom/
+  history/
+  id/
+  model/
+  store/
+  tools/
+
+packages/renderer-canvas2d/src/
+  renderer.ts
+  draw/
+  text/
+
+apps/web/src/
+  routes/
+  lib/
+    canvas/
+    ui/
+
+apps/desktop/
+  src-tauri/
+  (wraps web build)
+
+
+==============================================================================
+References (URLs)                                                   *wb-refs*
+==============================================================================
+
+tldraw conceptual references (inspiration only):
+- https://tldraw.dev/docs/shapes
+- https://tldraw.dev/docs/editor
+- https://tldraw.dev/reference/editor/Editor
+
+Yjs collaboration option:
+- https://docs.yjs.dev/
+- https://docs.yjs.dev/getting-started/working-with-shared-types
+- https://github.com/yjs/yjs
+
+SvelteKit + Tauri packaging:
+- https://v2.tauri.app/start/frontend/sveltekit/
+- https://svelte.dev/docs/kit/adapter-static
+- https://tauri.app/v1/guides/getting-started/setup/sveltekit/
+
+Canvas/infinite-canvas performance ideas:
+- https://antv.vision/infinite-canvas-tutorial/guide/lesson-008
+- https://harrisonmilbradt.com/blog/canvas-panning-and-zooming
