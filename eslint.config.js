@@ -11,6 +11,15 @@ export default defineConfig(
   eslintPluginUnicorn.configs.recommended,
   [{
     rules: {
+      "@typescript-eslint/no-unused-vars": ["error", {
+        "args": "all",
+        "argsIgnorePattern": "^_",
+        "caughtErrors": "all",
+        "caughtErrorsIgnorePattern": "^_",
+        "destructuredArrayIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "ignoreRestSiblings": true,
+      }],
       "unicorn/no-null": "off",
       "unicorn/prevent-abbreviations": ["error", { "replacements": { "i": false, "props": false, "doc": false } }],
     },

@@ -164,21 +164,21 @@ Tests
 Goal: draw the document from state, no interactivity yet.
 
 Renderer (/packages/renderer):
-[ ] createRenderer(canvas, store) -> { dispose() }
-[ ] Implement render loop strategy:
+[x] createRenderer(canvas, store) -> { dispose() }
+[x] Implement render loop strategy:
     - requestAnimationFrame redraw on "dirty" flag
     - mark dirty on store updates
 
-[ ] Implement draw pipeline:
+[x] Implement draw pipeline:
     - clear canvas
     - apply camera transform
     - draw shapes (rect/ellipse/line/arrow/text)
     - draw selection outline if selectionIds non-empty
 
-[ ] Implement text measurement fallback:
+[x] Implement text measurement fallback:
     - if text shape has w? else measureText and derive bounds
 
-[ ] Implement pixel ratio handling:
+[x] Implement pixel ratio handling:
     - set canvas width/height by devicePixelRatio
     - scale context accordingly
 
