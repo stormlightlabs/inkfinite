@@ -194,23 +194,22 @@ Renderer (/packages/renderer):
 Goal: determine what the cursor is over.
 
 Geometry (/packages/core/src/geom):
-[ ] shapeBounds(shape) -> Box2
-[ ] pointInRect(p, rectShape) -> bool
-[ ] pointInEllipse(p, ellipseShape) -> bool
-[ ] pointNearSegment(p, a, b, tolerance) -> bool
-[ ] hitTestPoint(state, worldPoint) -> shapeId? (topmost wins)
+[x] shapeBounds(shape) -> Box2
+[x] pointInRect(p, rectShape) -> bool
+[x] pointInEllipse(p, ellipseShape) -> bool
+[x] pointNearSegment(p, a, b, tolerance) -> bool
+[x] hitTestPoint(state, worldPoint) -> shapeId? (topmost wins)
 
 Layering:
-[ ] Define draw order = page.shapeIds order
-[ ] hitTest uses reverse order for topmost selection
+[x] Define draw order = page.shapeIds order
+[x] hitTest uses reverse order for topmost selection
 
 Tests:
-[ ] hitTestPoint returns expected shapeId for overlapping shapes
-[ ] tolerance works for line/arrow selection
+[x] hitTestPoint returns expected shapeId for overlapping shapes
+[x] tolerance works for line/arrow selection
 
 (DoD):
 - You can hover shapes and log the hit shape id (no selection yet).
-
 
 ==============================================================================
 7. Milestone G: Input system (pointer + keyboard)                      *wb-G*
