@@ -39,8 +39,8 @@
 		display: flex;
 		gap: 8px;
 		padding: 12px;
-		background: #f5f5f5;
-		border-bottom: 1px solid #e0e0e0;
+		background: var(--surface-elevated);
+		border-bottom: 1px solid var(--border);
 	}
 
 	.tool-button {
@@ -49,28 +49,29 @@
 		align-items: center;
 		gap: 4px;
 		padding: 8px 12px;
-		border: 1px solid #d0d0d0;
+		border: 1px solid var(--border);
 		border-radius: 4px;
-		background: white;
+		background: var(--surface);
+		color: var(--text);
 		cursor: pointer;
 		transition: all 0.2s;
 		min-width: 60px;
 	}
 
 	.tool-button:hover {
-		background: #f0f0f0;
-		border-color: #b0b0b0;
+		background: var(--surface-elevated);
+		border-color: var(--text-muted);
 	}
 
 	.tool-button:focus {
-		outline: 2px solid #4a90e2;
+		outline: 2px solid var(--accent);
 		outline-offset: 2px;
 	}
 
 	.tool-button.active {
-		background: #4a90e2;
-		color: white;
-		border-color: #357abd;
+		background: var(--accent);
+		color: var(--surface);
+		border-color: var(--accent-hover);
 	}
 
 	.tool-icon {

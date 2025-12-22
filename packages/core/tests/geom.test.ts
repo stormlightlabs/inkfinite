@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  BindingRecord,
   hitTestPoint,
   PageRecord,
   pointInEllipse,
   pointInRect,
   pointNearSegment,
+  resolveArrowEndpoints,
   shapeBounds,
+  shapeCenter,
   ShapeRecord,
   Store,
 } from "../src";
@@ -691,6 +694,304 @@ describe("Geometry", () => {
       expect(hitTestPoint(state, { x: 50, y: 50 })).toBe("shape:1");
       expect(hitTestPoint(state, { x: 250, y: 50 })).toBe("shape:2");
       expect(hitTestPoint(state, { x: 50, y: 252 }, 5)).toBe("shape:3");
+    });
+  });
+
+  describe("shapeCenter", () => {
+    it("should return center of rect shape", () => {
+      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
+
+      const center = shapeCenter(rect);
+
+      expect(center).toEqual({ x: 150, y: 125 });
+    });
+
+    it("should return center of ellipse shape", () => {
+      const ellipse = ShapeRecord.createEllipse("page:1", 100, 100, { w: 80, h: 60, fill: "", stroke: "" });
+
+      const center = shapeCenter(ellipse);
+
+      expect(center).toEqual({ x: 140, y: 130 });
+    });
+
+    it("should return center of line shape", () => {
+      const line = ShapeRecord.createLine("page:1", 100, 100, {
+        a: { x: 0, y: 0 },
+        b: { x: 100, y: 50 },
+        stroke: "",
+        width: 2,
+      });
+
+      const center = shapeCenter(line);
+
+      expect(center).toEqual({ x: 150, y: 125 });
+    });
+
+    it("should return center of arrow shape", () => {
+      const arrow = ShapeRecord.createArrow("page:1", 50, 50, {
+        a: { x: -50, y: -50 },
+        b: { x: 50, y: 50 },
+        stroke: "",
+        width: 2,
+      });
+
+      const center = shapeCenter(arrow);
+
+      expect(center).toEqual({ x: 50, y: 50 });
+    });
+
+    it("should handle rotated shapes", () => {
+      const rect = ShapeRecord.createRect("page:1", 0, 0, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
+      rect.rot = Math.PI / 4;
+
+      const center = shapeCenter(rect);
+      expect(center.x).toBeDefined();
+      expect(center.y).toBeDefined();
+    });
+  });
+
+  describe("resolveArrowEndpoints", () => {
+    it("should return arrow's own endpoints when no bindings exist", () => {
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page:1");
+      const arrow = ShapeRecord.createArrow("page:1", 100, 100, {
+        a: { x: 0, y: 0 },
+        b: { x: 100, y: 50 },
+        stroke: "",
+        width: 2,
+      }, "arrow:1");
+
+      store.setState((state) => ({
+        ...state,
+        doc: { pages: { [page.id]: { ...page, shapeIds: [arrow.id] } }, shapes: { [arrow.id]: arrow }, bindings: {} },
+        ui: { ...state.ui, currentPageId: page.id },
+      }));
+
+      const state = store.getState();
+      const resolved = resolveArrowEndpoints(state, arrow.id);
+
+      expect(resolved).toEqual({ a: { x: 100, y: 100 }, b: { x: 200, y: 150 } });
+    });
+
+    it("should resolve start endpoint when bound to a shape", () => {
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page:1");
+      const targetRect = ShapeRecord.createRect(
+        "page:1",
+        100,
+        100,
+        { w: 100, h: 100, fill: "", stroke: "", radius: 0 },
+        "rect:1",
+      );
+      const arrow = ShapeRecord.createArrow("page:1", 300, 300, {
+        a: { x: -150, y: -150 },
+        b: { x: 100, y: 100 },
+        stroke: "",
+        width: 2,
+      }, "arrow:1");
+
+      const binding = BindingRecord.create(arrow.id, targetRect.id, "start", { kind: "center" }, "binding:1");
+
+      store.setState((state) => ({
+        ...state,
+        doc: {
+          pages: { [page.id]: { ...page, shapeIds: [targetRect.id, arrow.id] } },
+          shapes: { [targetRect.id]: targetRect, [arrow.id]: arrow },
+          bindings: { [binding.id]: binding },
+        },
+        ui: { ...state.ui, currentPageId: page.id },
+      }));
+
+      const state = store.getState();
+      const resolved = resolveArrowEndpoints(state, arrow.id);
+
+      expect(resolved?.a).toEqual({ x: 150, y: 150 });
+      expect(resolved?.b).toEqual({ x: 400, y: 400 });
+    });
+
+    it("should resolve end endpoint when bound to a shape", () => {
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page:1");
+      const targetRect = ShapeRecord.createRect(
+        "page:1",
+        200,
+        200,
+        { w: 100, h: 100, fill: "", stroke: "", radius: 0 },
+        "rect:1",
+      );
+      const arrow = ShapeRecord.createArrow("page:1", 50, 50, {
+        a: { x: 0, y: 0 },
+        b: { x: 200, y: 200 },
+        stroke: "",
+        width: 2,
+      }, "arrow:1");
+
+      const binding = BindingRecord.create(arrow.id, targetRect.id, "end", { kind: "center" }, "binding:1");
+
+      store.setState((state) => ({
+        ...state,
+        doc: {
+          pages: { [page.id]: { ...page, shapeIds: [targetRect.id, arrow.id] } },
+          shapes: { [targetRect.id]: targetRect, [arrow.id]: arrow },
+          bindings: { [binding.id]: binding },
+        },
+        ui: { ...state.ui, currentPageId: page.id },
+      }));
+
+      const state = store.getState();
+      const resolved = resolveArrowEndpoints(state, arrow.id);
+      expect(resolved?.a).toEqual({ x: 50, y: 50 });
+      expect(resolved?.b).toEqual({ x: 250, y: 250 });
+    });
+
+    it("should resolve both endpoints when both are bound", () => {
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page:1");
+      const rect1 = ShapeRecord.createRect(
+        "page:1",
+        100,
+        100,
+        { w: 100, h: 100, fill: "", stroke: "", radius: 0 },
+        "rect:1",
+      );
+      const rect2 = ShapeRecord.createRect(
+        "page:1",
+        300,
+        300,
+        { w: 100, h: 100, fill: "", stroke: "", radius: 0 },
+        "rect:2",
+      );
+      const arrow = ShapeRecord.createArrow("page:1", 0, 0, {
+        a: { x: 0, y: 0 },
+        b: { x: 100, y: 100 },
+        stroke: "",
+        width: 2,
+      }, "arrow:1");
+
+      const binding1 = BindingRecord.create(arrow.id, rect1.id, "start", { kind: "center" }, "binding:1");
+      const binding2 = BindingRecord.create(arrow.id, rect2.id, "end", { kind: "center" }, "binding:2");
+
+      store.setState((state) => ({
+        ...state,
+        doc: {
+          pages: { [page.id]: { ...page, shapeIds: [rect1.id, rect2.id, arrow.id] } },
+          shapes: { [rect1.id]: rect1, [rect2.id]: rect2, [arrow.id]: arrow },
+          bindings: { [binding1.id]: binding1, [binding2.id]: binding2 },
+        },
+        ui: { ...state.ui, currentPageId: page.id },
+      }));
+
+      const state = store.getState();
+      const resolved = resolveArrowEndpoints(state, arrow.id);
+
+      expect(resolved?.a).toEqual({ x: 150, y: 150 });
+      expect(resolved?.b).toEqual({ x: 350, y: 350 });
+    });
+
+    it("should ignore bindings to missing shapes", () => {
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page:1");
+      const arrow = ShapeRecord.createArrow("page:1", 100, 100, {
+        a: { x: 0, y: 0 },
+        b: { x: 100, y: 50 },
+        stroke: "",
+        width: 2,
+      }, "arrow:1");
+
+      const binding = BindingRecord.create(arrow.id, "nonexistent:1", "start", { kind: "center" }, "binding:1");
+
+      store.setState((state) => ({
+        ...state,
+        doc: {
+          pages: { [page.id]: { ...page, shapeIds: [arrow.id] } },
+          shapes: { [arrow.id]: arrow },
+          bindings: { [binding.id]: binding },
+        },
+        ui: { ...state.ui, currentPageId: page.id },
+      }));
+
+      const state = store.getState();
+      const resolved = resolveArrowEndpoints(state, arrow.id);
+
+      expect(resolved?.a).toEqual({ x: 100, y: 100 });
+      expect(resolved?.b).toEqual({ x: 200, y: 150 });
+    });
+
+    it("should return null for non-existent arrow", () => {
+      const store = new Store();
+      const state = store.getState();
+      const resolved = resolveArrowEndpoints(state, "nonexistent:1");
+
+      expect(resolved).toBeNull();
+    });
+
+    it("should return null for non-arrow shapes", () => {
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page:1");
+      const rect = ShapeRecord.createRect(
+        "page:1",
+        100,
+        100,
+        { w: 100, h: 100, fill: "", stroke: "", radius: 0 },
+        "rect:1",
+      );
+
+      store.setState((state) => ({
+        ...state,
+        doc: { pages: { [page.id]: { ...page, shapeIds: [rect.id] } }, shapes: { [rect.id]: rect }, bindings: {} },
+        ui: { ...state.ui, currentPageId: page.id },
+      }));
+
+      const state = store.getState();
+      const resolved = resolveArrowEndpoints(state, rect.id);
+
+      expect(resolved).toBeNull();
+    });
+
+    it("should handle bound arrows when target shape moves", () => {
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page:1");
+      const targetRect = ShapeRecord.createRect(
+        "page:1",
+        100,
+        100,
+        { w: 100, h: 100, fill: "", stroke: "", radius: 0 },
+        "rect:1",
+      );
+      const arrow = ShapeRecord.createArrow("page:1", 50, 50, {
+        a: { x: 0, y: 0 },
+        b: { x: 100, y: 100 },
+        stroke: "",
+        width: 2,
+      }, "arrow:1");
+
+      const binding = BindingRecord.create(arrow.id, targetRect.id, "end", { kind: "center" }, "binding:1");
+
+      store.setState((state) => ({
+        ...state,
+        doc: {
+          pages: { [page.id]: { ...page, shapeIds: [targetRect.id, arrow.id] } },
+          shapes: { [targetRect.id]: targetRect, [arrow.id]: arrow },
+          bindings: { [binding.id]: binding },
+        },
+        ui: { ...state.ui, currentPageId: page.id },
+      }));
+
+      let state = store.getState();
+      const resolved1 = resolveArrowEndpoints(state, arrow.id);
+
+      expect(resolved1?.b).toEqual({ x: 150, y: 150 });
+
+      const movedRect = { ...targetRect, x: 300, y: 300 };
+      store.setState((state) => ({
+        ...state,
+        doc: { ...state.doc, shapes: { ...state.doc.shapes, [targetRect.id]: movedRect } },
+      }));
+
+      state = store.getState();
+      const resolved2 = resolveArrowEndpoints(state, arrow.id);
+
+      expect(resolved2?.b).toEqual({ x: 350, y: 350 });
     });
   });
 });

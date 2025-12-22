@@ -308,36 +308,32 @@ Rect tool (repeat pattern for others):
 (DoD):
 - You can draw rect/ellipse/line/arrow/text on the canvas.
 
-==============================================================================
-11. Milestone K: Bindings for arrows (v0)                              *wb-K*
-==============================================================================
+================================================================================
+11. Milestone K: Bindings for arrows (v0)                                 *wb-K*
+================================================================================
 
 Goal: arrow endpoints can "stick" to shapes.
 
 Binding creation:
-[ ] On arrow finalize:
+[x] On arrow finalize:
     - hit test start/end points
     - if point hits a target shape, create binding record for that handle
 
 Binding resolution:
-[ ] resolveArrowEndpoints(state, arrowId) -> { a, b } in world coords
+[x] resolveArrowEndpoints(state, arrowId) -> { a, b } in world coords
     - if bound, compute endpoint at target shape bounds center (v0)
     - else use arrow props a/b
 
 Live update:
-[ ] When a target shape moves, bound arrow rerenders automatically
+[x] When a target shape moves, bound arrow rerenders automatically
     - no mutation required if resolve happens during render
-
-Tests:
-[ ] moving bound shape changes resolved endpoint
-[ ] binding to missing target is ignored (or removed)-pick one and test
 
 (DoD):
 - Arrows remain connected to moved shapes (center-to-center is fine for v0).
 
-==============================================================================
-12. Milestone L: History (undo/redo)                                   *wb-L*
-==============================================================================
+================================================================================
+12. Milestone L: History (undo/redo)                                      *wb-L*
+================================================================================
 
 Goal: every user-visible change is undoable.
 
@@ -368,28 +364,66 @@ Tests:
 - Undo/redo works for create/move/delete and camera changes.
 
 ==============================================================================
-13. Milestone M: Persistence (web)                                     *wb-M*
+13. Milestone M: Persistence (web) via Yjs + IndexedDB                 *wb-M*
 ==============================================================================
 
-Goal: save/load documents locally.
+Goal: The web app persists boards locally using Yjs, with offline support via
+      IndexedDB (y-indexeddb).
 
-Serialization:
-[ ] serialize(state.doc) -> JSON string
-[ ] deserialize(json) -> doc (validate)
+Web persistence primitives (/packages/core/src/persist/web):
+[ ] Add deps (web build):
+    - yjs
+    - y-indexeddb (IndexedDB persistence provider)
 
-Web storage:
-[ ] Implement autosave to IndexedDB (or localStorage v0)
-[ ] Implement "New / Save / Load" UI:
-    - New resets doc
-    - Save exports .json
-    - Load imports .json and validates
+[ ] Define a Yjs schema for the drawing document (doc layer only):
+    - ydoc.getMap("pages"): Y.Map<pageId, PageRecord>
+    - ydoc.getMap("shapes"): Y.Map<shapeId, ShapeRecord>
+    - ydoc.getMap("bindings"): Y.Map<bindingId, BindingRecord>
+    - ydoc.getArray("pageOrder"): Y.Array<pageId>
+    - per-page shape order: either
+        a. PageRecord.shapeIds is source-of-truth, or
+        b. ydoc.getArray(`page:${id}:shapeOrder`)
+    Pick ONE and document the choice.
 
-Tests:
-[ ] load(save(doc)) yields equivalent doc
+[ ] Implement WebDocRepo (board-level API):
+    - listBoards(): Promise<BoardMeta[]>
+    - createBoard(name): Promise<boardId>
+    - openBoard(boardId): Promise<{ ydoc, provider, meta }>
+    - renameBoard(boardId, name): Promise<void>
+    - deleteBoard(boardId): Promise<void>
+
+    Notes:
+    - y-indexeddb persistence is keyed by a string name; use a stable boardId.
+    - Keep exactly ONE IndexeddbPersistence instance per (boardId, tab) to avoid
+      duplicated persistence work.
+
+[ ] Implement a tiny "board index" for listBoards():
+    - Store BoardMeta (id, name, createdAt, updatedAt) in:
+        - localStorage (v0), or
+        - a small IndexedDB store you control (v1)
+    - Update updatedAt whenever the Y.Doc changes.
+
+[ ] Bridge Yjs doc -> in-memory EditorState.doc snapshot:
+    - Add docSubscription:
+        - observe ydoc changes and rebuild/patch the in-memory doc snapshot
+    - Keep UI state out of Yjs for now:
+        - state.ui (selection/tool) remains local
+        - state.camera remains local
+
+[ ] Export/import (still useful for sharing/debugging):
+    - exportJSON(boardId): string (serialize to your plain JSON doc model)
+    - importJSON(json): createBoard + populate Y.Doc via Yjs transaction
+
+Tests (/packages/core/test):
+[ ] opening the same boardId twice reuses metadata and does not create duplicate
+    persistence instances (unit test at repo layer; integration test later).
+[ ] after mutating Y.Doc, closing and reopening loads the same content (offline).
+    (This is the expected y-indexeddb behavior.)
+[ ] board index updatedAt changes on Y.Doc update.
 
 (DoD):
-- You can close the tab, reopen, and recover your last drawing.
-
+- Web app: create a board, draw, refresh page, content is still there.
+- Renderer redraws when the Y.Doc changes (through your bridge layer).
 
 ==============================================================================
 14. Milestone N: Desktop packaging (Tauri)                             *wb-N*
@@ -456,33 +490,109 @@ Goal: the editor stays responsive with many shapes.
 
 
 ==============================================================================
-17. Milestone Q: Collaboration (optional, after v1)                    *wb-Q*
+17. Milestone Q: File Browser (web: Yjs/IndexedDB peek, desktop: FS)    *wb-Q*
 ==============================================================================
 
-Goal: real-time multiplayer without breaking the core model.
+Goal: A unified "Open board" experience:
+- Web: browse locally persisted Yjs boards + basic "storage inspector"
+- Desktop: browse real directories/files (native file browser semantics)
 
-Approach A (recommended): CRDT document (Yjs)
-[ ] Map doc model to Y.Map / Y.Array:
-    - pages (Y.Map)
-    - shapes (Y.Map)
-    - bindings (Y.Map)
-    - ordering (Y.Array of ids)
+------------------------------------------------------------------------------
+Q1. Shared UX + contracts (core)
+------------------------------------------------------------------------------
 
-[ ] Implement doc<->store bridge:
-    - local store updates write to Yjs
-    - Yjs remote updates update store
-    - avoid feedback loops (transaction origin tagging)
+Contracts (/packages/core/src/persist):
+[ ] Define BoardMeta:
+    - id, name, createdAt, updatedAt
+    - optional: storageKind = "web-indexeddb" | "desktop-fs"
 
-[ ] Add presence:
-    - user cursors (id, name, color, world pos)
-    - selections (ids[])
+[ ] Define DocRepo interface (implemented by web + desktop):
+    - listBoards(): Promise<BoardMeta[]>
+    - createBoard(name): Promise<string>
+    - openBoard(id): Promise<void> (or returns handle)
+    - renameBoard(id, name): Promise<void>
+    - deleteBoard(id): Promise<void>
 
-[ ] Add provider:
-    - websocket provider (self-host)
-    - awareness / presence channel
+[ ] Define a FileBrowserViewModel (pure data for UI):
+    - query string
+    - filtered list of BoardMeta
+    - selected board id
+    - actions: open/create/rename/delete
 
 (DoD):
-- Two clients can draw, select, and see each other’s cursors live.
+- Svelte UI can render the browser from a single ViewModel shape.
+
+------------------------------------------------------------------------------
+Q2. Web file browser: "Boards" + IndexedDB/Yjs inspector
+------------------------------------------------------------------------------
+
+UI (/apps/web/src/lib/filebrowser):
+[ ] Implement Boards panel:
+    - listBoards() -> render list
+    - search filter (client-side)
+    - create/rename/delete
+    - open on click
+
+[ ] Implement a "Storage inspector" drawer for the selected board:
+    - show boardId + y-indexeddb persistence name (same string)
+    - show "synced/loaded" status from the provider lifecycle (v0: boolean)
+    - show a rough persisted size indicator:
+        - compute encoded state size (bytes) from Yjs state vector/update
+          (v0: best-effort number; label it "approx")
+    - add buttons:
+        - Export JSON
+        - Export "Yjs update" (debug artifact)
+
+Svelte runes integration:
+[ ] Subscribe to repo changes using $effect and cleanup unsubscribe.
+
+(DoD):
+- Web: you can browse boards, open one, and view basic persistence/debug info
+  that confirms it’s backed by y-indexeddb.
+
+------------------------------------------------------------------------------
+Q3. Desktop file browser: real directory + files (Tauri)
+------------------------------------------------------------------------------
+
+Desktop behavior:
+[ ] Add "Workspace folder" concept:
+    - choose a directory using Tauri dialog open({ directory: true })
+    - remember last workspace path (v0: local settings file)
+
+[ ] Implement directory listing:
+    - read directories + files via Tauri FS plugin APIs
+    - display as:
+        - v0: flat list of "*.wanderboard.json" files, or
+        - v1: tree view (folders expandable)
+
+[ ] Implement file actions:
+    - New board: creates new file in workspace
+    - Rename: renames file
+    - Delete: deletes file
+    - Open: loads file into editor
+
+[ ] Scope/security note handling:
+    - paths returned by dialog are scoped for FS access; persist the chosen
+      workspace path yourself for the next launch.
+
+(DoD):
+- Desktop: pick a folder, browse files, open/save boards from disk.
+
+------------------------------------------------------------------------------
+Q4. "Parity" behaviors (web + desktop)
+------------------------------------------------------------------------------
+
+[ ] Consistent command surface:
+    - Ctrl/Cmd+O opens the file browser modal
+    - Ctrl/Cmd+N creates a board
+    - rename/delete via context menu
+
+[ ] Consistent metadata:
+    - show updatedAt and name in both modes
+
+(DoD):
+- Switching between web and desktop feels like the same app, but the web mode
+  clearly indicates "local Yjs/IndexedDB" storage, while desktop is real files.
 
 
 ==============================================================================

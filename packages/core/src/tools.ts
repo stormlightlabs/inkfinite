@@ -1,7 +1,7 @@
 import type { Action } from "./actions";
 import { hitTestPoint, shapeBounds } from "./geom";
 import { Box2, Vec2 } from "./math";
-import { createId, ShapeRecord } from "./model";
+import { BindingRecord, createId, ShapeRecord } from "./model";
 import type { EditorState, ToolId } from "./reactivity";
 import { getCurrentPage } from "./reactivity";
 
@@ -1003,10 +1003,47 @@ export class ArrowTool implements Tool {
     const arrowLength = Vec2.len(shape.props.b);
     if (arrowLength < MIN_SHAPE_SIZE) {
       newState = this.cancelShapeCreation(state);
+    } else {
+      newState = this.createBindingsForArrow(state, this.toolState.creatingShapeId);
     }
 
     this.resetToolState();
     return newState;
+  }
+
+  /**
+   * Create bindings for arrow endpoints that hit other shapes
+   */
+  private createBindingsForArrow(state: EditorState, arrowId: string): EditorState {
+    const arrow = state.doc.shapes[arrowId];
+    if (!arrow || arrow.type !== "arrow") return state;
+
+    const startWorld = { x: arrow.x + arrow.props.a.x, y: arrow.y + arrow.props.a.y };
+    const endWorld = { x: arrow.x + arrow.props.b.x, y: arrow.y + arrow.props.b.y };
+
+    const newBindings = { ...state.doc.bindings };
+
+    const stateWithoutArrow = {
+      ...state,
+      doc: {
+        ...state.doc,
+        shapes: Object.fromEntries(Object.entries(state.doc.shapes).filter(([id]) => id !== arrowId)),
+      },
+    };
+
+    const startHitId = hitTestPoint(stateWithoutArrow, startWorld);
+    if (startHitId) {
+      const binding = BindingRecord.create(arrowId, startHitId, "start");
+      newBindings[binding.id] = binding;
+    }
+
+    const endHitId = hitTestPoint(stateWithoutArrow, endWorld);
+    if (endHitId) {
+      const binding = BindingRecord.create(arrowId, endHitId, "end");
+      newBindings[binding.id] = binding;
+    }
+
+    return { ...state, doc: { ...state.doc, bindings: newBindings } };
   }
 
   private handleKeyDown(state: EditorState, action: Action): EditorState {

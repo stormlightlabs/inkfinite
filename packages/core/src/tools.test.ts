@@ -1064,3 +1064,209 @@ describe("TextTool", () => {
     expect(Object.keys(result.doc.shapes).length).toBe(shapeCountBefore);
   });
 });
+
+describe("Arrow Bindings", () => {
+  let tool: ArrowTool;
+  let initialState: EditorState;
+  let page: PageRecord;
+  let targetShape: ShapeRecord;
+
+  beforeEach(() => {
+    tool = new ArrowTool();
+    page = PageRecord.create("Test Page");
+
+    targetShape = ShapeRecord.createRect(page.id, 100, 100, {
+      w: 100,
+      h: 100,
+      fill: "#ff0000",
+      stroke: "#000000",
+      radius: 0,
+    });
+
+    page.shapeIds = [targetShape.id];
+
+    initialState = {
+      ...EditorState.create(),
+      doc: { pages: { [page.id]: page }, shapes: { [targetShape.id]: targetShape }, bindings: {} },
+      ui: { currentPageId: page.id, selectionIds: [], toolId: "arrow" },
+    };
+  });
+
+  it("should create binding when arrow start hits a shape", () => {
+    let result = tool.onAction(
+      initialState,
+      Action.pointerDown(
+        { x: 150, y: 150 },
+        { x: 150, y: 150 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerMove(
+        { x: 300, y: 300 },
+        { x: 300, y: 300 },
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerUp(
+        { x: 300, y: 300 },
+        { x: 300, y: 300 },
+        0,
+        PointerButtons.create(false, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    const bindings = Object.values(result.doc.bindings);
+    expect(bindings.length).toBe(1);
+    expect(bindings[0].toShapeId).toBe(targetShape.id);
+    expect(bindings[0].handle).toBe("start");
+  });
+
+  it("should create binding when arrow end hits a shape", () => {
+    let result = tool.onAction(
+      initialState,
+      Action.pointerDown(
+        { x: 50, y: 50 },
+        { x: 50, y: 50 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerMove(
+        { x: 150, y: 150 },
+        { x: 150, y: 150 },
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerUp(
+        { x: 150, y: 150 },
+        { x: 150, y: 150 },
+        0,
+        PointerButtons.create(false, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    const bindings = Object.values(result.doc.bindings);
+    expect(bindings.length).toBe(1);
+    expect(bindings[0].toShapeId).toBe(targetShape.id);
+    expect(bindings[0].handle).toBe("end");
+  });
+
+  it("should create bindings for both ends when both hit shapes", () => {
+    const targetShape2 = ShapeRecord.createRect(page.id, 300, 300, {
+      w: 100,
+      h: 100,
+      fill: "#00ff00",
+      stroke: "#000000",
+      radius: 0,
+    });
+
+    const stateWithTwoTargets = {
+      ...initialState,
+      doc: {
+        ...initialState.doc,
+        shapes: { ...initialState.doc.shapes, [targetShape2.id]: targetShape2 },
+        pages: { [page.id]: { ...page, shapeIds: [targetShape.id, targetShape2.id] } },
+      },
+    };
+
+    let result = tool.onAction(
+      stateWithTwoTargets,
+      Action.pointerDown(
+        { x: 150, y: 150 },
+        { x: 150, y: 150 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerMove(
+        { x: 350, y: 350 },
+        { x: 350, y: 350 },
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerUp(
+        { x: 350, y: 350 },
+        { x: 350, y: 350 },
+        0,
+        PointerButtons.create(false, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    const bindings = Object.values(result.doc.bindings);
+    expect(bindings.length).toBe(2);
+
+    const startBinding = bindings.find((b) => b.handle === "start");
+    const endBinding = bindings.find((b) => b.handle === "end");
+
+    expect(startBinding).toBeDefined();
+    expect(startBinding?.toShapeId).toBe(targetShape.id);
+
+    expect(endBinding).toBeDefined();
+    expect(endBinding?.toShapeId).toBe(targetShape2.id);
+  });
+
+  it("should not create binding when arrow does not hit any shape", () => {
+    let result = tool.onAction(
+      initialState,
+      Action.pointerDown(
+        { x: 50, y: 50 },
+        { x: 50, y: 50 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerMove(
+        { x: 80, y: 80 },
+        { x: 80, y: 80 },
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerUp(
+        { x: 80, y: 80 },
+        { x: 80, y: 80 },
+        0,
+        PointerButtons.create(false, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    const bindings = Object.values(result.doc.bindings);
+    expect(bindings.length).toBe(0);
+  });
+});

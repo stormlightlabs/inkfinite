@@ -10,7 +10,7 @@ import type {
   TextShape,
   Viewport,
 } from "inkfinite-core";
-import { getShapesOnCurrentPage } from "inkfinite-core";
+import { getShapesOnCurrentPage, resolveArrowEndpoints } from "inkfinite-core";
 
 export interface Renderer {
   /**
@@ -138,9 +138,11 @@ function drawScene(context: CanvasRenderingContext2D, state: EditorState, viewpo
 
   applyCameraTransform(context, state.camera, viewport);
 
+  drawGrid(context, state.camera, viewport);
+
   const shapes = getShapesOnCurrentPage(state);
   for (const shape of shapes) {
-    drawShape(context, shape);
+    drawShape(context, state, shape);
   }
 
   drawSelection(context, state, shapes);
@@ -163,9 +165,55 @@ function applyCameraTransform(context: CanvasRenderingContext2D, camera: Camera,
 }
 
 /**
+ * Draw grid/graph paper background
+ *
+ * Draws a subtle grid that helps with spatial awareness and alignment.
+ * The grid adapts to zoom level to maintain visual clarity.
+ */
+function drawGrid(context: CanvasRenderingContext2D, camera: Camera, viewport: Viewport) {
+  const gridSize = 50;
+  const minorGridColor = "rgba(128, 128, 128, 0.1)";
+  const majorGridColor = "rgba(128, 128, 128, 0.2)";
+
+  const topLeft = {
+    x: camera.x - viewport.width / (2 * camera.zoom),
+    y: camera.y - viewport.height / (2 * camera.zoom),
+  };
+  const bottomRight = {
+    x: camera.x + viewport.width / (2 * camera.zoom),
+    y: camera.y + viewport.height / (2 * camera.zoom),
+  };
+
+  const startX = Math.floor(topLeft.x / gridSize) * gridSize;
+  const endX = Math.ceil(bottomRight.x / gridSize) * gridSize;
+  const startY = Math.floor(topLeft.y / gridSize) * gridSize;
+  const endY = Math.ceil(bottomRight.y / gridSize) * gridSize;
+
+  context.lineWidth = 1 / camera.zoom;
+
+  for (let x = startX; x <= endX; x += gridSize) {
+    const isMajor = x % (gridSize * 5) === 0;
+    context.strokeStyle = isMajor ? majorGridColor : minorGridColor;
+    context.beginPath();
+    context.moveTo(x, startY);
+    context.lineTo(x, endY);
+    context.stroke();
+  }
+
+  for (let y = startY; y <= endY; y += gridSize) {
+    const isMajor = y % (gridSize * 5) === 0;
+    context.strokeStyle = isMajor ? majorGridColor : minorGridColor;
+    context.beginPath();
+    context.moveTo(startX, y);
+    context.lineTo(endX, y);
+    context.stroke();
+  }
+}
+
+/**
  * Draw a single shape
  */
-function drawShape(context: CanvasRenderingContext2D, shape: ShapeRecord) {
+function drawShape(context: CanvasRenderingContext2D, state: EditorState, shape: ShapeRecord) {
   context.save();
 
   context.translate(shape.x, shape.y);
@@ -187,7 +235,7 @@ function drawShape(context: CanvasRenderingContext2D, shape: ShapeRecord) {
       break;
     }
     case "arrow": {
-      drawArrow(context, shape);
+      drawArrow(context, state, shape);
       break;
     }
     case "text": {
@@ -273,8 +321,14 @@ function drawLine(context: CanvasRenderingContext2D, shape: LineShape) {
 /**
  * Draw an arrow shape
  */
-function drawArrow(context: CanvasRenderingContext2D, shape: ArrowShape) {
-  const { a, b, stroke, width } = shape.props;
+function drawArrow(context: CanvasRenderingContext2D, state: EditorState, shape: ArrowShape) {
+  const { stroke, width } = shape.props;
+
+  const resolved = resolveArrowEndpoints(state, shape.id);
+  if (!resolved) return;
+
+  const a = { x: resolved.a.x - shape.x, y: resolved.a.y - shape.y };
+  const b = { x: resolved.b.x - shape.x, y: resolved.b.y - shape.y };
 
   context.beginPath();
   context.moveTo(a.x, a.y);

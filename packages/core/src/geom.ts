@@ -298,3 +298,49 @@ export function hitTestPoint(state: EditorState, worldPoint: Vec2, tolerance = 5
 
   return null;
 }
+
+/**
+ * Get the center point of a shape's bounding box in world coordinates
+ *
+ * @param shape - The shape to get center for
+ * @returns Center point in world coordinates
+ */
+export function shapeCenter(shape: ShapeRecord): Vec2 {
+  const bounds = shapeBounds(shape);
+  return { x: (bounds.min.x + bounds.max.x) / 2, y: (bounds.min.y + bounds.max.y) / 2 };
+}
+
+/**
+ * Resolve arrow endpoints considering bindings
+ *
+ * If an arrow endpoint is bound to a target shape, returns the bound position
+ * (center of target shape for v0). Otherwise returns the arrow's stored endpoint.
+ *
+ * @param state - Editor state
+ * @param arrowId - ID of the arrow shape
+ * @returns Resolved endpoints {a, b} in world coordinates, or null if arrow not found
+ */
+export function resolveArrowEndpoints(state: EditorState, arrowId: string): { a: Vec2; b: Vec2 } | null {
+  const arrow = state.doc.shapes[arrowId];
+  if (!arrow || arrow.type !== "arrow") return null;
+
+  let a: Vec2 = { x: arrow.x + arrow.props.a.x, y: arrow.y + arrow.props.a.y };
+  let b: Vec2 = { x: arrow.x + arrow.props.b.x, y: arrow.y + arrow.props.b.y };
+
+  for (const binding of Object.values(state.doc.bindings)) {
+    if (binding.fromShapeId !== arrowId) continue;
+
+    const targetShape = state.doc.shapes[binding.toShapeId];
+    if (!targetShape) continue;
+
+    const targetCenter = shapeCenter(targetShape);
+
+    if (binding.handle === "start") {
+      a = targetCenter;
+    } else if (binding.handle === "end") {
+      b = targetCenter;
+    }
+  }
+
+  return { a, b };
+}
