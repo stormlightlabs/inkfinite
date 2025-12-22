@@ -1,8 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { Action, Modifiers, PointerButtons } from "./actions";
-import { PageRecord, ShapeRecord } from "./model";
+import {
+  type ArrowProps,
+  type EllipseProps,
+  type LineProps,
+  PageRecord,
+  type RectProps,
+  ShapeRecord,
+  type TextProps,
+} from "./model";
 import { EditorState } from "./reactivity";
-import { SelectTool } from "./tools";
+import { ArrowTool, EllipseTool, LineTool, RectTool, SelectTool, TextTool } from "./tools";
 
 describe("SelectTool", () => {
   let tool: SelectTool;
@@ -381,5 +389,678 @@ describe("SelectTool", () => {
 
       expect(result).toBe(initialState);
     });
+  });
+});
+
+describe("RectTool", () => {
+  let tool: RectTool;
+  let initialState: EditorState;
+  let page: PageRecord;
+
+  beforeEach(() => {
+    tool = new RectTool();
+    page = PageRecord.create("Test Page");
+
+    initialState = {
+      ...EditorState.create(),
+      doc: { pages: { [page.id]: page }, shapes: {}, bindings: {} },
+      ui: { currentPageId: page.id, selectionIds: [], toolId: "rect" },
+    };
+  });
+
+  describe("shape creation", () => {
+    it("should create a rect shape on pointer down", () => {
+      const action = Action.pointerDown(
+        { x: 100, y: 100 },
+        { x: 100, y: 100 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      );
+
+      const result = tool.onAction(initialState, action);
+
+      const shapeIds = Object.keys(result.doc.shapes);
+      expect(shapeIds.length).toBe(1);
+
+      const shape = result.doc.shapes[shapeIds[0]];
+      expect(shape.type).toBe("rect");
+      expect(shape.x).toBe(100);
+      expect(shape.y).toBe(100);
+      expect((shape.props as RectProps).w).toBe(0);
+      expect((shape.props as RectProps).h).toBe(0);
+      expect(result.ui.selectionIds).toEqual([shape.id]);
+    });
+
+    it("should update rect dimensions on pointer move", () => {
+      let result = tool.onAction(
+        initialState,
+        Action.pointerDown(
+          { x: 100, y: 100 },
+          { x: 100, y: 100 },
+          0,
+          PointerButtons.create(true, false, false),
+          Modifiers.create(),
+        ),
+      );
+
+      result = tool.onAction(
+        result,
+        Action.pointerMove(
+          { x: 200, y: 150 },
+          { x: 200, y: 150 },
+          PointerButtons.create(true, false, false),
+          Modifiers.create(),
+        ),
+      );
+
+      const shapeId = Object.keys(result.doc.shapes)[0];
+      const shape = result.doc.shapes[shapeId];
+
+      expect(shape.type).toBe("rect");
+      expect(shape.x).toBe(100);
+      expect(shape.y).toBe(100);
+      expect((shape.props as RectProps).w).toBe(100);
+      expect((shape.props as RectProps).h).toBe(50);
+    });
+
+    it("should handle negative dragging (drag up-left)", () => {
+      let result = tool.onAction(
+        initialState,
+        Action.pointerDown(
+          { x: 200, y: 200 },
+          { x: 200, y: 200 },
+          0,
+          PointerButtons.create(true, false, false),
+          Modifiers.create(),
+        ),
+      );
+
+      result = tool.onAction(
+        result,
+        Action.pointerMove(
+          { x: 100, y: 100 },
+          { x: 100, y: 100 },
+          PointerButtons.create(true, false, false),
+          Modifiers.create(),
+        ),
+      );
+
+      const shapeId = Object.keys(result.doc.shapes)[0];
+      const shape = result.doc.shapes[shapeId];
+
+      expect(shape.type).toBe("rect");
+      expect(shape.x).toBe(100);
+      expect(shape.y).toBe(100);
+      expect((shape.props as RectProps).w).toBe(100);
+      expect((shape.props as RectProps).h).toBe(100);
+    });
+
+    it("should remove shape if too small on pointer up", () => {
+      let result = tool.onAction(
+        initialState,
+        Action.pointerDown(
+          { x: 100, y: 100 },
+          { x: 100, y: 100 },
+          0,
+          PointerButtons.create(true, false, false),
+          Modifiers.create(),
+        ),
+      );
+
+      result = tool.onAction(
+        result,
+        Action.pointerMove(
+          { x: 102, y: 102 },
+          { x: 102, y: 102 },
+          PointerButtons.create(true, false, false),
+          Modifiers.create(),
+        ),
+      );
+
+      result = tool.onAction(
+        result,
+        Action.pointerUp(
+          { x: 102, y: 102 },
+          { x: 102, y: 102 },
+          0,
+          PointerButtons.create(false, false, false),
+          Modifiers.create(),
+        ),
+      );
+
+      expect(Object.keys(result.doc.shapes).length).toBe(0);
+      expect(result.ui.selectionIds).toEqual([]);
+    });
+
+    it("should keep shape if large enough on pointer up", () => {
+      let result = tool.onAction(
+        initialState,
+        Action.pointerDown(
+          { x: 100, y: 100 },
+          { x: 100, y: 100 },
+          0,
+          PointerButtons.create(true, false, false),
+          Modifiers.create(),
+        ),
+      );
+
+      result = tool.onAction(
+        result,
+        Action.pointerMove(
+          { x: 200, y: 200 },
+          { x: 200, y: 200 },
+          PointerButtons.create(true, false, false),
+          Modifiers.create(),
+        ),
+      );
+
+      result = tool.onAction(
+        result,
+        Action.pointerUp(
+          { x: 200, y: 200 },
+          { x: 200, y: 200 },
+          0,
+          PointerButtons.create(false, false, false),
+          Modifiers.create(),
+        ),
+      );
+
+      expect(Object.keys(result.doc.shapes).length).toBe(1);
+    });
+
+    it("should cancel shape creation on Escape", () => {
+      let result = tool.onAction(
+        initialState,
+        Action.pointerDown(
+          { x: 100, y: 100 },
+          { x: 100, y: 100 },
+          0,
+          PointerButtons.create(true, false, false),
+          Modifiers.create(),
+        ),
+      );
+
+      result = tool.onAction(result, Action.keyDown("Escape", "Escape", Modifiers.create()));
+
+      expect(Object.keys(result.doc.shapes).length).toBe(0);
+      expect(result.ui.selectionIds).toEqual([]);
+    });
+
+    it("should cleanup on tool exit", () => {
+      let result = tool.onAction(
+        initialState,
+        Action.pointerDown(
+          { x: 100, y: 100 },
+          { x: 100, y: 100 },
+          0,
+          PointerButtons.create(true, false, false),
+          Modifiers.create(),
+        ),
+      );
+
+      result = tool.onExit(result);
+
+      expect(Object.keys(result.doc.shapes).length).toBe(0);
+      expect(result.ui.selectionIds).toEqual([]);
+    });
+  });
+});
+
+describe("EllipseTool", () => {
+  let tool: EllipseTool;
+  let initialState: EditorState;
+  let page: PageRecord;
+
+  beforeEach(() => {
+    tool = new EllipseTool();
+    page = PageRecord.create("Test Page");
+
+    initialState = {
+      ...EditorState.create(),
+      doc: { pages: { [page.id]: page }, shapes: {}, bindings: {} },
+      ui: { currentPageId: page.id, selectionIds: [], toolId: "ellipse" },
+    };
+  });
+
+  it("should create an ellipse shape on pointer down", () => {
+    const result = tool.onAction(
+      initialState,
+      Action.pointerDown(
+        { x: 100, y: 100 },
+        { x: 100, y: 100 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    const shapeIds = Object.keys(result.doc.shapes);
+    expect(shapeIds.length).toBe(1);
+
+    const shape = result.doc.shapes[shapeIds[0]];
+    expect(shape.type).toBe("ellipse");
+    expect(shape.x).toBe(100);
+    expect(shape.y).toBe(100);
+  });
+
+  it("should update ellipse dimensions on pointer move", () => {
+    let result = tool.onAction(
+      initialState,
+      Action.pointerDown(
+        { x: 100, y: 100 },
+        { x: 100, y: 100 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerMove(
+        { x: 250, y: 200 },
+        { x: 250, y: 200 },
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    const shapeId = Object.keys(result.doc.shapes)[0];
+    const shape = result.doc.shapes[shapeId];
+
+    expect(shape.type).toBe("ellipse");
+    expect((shape.props as EllipseProps).w).toBe(150);
+    expect((shape.props as EllipseProps).h).toBe(100);
+  });
+
+  it("should remove ellipse if too small on pointer up", () => {
+    let result = tool.onAction(
+      initialState,
+      Action.pointerDown(
+        { x: 100, y: 100 },
+        { x: 100, y: 100 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerMove(
+        { x: 103, y: 103 },
+        { x: 103, y: 103 },
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerUp(
+        { x: 103, y: 103 },
+        { x: 103, y: 103 },
+        0,
+        PointerButtons.create(false, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    expect(Object.keys(result.doc.shapes).length).toBe(0);
+  });
+});
+
+describe("LineTool", () => {
+  let tool: LineTool;
+  let initialState: EditorState;
+  let page: PageRecord;
+
+  beforeEach(() => {
+    tool = new LineTool();
+    page = PageRecord.create("Test Page");
+
+    initialState = {
+      ...EditorState.create(),
+      doc: { pages: { [page.id]: page }, shapes: {}, bindings: {} },
+      ui: { currentPageId: page.id, selectionIds: [], toolId: "line" },
+    };
+  });
+
+  it("should create a line shape on pointer down", () => {
+    const result = tool.onAction(
+      initialState,
+      Action.pointerDown(
+        { x: 100, y: 100 },
+        { x: 100, y: 100 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    const shapeIds = Object.keys(result.doc.shapes);
+    expect(shapeIds.length).toBe(1);
+
+    const shape = result.doc.shapes[shapeIds[0]];
+    expect(shape.type).toBe("line");
+    expect(shape.x).toBe(100);
+    expect(shape.y).toBe(100);
+    expect((shape.props as LineProps).a).toEqual({ x: 0, y: 0 });
+    expect((shape.props as LineProps).b).toEqual({ x: 0, y: 0 });
+  });
+
+  it("should update line endpoint on pointer move", () => {
+    let result = tool.onAction(
+      initialState,
+      Action.pointerDown(
+        { x: 100, y: 100 },
+        { x: 100, y: 100 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerMove(
+        { x: 200, y: 150 },
+        { x: 200, y: 150 },
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    const shapeId = Object.keys(result.doc.shapes)[0];
+    const shape = result.doc.shapes[shapeId];
+
+    expect(shape.type).toBe("line");
+    expect((shape.props as LineProps).b).toEqual({ x: 100, y: 50 });
+  });
+
+  it("should remove line if too short on pointer up", () => {
+    let result = tool.onAction(
+      initialState,
+      Action.pointerDown(
+        { x: 100, y: 100 },
+        { x: 100, y: 100 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerMove(
+        { x: 102, y: 102 },
+        { x: 102, y: 102 },
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerUp(
+        { x: 102, y: 102 },
+        { x: 102, y: 102 },
+        0,
+        PointerButtons.create(false, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    expect(Object.keys(result.doc.shapes).length).toBe(0);
+  });
+
+  it("should keep line if long enough on pointer up", () => {
+    let result = tool.onAction(
+      initialState,
+      Action.pointerDown(
+        { x: 100, y: 100 },
+        { x: 100, y: 100 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerMove(
+        { x: 200, y: 200 },
+        { x: 200, y: 200 },
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerUp(
+        { x: 200, y: 200 },
+        { x: 200, y: 200 },
+        0,
+        PointerButtons.create(false, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    expect(Object.keys(result.doc.shapes).length).toBe(1);
+  });
+});
+
+describe("ArrowTool", () => {
+  let tool: ArrowTool;
+  let initialState: EditorState;
+  let page: PageRecord;
+
+  beforeEach(() => {
+    tool = new ArrowTool();
+    page = PageRecord.create("Test Page");
+
+    initialState = {
+      ...EditorState.create(),
+      doc: { pages: { [page.id]: page }, shapes: {}, bindings: {} },
+      ui: { currentPageId: page.id, selectionIds: [], toolId: "arrow" },
+    };
+  });
+
+  it("should create an arrow shape on pointer down", () => {
+    const result = tool.onAction(
+      initialState,
+      Action.pointerDown(
+        { x: 100, y: 100 },
+        { x: 100, y: 100 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    const shapeIds = Object.keys(result.doc.shapes);
+    expect(shapeIds.length).toBe(1);
+
+    const shape = result.doc.shapes[shapeIds[0]];
+    expect(shape.type).toBe("arrow");
+    expect(shape.x).toBe(100);
+    expect(shape.y).toBe(100);
+  });
+
+  it("should update arrow endpoint on pointer move", () => {
+    let result = tool.onAction(
+      initialState,
+      Action.pointerDown(
+        { x: 100, y: 100 },
+        { x: 100, y: 100 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerMove(
+        { x: 300, y: 200 },
+        { x: 300, y: 200 },
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    const shapeId = Object.keys(result.doc.shapes)[0];
+    const shape = result.doc.shapes[shapeId];
+
+    expect(shape.type).toBe("arrow");
+    expect((shape.props as ArrowProps).b).toEqual({ x: 200, y: 100 });
+  });
+
+  it("should remove arrow if too short on pointer up", () => {
+    let result = tool.onAction(
+      initialState,
+      Action.pointerDown(
+        { x: 100, y: 100 },
+        { x: 100, y: 100 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerMove(
+        { x: 101, y: 101 },
+        { x: 101, y: 101 },
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerUp(
+        { x: 101, y: 101 },
+        { x: 101, y: 101 },
+        0,
+        PointerButtons.create(false, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    expect(Object.keys(result.doc.shapes).length).toBe(0);
+  });
+});
+
+describe("TextTool", () => {
+  let tool: TextTool;
+  let initialState: EditorState;
+  let page: PageRecord;
+
+  beforeEach(() => {
+    tool = new TextTool();
+    page = PageRecord.create("Test Page");
+
+    initialState = {
+      ...EditorState.create(),
+      doc: { pages: { [page.id]: page }, shapes: {}, bindings: {} },
+      ui: { currentPageId: page.id, selectionIds: [], toolId: "text" },
+    };
+  });
+
+  it("should create a text shape on pointer down", () => {
+    const result = tool.onAction(
+      initialState,
+      Action.pointerDown(
+        { x: 150, y: 200 },
+        { x: 150, y: 200 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    const shapeIds = Object.keys(result.doc.shapes);
+    expect(shapeIds.length).toBe(1);
+
+    const shape = result.doc.shapes[shapeIds[0]];
+    expect(shape.type).toBe("text");
+    expect(shape.x).toBe(150);
+    expect(shape.y).toBe(200);
+    expect((shape.props as TextProps).text).toBe("Text");
+    expect((shape.props as TextProps).fontSize).toBe(16);
+    expect(result.ui.selectionIds).toEqual([shape.id]);
+  });
+
+  it("should create new text shape on each click", () => {
+    let result = tool.onAction(
+      initialState,
+      Action.pointerDown(
+        { x: 100, y: 100 },
+        { x: 100, y: 100 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    result = tool.onAction(
+      result,
+      Action.pointerDown(
+        { x: 200, y: 200 },
+        { x: 200, y: 200 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    expect(Object.keys(result.doc.shapes).length).toBe(2);
+  });
+
+  it("should not respond to pointer move or up", () => {
+    let result = tool.onAction(
+      initialState,
+      Action.pointerDown(
+        { x: 100, y: 100 },
+        { x: 100, y: 100 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    const beforeMove = result;
+    const shapeCountBefore = Object.keys(result.doc.shapes).length;
+
+    result = tool.onAction(
+      result,
+      Action.pointerMove(
+        { x: 200, y: 200 },
+        { x: 200, y: 200 },
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    expect(result).toBe(beforeMove);
+    expect(Object.keys(result.doc.shapes).length).toBe(shapeCountBefore);
+
+    result = tool.onAction(
+      result,
+      Action.pointerUp(
+        { x: 200, y: 200 },
+        { x: 200, y: 200 },
+        0,
+        PointerButtons.create(false, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    expect(result).toBe(beforeMove);
+    expect(Object.keys(result.doc.shapes).length).toBe(shapeCountBefore);
   });
 });

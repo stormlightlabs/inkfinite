@@ -140,7 +140,7 @@ Selectors (pure functions, no RxJS):
     - getShapesOnCurrentPage(state)
     - getSelectedShapes(state)
 
-Invariants (pick “repair” and test it):
+Invariants (pick "repair" and test it):
 [x] Implement enforceInvariants(state): EditorState (repair strategy):
     - selectionIds := selectionIds filtered to existing shapes
     - currentPageId must exist:
@@ -204,10 +204,6 @@ Layering:
 [x] Define draw order = page.shapeIds order
 [x] hitTest uses reverse order for topmost selection
 
-Tests:
-[x] hitTestPoint returns expected shapeId for overlapping shapes
-[x] tolerance works for line/arrow selection
-
 (DoD):
 - You can hover shapes and log the hit shape id (no selection yet).
 
@@ -255,10 +251,6 @@ Tools (/packages/core/src/tools):
 Tool router:
 [x] routeAction(state, action) -> newState (delegates to active tool)
 
-Tests:
-[x] Switching tools calls onExit/onEnter in correct order
-[x] Tool ignores actions it doesn't care about
-
 (DoD):
 - A dummy tool can consume pointer events and update state deterministically.
 
@@ -287,11 +279,6 @@ UX:
 [x] Escape clears selection
 [x] Delete removes selected shapes
 
-Tests:
-[x] drag moves exactly by delta
-[x] shift-click toggles membership
-[x] delete removes and clears selection
-
 (DoD):
 - You can select and move shapes reliably.
 
@@ -302,25 +289,21 @@ Tests:
 Goal: place shapes with dedicated tools.
 
 Rect tool (repeat pattern for others):
-[ ] PointerDown on canvas:
+[x] PointerDown on canvas:
     - create a draft rect shape with w/h=0 at startWorld
     - selection = [newId]
-[ ] PointerMove:
+[x] PointerMove:
     - update w/h based on currentWorld - startWorld
-[ ] PointerUp:
+[x] PointerUp:
     - if too small, delete it (click-cancel behavior)
     - else finalize
 
-[ ] Implement ellipse tool (same mechanics)
-[ ] Implement line tool (a=startWorld, b=currentWorld)
-[ ] Implement arrow tool (same as line but type="arrow")
-[ ] Implement text tool:
+[x] Implement ellipse tool (same mechanics)
+[x] Implement line tool (a=startWorld, b=currentWorld)
+[x] Implement arrow tool (same as line but type="arrow")
+[x] Implement text tool:
     - click to create text shape
     - open in-place editor overlay (contenteditable) in Svelte
-
-Tests:
-[ ] shape creation creates one record with correct props
-[ ] click-cancel removes zero-area shapes
 
 (DoD):
 - You can draw rect/ellipse/line/arrow/text on the canvas.
@@ -329,7 +312,7 @@ Tests:
 11. Milestone K: Bindings for arrows (v0)                              *wb-K*
 ==============================================================================
 
-Goal: arrow endpoints can “stick” to shapes.
+Goal: arrow endpoints can "stick" to shapes.
 
 Binding creation:
 [ ] On arrow finalize:
@@ -506,7 +489,7 @@ Approach A (recommended): CRDT document (Yjs)
 18. Milestone R: Quality polish (what makes it feel "real")            *wb-R*
 ==============================================================================
 
-Goal: the UX crosses the “this is legit” threshold.
+Goal: the UX crosses the "this is legit" threshold.
 
 [ ] Snapping:
     - snap move to grid

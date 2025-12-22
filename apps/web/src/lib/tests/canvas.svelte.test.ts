@@ -49,4 +49,59 @@ describe("Canvas component", () => {
     // FIXME: We can't directly access the store
     expect(component).toBeTruthy();
   });
+
+  it("should render the Toolbar component", () => {
+    const { container } = render(Canvas);
+    const toolbar = container.querySelector(".toolbar");
+
+    expect(toolbar).toBeTruthy();
+    expect(toolbar?.getAttribute("role")).toBe("toolbar");
+  });
+
+  it("should render editor wrapper with correct layout", () => {
+    const { container } = render(Canvas);
+    const editor = container.querySelector(".editor");
+
+    expect(editor).toBeTruthy();
+    const style = window.getComputedStyle(editor as Element);
+    expect(style.display).toBe("flex");
+    expect(style.flexDirection).toBe("column");
+  });
+
+  it("should render all tool buttons in toolbar", () => {
+    const { container } = render(Canvas);
+    const toolButtons = container.querySelectorAll(".tool-button");
+
+    expect(toolButtons.length).toBe(6);
+
+    const toolIds = Array.from(toolButtons).map((btn) => btn.getAttribute("data-tool-id"));
+    expect(toolIds).toEqual(["select", "rect", "ellipse", "line", "arrow", "text"]);
+  });
+
+  it("should have select tool active by default", () => {
+    const { container } = render(Canvas);
+    const selectButton = container.querySelector(".tool-button[data-tool-id=\"select\"]");
+
+    expect(selectButton?.classList.contains("active")).toBe(true);
+  });
+
+  it("should change active tool when toolbar button is clicked", async () => {
+    const { container } = render(Canvas);
+
+    const selectButton = container.querySelector(".tool-button[data-tool-id=\"select\"]");
+    const rectButton = container.querySelector(".tool-button[data-tool-id=\"rect\"]") as HTMLButtonElement;
+
+    expect(selectButton?.classList.contains("active")).toBe(true);
+    expect(rectButton?.classList.contains("active")).toBe(false);
+
+    rectButton.click();
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const selectButtonAfter = container.querySelector(".tool-button[data-tool-id=\"select\"]");
+    const rectButtonAfter = container.querySelector(".tool-button[data-tool-id=\"rect\"]");
+
+    expect(selectButtonAfter?.classList.contains("active")).toBe(false);
+    expect(rectButtonAfter?.classList.contains("active")).toBe(true);
+  });
 });
