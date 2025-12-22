@@ -53,7 +53,7 @@ vi.mock(
       update: () => {},
     }),
     createSnapStore: () => ({
-      get: () => ({ snapEnabled: false, gridEnabled: false, gridSize: 10 }),
+      get: () => ({ snapEnabled: false, gridEnabled: true, gridSize: 25 }),
       subscribe: () => () => {},
       update: () => {},
       set: () => {},

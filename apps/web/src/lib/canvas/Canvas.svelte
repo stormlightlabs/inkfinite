@@ -1,6 +1,7 @@
 <script lang="ts">
 	import HistoryViewer from '$lib/components/HistoryViewer.svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
+	import TitleBar from '$lib/components/TitleBar.svelte';
 	import Toolbar from '$lib/components/Toolbar.svelte';
 	import { createInputAdapter, type InputAdapter } from '$lib/input';
 	import {
@@ -324,6 +325,7 @@
 </script>
 
 <div class="editor">
+	<TitleBar />
 	<Toolbar currentTool={currentToolId} onToolChange={handleToolChange} onHistoryClick={handleHistoryClick} />
 	<canvas bind:this={canvas}></canvas>
 	<HistoryViewer {store} bind:open={historyViewerOpen} onClose={handleHistoryClose} />

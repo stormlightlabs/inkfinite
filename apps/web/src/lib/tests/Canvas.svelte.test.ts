@@ -23,7 +23,7 @@ vi.mock("$lib/status", () => {
       update: () => {},
     }),
     createSnapStore: () => ({
-      get: () => ({ snapEnabled: false, gridEnabled: false, gridSize: 10 }),
+      get: () => ({ snapEnabled: false, gridEnabled: true, gridSize: 25 }),
       subscribe: () => () => {},
       update: () => {},
       set: () => {},
@@ -102,6 +102,13 @@ describe("Canvas component", () => {
     const statusBar = container.querySelector(".status-bar");
 
     expect(statusBar).toBeTruthy();
+  });
+
+  it("should render the header with info button", () => {
+    const { container } = render(Canvas);
+    const titleBar = container.querySelector(".titlebar");
+    expect(titleBar).toBeTruthy();
+    expect(titleBar?.querySelector(".titlebar__info")).toBeTruthy();
   });
 
   it("should render all tool buttons in toolbar", () => {
