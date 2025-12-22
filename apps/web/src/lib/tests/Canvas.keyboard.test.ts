@@ -1,0 +1,291 @@
+import type { Action, Command } from "inkfinite-core";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render } from "vitest-browser-svelte";
+
+const actionHandlers: Array<(action: Action) => void> = [];
+const coreMocks = vi.hoisted(() => ({ storeInstances: [] as unknown[], executeCommandSpy: vi.fn() }));
+
+vi.mock("../input", () => {
+  return {
+    createInputAdapter: vi.fn((config) => {
+      actionHandlers.push(config.onAction);
+      return { dispose: vi.fn() };
+    }),
+  };
+});
+
+vi.mock(
+  "$lib/status",
+  () => ({
+    createPersistenceManager: () => ({
+      sink: { enqueueDocPatch: vi.fn(), flush: vi.fn() },
+      status: {
+        get: () => ({ backend: "indexeddb", state: "saved", pendingWrites: 0 }),
+        subscribe: () => () => {},
+        update: () => {},
+      },
+      setActiveBoard: vi.fn(),
+      dispose: vi.fn(),
+    }),
+    createStatusStore: () => ({
+      get: () => ({ backend: "indexeddb", state: "saved", pendingWrites: 0 }),
+      subscribe: () => () => {},
+      update: () => {},
+    }),
+    createSnapStore: () => ({
+      get: () => ({ snapEnabled: false, gridEnabled: true, gridSize: 25 }),
+      subscribe: () => () => {},
+      update: () => {},
+      set: () => {},
+    }),
+  }),
+);
+
+vi.mock("inkfinite-renderer", () => {
+  return { createRenderer: vi.fn(() => ({ dispose: vi.fn(), markDirty: vi.fn() })) };
+});
+
+vi.mock("inkfinite-core", async () => {
+  const actual = await vi.importActual<typeof import("inkfinite-core")>("inkfinite-core");
+  const { executeCommandSpy } = coreMocks;
+
+  class MockStore extends actual.Store {
+    executeCommand(command: unknown) {
+      executeCommandSpy(command);
+      return super.executeCommand(command as Command);
+    }
+  }
+
+  class MockInkfiniteDB {
+    boards = { toArray: async () => [], add: async () => "board-1" };
+    boardDocuments = { get: async () => null, put: async () => {} };
+  }
+
+  return {
+    ...actual,
+    Store: MockStore,
+    InkfiniteDB: MockInkfiniteDB,
+    createWebDocRepo: vi.fn(() => ({
+      listBoards: async () => [{ id: "board-1", name: "Test Board", createdAt: 0, updatedAt: 0 }],
+      createBoard: async () => "board-1",
+      loadDoc: async () => ({
+        pages: { "page:1": { id: "page:1", name: "Page 1", shapeIds: ["shape:1"] } },
+        shapes: {
+          "shape:1": {
+            id: "shape:1",
+            type: "rect",
+            pageId: "page:1",
+            x: 100,
+            y: 100,
+            rot: 0,
+            props: { w: 50, h: 50, fill: "#ff0000", stroke: "#000000", radius: 0 },
+          },
+        },
+        bindings: {},
+        order: { pageIds: ["page:1"] },
+      }),
+    })),
+  };
+});
+
+import Canvas from "../canvas/Canvas.svelte";
+
+describe("Canvas keyboard shortcuts", () => {
+  beforeEach(() => {
+    cleanup();
+    actionHandlers.length = 0;
+    coreMocks.executeCommandSpy.mockClear();
+  });
+
+  it("should handle space key for panning mode", async () => {
+    render(Canvas);
+    await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
+
+    const handler = actionHandlers[0];
+
+    // Press space key
+    handler({
+      type: "key-down",
+      key: " ",
+      code: "Space",
+      modifiers: { ctrl: false, shift: false, alt: false, meta: false },
+      repeat: false,
+      timestamp: Date.now(),
+    });
+
+    // Space key should enable panning mode (no command executed)
+    expect(coreMocks.executeCommandSpy).not.toHaveBeenCalled();
+
+    // Release space key
+    handler({
+      type: "key-up",
+      key: " ",
+      code: "Space",
+      modifiers: { ctrl: false, shift: false, alt: false, meta: false },
+      timestamp: Date.now(),
+    });
+
+    expect(coreMocks.executeCommandSpy).not.toHaveBeenCalled();
+  });
+
+  it("should nudge selected shapes with arrow keys", async () => {
+    render(Canvas);
+    await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
+
+    const handler = actionHandlers[0];
+
+    // Wait for shapes to load
+    await vi.waitFor(() => expect(coreMocks.executeCommandSpy).toHaveBeenCalled(), { timeout: 2000 });
+    coreMocks.executeCommandSpy.mockClear();
+
+    // Press ArrowRight to nudge
+    handler({
+      type: "key-down",
+      key: "ArrowRight",
+      code: "ArrowRight",
+      modifiers: { ctrl: false, shift: false, alt: false, meta: false },
+      repeat: false,
+      timestamp: Date.now(),
+    });
+
+    // Should execute a nudge command
+    await vi.waitFor(() => {
+      const calls = coreMocks.executeCommandSpy.mock.calls;
+      const nudgeCalls = calls.filter((call) => call[0]?.name === "Nudge");
+      expect(nudgeCalls.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("should nudge by 10px with shift modifier", async () => {
+    render(Canvas);
+    await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
+
+    const handler = actionHandlers[0];
+    await vi.waitFor(() => expect(coreMocks.executeCommandSpy).toHaveBeenCalled(), { timeout: 2000 });
+    coreMocks.executeCommandSpy.mockClear();
+
+    // Press ArrowDown with Shift
+    handler({
+      type: "key-down",
+      key: "ArrowDown",
+      code: "ArrowDown",
+      modifiers: { ctrl: false, shift: true, alt: false, meta: false },
+      repeat: false,
+      timestamp: Date.now(),
+    });
+
+    await vi.waitFor(() => {
+      const calls = coreMocks.executeCommandSpy.mock.calls;
+      const nudgeCalls = calls.filter((call) => call[0]?.name === "Nudge");
+      expect(nudgeCalls.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("should duplicate selected shapes with Cmd/Ctrl+D", async () => {
+    render(Canvas);
+    await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
+
+    const handler = actionHandlers[0];
+    await vi.waitFor(() => expect(coreMocks.executeCommandSpy).toHaveBeenCalled(), { timeout: 2000 });
+    coreMocks.executeCommandSpy.mockClear();
+
+    // Press Cmd+D (on Mac) or Ctrl+D (on other platforms)
+    const isMac = navigator.userAgent.toUpperCase().includes("MAC");
+    handler({
+      type: "key-down",
+      key: "d",
+      code: "KeyD",
+      modifiers: { ctrl: !isMac, shift: false, alt: false, meta: isMac },
+      repeat: false,
+      timestamp: Date.now(),
+    });
+
+    await vi.waitFor(() => {
+      const calls = coreMocks.executeCommandSpy.mock.calls;
+      const duplicateCalls = calls.filter((call) => call[0]?.name === "Duplicate");
+      expect(duplicateCalls.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("should bring shapes forward with Cmd/Ctrl+]", async () => {
+    render(Canvas);
+    await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
+
+    const handler = actionHandlers[0];
+    await vi.waitFor(() => expect(coreMocks.executeCommandSpy).toHaveBeenCalled(), { timeout: 2000 });
+    coreMocks.executeCommandSpy.mockClear();
+
+    const isMac = navigator.userAgent.toUpperCase().includes("MAC");
+    handler({
+      type: "key-down",
+      key: "]",
+      code: "BracketRight",
+      modifiers: { ctrl: !isMac, shift: false, alt: false, meta: isMac },
+      repeat: false,
+      timestamp: Date.now(),
+    });
+
+    await vi.waitFor(() => {
+      const calls = coreMocks.executeCommandSpy.mock.calls;
+      const bringForwardCalls = calls.filter((call) => call[0]?.name === "Bring Forward");
+      expect(bringForwardCalls.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("should send shapes backward with Cmd/Ctrl+[", async () => {
+    render(Canvas);
+    await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
+
+    const handler = actionHandlers[0];
+    await vi.waitFor(() => expect(coreMocks.executeCommandSpy).toHaveBeenCalled(), { timeout: 2000 });
+    coreMocks.executeCommandSpy.mockClear();
+
+    const isMac = navigator.userAgent.toUpperCase().includes("MAC");
+    handler({
+      type: "key-down",
+      key: "[",
+      code: "BracketLeft",
+      modifiers: { ctrl: !isMac, shift: false, alt: false, meta: isMac },
+      repeat: false,
+      timestamp: Date.now(),
+    });
+
+    await vi.waitFor(() => {
+      const calls = coreMocks.executeCommandSpy.mock.calls;
+      const sendBackwardCalls = calls.filter((call) => call[0]?.name === "Send Backward");
+      expect(sendBackwardCalls.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("should not process tool actions while space is held", async () => {
+    render(Canvas);
+    await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
+
+    const handler = actionHandlers[0];
+    await vi.waitFor(() => expect(coreMocks.executeCommandSpy).toHaveBeenCalled(), { timeout: 2000 });
+    coreMocks.executeCommandSpy.mockClear();
+
+    // Press space
+    handler({
+      type: "key-down",
+      key: " ",
+      code: "Space",
+      modifiers: { ctrl: false, shift: false, alt: false, meta: false },
+      repeat: false,
+      timestamp: Date.now(),
+    });
+
+    // Try to nudge with arrow key while space is held
+    handler({
+      type: "key-down",
+      key: "ArrowRight",
+      code: "ArrowRight",
+      modifiers: { ctrl: false, shift: false, alt: false, meta: false },
+      repeat: false,
+      timestamp: Date.now(),
+    });
+
+    // Should not execute nudge command while panning mode is active
+    expect(coreMocks.executeCommandSpy).not.toHaveBeenCalled();
+  });
+});

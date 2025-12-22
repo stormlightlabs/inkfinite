@@ -61,10 +61,10 @@
 </script>
 
 {#if open}
-	<div class="dialog-backdrop" role="presentation" onclick={handleBackdropClick} onkeydown={handleKeyDown}>
+	<div class="dialog__backdrop" role="presentation" onclick={handleBackdropClick} onkeydown={handleKeyDown}>
 		<div
 			bind:this={dialogElement}
-			class="dialog-content {className}"
+			class="dialog__content {className}"
 			role="dialog"
 			aria-modal="true"
 			aria-label={title}
@@ -75,7 +75,7 @@
 {/if}
 
 <style>
-	.dialog-backdrop {
+	.dialog__backdrop {
 		position: fixed;
 		top: 0;
 		left: 0;
@@ -89,8 +89,9 @@
 		animation: fadeIn 0.15s ease-out;
 	}
 
-	.dialog-content {
-		background-color: white;
+	.dialog__content {
+		background-color: var(--surface);
+		color: var(--text);
 		border-radius: 8px;
 		box-shadow:
 			0 10px 25px rgba(0, 0, 0, 0.1),

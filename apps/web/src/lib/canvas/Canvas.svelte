@@ -13,6 +13,7 @@
 	} from '$lib/status';
 	import {
 		ArrowTool,
+		Camera,
 		CursorStore,
 		EditorState,
 		EllipseTool,
@@ -20,6 +21,7 @@
 		LineTool,
 		RectTool,
 		SelectTool,
+		ShapeRecord,
 		SnapshotCommand,
 		Store,
 		TextTool,
@@ -41,7 +43,11 @@
 	let repo: ReturnType<typeof createWebDocRepo> | null = null;
 	let sink: PersistenceSink | null = null;
 	let persistenceManager: ReturnType<typeof createPersistenceManager> | null = null;
-	const fallbackStatusStore = createStatusStore({ backend: 'indexeddb', state: 'saved', pendingWrites: 0 });
+	const fallbackStatusStore = createStatusStore({
+		backend: 'indexeddb',
+		state: 'saved',
+		pendingWrites: 0
+	});
 	let persistenceStatusStore = $state<StatusStore>(fallbackStatusStore);
 	let activeBoardId: string | null = null;
 
@@ -57,6 +63,7 @@
 	const cursorStore = new CursorStore();
 	const snapStore: SnapStore = createSnapStore();
 	const pointerState = $state({ isPointerDown: false });
+	const panState = $state({ isPanning: false, spaceHeld: false, lastScreen: { x: 0, y: 0 } });
 	const snapProvider = { get: () => snapStore.get() };
 	const cursorProvider = { get: () => cursorStore.getState() };
 	const pointerStateProvider = { get: () => pointerState };
@@ -67,8 +74,33 @@
 		store.setState((state) => ({
 			...state,
 			doc: { pages: doc.pages, shapes: doc.shapes, bindings: doc.bindings },
-			ui: { ...state.ui, currentPageId: firstPageId }
+			ui: { ...state.ui, currentPageId: firstPageId, selectionIds: [] }
 		}));
+		initializeSelection(firstPageId, doc);
+	}
+
+	function initializeSelection(pageId: string | null, doc: LoadedDoc) {
+		if (!pageId) {
+			return;
+		}
+		const page = doc.pages[pageId];
+		const firstShapeId = page?.shapeIds[0];
+		if (!firstShapeId) {
+			return;
+		}
+		const state = store.getState();
+		if (state.ui.selectionIds.length === 1 && state.ui.selectionIds[0] === firstShapeId) {
+			return;
+		}
+		const before = EditorState.clone(state);
+		const after = { ...state, ui: { ...state.ui, selectionIds: [firstShapeId] } };
+		const command = new SnapshotCommand(
+			'Initialize Selection',
+			'ui',
+			before,
+			EditorState.clone(after)
+		);
+		store.executeCommand(command);
 	}
 
 	const selectTool = new SelectTool();
@@ -98,6 +130,173 @@
 		historyViewerOpen = false;
 	}
 
+	function handleBringForward() {
+		const currentState = store.getState();
+		const selectedIds = currentState.ui.selectionIds;
+		const currentPageId = currentState.ui.currentPageId;
+
+		if (selectedIds.length === 0 || !currentPageId) {
+			return;
+		}
+
+		const before = EditorState.clone(currentState);
+		const page = currentState.doc.pages[currentPageId];
+		if (!page) return;
+
+		const newShapeIds = [...page.shapeIds];
+
+		for (const shapeId of selectedIds) {
+			const currentIndex = newShapeIds.indexOf(shapeId);
+			if (currentIndex !== -1 && currentIndex < newShapeIds.length - 1) {
+				[newShapeIds[currentIndex], newShapeIds[currentIndex + 1]] = [
+					newShapeIds[currentIndex + 1],
+					newShapeIds[currentIndex]
+				];
+			}
+		}
+
+		const after = {
+			...currentState,
+			doc: {
+				...currentState.doc,
+				pages: { ...currentState.doc.pages, [currentPageId]: { ...page, shapeIds: newShapeIds } }
+			}
+		};
+
+		const command = new SnapshotCommand('Bring Forward', 'doc', before, EditorState.clone(after));
+		store.executeCommand(command);
+	}
+
+	function handleSendBackward() {
+		const currentState = store.getState();
+		const selectedIds = currentState.ui.selectionIds;
+		const currentPageId = currentState.ui.currentPageId;
+
+		if (selectedIds.length === 0 || !currentPageId) {
+			return;
+		}
+
+		const before = EditorState.clone(currentState);
+		const page = currentState.doc.pages[currentPageId];
+		if (!page) return;
+
+		const newShapeIds = [...page.shapeIds];
+
+		for (let i = selectedIds.length - 1; i >= 0; i--) {
+			const shapeId = selectedIds[i];
+			const currentIndex = newShapeIds.indexOf(shapeId);
+			if (currentIndex > 0) {
+				[newShapeIds[currentIndex], newShapeIds[currentIndex - 1]] = [
+					newShapeIds[currentIndex - 1],
+					newShapeIds[currentIndex]
+				];
+			}
+		}
+
+		const after = {
+			...currentState,
+			doc: {
+				...currentState.doc,
+				pages: { ...currentState.doc.pages, [currentPageId]: { ...page, shapeIds: newShapeIds } }
+			}
+		};
+
+		const command = new SnapshotCommand('Send Backward', 'doc', before, EditorState.clone(after));
+		store.executeCommand(command);
+	}
+
+	function handleDuplicate() {
+		const currentState = store.getState();
+		const selectedIds = currentState.ui.selectionIds;
+
+		if (selectedIds.length === 0) {
+			return;
+		}
+
+		const before = EditorState.clone(currentState);
+		const newShapes = { ...currentState.doc.shapes };
+		const newPages = { ...currentState.doc.pages };
+		const duplicatedIds: string[] = [];
+
+		const DUPLICATE_OFFSET = 20;
+
+		for (const shapeId of selectedIds) {
+			const shape = currentState.doc.shapes[shapeId];
+			if (!shape) continue;
+
+			const cloned = ShapeRecord.clone(shape);
+			const newId = `shape:${crypto.randomUUID()}`;
+			const duplicated = {
+				...cloned,
+				id: newId,
+				x: shape.x + DUPLICATE_OFFSET,
+				y: shape.y + DUPLICATE_OFFSET
+			};
+
+			newShapes[newId] = duplicated;
+			duplicatedIds.push(newId);
+
+			const currentPageId = currentState.ui.currentPageId;
+			if (currentPageId) {
+				const page = newPages[currentPageId];
+				if (page) {
+					newPages[currentPageId] = { ...page, shapeIds: [...page.shapeIds, newId] };
+				}
+			}
+		}
+
+		const after = {
+			...currentState,
+			doc: { ...currentState.doc, shapes: newShapes, pages: newPages },
+			ui: { ...currentState.ui, selectionIds: duplicatedIds }
+		};
+
+		const command = new SnapshotCommand('Duplicate', 'doc', before, EditorState.clone(after));
+		store.executeCommand(command);
+	}
+
+	function handleNudge(arrowKey: string, largeNudge: boolean) {
+		const currentState = store.getState();
+		const selectedIds = currentState.ui.selectionIds;
+
+		if (selectedIds.length === 0) {
+			return;
+		}
+
+		const nudgeDistance = largeNudge ? 10 : 1;
+		let deltaX = 0;
+		let deltaY = 0;
+
+		switch (arrowKey) {
+			case 'ArrowLeft':
+				deltaX = -nudgeDistance;
+				break;
+			case 'ArrowRight':
+				deltaX = nudgeDistance;
+				break;
+			case 'ArrowUp':
+				deltaY = -nudgeDistance;
+				break;
+			case 'ArrowDown':
+				deltaY = nudgeDistance;
+				break;
+		}
+
+		const before = EditorState.clone(currentState);
+		const newShapes = { ...currentState.doc.shapes };
+
+		for (const shapeId of selectedIds) {
+			const shape = newShapes[shapeId];
+			if (shape) {
+				newShapes[shapeId] = { ...shape, x: shape.x + deltaX, y: shape.y + deltaY };
+			}
+		}
+
+		const after = { ...currentState, doc: { ...currentState.doc, shapes: newShapes } };
+		const command = new SnapshotCommand('Nudge', 'doc', before, EditorState.clone(after));
+		store.executeCommand(command);
+	}
+
 	function applyActionWithHistory(action: Action) {
 		const before = store.getState();
 		const nextState = routeAction(before, action, tools);
@@ -107,11 +306,52 @@
 
 		const kind = getCommandKind(before, nextState);
 		const commandName = describeAction(action, kind);
-		const command = new SnapshotCommand(commandName, kind, EditorState.clone(before), EditorState.clone(nextState));
+		const command = new SnapshotCommand(
+			commandName,
+			kind,
+			EditorState.clone(before),
+			EditorState.clone(nextState)
+		);
 		store.executeCommand(command);
 	}
 
 	function handleAction(action: Action) {
+		if (action.type === 'key-down' && action.key === ' ') {
+			panState.spaceHeld = true;
+			return;
+		}
+
+		if (action.type === 'key-up' && action.key === ' ') {
+			panState.spaceHeld = false;
+			panState.isPanning = false;
+			return;
+		}
+
+		if (action.type === 'pointer-down' && action.button === 0 && panState.spaceHeld) {
+			panState.isPanning = true;
+			panState.lastScreen = { x: action.screen.x, y: action.screen.y };
+			return;
+		}
+
+		if (action.type === 'pointer-move' && panState.isPanning) {
+			const deltaX = action.screen.x - panState.lastScreen.x;
+			const deltaY = action.screen.y - panState.lastScreen.y;
+			const currentCamera = store.getState().camera;
+			const newCamera = Camera.pan(currentCamera, { x: deltaX, y: deltaY });
+			store.setState((state) => ({ ...state, camera: newCamera }));
+			panState.lastScreen = { x: action.screen.x, y: action.screen.y };
+			return;
+		}
+
+		if (action.type === 'pointer-up' && action.button === 0 && panState.isPanning) {
+			panState.isPanning = false;
+			return;
+		}
+
+		if (panState.isPanning || panState.spaceHeld) {
+			return;
+		}
+
 		const actionWithSnap = applySnapping(action);
 
 		if (actionWithSnap.type === 'pointer-down' && actionWithSnap.button === 0) {
@@ -124,7 +364,11 @@
 			return;
 		}
 
-		if (actionWithSnap.type === 'pointer-move' && pointerState.isPointerDown && pendingCommandStart) {
+		if (
+			actionWithSnap.type === 'pointer-move' &&
+			pointerState.isPointerDown &&
+			pendingCommandStart
+		) {
 			void applyImmediateAction(actionWithSnap);
 			return;
 		}
@@ -145,13 +389,41 @@
 				(actionWithSnap.modifiers.meta && navigator.platform.toUpperCase().includes('MAC')) ||
 				(actionWithSnap.modifiers.ctrl && !navigator.platform.toUpperCase().includes('MAC'));
 
-			if (isPrimary && !actionWithSnap.modifiers.shift && (actionWithSnap.key === 'z' || actionWithSnap.key === 'Z')) {
+			if (
+				isPrimary &&
+				!actionWithSnap.modifiers.shift &&
+				(actionWithSnap.key === 'z' || actionWithSnap.key === 'Z')
+			) {
 				store.undo();
 				return;
 			}
 
-			if (isPrimary && actionWithSnap.modifiers.shift && (actionWithSnap.key === 'z' || actionWithSnap.key === 'Z')) {
+			if (
+				isPrimary &&
+				actionWithSnap.modifiers.shift &&
+				(actionWithSnap.key === 'z' || actionWithSnap.key === 'Z')
+			) {
 				store.redo();
+				return;
+			}
+
+			if (isPrimary && (actionWithSnap.key === 'd' || actionWithSnap.key === 'D')) {
+				handleDuplicate();
+				return;
+			}
+
+			if (isPrimary && actionWithSnap.key === ']') {
+				handleBringForward();
+				return;
+			}
+
+			if (isPrimary && actionWithSnap.key === '[') {
+				handleSendBackward();
+				return;
+			}
+
+			if (actionWithSnap.key.startsWith('Arrow')) {
+				handleNudge(actionWithSnap.key, actionWithSnap.modifiers.shift);
 				return;
 			}
 		}
@@ -285,7 +557,11 @@
 			return store.getState().camera;
 		}
 
-		renderer = createRenderer(canvas!, store, { snapProvider, cursorProvider, pointerStateProvider });
+		renderer = createRenderer(canvas!, store, {
+			snapProvider,
+			cursorProvider,
+			pointerStateProvider
+		});
 		inputAdapter = createInputAdapter({
 			canvas: canvas!,
 			getCamera,

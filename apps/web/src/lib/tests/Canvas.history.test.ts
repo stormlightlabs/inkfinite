@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render } from "vitest-browser-svelte";
 
@@ -261,6 +262,12 @@ vi.mock("inkfinite-core", () => {
     Store: MockStore,
     EditorState,
     SnapshotCommand,
+    Camera: {
+      pan(camera: { x: number; y: number; zoom: number }, delta: { x: number; y: number }) {
+        return { ...camera, x: camera.x - delta.x, y: camera.y - delta.y };
+      },
+    },
+    ShapeRecord: { clone: (shape: any) => ({ ...shape }) },
     createToolMap: (toolList: any[]) => new Map(toolList.map((tool) => [tool.id, tool])),
     routeAction,
     switchTool: (state: any, toolId: string) => ({ ...state, ui: { ...state.ui, toolId } }),

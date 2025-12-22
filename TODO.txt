@@ -293,21 +293,32 @@ R4. Parity behaviors
 
 Goal: the UX crosses the "this is legit" threshold.
 
-[ ] Snapping:
-    - snap move to grid
-    - snap to other shape edges/centers
+[x] BEM-ify CSS classes
+    - Dialog, Sheet, Toolbar, and StatusBar now use BEM naming
+    - Fixed hardcoded white backgrounds in Dialog/Sheet (now use CSS vars)
+    - All text colors use proper CSS variables for dark mode support
+[x] Panning viewport
+    - Hold space + drag to pan the canvas
+    - Camera.pan integration in Canvas.svelte
+[x] Keyboard affordances:
+    - Arrow keys nudge selected shapes (1px, 10px with Shift)
+    - Ctrl/Cmd+D duplicates selected shapes
+    - Ctrl/Cmd+] brings shapes forward
+    - Ctrl/Cmd+[ sends shapes backward
+[x] Accessibility:
+    - Tool buttons have ARIA labels and aria-pressed states
+    - Zoom and Export menus have proper ARIA attributes (haspopup, expanded, role=menu)
+    - Visible focus states on all interactive elements
+    - Checkboxes in StatusBar have ARIA labels
+    - All controls keyboard-navigable with Tab
+
+[ ] Editable Text
+[ ] Snapping refinement
+    - Guideline positioning
 [ ] Handles:
     - resize handles for rect/ellipse
     - rotate handle
     - cursor affordances
-[ ] Keyboard affordances:
-    - nudge with arrow keys
-    - duplicate (Ctrl/Cmd+D)
-    - bring forward/back
-[ ] Accessibility:
-    - tool buttons navigable with keyboard
-    - visible focus states
-    - ARIA labels for controls
 
 (DoD):
 - A user can comfortably draw and edit without surprises.

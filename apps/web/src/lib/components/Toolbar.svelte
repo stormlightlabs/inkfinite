@@ -210,59 +210,116 @@
 </script>
 
 <div class="toolbar" role="toolbar" aria-label="Drawing tools">
-	{#each tools as tool}
+	{#each tools as tool (`${tool.id}:${tool.label}`)}
 		<button
-			class="tool-button"
+			class="toolbar__tool-button tool-button"
+			class:toolbar__tool-button--active={currentTool === tool.id}
 			class:active={currentTool === tool.id}
 			onclick={() => handleToolClick(tool.id)}
 			aria-label={tool.label}
 			aria-pressed={currentTool === tool.id}
 			data-tool-id={tool.id}>
-			<span class="tool-icon">{tool.icon}</span>
-			<span class="tool-label">{tool.label}</span>
+			<span class="toolbar__tool-icon">{tool.icon}</span>
+			<span class="toolbar__tool-label">{tool.label}</span>
 		</button>
 	{/each}
 
-	<div class="toolbar-divider"></div>
+	<div class="toolbar__divider"></div>
 
-	<!-- Zoom controls -->
-	<div class="toolbar-zoom">
-		<button class="zoom-button" bind:this={zoomButtonEl} onclick={() => (zoomMenuOpen = !zoomMenuOpen)}>
+	<div class="toolbar__zoom">
+		<button
+			class="toolbar__zoom-button"
+			bind:this={zoomButtonEl}
+			onclick={() => (zoomMenuOpen = !zoomMenuOpen)}
+			aria-label="Zoom level"
+			aria-haspopup="true"
+			aria-expanded={zoomMenuOpen}>
 			{getZoomPct()}%
 		</button>
 
 		{#if zoomMenuOpen}
-			<div class="zoom-menu" bind:this={zoomMenuEl}>
-				{#each zoomPresets as preset}
-					<button onclick={() => setZoomPercent(preset.value)}>{preset.label}</button>
+			<div class="toolbar__zoom-menu" bind:this={zoomMenuEl} role="menu" aria-label="Zoom options">
+				{#each zoomPresets as preset (`${preset.label}:${preset.value}`)}
+					<button
+						class="toolbar__menu-item"
+						role="menuitem"
+						onclick={() => setZoomPercent(preset.value)}
+						aria-label="Zoom to {preset.label}">
+						{preset.label}
+					</button>
 				{/each}
-				<div class="menu-divider"></div>
-				<button onclick={zoomToFit}>Zoom to fit</button>
-				<button onclick={zoomToSelection}>Zoom to selection</button>
+				<div class="toolbar__menu-divider"></div>
+				<button
+					class="toolbar__menu-item"
+					role="menuitem"
+					onclick={zoomToFit}
+					aria-label="Zoom to fit all shapes">
+					Zoom to fit
+				</button>
+				<button
+					class="toolbar__menu-item"
+					role="menuitem"
+					onclick={zoomToSelection}
+					aria-label="Zoom to selected shapes">
+					Zoom to selection
+				</button>
 			</div>
 		{/if}
 	</div>
 
 	<!-- Export controls -->
-	<div class="toolbar-export">
-		<button class="export-button" bind:this={exportButtonEl} onclick={() => (exportMenuOpen = !exportMenuOpen)}>
+	<div class="toolbar__export">
+		<button
+			class="toolbar__export-button"
+			bind:this={exportButtonEl}
+			onclick={() => (exportMenuOpen = !exportMenuOpen)}
+			aria-label="Export drawing"
+			aria-haspopup="true"
+			aria-expanded={exportMenuOpen}>
 			Export
 		</button>
 
 		{#if exportMenuOpen}
-			<div class="export-menu" bind:this={exportMenuEl}>
-				<button onclick={exportPNGViewport}>PNG (Viewport)</button>
-				<button onclick={exportSVGAll}>SVG (All)</button>
-				<button onclick={exportSVGSelection}>SVG (Selection)</button>
+			<div
+				class="toolbar__export-menu"
+				bind:this={exportMenuEl}
+				role="menu"
+				aria-label="Export options">
+				<button
+					class="toolbar__menu-item"
+					role="menuitem"
+					onclick={exportPNGViewport}
+					aria-label="Export current view as PNG">
+					PNG (Viewport)
+				</button>
+				<button
+					class="toolbar__menu-item"
+					role="menuitem"
+					onclick={exportSVGAll}
+					aria-label="Export all shapes as SVG">
+					SVG (All)
+				</button>
+				<button
+					class="toolbar__menu-item"
+					role="menuitem"
+					onclick={exportSVGSelection}
+					aria-label="Export selected shapes as SVG">
+					SVG (Selection)
+				</button>
 			</div>
 		{/if}
 	</div>
 
 	{#if onHistoryClick}
-		<div class="toolbar-divider"></div>
-		<button class="tool-button history-button" onclick={onHistoryClick} aria-label="History">
-			<span class="tool-icon">⏱</span>
-			<span class="tool-label">History</span>
+		<div class="toolbar__divider"></div>
+		<button
+			class="toolbar__tool-button toolbar__tool-button--history tool-button history-button"
+			data-tool-id="history"
+			onclick={onHistoryClick}
+			aria-label="History"
+			aria-pressed="false">
+			<span class="toolbar__tool-icon">⏱</span>
+			<span class="toolbar__tool-label">History</span>
 		</button>
 	{/if}
 </div>
@@ -277,7 +334,7 @@
 		align-items: center;
 	}
 
-	.tool-button {
+	.toolbar__tool-button {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -292,49 +349,51 @@
 		min-width: 60px;
 	}
 
-	.tool-button:hover {
+	.toolbar__tool-button:hover {
 		background: var(--surface-elevated);
 		border-color: var(--text-muted);
 	}
 
-	.tool-button:focus {
+	.toolbar__tool-button:focus {
 		outline: 2px solid var(--accent);
 		outline-offset: 2px;
 	}
 
+	.toolbar__tool-button--active,
 	.tool-button.active {
 		background: var(--accent);
 		color: var(--surface);
 		border-color: var(--accent-hover);
 	}
 
-	.tool-icon {
+	.toolbar__tool-icon {
 		font-size: 20px;
 		line-height: 1;
 	}
 
-	.tool-label {
+	.toolbar__tool-label {
 		font-size: 11px;
 		line-height: 1;
 		white-space: nowrap;
 	}
 
-	.toolbar-divider {
+	.toolbar__divider {
 		width: 1px;
 		background-color: var(--border);
 		margin: 0 8px;
 		height: 40px;
 	}
 
-	.toolbar-zoom,
-	.toolbar-export {
+	.toolbar__zoom,
+	.toolbar__export {
 		position: relative;
 	}
 
-	.zoom-button,
-	.export-button {
+	.toolbar__zoom-button,
+	.toolbar__export-button {
 		border: 1px solid var(--border);
 		background: var(--surface);
+		color: var(--text);
 		padding: 8px 12px;
 		border-radius: 4px;
 		cursor: pointer;
@@ -342,17 +401,24 @@
 		min-width: 60px;
 	}
 
-	.zoom-button:hover,
-	.export-button:hover {
+	.toolbar__zoom-button:hover,
+	.toolbar__export-button:hover {
 		background: var(--surface-elevated);
 	}
 
-	.zoom-menu,
-	.export-menu {
+	.toolbar__zoom-button:focus,
+	.toolbar__export-button:focus {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+
+	.toolbar__zoom-menu,
+	.toolbar__export-menu {
 		position: absolute;
 		top: calc(100% + 4px);
 		left: 0;
 		background: var(--surface);
+		color: var(--text);
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -364,10 +430,10 @@
 		min-width: 150px;
 	}
 
-	.zoom-menu button,
-	.export-menu button {
+	.toolbar__menu-item {
 		border: none;
 		background: transparent;
+		color: var(--text);
 		padding: 4px 8px;
 		border-radius: 4px;
 		text-align: left;
@@ -375,18 +441,22 @@
 		font-size: 13px;
 	}
 
-	.zoom-menu button:hover,
-	.export-menu button:hover {
+	.toolbar__menu-item:hover {
 		background: var(--surface-elevated);
 	}
 
-	.menu-divider {
+	.toolbar__menu-item:focus {
+		outline: 2px solid var(--accent);
+		outline-offset: -2px;
+	}
+
+	.toolbar__menu-divider {
 		height: 1px;
 		background: var(--border);
 		margin: 6px 0;
 	}
 
-	.history-button {
+	.toolbar__tool-button--history {
 		margin-left: auto;
 	}
 </style>

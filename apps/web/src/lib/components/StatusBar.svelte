@@ -16,7 +16,11 @@
 
 	let editorSnapshot: EditorState = EditorStateOps.create();
 	let cursorSnapshot: CursorState = { cursorWorld: { x: 0, y: 0 }, lastMoveAt: Date.now() };
-	let persistenceSnapshot: PersistenceStatus = { backend: 'indexeddb', state: 'saved', pendingWrites: 0 };
+	let persistenceSnapshot: PersistenceStatus = {
+		backend: 'indexeddb',
+		state: 'saved',
+		pendingWrites: 0
+	};
 	let snapSnapshot = $state<SnapSettings>({ snapEnabled: false, gridEnabled: true, gridSize: 25 });
 	let statusVm = $state(buildStatusBarVM(editorSnapshot, cursorSnapshot, persistenceSnapshot));
 
@@ -27,6 +31,7 @@
 	$effect(() => {
 		const currentStore = store;
 		editorSnapshot = currentStore.getState();
+		updateVm();
 		const unsubscribe = currentStore.subscribe((state) => {
 			editorSnapshot = state;
 			updateVm();
@@ -37,6 +42,7 @@
 	$effect(() => {
 		const currentCursor = cursor;
 		cursorSnapshot = currentCursor.getState();
+		updateVm();
 		const unsubscribe = currentCursor.subscribe((state) => {
 			cursorSnapshot = state;
 			updateVm();
@@ -47,6 +53,7 @@
 	$effect(() => {
 		const currentPersistence = persistence;
 		persistenceSnapshot = currentPersistence.get();
+		updateVm();
 		const unsubscribe = currentPersistence.subscribe((state) => {
 			persistenceSnapshot = state;
 			updateVm();
@@ -57,6 +64,7 @@
 	$effect(() => {
 		const currentSnap = snap;
 		snapSnapshot = currentSnap.get();
+		updateVm();
 		const unsubscribe = currentSnap.subscribe((state) => {
 			snapSnapshot = state;
 			updateVm();
@@ -115,41 +123,52 @@
 </script>
 
 <div class="status-bar">
-	<div class="status-section">
-		<span class="label">Tool</span>
-		<span class="value">{statusVm.toolId}</span>
-		<span class="mode">{statusVm.mode}</span>
+	<div class="status-bar__section">
+		<span class="status-bar__label">Tool</span>
+		<span class="status-bar__value">{statusVm.toolId}</span>
+		<span class="status-bar__mode">{statusVm.mode}</span>
 	</div>
 
-	<div class="status-section">
-		<span class="label">Cursor</span>
-		<span class="value">
+	<div class="status-bar__section">
+		<span class="status-bar__label">Cursor</span>
+		<span class="status-bar__value">
 			{formatCursorCoord(statusVm.cursorWorld.x)}, {formatCursorCoord(statusVm.cursorWorld.y)}
 		</span>
 	</div>
 
-	<div class="status-section">
-		<span class="label">Selection</span>
-		<span class="value">{formatSelection()}</span>
+	<div class="status-bar__section">
+		<span class="status-bar__label">Selection</span>
+		<span class="status-bar__value">{formatSelection()}</span>
 	</div>
 
-	<div class="status-section snap">
-		<span class="label">Snap</span>
-		<div class="toggle-row">
-			<label class="toggle">
-				<input type="checkbox" checked={snapSnapshot.snapEnabled} onchange={handleSnapToggle} />
+	<div class="status-bar__section status-bar__section--snap">
+		<span class="status-bar__label">Snap</span>
+		<div class="status-bar__toggle-row">
+			<label class="status-bar__toggle">
+				<input
+					type="checkbox"
+					checked={snapSnapshot.snapEnabled}
+					onchange={handleSnapToggle}
+					aria-label="Enable main snapping" />
 				<span>Main</span>
 			</label>
-			<label class="toggle">
-				<input type="checkbox" checked={snapSnapshot.gridEnabled} onchange={handleGridToggle} />
+			<label class="status-bar__toggle">
+				<input
+					type="checkbox"
+					checked={snapSnapshot.gridEnabled}
+					onchange={handleGridToggle}
+					aria-label="Enable grid snapping" />
 				<span>Grid</span>
 			</label>
 		</div>
 	</div>
 
-	<div class="status-section persistence">
-		<span class="label">Sync</span>
-		<span class="value" class:error={statusVm.persistence.state === 'error'}>{formatPersistenceSummary()}</span>
+	<div class="status-bar__section status-bar__section--persistence">
+		<span class="status-bar__label">Sync</span>
+		<span
+			class="status-bar__value"
+			class:status-bar__value--error={statusVm.persistence.state === 'error'}
+			>{formatPersistenceSummary()}</span>
 	</div>
 </div>
 
@@ -166,23 +185,23 @@
 		min-height: 48px;
 	}
 
-	.status-section {
+	.status-bar__section {
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
 		position: relative;
 	}
 
-	.status-section.snap {
+	.status-bar__section--snap {
 		align-items: flex-start;
 	}
 
-	.toggle-row {
+	.status-bar__toggle-row {
 		display: flex;
 		gap: 8px;
 	}
 
-	.toggle {
+	.status-bar__toggle {
 		display: flex;
 		align-items: center;
 		gap: 4px;
@@ -190,27 +209,33 @@
 		color: var(--text);
 	}
 
-	.toggle input {
+	.status-bar__toggle input {
 		margin: 0;
+		cursor: pointer;
 	}
 
-	.label {
+	.status-bar__toggle input:focus {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+
+	.status-bar__label {
 		font-size: 11px;
 		color: var(--text-muted);
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 	}
 
-	.value {
+	.status-bar__value {
 		font-weight: 500;
 		color: var(--text);
 	}
 
-	.value.error {
-		color: var(--error, #d14343);
+	.status-bar__value--error {
+		color: var(--color-error);
 	}
 
-	.mode {
+	.status-bar__mode {
 		font-size: 12px;
 		color: var(--text-muted);
 	}

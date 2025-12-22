@@ -6,11 +6,6 @@
 	 *
 	 * A sliding panel that appears from the side of the screen.
 	 * Built on top of Dialog primitive with custom positioning.
-	 *
-	 * Features:
-	 * - Slides in from left, right, top, or bottom
-	 * - Same accessibility features as Dialog
-	 * - Escape key and backdrop click to close
 	 */
 
 	type Side = 'left' | 'right' | 'top' | 'bottom';
@@ -78,10 +73,14 @@
 </script>
 
 {#if open}
-	<div class="sheet-backdrop" role="presentation" onclick={handleBackdropClick} onkeydown={handleKeyDown}>
+	<div
+		class="sheet__backdrop"
+		role="presentation"
+		onclick={handleBackdropClick}
+		onkeydown={handleKeyDown}>
 		<div
 			bind:this={sheetElement}
-			class="sheet-content sheet-{side} {className}"
+			class="sheet sheet__content sheet__content--{side} sheet-{side} {className}"
 			role="dialog"
 			aria-modal="true"
 			aria-label={title}
@@ -92,7 +91,7 @@
 {/if}
 
 <style>
-	.sheet-backdrop {
+	.sheet__backdrop {
 		position: fixed;
 		top: 0;
 		left: 0;
@@ -104,8 +103,9 @@
 		animation: fadeIn 0.15s ease-out;
 	}
 
-	.sheet-content {
-		background-color: white;
+	.sheet__content {
+		background-color: var(--surface);
+		color: var(--text);
 		box-shadow:
 			0 10px 25px rgba(0, 0, 0, 0.1),
 			0 4px 10px rgba(0, 0, 0, 0.08);
@@ -114,7 +114,7 @@
 	}
 
 	/* Right side (default) */
-	.sheet-right {
+	.sheet__content--right {
 		position: fixed;
 		top: 0;
 		right: 0;
@@ -124,7 +124,7 @@
 	}
 
 	/* Left side */
-	.sheet-left {
+	.sheet__content--left {
 		position: fixed;
 		top: 0;
 		left: 0;
@@ -134,7 +134,7 @@
 	}
 
 	/* Top side */
-	.sheet-top {
+	.sheet__content--top {
 		position: fixed;
 		top: 0;
 		left: 0;
@@ -144,7 +144,7 @@
 	}
 
 	/* Bottom side */
-	.sheet-bottom {
+	.sheet__content--bottom {
 		position: fixed;
 		bottom: 0;
 		left: 0;
