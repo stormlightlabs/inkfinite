@@ -10,7 +10,7 @@ describe("TitleBar", () => {
   it("renders title/logo and info button", () => {
     const { container } = render(TitleBar);
     expect(container.querySelector(".titlebar")).toBeTruthy();
-    expect(container.querySelector(".titlebar__logo")?.textContent).toContain("∞");
+    expect(container.querySelector(".titlebar__logo img")).toBeTruthy();
     expect(container.querySelector(".titlebar__info")).toBeTruthy();
   });
 

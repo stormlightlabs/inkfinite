@@ -1,7 +1,11 @@
 import type { ToolId } from "inkfinite-core";
+import { Store } from "inkfinite-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render } from "vitest-browser-svelte";
 import Toolbar from "../../components/Toolbar.svelte";
+
+const createMockStore = () => new Store();
+const createMockGetViewport = () => () => ({ width: 1024, height: 768 });
 
 describe("Toolbar component", () => {
   beforeEach(() => {
@@ -10,7 +14,9 @@ describe("Toolbar component", () => {
 
   it("should render all tool buttons", () => {
     const onToolChange = vi.fn();
-    const { container } = render(Toolbar, { currentTool: "select", onToolChange });
+    const store = createMockStore();
+    const getViewport = createMockGetViewport();
+    const { container } = render(Toolbar, { currentTool: "select", onToolChange, store, getViewport });
 
     const buttons = container.querySelectorAll(".tool-button");
     expect(buttons.length).toBe(6);
@@ -21,7 +27,9 @@ describe("Toolbar component", () => {
 
   it("should mark the current tool as active", () => {
     const onToolChange = vi.fn();
-    const { container } = render(Toolbar, { currentTool: "rect", onToolChange });
+    const store = createMockStore();
+    const getViewport = createMockGetViewport();
+    const { container } = render(Toolbar, { currentTool: "rect", onToolChange, store, getViewport });
 
     const activeButton = container.querySelector(".tool-button[data-tool-id=\"rect\"]");
     expect(activeButton?.classList.contains("active")).toBe(true);
@@ -30,7 +38,9 @@ describe("Toolbar component", () => {
 
   it("should call onToolChange when a tool button is clicked", async () => {
     const onToolChange = vi.fn();
-    const { container } = render(Toolbar, { currentTool: "select", onToolChange });
+    const store = createMockStore();
+    const getViewport = createMockGetViewport();
+    const { container } = render(Toolbar, { currentTool: "select", onToolChange, store, getViewport });
 
     const ellipseButton = container.querySelector(".tool-button[data-tool-id=\"ellipse\"]") as HTMLButtonElement;
     expect(ellipseButton).toBeTruthy();
@@ -50,7 +60,9 @@ describe("Toolbar component", () => {
     { toolId: "text" as ToolId, label: "Text" },
   ])("should have correct aria-label for $toolId tool", ({ toolId, label }) => {
     const onToolChange = vi.fn();
-    const { container } = render(Toolbar, { currentTool: "select", onToolChange });
+    const store = createMockStore();
+    const getViewport = createMockGetViewport();
+    const { container } = render(Toolbar, { currentTool: "select", onToolChange, store, getViewport });
 
     const button = container.querySelector(`.tool-button[data-tool-id="${toolId}"]`);
     expect(button?.getAttribute("aria-label")).toBe(label);
@@ -58,7 +70,9 @@ describe("Toolbar component", () => {
 
   it("should update active state when currentTool prop changes", async () => {
     const onToolChange = vi.fn();
-    const { container, rerender } = render(Toolbar, { currentTool: "select", onToolChange });
+    const store = createMockStore();
+    const getViewport = createMockGetViewport();
+    const { container, rerender } = render(Toolbar, { currentTool: "select", onToolChange, store, getViewport });
 
     let selectButton = container.querySelector(".tool-button[data-tool-id=\"select\"]");
     let rectButton = container.querySelector(".tool-button[data-tool-id=\"rect\"]");
@@ -66,7 +80,7 @@ describe("Toolbar component", () => {
     expect(selectButton?.classList.contains("active")).toBe(true);
     expect(rectButton?.classList.contains("active")).toBe(false);
 
-    await rerender({ currentTool: "rect", onToolChange });
+    await rerender({ currentTool: "rect", onToolChange, store, getViewport });
 
     selectButton = container.querySelector(".tool-button[data-tool-id=\"select\"]");
     rectButton = container.querySelector(".tool-button[data-tool-id=\"rect\"]");
@@ -77,7 +91,9 @@ describe("Toolbar component", () => {
 
   it("should have proper accessibility attributes", () => {
     const onToolChange = vi.fn();
-    const { container } = render(Toolbar, { currentTool: "select", onToolChange });
+    const store = createMockStore();
+    const getViewport = createMockGetViewport();
+    const { container } = render(Toolbar, { currentTool: "select", onToolChange, store, getViewport });
 
     const toolbar = container.querySelector(".toolbar");
     expect(toolbar?.getAttribute("role")).toBe("toolbar");

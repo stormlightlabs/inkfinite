@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Dialog from '$lib/components/Dialog.svelte';
+	import icon from '../assets/favicon.svg';
 
 	const helpLinks = [
 		{ label: 'Project README', href: 'https://github.com/stormlightlabs/inkfinite', external: true },
@@ -23,7 +24,9 @@
 
 <header class="titlebar">
 	<div class="titlebar__brand">
-		<div class="titlebar__logo">∞</div>
+		<div class="titlebar__logo">
+			<img src={icon} alt="Inkfinite Icon" />
+		</div>
 		<div>
 			<div class="titlebar__name">Inkfinite</div>
 			<div class="titlebar__tagline">Infinite canvas playground</div>

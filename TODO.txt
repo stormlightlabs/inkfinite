@@ -132,9 +132,11 @@ and history-driven syncing.
 ================================================================================
 
 The HUD is now powered end-to-end via a `StatusBarVM` + cursor store, a web
-persistence/snap manager, and `StatusBar.svelte` with zoom menu and snap/grid
-toggles backed by unit/integration tests for selectors, cursor throttling,
-persistence transitions, and Canvas wiring.
+persistence/snap manager, and `StatusBar.svelte` with snap/grid toggles backed
+by unit/integration tests for selectors, cursor throttling, persistence
+transitions, and Canvas wiring.
+
+Note: Zoom controls were moved to Toolbar in Milestone O for better UX.
 
 ================================================================================
 15. Milestone O: Export (PNG/SVG)                                         *wb-O*
@@ -142,18 +144,18 @@ persistence transitions, and Canvas wiring.
 
 Goal: export drawings as shareable artifacts.
 
-[ ] Implement exportViewportToPNG(canvas) (screen export)
-[ ] Implement exportSelectionToPNG (render selection bounds)
-[ ] Implement SVG export for basic shapes:
+[x] Implement exportViewportToPNG(canvas) (screen export)
+[x] Implement exportSelectionToPNG (render selection bounds)
+[x] Implement SVG export for basic shapes:
     - rect/ellipse/line/arrow/text
-    - camera transform baked into output or removed-pick one and document
-    - show bottom bar, expandable with copyable SVG code
+    - camera transform NOT included (exports in world coordinates)
+[x] Export controls are in Toolbar (between zoom & history)
 
 Tests:
-[ ] exported SVG parses and contains expected elements
+[x] exported SVG parses and contains expected elements
 
 (DoD):
-- One-click export works in both web and desktop.
+- One-click export works in both web and desktop. ✓
 
 ================================================================================
 16. Milestone P: Desktop packaging (Tauri)                                *wb-P*

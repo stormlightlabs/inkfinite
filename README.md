@@ -176,6 +176,6 @@ Theme
 
 - **Light:** Nord color palette
 - **Dark:** Iceberg.vim color palette
-- **Font:** Space Grotesk
+- **Font:** Open Sans
 
 </details>

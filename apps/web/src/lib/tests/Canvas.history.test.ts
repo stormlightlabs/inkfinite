@@ -277,7 +277,6 @@ vi.mock("inkfinite-core", () => {
     createPersistenceSink: vi.fn(() => ({ enqueueDocPatch: sinkEnqueueSpy, flush: vi.fn() })),
     buildStatusBarVM: () => ({
       cursorWorld: { x: 0, y: 0 },
-      zoomPct: 100,
       toolId: "select",
       mode: "idle",
       selection: { count: 0 },
@@ -289,6 +288,9 @@ vi.mock("inkfinite-core", () => {
     shapeBounds: () => ({ min: { x: 0, y: 0 }, max: { x: 0, y: 0 } }),
     diffDoc: vi.fn(() => ({})),
     InkfiniteDB: class {},
+    exportToSVG: vi.fn(() => "<svg></svg>"),
+    exportViewportToPNG: vi.fn(() => Promise.resolve(new Blob())),
+    exportSelectionToPNG: vi.fn(() => Promise.resolve(new Blob())),
     __storeInstances: storeInstances,
     __sinkEnqueueSpy: sinkEnqueueSpy,
   };

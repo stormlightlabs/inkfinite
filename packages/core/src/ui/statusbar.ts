@@ -19,7 +19,6 @@ export type PersistenceStatus = {
 export type StatusBarVM = {
   cursorWorld: Vec2;
   cursorScreen?: Vec2;
-  zoomPct: number;
   toolId: ToolId;
   mode: "idle" | "dragging" | "panning" | "text-edit" | string;
   selection: SelectionSummary;
@@ -90,7 +89,6 @@ export function buildStatusBarVM(
   return {
     cursorWorld: Vec2Ops.clone(cursorState.cursorWorld),
     cursorScreen: cursorState.cursorScreen ? Vec2Ops.clone(cursorState.cursorScreen) : undefined,
-    zoomPct: getZoomPct(editorState),
     toolId: getToolId(editorState),
     mode,
     selection: getSelectionSummary(editorState),

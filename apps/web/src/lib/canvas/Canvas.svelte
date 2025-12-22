@@ -234,7 +234,7 @@
 		return { ...action, world: snappedWorld };
 	}
 
-	let canvas: HTMLCanvasElement;
+	let canvas = $state<HTMLCanvasElement>();
 	let renderer: Renderer | null = null;
 	let inputAdapter: InputAdapter | null = null;
 
@@ -285,9 +285,9 @@
 			return store.getState().camera;
 		}
 
-		renderer = createRenderer(canvas, store, { snapProvider, cursorProvider, pointerStateProvider });
+		renderer = createRenderer(canvas!, store, { snapProvider, cursorProvider, pointerStateProvider });
 		inputAdapter = createInputAdapter({
-			canvas,
+			canvas: canvas!,
 			getCamera,
 			getViewport,
 			onAction: handleAction,
@@ -326,10 +326,16 @@
 
 <div class="editor">
 	<TitleBar />
-	<Toolbar currentTool={currentToolId} onToolChange={handleToolChange} onHistoryClick={handleHistoryClick} />
+	<Toolbar
+		currentTool={currentToolId}
+		onToolChange={handleToolChange}
+		onHistoryClick={handleHistoryClick}
+		{store}
+		{getViewport}
+		{canvas} />
 	<canvas bind:this={canvas}></canvas>
 	<HistoryViewer {store} bind:open={historyViewerOpen} onClose={handleHistoryClose} />
-	<StatusBar {store} cursor={cursorStore} persistence={persistenceStatusStore} snap={snapStore} {getViewport} />
+	<StatusBar {store} cursor={cursorStore} persistence={persistenceStatusStore} snap={snapStore} />
 </div>
 
 <style>

@@ -116,7 +116,6 @@ describe("Status bar selectors", () => {
 
       expect(vm.cursorWorld).toEqual({ x: 5, y: 6 });
       expect(vm.cursorScreen).toEqual({ x: 1, y: 2 });
-      expect(vm.zoomPct).toBe(100);
       expect(vm.toolId).toBe("select");
       expect(vm.mode).toBe("dragging");
       expect(vm.selection).toEqual({ count: 1, kind: "rect", bounds: { w: 50, h: 50 } });
