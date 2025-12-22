@@ -1,0 +1,186 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap');
+
+/* Light Theme - Nord */
+:root {
+	/* Polar Night - backgrounds */
+	--bg-primary: #eceff4;
+	--bg-secondary: #e5e9f0;
+	--bg-tertiary: #d8dee9;
+
+	/* Snow Storm - foreground/text */
+	--fg-primary: #2e3440;
+	--fg-secondary: #3b4252;
+	--fg-tertiary: #434c5e;
+	--fg-muted: #4c566a;
+
+	/* Frost - accent colors */
+	--accent-cyan: #8fbcbb;
+	--accent-blue-bright: #88c0d0;
+	--accent-blue: #81a1c1;
+	--accent-blue-dark: #5e81ac;
+
+	/* Aurora - semantic colors */
+	--color-error: #bf616a;
+	--color-warning: #d08770;
+	--color-info: #ebcb8b;
+	--color-success: #a3be8c;
+	--color-purple: #b48ead;
+
+	/* Semantic UI colors */
+	--surface: var(--bg-primary);
+	--surface-elevated: var(--bg-secondary);
+	--surface-overlay: var(--bg-tertiary);
+	--text: var(--fg-primary);
+	--text-secondary: var(--fg-secondary);
+	--text-muted: var(--fg-muted);
+	--border: var(--fg-tertiary);
+	--accent: var(--accent-blue);
+	--accent-hover: var(--accent-blue-dark);
+}
+
+/* Dark Theme - Iceberg */
+@media (prefers-color-scheme: dark) {
+	:root {
+		/* Backgrounds */
+		--bg-primary: #161821;
+		--bg-secondary: #1e2132;
+		--bg-tertiary: #272c42;
+
+		/* Foreground/text */
+		--fg-primary: #c6c8d1;
+		--fg-secondary: #89b8c2;
+		--fg-tertiary: #84a0c6;
+		--fg-muted: #6b7089;
+
+		/* Accents */
+		--accent-purple: #a093c7;
+		--accent-cyan: #89b8c2;
+		--accent-blue: #84a0c6;
+		--accent-search: #e4aa80;
+
+		/* Semantic colors */
+		--color-error: #e27878;
+		--color-warning: #e2a478;
+		--color-success: #b4be82;
+		--color-info: #e4aa80;
+		--color-purple: #a093c7;
+
+		/* UI elements */
+		--line-numbers: #444b71;
+		--selection: #272c42;
+
+		/* Semantic UI colors */
+		--surface: var(--bg-primary);
+		--surface-elevated: var(--bg-secondary);
+		--surface-overlay: var(--bg-tertiary);
+		--text: var(--fg-primary);
+		--text-secondary: var(--fg-secondary);
+		--text-muted: var(--fg-muted);
+		--border: var(--line-numbers);
+		--accent: var(--accent-blue);
+		--accent-hover: var(--accent-cyan);
+	}
+}
+
+/* Manual theme override classes */
+[data-theme='light'] {
+	/* Polar Night - backgrounds */
+	--bg-primary: #eceff4;
+	--bg-secondary: #e5e9f0;
+	--bg-tertiary: #d8dee9;
+
+	/* Snow Storm - foreground/text */
+	--fg-primary: #2e3440;
+	--fg-secondary: #3b4252;
+	--fg-tertiary: #434c5e;
+	--fg-muted: #4c566a;
+
+	/* Frost - accent colors */
+	--accent-cyan: #8fbcbb;
+	--accent-blue-bright: #88c0d0;
+	--accent-blue: #81a1c1;
+	--accent-blue-dark: #5e81ac;
+
+	/* Aurora - semantic colors */
+	--color-error: #bf616a;
+	--color-warning: #d08770;
+	--color-info: #ebcb8b;
+	--color-success: #a3be8c;
+	--color-purple: #b48ead;
+
+	/* Semantic UI colors */
+	--surface: var(--bg-primary);
+	--surface-elevated: var(--bg-secondary);
+	--surface-overlay: var(--bg-tertiary);
+	--text: var(--fg-primary);
+	--text-secondary: var(--fg-secondary);
+	--text-muted: var(--fg-muted);
+	--border: var(--fg-tertiary);
+	--accent: var(--accent-blue);
+	--accent-hover: var(--accent-blue-dark);
+}
+
+[data-theme='dark'] {
+	/* Backgrounds */
+	--bg-primary: #161821;
+	--bg-secondary: #1e2132;
+	--bg-tertiary: #272c42;
+
+	/* Foreground/text */
+	--fg-primary: #c6c8d1;
+	--fg-secondary: #89b8c2;
+	--fg-tertiary: #84a0c6;
+	--fg-muted: #6b7089;
+
+	/* Accents */
+	--accent-purple: #a093c7;
+	--accent-cyan: #89b8c2;
+	--accent-blue: #84a0c6;
+	--accent-search: #e4aa80;
+
+	/* Semantic colors */
+	--color-error: #e27878;
+	--color-warning: #e2a478;
+	--color-success: #b4be82;
+	--color-info: #e4aa80;
+	--color-purple: #a093c7;
+
+	/* UI elements */
+	--line-numbers: #444b71;
+	--selection: #272c42;
+
+	/* Semantic UI colors */
+	--surface: var(--bg-primary);
+	--surface-elevated: var(--bg-secondary);
+	--surface-overlay: var(--bg-tertiary);
+	--text: var(--fg-primary);
+	--text-secondary: var(--fg-secondary);
+	--text-muted: var(--fg-muted);
+	--border: var(--line-numbers);
+	--accent: var(--accent-blue);
+	--accent-hover: var(--accent-cyan);
+}
+
+/* Base styles */
+* {
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+}
+
+body {
+	font-family:
+		'Space Grotesk',
+		-apple-system,
+		BlinkMacSystemFont,
+		'Segoe UI',
+		sans-serif;
+	background-color: var(--surface);
+	color: var(--text);
+	line-height: 1.6;
+}
+
+::selection {
+	background-color: var(--accent);
+	color: var(--surface);
+}
