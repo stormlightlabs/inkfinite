@@ -1,5 +1,6 @@
 export * from "./actions";
 export * from "./camera";
+export * from "./cursor";
 export * from "./geom";
 export * from "./history";
 export * from "./math";
@@ -8,3 +9,4 @@ export * from "./persistence/db";
 export * from "./persistence/web";
 export * from "./reactivity";
 export * from "./tools";
+export * from "./ui/statusbar";
