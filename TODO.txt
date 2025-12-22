@@ -146,8 +146,8 @@ Svelte integration detail:
 N1. Define the StatusBar view model (core, pure TS)
 ------------------------------------------------------------------------------
 
-/packages/core/src/ui/statusbar/types.ts
-[ ] Define StatusBarVM (single object the UI renders):
+/packages/core/src/ui/statusbar.ts
+[x] Define StatusBarVM (single object the UI renders):
     - cursorWorld: { x, y }         " world coords (always)
     - cursorScreen: { x, y }?       " optional dev-only
     - zoomPct: number               " e.g. 100, 67, 250
@@ -179,20 +179,20 @@ Notes:
 N2. Provide selectors / derivations for StatusBarVM
 ------------------------------------------------------------------------------
 
-/packages/core/src/ui/statusbar/selectors.ts
-[ ] Implement pure functions:
+/packages/core/src/ui/statusbar.ts
+[x] Implement pure functions:
     - getZoomPct(state) -> number
     - getToolId(state) -> ToolId
     - getSelectionSummary(state) -> { count, kind?, bounds? }
     - getSnapSummary(state) -> snap summary (default safe values)
 
 Cursor position source:
-[ ] Define a minimal CursorState in core (NOT persisted):
+[x] Define a minimal CursorState in core (NOT persisted):
     - cursorWorld: Vec2
     - cursorScreen?: Vec2
     - lastMoveAt: number
 
-[ ] Add updateCursor(world, screen?) action + reducer handler (or direct setter)
+[x] Add updateCursor(world, screen?) action + reducer handler (or direct setter)
     that ONLY touches CursorState (no history command, no persistence).
 
 (DoD):
@@ -202,13 +202,13 @@ Cursor position source:
 N3. Wire cursor updates from pointer movement (apps/web)
 ------------------------------------------------------------------------------
 
-/apps/web/src/lib/pointer.ts
-[ ] On pointermove (or mousemove when not captured):
+/apps/web/src/lib/input.ts
+[x] On pointermove (or mousemove when not captured):
     - compute world coords using camera.screenToWorld
     - dispatch updateCursor(world, screen)
 
 Performance:
-[ ] Throttle cursor updates:
+[x] Throttle cursor updates:
     - v0: requestAnimationFrame coalescing (only publish latest per frame)
     - avoid flooding render/history/persistence
 
@@ -224,11 +224,11 @@ Expose persistence state without touching the history system (Milestone L is
 done; persistence is already hooked to history in Milestone M).
 
 /apps/web/src/lib/status.ts
-[ ] Extend your persistence sink (from Milestone M) to expose a small status:
+[x] Extend your persistence sink (from Milestone M) to expose a small status:
     - pendingWrites counter (increment on enqueue, decrement on commit)
     - lastSavedAt timestamp (set on successful commit)
     - lastError (set on failed commit)
-[ ] Use Dexie liveQuery to observe the current board’s updatedAt from IndexedDB
+[x] Use Dexie liveQuery to observe the current board’s updatedAt from IndexedDB
     and reflect it in the UI (helps confirm persisted state across tabs).
 
 (DoD):

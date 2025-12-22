@@ -3,6 +3,36 @@ import { cleanup, render } from "vitest-browser-svelte";
 
 const actionHandlers: Array<(action: any) => void> = [];
 const coreMocks = vi.hoisted(() => ({ sinkEnqueueSpy: vi.fn(), storeInstances: [] as any[] }));
+const persistenceMocks = vi.hoisted(() => {
+  const state = {
+    instance: null as null | {
+      sink: { enqueueDocPatch: ReturnType<typeof vi.fn>; flush: ReturnType<typeof vi.fn> };
+      status: {
+        get: () => { backend: string; state: string; pendingWrites: number };
+        subscribe: () => () => void;
+        update: () => void;
+      };
+      setActiveBoard: ReturnType<typeof vi.fn>;
+      dispose: ReturnType<typeof vi.fn>;
+    },
+  };
+  return {
+    state,
+    createPersistenceManager: vi.fn(() => {
+      state.instance = {
+        sink: { enqueueDocPatch: vi.fn(), flush: vi.fn() },
+        status: {
+          get: () => ({ backend: "indexeddb", state: "saved", pendingWrites: 0 }),
+          subscribe: () => () => {},
+          update: () => {},
+        },
+        setActiveBoard: vi.fn(),
+        dispose: vi.fn(),
+      };
+      return state.instance;
+    }),
+  };
+});
 
 vi.mock("../input", () => {
   return {
@@ -12,6 +42,8 @@ vi.mock("../input", () => {
     }),
   };
 });
+
+vi.mock("$lib/status", () => ({ createPersistenceManager: persistenceMocks.createPersistenceManager }));
 
 vi.mock("inkfinite-renderer", () => {
   return { createRenderer: vi.fn(() => ({ dispose: vi.fn(), markDirty: vi.fn() })) };
@@ -216,6 +248,15 @@ vi.mock("inkfinite-core", () => {
     createToolMap: (toolList: any[]) => new Map(toolList.map((tool) => [tool.id, tool])),
     routeAction,
     switchTool: (state: any, toolId: string) => ({ ...state, ui: { ...state.ui, toolId } }),
+    CursorStore: class {
+      updateCursor() {}
+      subscribe() {
+        return () => {};
+      }
+      getState() {
+        return { cursorWorld: { x: 0, y: 0 }, lastMoveAt: Date.now() };
+      }
+    },
     createWebDocRepo,
     createPersistenceSink: vi.fn(() => ({ enqueueDocPatch: sinkEnqueueSpy, flush: vi.fn() })),
     diffDoc: vi.fn(() => ({})),
@@ -256,7 +297,6 @@ describe("Canvas history integration", () => {
     const stores = (InkfiniteCore as any).__storeInstances as Array<{ commands: any[] }>;
     expect(stores.at(-1)?.commands).toHaveLength(1);
     expect(stores.at(-1)?.commands[0].kind).toBe("doc");
-    const sinkSpy = (InkfiniteCore as any).__sinkEnqueueSpy as ReturnType<typeof vi.fn>;
-    expect(sinkSpy).toHaveBeenCalledTimes(1);
+    expect(persistenceMocks.state.instance?.sink.enqueueDocPatch).toHaveBeenCalledTimes(1);
   });
 });

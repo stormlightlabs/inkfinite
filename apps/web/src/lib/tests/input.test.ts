@@ -247,6 +247,41 @@ describe("InputAdapter", () => {
     });
   });
 
+  describe("cursor updates", () => {
+    it("throttles onCursorUpdate via requestAnimationFrame", () => {
+      adapter.dispose();
+      const rafCallbacks: FrameRequestCallback[] = [];
+      const rafSpy = vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb: FrameRequestCallback) => {
+        rafCallbacks.push(cb);
+        return rafCallbacks.length;
+      });
+      const cancelSpy = vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+      const onCursorUpdate = vi.fn();
+
+      adapter = new InputAdapter({
+        canvas,
+        getCamera: () => camera,
+        getViewport: () => ({ width: 800, height: 600 }),
+        onAction: (action) => actions.push(action),
+        onCursorUpdate,
+      });
+
+      canvas.dispatchEvent(createPointerEvent("pointermove", { clientX: 10, clientY: 20 }));
+      canvas.dispatchEvent(createPointerEvent("pointermove", { clientX: 50, clientY: 60 }));
+
+      expect(onCursorUpdate).not.toHaveBeenCalled();
+      expect(rafCallbacks).toHaveLength(1);
+
+      rafCallbacks[0](16);
+
+      expect(onCursorUpdate).toHaveBeenCalledTimes(1);
+      expect(onCursorUpdate).toHaveBeenCalledWith({ x: -350, y: -240 }, { x: 50, y: 60 });
+
+      rafSpy.mockRestore();
+      cancelSpy.mockRestore();
+    });
+  });
+
   describe("wheel events", () => {
     it("should dispatch wheel action", () => {
       const event = createWheelEvent({ clientX: 400, clientY: 300, deltaY: -100 });

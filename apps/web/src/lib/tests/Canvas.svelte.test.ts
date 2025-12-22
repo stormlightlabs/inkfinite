@@ -1,6 +1,24 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render } from "vitest-browser-svelte";
 import Canvas from "../canvas/Canvas.svelte";
+
+vi.mock("$lib/status", () => {
+  return {
+    createPersistenceManager: () => ({
+      sink: {
+        enqueueDocPatch: () => {},
+        flush: () => Promise.resolve(),
+      },
+      status: {
+        get: () => ({ backend: "indexeddb", state: "saved", pendingWrites: 0 }),
+        subscribe: () => () => {},
+        update: () => {},
+      },
+      setActiveBoard: () => {},
+      dispose: () => {},
+    }),
+  };
+});
 
 describe("Canvas component", () => {
   beforeEach(() => {

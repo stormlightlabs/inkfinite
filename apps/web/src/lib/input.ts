@@ -1,4 +1,12 @@
-import { Action, type Action as ActionType, Camera, Modifiers, PointerButtons, type Viewport } from "inkfinite-core";
+import {
+  Action,
+  type Action as ActionType,
+  Camera,
+  Modifiers,
+  PointerButtons,
+  type Vec2,
+  type Viewport,
+} from "inkfinite-core";
 
 /**
  * Pointer state tracked by the input adapter
@@ -30,6 +38,8 @@ export type InputAdapterConfig = {
   getViewport: () => Viewport;
   /** Callback for dispatching actions */
   onAction: (action: ActionType) => void;
+  /** Optional callback for raw cursor updates */
+  onCursorUpdate?: (world: Vec2, screen: Vec2) => void;
   /** Whether to prevent default browser behavior (default: true) */
   preventDefault?: boolean;
   /** Whether to capture keyboard events on window (default: true) */
@@ -49,7 +59,7 @@ export type InputAdapterConfig = {
  * - Dispatches normalized actions
  */
 export class InputAdapter {
-  private config: Required<InputAdapterConfig>;
+  private config: InputAdapterConfig & { preventDefault: boolean; captureKeyboard: boolean };
   private pointerState: PointerState;
   private boundHandlers: {
     pointerDown: (e: PointerEvent) => void;
@@ -60,6 +70,9 @@ export class InputAdapter {
     keyUp: (e: KeyboardEvent) => void;
     contextMenu: (e: Event) => void;
   };
+  private cursorUpdateFrame: number | null;
+  private pendingCursorWorld: Vec2 | null;
+  private pendingCursorScreen: Vec2 | null;
 
   constructor(config: InputAdapterConfig) {
     this.config = {
@@ -86,6 +99,9 @@ export class InputAdapter {
       keyUp: this.handleKeyUp.bind(this),
       contextMenu: this.handleContextMenu.bind(this),
     };
+    this.cursorUpdateFrame = null;
+    this.pendingCursorWorld = null;
+    this.pendingCursorScreen = null;
 
     this.attach();
   }
@@ -130,6 +146,15 @@ export class InputAdapter {
     if (this.config.captureKeyboard) {
       window.removeEventListener("keydown", this.boundHandlers.keyDown);
       window.removeEventListener("keyup", this.boundHandlers.keyUp);
+    }
+
+    if (
+      this.cursorUpdateFrame !== null
+      && typeof window !== "undefined"
+      && typeof window.cancelAnimationFrame === "function"
+    ) {
+      window.cancelAnimationFrame(this.cursorUpdateFrame);
+      this.cursorUpdateFrame = null;
     }
   }
 
@@ -191,6 +216,7 @@ export class InputAdapter {
     this.pointerState.buttons = buttons;
 
     this.config.onAction(Action.pointerMove(screen, world, buttons, modifiers));
+    this.queueCursorUpdate(world, screen);
   }
 
   /**
@@ -235,9 +261,6 @@ export class InputAdapter {
     this.config.onAction(Action.wheel(screen, world, e.deltaY, modifiers));
   }
 
-  /**
-   * Handle key down event
-   */
   private handleKeyDown(e: KeyboardEvent): void {
     const target = e.target as HTMLElement;
     if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable) {
@@ -253,9 +276,6 @@ export class InputAdapter {
     }
   }
 
-  /**
-   * Handle key up event
-   */
   private handleKeyUp(e: KeyboardEvent): void {
     const target = e.target as HTMLElement;
     if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable) {
@@ -266,13 +286,52 @@ export class InputAdapter {
     this.config.onAction(Action.keyUp(e.key, e.code, modifiers));
   }
 
-  /**
-   * Handle context menu event (prevent default)
-   */
   private handleContextMenu(e: Event): void {
     if (this.config.preventDefault) {
       e.preventDefault();
     }
+  }
+
+  /**
+   * Throttle cursor updates using requestAnimationFrame.
+   */
+  private queueCursorUpdate(world: Vec2, screen: Vec2): void {
+    if (!this.config.onCursorUpdate) {
+      return;
+    }
+
+    this.pendingCursorWorld = { x: world.x, y: world.y };
+    this.pendingCursorScreen = { x: screen.x, y: screen.y };
+
+    if (this.cursorUpdateFrame !== null) {
+      return;
+    }
+
+    const schedule = typeof window !== "undefined" && typeof window.requestAnimationFrame === "function"
+      ? window.requestAnimationFrame.bind(window)
+      : null;
+
+    if (!schedule) {
+      this.flushCursorUpdate();
+      return;
+    }
+
+    this.cursorUpdateFrame = schedule(() => {
+      this.cursorUpdateFrame = null;
+      this.flushCursorUpdate();
+    });
+  }
+
+  private flushCursorUpdate(): void {
+    if (!this.config.onCursorUpdate || !this.pendingCursorWorld || !this.pendingCursorScreen) {
+      this.pendingCursorWorld = null;
+      this.pendingCursorScreen = null;
+      return;
+    }
+
+    this.config.onCursorUpdate(this.pendingCursorWorld, this.pendingCursorScreen);
+    this.pendingCursorWorld = null;
+    this.pendingCursorScreen = null;
   }
 
   /**

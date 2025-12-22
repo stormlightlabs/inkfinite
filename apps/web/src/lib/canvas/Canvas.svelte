@@ -2,8 +2,10 @@
 	import HistoryViewer from '$lib/components/HistoryViewer.svelte';
 	import Toolbar from '$lib/components/Toolbar.svelte';
 	import { createInputAdapter, type InputAdapter } from '$lib/input';
+	import { createPersistenceManager } from '$lib/status';
 	import {
 		ArrowTool,
+		CursorStore,
 		EditorState,
 		EllipseTool,
 		InkfiniteDB,
@@ -13,7 +15,6 @@
 		SnapshotCommand,
 		Store,
 		TextTool,
-		createPersistenceSink,
 		createToolMap,
 		createWebDocRepo,
 		diffDoc,
@@ -22,6 +23,7 @@
 		type Action,
 		type CommandKind,
 		type LoadedDoc,
+		type PersistenceSink,
 		type ToolId,
 		type Viewport
 	} from 'inkfinite-core';
@@ -29,7 +31,8 @@
 	import { onDestroy, onMount } from 'svelte';
 
 	let repo: ReturnType<typeof createWebDocRepo> | null = null;
-	let sink: ReturnType<typeof createPersistenceSink> | null = null;
+	let sink: PersistenceSink | null = null;
+	let persistenceManager: ReturnType<typeof createPersistenceManager> | null = null;
 	let activeBoardId: string | null = null;
 
 	const store = new Store(undefined, {
@@ -41,6 +44,7 @@
 			sink.enqueueDocPatch(activeBoardId, patch);
 		}
 	});
+	const cursorStore = new CursorStore();
 
 	function applyLoadedDoc(doc: LoadedDoc) {
 		const firstPageId = doc.order.pageIds[0] ?? Object.keys(doc.pages)[0] ?? null;
@@ -151,7 +155,8 @@
 	onMount(() => {
 		const db = new InkfiniteDB();
 		repo = createWebDocRepo(db);
-		sink = createPersistenceSink(repo, { debounceMs: 200 });
+		persistenceManager = createPersistenceManager(db, repo, { sink: { debounceMs: 200 } });
+		sink = persistenceManager.sink;
 		let disposed = false;
 
 		const hydrate = async () => {
@@ -168,6 +173,7 @@
 				activeBoardId = id;
 				const loaded = await repoInstance.loadDoc(id);
 				if (!disposed) {
+					persistenceManager?.setActiveBoard(id);
 					applyLoadedDoc(loaded);
 				}
 			} catch (error) {
@@ -187,7 +193,13 @@
 		}
 
 		renderer = createRenderer(canvas, store);
-		inputAdapter = createInputAdapter({ canvas, getCamera, getViewport, onAction: handleAction });
+		inputAdapter = createInputAdapter({
+			canvas,
+			getCamera,
+			getViewport,
+			onAction: handleAction,
+			onCursorUpdate: (world, screen) => cursorStore.updateCursor(world, screen)
+		});
 
 		function handleBeforeUnload() {
 			if (sink) {
@@ -212,6 +224,8 @@
 		repo = null;
 		sink = null;
 		activeBoardId = null;
+		persistenceManager?.dispose();
+		persistenceManager = null;
 	});
 </script>
 
