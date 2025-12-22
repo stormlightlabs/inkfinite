@@ -92,10 +92,8 @@ export const ShapeRecord = {
 export type BindingType = "arrow-end";
 export type BindingHandle = "start" | "end";
 
-export type BindingAnchor = {
-  // TODO: 'edge', 'corner', etc.
-  kind: "center";
-};
+// TODO: 'edge', 'corner', etc.
+export type BindingAnchor = { kind: "center" };
 
 export type BindingRecord = {
   id: string;

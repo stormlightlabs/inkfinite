@@ -72,10 +72,13 @@ describe("Canvas component", () => {
     const { container } = render(Canvas);
     const toolButtons = container.querySelectorAll(".tool-button");
 
-    expect(toolButtons.length).toBe(6);
+    expect(toolButtons.length).toBe(7);
 
     const toolIds = Array.from(toolButtons).map((btn) => btn.getAttribute("data-tool-id"));
-    expect(toolIds).toEqual(["select", "rect", "ellipse", "line", "arrow", "text"]);
+    expect(toolIds.slice(0, 6)).toEqual(["select", "rect", "ellipse", "line", "arrow", "text"]);
+
+    const historyButton = container.querySelector(".tool-button.history-button");
+    expect(historyButton).toBeTruthy();
   });
 
   it("should have select tool active by default", () => {

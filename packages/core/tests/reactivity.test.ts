@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { Camera } from "../src/camera";
+import { CreateShapeCommand } from "../src/history";
 import { PageRecord, ShapeRecord } from "../src/model";
 import {
   EditorState as EditorStateOps,
@@ -817,5 +818,319 @@ describe("Integration scenarios", () => {
 
     store.setState((state) => ({ ...state, ui: { ...state.ui, toolId: "ellipse" } }));
     expect(store.getState().ui.toolId).toBe("ellipse");
+  });
+});
+
+describe("History integration", () => {
+  describe("executeCommand", () => {
+    it("should execute command and add to history", () => {
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page1");
+
+      store.setState((state) => ({
+        ...state,
+        doc: { ...state.doc, pages: { page1: page } },
+        ui: { ...state.ui, currentPageId: "page1" },
+      }));
+
+      const shape = ShapeRecord.createRect("page1", 10, 20, { w: 100, h: 50, fill: "#fff", stroke: "#000", radius: 0 });
+
+      const command = new CreateShapeCommand(shape, page.id);
+      store.executeCommand(command);
+
+      const state = store.getState();
+      expect(state.doc.shapes[shape.id]).toBeDefined();
+      expect(store.canUndo()).toBe(true);
+    });
+
+    it("should notify subscribers when command is executed", () => {
+      const store = new Store();
+      const listener = vi.fn();
+
+      store.subscribe(listener);
+      listener.mockClear();
+
+      const page = PageRecord.create("Page 1", "page1");
+      store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
+
+      listener.mockClear();
+
+      const shape = ShapeRecord.createRect("page1", 10, 20, { w: 100, h: 50, fill: "#fff", stroke: "#000", radius: 0 });
+
+      const command = new CreateShapeCommand(shape, page.id);
+      store.executeCommand(command);
+
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("undo", () => {
+    it("should undo last command", () => {
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page1");
+
+      store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
+
+      const shape = ShapeRecord.createRect("page1", 10, 20, { w: 100, h: 50, fill: "#fff", stroke: "#000", radius: 0 });
+
+      const command = new CreateShapeCommand(shape, page.id);
+      store.executeCommand(command);
+
+      expect(store.getState().doc.shapes[shape.id]).toBeDefined();
+
+      store.undo();
+
+      expect(store.getState().doc.shapes[shape.id]).toBeUndefined();
+    });
+
+    it("should return false when nothing to undo", () => {
+      const store = new Store();
+      const result = store.undo();
+
+      expect(result).toBe(false);
+    });
+
+    it("should notify subscribers when undoing", () => {
+      const store = new Store();
+      const listener = vi.fn();
+
+      store.subscribe(listener);
+
+      const page = PageRecord.create("Page 1", "page1");
+      store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
+
+      const shape = ShapeRecord.createRect("page1", 10, 20, { w: 100, h: 50, fill: "#fff", stroke: "#000", radius: 0 });
+
+      const command = new CreateShapeCommand(shape, page.id);
+      store.executeCommand(command);
+
+      listener.mockClear();
+
+      store.undo();
+
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("redo", () => {
+    it("should redo last undone command", () => {
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page1");
+
+      store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
+
+      const shape = ShapeRecord.createRect("page1", 10, 20, { w: 100, h: 50, fill: "#fff", stroke: "#000", radius: 0 });
+
+      const command = new CreateShapeCommand(shape, page.id);
+      store.executeCommand(command);
+      store.undo();
+
+      expect(store.getState().doc.shapes[shape.id]).toBeUndefined();
+
+      store.redo();
+
+      expect(store.getState().doc.shapes[shape.id]).toBeDefined();
+    });
+
+    it("should return false when nothing to redo", () => {
+      const store = new Store();
+      const result = store.redo();
+
+      expect(result).toBe(false);
+    });
+
+    it("should notify subscribers when redoing", () => {
+      const store = new Store();
+      const listener = vi.fn();
+
+      store.subscribe(listener);
+
+      const page = PageRecord.create("Page 1", "page1");
+      store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
+
+      const shape = ShapeRecord.createRect("page1", 10, 20, { w: 100, h: 50, fill: "#fff", stroke: "#000", radius: 0 });
+
+      const command = new CreateShapeCommand(shape, page.id);
+      store.executeCommand(command);
+      store.undo();
+
+      listener.mockClear();
+
+      store.redo();
+
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("canUndo/canRedo", () => {
+    it("should return false initially", () => {
+      const store = new Store();
+
+      expect(store.canUndo()).toBe(false);
+      expect(store.canRedo()).toBe(false);
+    });
+
+    it("should return true after executing command", () => {
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page1");
+
+      store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
+
+      const shape = ShapeRecord.createRect("page1", 10, 20, { w: 100, h: 50, fill: "#fff", stroke: "#000", radius: 0 });
+
+      const command = new CreateShapeCommand(shape, page.id);
+      store.executeCommand(command);
+
+      expect(store.canUndo()).toBe(true);
+      expect(store.canRedo()).toBe(false);
+    });
+
+    it("should return true for redo after undo", () => {
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page1");
+
+      store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
+
+      const shape = ShapeRecord.createRect("page1", 10, 20, { w: 100, h: 50, fill: "#fff", stroke: "#000", radius: 0 });
+
+      const command = new CreateShapeCommand(shape, page.id);
+      store.executeCommand(command);
+      store.undo();
+
+      expect(store.canUndo()).toBe(false);
+      expect(store.canRedo()).toBe(true);
+    });
+  });
+
+  describe("getHistory", () => {
+    it("should return history state", () => {
+      const store = new Store();
+      const history = store.getHistory();
+
+      expect(history).toBeDefined();
+      expect(history.undoStack).toEqual([]);
+      expect(history.redoStack).toEqual([]);
+    });
+
+    it("should return updated history after commands", () => {
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page1");
+
+      store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
+
+      const shape = ShapeRecord.createRect("page1", 10, 20, { w: 100, h: 50, fill: "#fff", stroke: "#000", radius: 0 });
+
+      const command = new CreateShapeCommand(shape, page.id);
+      store.executeCommand(command);
+
+      const history = store.getHistory();
+
+      expect(history.undoStack).toHaveLength(1);
+      expect(history.redoStack).toHaveLength(0);
+    });
+  });
+
+  describe("clearHistory", () => {
+    it("should clear all history", () => {
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page1");
+
+      store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
+
+      const shape = ShapeRecord.createRect("page1", 10, 20, { w: 100, h: 50, fill: "#fff", stroke: "#000", radius: 0 });
+
+      const command = new CreateShapeCommand(shape, page.id);
+      store.executeCommand(command);
+
+      expect(store.canUndo()).toBe(true);
+
+      store.clearHistory();
+
+      expect(store.canUndo()).toBe(false);
+      expect(store.canRedo()).toBe(false);
+    });
+  });
+
+  describe("history with multiple commands", () => {
+    it("should handle multiple commands", () => {
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page1");
+
+      store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
+
+      const shape1 = ShapeRecord.createRect(
+        "page1",
+        10,
+        20,
+        { w: 100, h: 50, fill: "#fff", stroke: "#000", radius: 0 },
+        "shape1",
+      );
+
+      const shape2 = ShapeRecord.createRect("page1", 30, 40, {
+        w: 200,
+        h: 100,
+        fill: "#000",
+        stroke: "#fff",
+        radius: 0,
+      }, "shape2");
+
+      store.executeCommand(new CreateShapeCommand(shape1, page.id));
+      store.executeCommand(new CreateShapeCommand(shape2, page.id));
+
+      expect(store.getState().doc.shapes[shape1.id]).toBeDefined();
+      expect(store.getState().doc.shapes[shape2.id]).toBeDefined();
+
+      store.undo();
+
+      expect(store.getState().doc.shapes[shape1.id]).toBeDefined();
+      expect(store.getState().doc.shapes[shape2.id]).toBeUndefined();
+
+      store.undo();
+
+      expect(store.getState().doc.shapes[shape1.id]).toBeUndefined();
+      expect(store.getState().doc.shapes[shape2.id]).toBeUndefined();
+
+      store.redo();
+
+      expect(store.getState().doc.shapes[shape1.id]).toBeDefined();
+      expect(store.getState().doc.shapes[shape2.id]).toBeUndefined();
+
+      store.redo();
+
+      expect(store.getState().doc.shapes[shape1.id]).toBeDefined();
+      expect(store.getState().doc.shapes[shape2.id]).toBeDefined();
+    });
+
+    it("should clear redo stack when new command is executed", () => {
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page1");
+
+      store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
+
+      const shape1 = ShapeRecord.createRect(
+        "page1",
+        10,
+        20,
+        { w: 100, h: 50, fill: "#fff", stroke: "#000", radius: 0 },
+        "shape1",
+      );
+
+      const shape2 = ShapeRecord.createRect("page1", 30, 40, {
+        w: 200,
+        h: 100,
+        fill: "#000",
+        stroke: "#fff",
+        radius: 0,
+      }, "shape2");
+
+      store.executeCommand(new CreateShapeCommand(shape1, page.id));
+      store.undo();
+
+      expect(store.canRedo()).toBe(true);
+
+      store.executeCommand(new CreateShapeCommand(shape2, page.id));
+
+      expect(store.canRedo()).toBe(false);
+    });
   });
 });

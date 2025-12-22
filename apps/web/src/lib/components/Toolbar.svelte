@@ -1,9 +1,9 @@
 <script lang="ts">
 	import type { ToolId } from 'inkfinite-core';
 
-	type Props = { currentTool: ToolId; onToolChange: (toolId: ToolId) => void };
+	type Props = { currentTool: ToolId; onToolChange: (toolId: ToolId) => void; onHistoryClick?: () => void };
 
-	let { currentTool, onToolChange }: Props = $props();
+	let { currentTool, onToolChange, onHistoryClick }: Props = $props();
 
 	const tools: Array<{ id: ToolId; label: string; icon: string }> = [
 		{ id: 'select', label: 'Select', icon: '⌖' },
@@ -32,6 +32,14 @@
 			<span class="tool-label">{tool.label}</span>
 		</button>
 	{/each}
+
+	{#if onHistoryClick}
+		<div class="toolbar-divider"></div>
+		<button class="tool-button history-button" onclick={onHistoryClick} aria-label="History">
+			<span class="tool-icon">⏱</span>
+			<span class="tool-label">History</span>
+		</button>
+	{/if}
 </div>
 
 <style>
@@ -83,5 +91,15 @@
 		font-size: 11px;
 		line-height: 1;
 		white-space: nowrap;
+	}
+
+	.toolbar-divider {
+		width: 1px;
+		background-color: var(--border);
+		margin: 0 8px;
+	}
+
+	.history-button {
+		margin-left: auto;
 	}
 </style>

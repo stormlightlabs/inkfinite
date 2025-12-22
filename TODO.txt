@@ -338,27 +338,23 @@ Live update:
 Goal: every user-visible change is undoable.
 
 History model (/packages/core/src/history):
-[ ] Define Command:
+[x] Define Command:
     - do(state) -> state
     - undo(state) -> state
 
-[ ] Wrap mutations as commands:
+[x] Wrap mutations as commands:
     - CreateShapeCommand
     - UpdateShapeCommand (with before/after snapshot)
     - DeleteShapesCommand
     - SetSelectionCommand
     - SetCameraCommand
 
-[ ] Implement stacks:
+[x] Implement stacks:
     - undoStack, redoStack
 
-[ ] Wire shortcuts:
+[x] Wire shortcuts:
     - Ctrl/Cmd+Z undo
     - Ctrl/Cmd+Shift+Z redo
-
-Tests:
-[ ] round-trip: do -> undo returns to identical state (deep equal)
-[ ] redo re-applies exactly
 
 (DoD):
 - Undo/redo works for create/move/delete and camera changes.
@@ -380,10 +376,7 @@ Web persistence primitives (/packages/core/src/persist/web):
     - ydoc.getMap("shapes"): Y.Map<shapeId, ShapeRecord>
     - ydoc.getMap("bindings"): Y.Map<bindingId, BindingRecord>
     - ydoc.getArray("pageOrder"): Y.Array<pageId>
-    - per-page shape order: either
-        a. PageRecord.shapeIds is source-of-truth, or
-        b. ydoc.getArray(`page:${id}:shapeOrder`)
-    Pick ONE and document the choice.
+    - per-page shape order: ydoc.getArray(`page:${id}:shapeOrder`)
 
 [ ] Implement WebDocRepo (board-level API):
     - listBoards(): Promise<BoardMeta[]>

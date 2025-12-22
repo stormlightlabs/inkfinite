@@ -18,6 +18,7 @@
 	} from 'inkfinite-core';
 	import { createRenderer, type Renderer } from 'inkfinite-renderer';
 	import { onDestroy, onMount } from 'svelte';
+	import HistoryViewer from '../components/HistoryViewer.svelte';
 	import Toolbar from '../components/Toolbar.svelte';
 	import { createInputAdapter, type InputAdapter } from '../input';
 
@@ -68,6 +69,7 @@
 	const tools = createToolMap([selectTool, rectTool, ellipseTool, lineTool, arrowTool, textTool]);
 
 	let currentToolId = $state<ToolId>('select');
+	let historyViewerOpen = $state(false);
 
 	store.subscribe((state) => {
 		currentToolId = state.ui.toolId;
@@ -77,7 +79,31 @@
 		store.setState((state) => switchTool(state, toolId, tools));
 	}
 
+	function handleHistoryClick() {
+		historyViewerOpen = true;
+	}
+
+	function handleHistoryClose() {
+		historyViewerOpen = false;
+	}
+
 	function handleAction(action: Action) {
+		if (action.type === 'key-down') {
+			const isPrimary =
+				(action.modifiers.meta && navigator.platform.toUpperCase().includes('MAC')) ||
+				(action.modifiers.ctrl && !navigator.platform.toUpperCase().includes('MAC'));
+
+			if (isPrimary && !action.modifiers.shift && (action.key === 'z' || action.key === 'Z')) {
+				store.undo();
+				return;
+			}
+
+			if (isPrimary && action.modifiers.shift && (action.key === 'z' || action.key === 'Z')) {
+				store.redo();
+				return;
+			}
+		}
+
 		store.setState((state) => routeAction(state, action, tools));
 	}
 
@@ -107,8 +133,9 @@
 </script>
 
 <div class="editor">
-	<Toolbar currentTool={currentToolId} onToolChange={handleToolChange} />
+	<Toolbar currentTool={currentToolId} onToolChange={handleToolChange} onHistoryClick={handleHistoryClick} />
 	<canvas bind:this={canvas}></canvas>
+	<HistoryViewer {store} bind:open={historyViewerOpen} onClose={handleHistoryClose} />
 </div>
 
 <style>

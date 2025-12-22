@@ -1,6 +1,7 @@
 import { BehaviorSubject, type Subscription } from "rxjs";
 import type { Camera } from "./camera";
 import { Camera as CameraOps } from "./camera";
+import { type Command, History, type HistoryState } from "./history";
 import type { Document, PageRecord, ShapeRecord } from "./model";
 import { Document as DocumentOps } from "./model";
 
@@ -45,12 +46,15 @@ export type StateListener = (state: EditorState) => void;
  * - Immutable state updates
  * - Invariant enforcement (repairs invalid state)
  * - Subscription management
+ * - Undo/redo history support
  */
 export class Store {
   private readonly state$: BehaviorSubject<EditorState>;
+  private history: HistoryState;
 
   constructor(initialState?: EditorState) {
     this.state$ = new BehaviorSubject(initialState ?? EditorState.create());
+    this.history = History.create();
   }
 
   /**
@@ -66,6 +70,8 @@ export class Store {
    * The updater receives the current state and returns a new state.
    * Invariants are enforced after the update.
    *
+   * Note: This bypasses history. Use executeCommand() for undoable changes.
+   *
    * @param updater - Function that transforms current state to new state
    */
   setState(updater: StateUpdater): void {
@@ -73,6 +79,89 @@ export class Store {
     const newState = updater(currentState);
     const repairedState = enforceInvariants(newState);
     this.state$.next(repairedState);
+  }
+
+  /**
+   * Execute a command and add it to history
+   *
+   * This is the preferred way to make undoable changes to the state.
+   *
+   * @param command - Command to execute
+   */
+  executeCommand(command: Command): void {
+    const currentState = this.state$.value;
+    const [newHistory, newState] = History.execute(this.history, currentState, command);
+    this.history = newHistory;
+    const repairedState = enforceInvariants(newState);
+    this.state$.next(repairedState);
+  }
+
+  /**
+   * Undo the last command
+   *
+   * @returns True if undo was successful, false if nothing to undo
+   */
+  undo(): boolean {
+    const currentState = this.state$.value;
+    const result = History.undo(this.history, currentState);
+
+    if (!result) {
+      return false;
+    }
+
+    const [newHistory, newState] = result;
+    this.history = newHistory;
+    const repairedState = enforceInvariants(newState);
+    this.state$.next(repairedState);
+    return true;
+  }
+
+  /**
+   * Redo the last undone command
+   *
+   * @returns True if redo was successful, false if nothing to redo
+   */
+  redo(): boolean {
+    const currentState = this.state$.value;
+    const result = History.redo(this.history, currentState);
+
+    if (!result) {
+      return false;
+    }
+
+    const [newHistory, newState] = result;
+    this.history = newHistory;
+    const repairedState = enforceInvariants(newState);
+    this.state$.next(repairedState);
+    return true;
+  }
+
+  /**
+   * Check if undo is available
+   */
+  canUndo(): boolean {
+    return History.canUndo(this.history);
+  }
+
+  /**
+   * Check if redo is available
+   */
+  canRedo(): boolean {
+    return History.canRedo(this.history);
+  }
+
+  /**
+   * Get the history state (for debugging/UI)
+   */
+  getHistory(): HistoryState {
+    return this.history;
+  }
+
+  /**
+   * Clear all history
+   */
+  clearHistory(): void {
+    this.history = History.clear();
   }
 
   /**

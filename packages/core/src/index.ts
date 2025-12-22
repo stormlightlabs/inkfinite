@@ -1,6 +1,7 @@
 export * from "./actions";
 export * from "./camera";
 export * from "./geom";
+export * from "./history";
 export * from "./math";
 export * from "./model";
 export * from "./reactivity";
