@@ -1,4 +1,5 @@
-=============================================================================
+================================================================================
+
 Author intent:
 - Build a Svelte-native editor core (TS) + renderer + UI.
 - Keep the "engine" framework-agnostic so Web + Tauri share it.
@@ -8,9 +9,10 @@ Conventions:
 - [ ] Task
 - (DoD) Definition of Done for the milestone
 - Files shown are ideas, not requirements
-==============================================================================
-1. Milestone A: Repo skeleton + dev loop                            *wb-A*
-==============================================================================
+
+================================================================================
+1. Milestone A: Repo skeleton + dev loop                                  *wb-A*
+================================================================================
 
 Goal: a monorepo that can run a blank canvas in web + desktop.
 
@@ -40,498 +42,94 @@ Goal: a monorepo that can run a blank canvas in web + desktop.
 - `pnpm dev:desktop` launches a Tauri window that shows the same canvas.
 - `pnpm test` runs at least 1 passing core test.
 
-==============================================================================
-2. Milestone B: Math + coordinate systems                            *wb-B*
-==============================================================================
+================================================================================
+2. Milestone B: Math + coordinate systems                                 *wb-B*
+================================================================================
 
-Goal: a correct, testable camera transform (world <-> screen).
+Camera math, matrix utilities, and transforms are fully implemented and verified
+so world and screen coordinates map precisely.
 
-Core primitives (/packages/core/src/math.ts):
-[x] Define Vec2 { x, y } + helpers:
-    - add, sub, mulScalar, len, normalize, dot
-[x] Define Box2 { min: Vec2, max: Vec2 }:
-    - fromPoints, containsPoint, intersectsBox
-[x] Define Mat3 (2D affine) or equivalent:
-    - identity
-    - translate(tx, ty)
-    - scale(sx, sy)
-    - rotate(theta)
-    - multiply(a, b)
-    - transformPoint(m, p)
+================================================================================
+3. Milestone C: Document model (records)                                  *wb-C*
+================================================================================
 
-Camera (/packages/core/src/camera.ts):
-[x] Define Camera { x, y, zoom } (world origin + scale)
-[x] Implement worldToScreen(camera, p)
-[x] Implement screenToWorld(camera, p)
-[x] Implement cameraPan(camera, deltaScreen) -> camera'
-[x] Implement cameraZoomAt(camera, factor, anchorScreenPoint) -> camera'
+Document/page/shape/binding records plus validation let the editor serialize and
+reason about drawings safely.
 
-Tests (/packages/core/tests/camera.test.ts):
-[x] worldToScreen(screenToWorld(p)) round-trip within epsilon
-[x] zoomAt keeps anchor point stable (screen position unchanged)
-[x] pan moves world under cursor as expected
+================================================================================
+4. Milestone D: Store + selectors (reactive core)                         *wb-D*
+================================================================================
 
-(DoD):
-- All math/camera functions are unit-tested and pass.
+The reactive store, invariants, and selectors supply deterministic state streams
+for both renderer and UI subscribers.
 
-==============================================================================
-3. Milestone C: Document model (records)                              *wb-C*
-==============================================================================
+================================================================================
+5. Milestone E: Canvas renderer (read-only)                               *wb-E*
+================================================================================
 
-Goal: define the minimal data model that can represent a drawing.
+The renderer now draws the document via Canvas2D with camera transforms,
+DPI scaling, text sizing, and selection outlines.
 
-Records & ID (/packages/core/src/model):
-[x] Implement createId(prefix) -> uuid (v4)
-[x] Define PageRecord { id, name, shapeIds: string[] }
-[x] Define ShapeRecord base:
-    - id, type, pageId
-    - x, y, rot
-    - props: object (type-specific)
+================================================================================
+6. Milestone F: Hit testing (picking)                                     *wb-F*
+================================================================================
 
-[x] Define shape types (minimal):
-    - rect: { w, h, fill, stroke, radius }
-    - ellipse: { w, h, fill, stroke }
-    - line: { a: Vec2, b: Vec2, stroke, width }
-    - arrow: { a: Vec2, b: Vec2, stroke, width }
-    - text: { text, fontSize, fontFamily, color, w? }
+Geometry helpers compute bounds and intersections so hit testing can always
+return the topmost shape under the cursor.
 
-[x] Define BindingRecord (for arrow endpoints):
-    - id, type: "arrow-end"
-    - fromShapeId (arrow id)
-    - toShapeId (target shape id)
-    - handle: "start" | "end"
-    - anchor: e.g. { kind: "center" } for v0
+================================================================================
+7. Milestone G: Input system (pointer + keyboard)                         *wb-G*
+================================================================================
 
-Validation:
-[x] validateDoc(doc) -> { ok | errors[] }
+Pointer and keyboard adapters now normalize events, map them into actions, and
+feed the editor consistently across platforms.
 
-(DoD):
-- You can serialize a doc with a page + 1 shape to JSON and validate it.
+================================================================================
+8. Milestone H: Tool state machine (foundation)                           *wb-H*
+================================================================================
 
-==============================================================================
-4. Milestone D: Store + selectors (reactive core)                      *wb-D*
-==============================================================================
-
-Goal: a fast, deterministic state container for the editor using RxJS
-
-Store (/packages/core/src/reactivity.ts) - RxJS + SvelteKit (runes) friendly
-
-Core types:
-[x] Define EditorState:
-    - doc: { pages, shapes, bindings }
-    - ui: { currentPageId, selectionIds: string[], toolId: ToolId }
-    - camera: { x, y, zoom }
-
-RxJS store (BehaviorSubject-backed):
-[x] Implement createEditorStore(initial: EditorState) that exposes:
-    - state$: Observable<EditorState>         (read stream)
-    - getState(): EditorState                (sync snapshot)
-    - setState(updater: (s) => s): void      (mutation API)
-    - subscribe(listener): () => void        (Svelte-compatible subscribe)
-    - select(selector, eq?): Observable<T>   (derived streams)
-
-    Notes:
-    - Use BehaviorSubject so new subscribers immediately get the current value.
-    - subscribe must return an unsubscribe function.
-
-Selectors (pure functions, no RxJS):
-[x] Implement selectors
-    - getCurrentPage(state)
-    - getShapesOnCurrentPage(state)
-    - getSelectedShapes(state)
-
-Invariants (pick "repair" and test it):
-[x] Implement enforceInvariants(state): EditorState (repair strategy):
-    - selectionIds := selectionIds filtered to existing shapes
-    - currentPageId must exist:
-        - if missing, set to first existing page
-        - if no pages exist, create a default page and set it
-[x] Ensure setState always runs enforceInvariants before publishing next state
-
-Tests
-[x] subscribe immediately receives current state upon subscription (BehaviorSubject behavior)
-[x] subscribe fires exactly once per setState call
-[x] invariants are enforced on any update (selection filtered, page fixed/created)
-
-(DoD):
-- Renderer can subscribe to state$ (or subscribe()) and redraw on any change.
-- SvelteKit can bridge to runes with $effect unsubscribe cleanup.
-
-==============================================================================
-5. Milestone E: Canvas renderer (read-only)                            *wb-E*
-==============================================================================
-
-Goal: draw the document from state, no interactivity yet.
-
-Renderer (/packages/renderer):
-[x] createRenderer(canvas, store) -> { dispose() }
-[x] Implement render loop strategy:
-    - requestAnimationFrame redraw on "dirty" flag
-    - mark dirty on store updates
-[x] Implement draw pipeline:
-    - clear canvas
-    - apply camera transform
-    - draw shapes (rect/ellipse/line/arrow/text)
-    - draw selection outline if selectionIds non-empty
-[x] Implement text measurement fallback:
-    - if text shape has w? else measureText and derive bounds
-[x] Implement pixel ratio handling:
-    - set canvas width/height by devicePixelRatio
-    - scale context accordingly
-
-(DoD):
-- With a hardcoded doc in the store, shapes appear at correct coordinates
-  and stay stable while resizing the browser window.
-
-==============================================================================
-6. Milestone F: Hit testing (picking)                                  *wb-F*
-==============================================================================
-
-Goal: determine what the cursor is over.
-
-Geometry (/packages/core/src/geom):
-[x] shapeBounds(shape) -> Box2
-[x] pointInRect(p, rectShape) -> bool
-[x] pointInEllipse(p, ellipseShape) -> bool
-[x] pointNearSegment(p, a, b, tolerance) -> bool
-[x] hitTestPoint(state, worldPoint) -> shapeId? (topmost wins)
-
-Layering:
-[x] Define draw order = page.shapeIds order
-[x] hitTest uses reverse order for topmost selection
-
-(DoD):
-- You can hover shapes and log the hit shape id (no selection yet).
-
-==============================================================================
-7. Milestone G: Input system (pointer + keyboard)                      *wb-G*
-==============================================================================
-
-Goal: normalize events into editor actions.
-
-Input adapter (/apps/web/src/lib/input):
-[x] Capture pointerdown/move/up
-[x] Convert screen coords -> world coords using camera
-[x] Track pointer state: isDown, startWorld, lastWorld, buttons
-
-Keyboard:
-[x] Capture keydown/keyup
-[x] Normalize modifiers (ctrl/cmd, shift, alt)
-
-Action bus (/packages/core/src/actions.ts):
-[x] Define Action union:
-    - PointerDown, PointerMove, PointerUp
-    - KeyDown, KeyUp
-    - Wheel (for zoom)
-[x] dispatch(action) -> store updates via tool state machine (next milestone)
-
-(DoD):
-- You can pan/zoom camera via wheel/drag with a temporary "camera tool"
-  (even before selection tool exists).
-
-==============================================================================
-8. Milestone H: Tool state machine (foundation)                        *wb-H*
-==============================================================================
-
-Goal: tools are explicit, testable state machines (RxJS based)
-
-Tools (/packages/core/src/tools):
-[x] Define ToolId: "select" | "rect" | "ellipse" | "line" | "arrow" | "text" | "pen"
-[x] Define Tool interface:
-    - id
-    - onEnter(state)
-    - onAction(state, action) -> newState
-    - onExit(state)
-
-Tool router:
-[x] routeAction(state, action) -> newState (delegates to active tool)
-
-(DoD):
-- A dummy tool can consume pointer events and update state deterministically.
+Tool interfaces and the router manage lifecycle hooks so each tool is an
+explicit, testable state machine.
 
 
-==============================================================================
-9. Milestone I: Select/move tool (MVP interaction)                     *wb-I*
-==============================================================================
+================================================================================
+9. Milestone I: Select/move tool (MVP interaction)                        *wb-I*
+================================================================================
 
-Goal: select shapes and drag them.
+Selection logic handles hit selection, marquee, dragging, deletion, and escape
+so shapes can be moved reliably.
 
-Selection:
-[x] PointerDown:
-    - if hit shape: selection = [shapeId] (or add with shift)
-    - else selection = []
-[x] PointerMove while dragging selected:
-    - translate selected shapes by deltaWorld
-[x] PointerUp:
-    - end drag
+================================================================================
+10. Milestone J: Create basic shapes via tools                            *wb-J*
+================================================================================
 
-Marquee select (smallest slices):
-[x] Implement marquee start (on empty canvas pointerdown)
-[x] Render marquee rectangle overlay
-[x] On pointerup, select shapes whose bounds intersect marquee
-
-UX:
-[x] Escape clears selection
-[x] Delete removes selected shapes
-
-(DoD):
-- You can select and move shapes reliably.
-
-==============================================================================
-10. Milestone J: Create basic shapes via tools                         *wb-J*
-==============================================================================
-
-Goal: place shapes with dedicated tools.
-
-Rect tool (repeat pattern for others):
-[x] PointerDown on canvas:
-    - create a draft rect shape with w/h=0 at startWorld
-    - selection = [newId]
-[x] PointerMove:
-    - update w/h based on currentWorld - startWorld
-[x] PointerUp:
-    - if too small, delete it (click-cancel behavior)
-    - else finalize
-
-[x] Implement ellipse tool (same mechanics)
-[x] Implement line tool (a=startWorld, b=currentWorld)
-[x] Implement arrow tool (same as line but type="arrow")
-[x] Implement text tool:
-    - click to create text shape
-    - open in-place editor overlay (contenteditable) in Svelte
-
-(DoD):
-- You can draw rect/ellipse/line/arrow/text on the canvas.
+Rect, ellipse, line, arrow, and text tools now create shapes via click-drag
+interactions with proper finalize/cancel behavior.
 
 ================================================================================
 11. Milestone K: Bindings for arrows (v0)                                 *wb-K*
 ================================================================================
 
-Goal: arrow endpoints can "stick" to shapes.
-
-Binding creation:
-[x] On arrow finalize:
-    - hit test start/end points
-    - if point hits a target shape, create binding record for that handle
-
-Binding resolution:
-[x] resolveArrowEndpoints(state, arrowId) -> { a, b } in world coords
-    - if bound, compute endpoint at target shape bounds center (v0)
-    - else use arrow props a/b
-
-Live update:
-[x] When a target shape moves, bound arrow rerenders automatically
-    - no mutation required if resolve happens during render
-
-(DoD):
-- Arrows remain connected to moved shapes (center-to-center is fine for v0).
+Arrow endpoints bind to target shapes and stay attached by recalculating anchors
+whenever shapes move.
 
 ================================================================================
 12. Milestone L: History (undo/redo)                                      *wb-L*
 ================================================================================
 
-Goal: every user-visible change is undoable.
+All document-affecting actions run through undoable commands with history stacks
+and keyboard shortcuts.
 
-History model (/packages/core/src/history):
-[x] Define Command:
-    - do(state) -> state
-    - undo(state) -> state
-[x] Wrap mutations as commands:
-    - CreateShapeCommand
-    - UpdateShapeCommand (with before/after snapshot)
-    - DeleteShapesCommand
-    - SetSelectionCommand
-    - SetCameraCommand
-[x] Implement stacks:
-    - undoStack, redoStack
-[x] Wire shortcuts:
-    - Ctrl/Cmd+Z undo
-    - Ctrl/Cmd+Shift+Z redo
+================================================================================
+13. Milestone M: Persistence (web) via Dexie + History integration        *wb-M*
+================================================================================
 
-(DoD):
-- Undo/redo works for create/move/delete and camera changes.
+Document changes now persist to IndexedDB via Dexie with migrations, repo API,
+and history-driven syncing.
 
-==============================================================================
-13. Milestone M: Persistence (web) via Dexie + History integration      *wb-M*
-==============================================================================
-
-Goal:
-- Persist boards to IndexedDB using Dexie (with schema versions + data upgrades).
-- Integrate with the (already implemented) history/command system so:
-  - do/undo/redo that changes the document is persisted
-  - non-document UI changes (selection/tool/camera, etc.) are NOT persisted
-
-Storage shape (v0 choice): Normalized tables
-- boards, pages, shapes, bindings + meta + migrations
-
-------------------------------------------------------------------------------
-M1. Dexie DB + schema v1
-------------------------------------------------------------------------------
-
-/apps/web/src/lib/db.ts
-[ ] Create a Dexie DB class `InkfiniteDB` extending Dexie.
-[ ] db.version(1).stores({
-      boards:      'id, name, createdAt, updatedAt',
-      pages:       '[boardId+id], boardId, updatedAt',
-      shapes:      '[boardId+id], boardId, type, updatedAt',
-      bindings:    '[boardId+id], boardId, type, updatedAt',
-      meta:        'key',
-      migrations:  'id, appliedAt'
-    })
-
-[ ] Implement schema upgrade hook(s):
-    - db.version(N).upgrade(tx => runMigrations(tx))
-
-(DoD):
-- DB opens; can insert + read a boards row.
-
-------------------------------------------------------------------------------
-M2. Repo API (what the editor uses)
-------------------------------------------------------------------------------
-
-/packages/core/src/persist/web.ts
-[ ] Define BoardMeta: { id, name, createdAt, updatedAt }.
-[ ] Implement DocRepo methods:
-    - listBoards(): Promise<BoardMeta[]>
-    - createBoard(name): Promise<boardId>
-    - renameBoard(boardId, name): Promise<void>
-    - deleteBoard(boardId): Promise<void>
-    - loadDoc(boardId): Promise<{ pages, shapes, bindings, order }>
-    - applyDocPatch(boardId, patch): Promise<void>
-
-Transactions:
-[ ] Ensure create/delete/applyDocPatch are atomic using db.transaction('rw', ...).
-
-Bulk writes:
-[ ] applyDocPatch uses bulkPut / bulkAdd when writing many shapes/pages/bindings.
-
-(DoD):
-- createBoard -> applyDocPatch -> loadDoc round-trips a simple doc.
-
-------------------------------------------------------------------------------
-M3. Migration system (schema + logical migrations)
-------------------------------------------------------------------------------
-
-Schema versions:
-[ ] When adding indexes/stores:
-    - bump db.version(N).stores(...)
-    - attach .upgrade(tx => ...) for data backfill/reshape
-
-Logical migrations:
-[ ] Create `runMigrations(tx)` called from Version.upgrade():
-    - reads applied ids from migrations table
-    - runs missing migrations in order
-    - writes (id, appliedAt) as each completes
-
-Smallest initial migrations:
-[ ] MIG-0001: backfill boards.createdAt / updatedAt if missing
-[ ] MIG-0002: ensure every board has a default page row
-
-(DoD):
-- Upgrading applies each logical migration exactly once.
-
-------------------------------------------------------------------------------
-M4. History integration (persist on do/undo/redo)
-------------------------------------------------------------------------------
-
-Goal:
-- Any history step that changes the document produces a persistence write.
-- Undo/redo produces persistence writes too.
-- UI-only commands do not touch IndexedDB.
-
-Step 1: Tag commands with persistence intent
-[ ] In your Command types (history layer), add a doc-impact tag:
-    - affectsDoc: boolean
-    - OR kind: 'doc' | 'ui' | 'camera'
-
-Rules (v0):
-- 'doc' commands persist
-- 'ui' and 'camera' do not persist
-
-Step 2: Provide a single hook point in history
-[ ] Add a history callback or event:
-    - onApplied({ kind, beforeState, afterState, commandId, op: 'do'|'undo'|'redo' })
-  This MUST fire after every do/undo/redo.
-
-Step 3: Compute a persistence patch (smallest practical approach)
-[ ] Implement `diffDoc(before.doc, after.doc) -> DocPatch` that outputs:
-    - upserts: pages[], shapes[], bindings[]
-    - deletes: pageIds[], shapeIds[], bindingIds[]
-    - order updates (page order, per-page shape order)
-
-  Note:
-  - Keep it minimal: only compare ids + updatedAt (or stable hash) initially.
-  - If this gets complicated, fall back to “persist full doc snapshot” v0 and
-    switch to patching later (but still behind applyDocPatch).
-
-Step 4: Persist after history events (with batching)
-[ ] Implement `createPersistenceSink(repo)` that exposes:
-    - enqueueDocPatch(boardId, patch): void
-    - flush(): Promise<void>
-
-[ ] Wire history -> sink:
-    - if event.kind === 'doc':
-        sink.enqueueDocPatch(boardId, diffDoc(before, after))
-    - else:
-        no-op
-
-[ ] Batch + flush policy:
-    - debounce 100–250ms
-    - force flush on:
-        - board switch
-        - page unload (best-effort)
-        - explicit Save action
-
-Step 5: Update updatedAt correctly
-[ ] On any persisted doc change, update:
-    - boards.updatedAt = now()
-    - updatedAt on modified rows (pages/shapes/bindings) if you store it
-
-(DoD):
-- Creating/moving/deleting shapes persists through refresh.
-- Undo and redo also persist through refresh.
-- Selection changes do NOT write to Dexie.
-
-------------------------------------------------------------------------------
-M5. Export / Import (backups + portability)
-------------------------------------------------------------------------------
-
-[ ] Export board:
-    - loadDoc(boardId) -> JSON (doc + meta)
-[ ] Import board:
-    - createBoard(name)
-    - applyDocPatch(full snapshot as upserts)
-
-(DoD):
-- Export -> Import recreates the same drawing.
-
-------------------------------------------------------------------------------
-Tests (vitest; use fake IndexedDB)
-------------------------------------------------------------------------------
-
-Dexie correctness:
-[ ] applyDocPatch uses a single transaction for multi-table writes
-[ ] deleteBoard deletes boards + related rows atomically
-
-History integration:
-[ ] doc command do => exactly 1 persistence flush (after debounce)
-[ ] undo => persists (document matches expected)
-[ ] redo => persists (document matches expected)
-[ ] ui-only command => 0 DB writes
-[ ] batching: 10 rapid doc commands => <= 2 writes (depending on debounce window)
-
-------------------------------------------------------------------------------
-Definition of Done
-------------------------------------------------------------------------------
-
-- Web: create board, draw, refresh -> content persists.
-- Undo/redo across refresh works.
-- Migration system exists and is exercised by at least one schema bump + upgrade.
-- Renderer redraws from in-memory state; persistence is driven by history events.
-
-==============================================================================
-14. Milestone N: Desktop packaging (Tauri)                             *wb-N*
-==============================================================================
+================================================================================
+14. Milestone N: Desktop packaging (Tauri)                                *wb-N*
+================================================================================
 
 Goal: same app works as a desktop app with filesystem access.
 
@@ -548,9 +146,9 @@ File dialogs + FS:
 (DoD):
 - Desktop app opens/saves JSON files on disk and reopens them correctly.
 
-==============================================================================
-15. Milestone O: Export (PNG/SVG)                                      *wb-O*
-==============================================================================
+================================================================================
+15. Milestone O: Export (PNG/SVG)                                         *wb-O*
+================================================================================
 
 Goal: export drawings as shareable artifacts.
 
@@ -567,9 +165,9 @@ Tests:
 - One-click export works in both web and desktop.
 
 
-==============================================================================
-16. Milestone P: Performance + big docs (pragmatic)                    *wb-P*
-==============================================================================
+================================================================================
+16. Milestone P: Performance + big docs (pragmatic)                       *wb-P*
+================================================================================
 
 Goal: the editor stays responsive with many shapes.
 
@@ -592,17 +190,17 @@ Goal: the editor stays responsive with many shapes.
 (DoD):
 - 10k simple shapes pans/zooms smoothly on a typical machine.
 
-==============================================================================
-17. Milestone Q: File Browser (web: Dexie inspector, desktop: FS)       *wb-Q*
-==============================================================================
+================================================================================
+17. Milestone Q: File Browser (web: Dexie inspector, desktop: FS)         *wb-Q*
+================================================================================
 
 Goal: A unified “Open board” experience:
 - Web: browse Dexie-backed boards + a useful persistence/migration inspector
 - Desktop: browse real directories/files (native file browser semantics)
 
-------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 Q1. Shared UX contracts
-------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 /packages/core/src/persist/DocRepo.ts:
 [ ] Define DocRepo interface (web + desktop):
@@ -619,9 +217,9 @@ Q1. Shared UX contracts
 (DoD):
 - Svelte UI can render the browser purely from the ViewModel.
 
-------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 Q2. Web: Boards list + Dexie “Inspector” drawer
-------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 /apps/web/src/lib/filebrowser/FileBrowser.svelte:
 [ ] Boards panel:
@@ -648,9 +246,9 @@ Safe deletes:
 (DoD):
 - Web: you can browse boards, open one, and verify migrations + row counts.
 
-------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 Q3. Desktop: real directory + files (Tauri)
-------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 [ ] Add “Workspace folder” concept:
     - pick directory
@@ -668,9 +266,9 @@ Q3. Desktop: real directory + files (Tauri)
 (DoD):
 - Desktop: pick a folder, browse files, open/save boards from disk.
 
-------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 Q4. Parity behaviors
-------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 [ ] Same shortcuts:
     - Ctrl/Cmd+O opens file browser
@@ -681,9 +279,9 @@ Q4. Parity behaviors
 (DoD):
 - Web and desktop feel like the same app, with storage differences made explicit.
 
-==============================================================================
-18. Milestone R: Quality polish (what makes it feel "real")            *wb-R*
-==============================================================================
+================================================================================
+18. Milestone R: Quality polish (what makes it feel "real")               *wb-R*
+================================================================================
 
 Goal: the UX crosses the "this is legit" threshold.
 
@@ -706,9 +304,9 @@ Goal: the UX crosses the "this is legit" threshold.
 (DoD):
 - A user can comfortably draw and edit without surprises.
 
-==============================================================================
-References (URLs)                                                   *wb-refs*
-==============================================================================
+================================================================================
+References (URLs)                                                      *wb-refs*
+================================================================================
 
 tldraw conceptual references (inspiration only):
 - https://tldraw.dev/docs/shapes

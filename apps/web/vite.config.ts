@@ -7,6 +7,7 @@ export default defineConfig({
   plugins: [sveltekit(), devtoolsJson()],
   test: {
     ui: false,
+    watch: false,
     expect: { requireAssertions: true },
     projects: [{
       extends: "./vite.config.ts",

@@ -1,7 +1,14 @@
 import { BehaviorSubject, type Subscription } from "rxjs";
 import type { Camera } from "./camera";
 import { Camera as CameraOps } from "./camera";
-import { type Command, History, type HistoryState } from "./history";
+import {
+  type Command,
+  History,
+  type HistoryAppliedEvent,
+  type HistoryEntry,
+  type HistoryOperation,
+  type HistoryState,
+} from "./history";
 import type { Document, PageRecord, ShapeRecord } from "./model";
 import { Document as DocumentOps } from "./model";
 
@@ -37,6 +44,7 @@ export const EditorState = {
 
 export type StateUpdater = (state: EditorState) => EditorState;
 export type StateListener = (state: EditorState) => void;
+export type StoreOptions = { onHistoryEvent?: (event: HistoryAppliedEvent) => void };
 
 /**
  * Reactive store for editor state
@@ -51,10 +59,12 @@ export type StateListener = (state: EditorState) => void;
 export class Store {
   private readonly state$: BehaviorSubject<EditorState>;
   private history: HistoryState;
+  private readonly historyListener?: (event: HistoryAppliedEvent) => void;
 
-  constructor(initialState?: EditorState) {
+  constructor(initialState?: EditorState, options?: StoreOptions) {
     this.state$ = new BehaviorSubject(initialState ?? EditorState.create());
     this.history = History.create();
+    this.historyListener = options?.onHistoryEvent;
   }
 
   /**
@@ -94,6 +104,10 @@ export class Store {
     this.history = newHistory;
     const repairedState = enforceInvariants(newState);
     this.state$.next(repairedState);
+    const entry = this.history.undoStack.at(-1);
+    if (entry) {
+      this.emitHistoryEvent("do", entry, currentState, repairedState);
+    }
   }
 
   /**
@@ -103,6 +117,7 @@ export class Store {
    */
   undo(): boolean {
     const currentState = this.state$.value;
+    const entry = this.history.undoStack.at(-1);
     const result = History.undo(this.history, currentState);
 
     if (!result) {
@@ -113,6 +128,9 @@ export class Store {
     this.history = newHistory;
     const repairedState = enforceInvariants(newState);
     this.state$.next(repairedState);
+    if (entry) {
+      this.emitHistoryEvent("undo", entry, currentState, repairedState);
+    }
     return true;
   }
 
@@ -123,6 +141,7 @@ export class Store {
    */
   redo(): boolean {
     const currentState = this.state$.value;
+    const entry = this.history.redoStack.at(-1);
     const result = History.redo(this.history, currentState);
 
     if (!result) {
@@ -133,6 +152,9 @@ export class Store {
     this.history = newHistory;
     const repairedState = enforceInvariants(newState);
     this.state$.next(repairedState);
+    if (entry) {
+      this.emitHistoryEvent("redo", entry, currentState, repairedState);
+    }
     return true;
   }
 
@@ -183,6 +205,26 @@ export class Store {
    */
   getObservable() {
     return this.state$.asObservable();
+  }
+
+  private emitHistoryEvent(
+    op: HistoryOperation,
+    entry: HistoryEntry,
+    beforeState: EditorState,
+    afterState: EditorState,
+  ): void {
+    if (!this.historyListener) {
+      return;
+    }
+
+    this.historyListener({
+      op,
+      commandId: entry.timestamp,
+      command: entry.command,
+      kind: entry.command.kind,
+      beforeState,
+      afterState,
+    });
   }
 }
 

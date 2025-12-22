@@ -2,6 +2,19 @@ import type { Camera } from "./camera";
 import type { ShapeRecord } from "./model";
 import type { EditorState } from "./reactivity";
 
+export type CommandKind = "doc" | "ui" | "camera";
+
+export type HistoryOperation = "do" | "undo" | "redo";
+
+export type HistoryAppliedEvent = {
+  op: HistoryOperation;
+  commandId: number;
+  command: Command;
+  kind: CommandKind;
+  beforeState: EditorState;
+  afterState: EditorState;
+};
+
 /**
  * Command interface for undo/redo operations
  *
@@ -10,6 +23,8 @@ import type { EditorState } from "./reactivity";
 export interface Command {
   /** Display name for this command (shown in history UI) */
   readonly name: string;
+  /** Command category, used for persistence decisions */
+  readonly kind: CommandKind;
 
   /**
    * Execute the command and return the new state
@@ -31,6 +46,7 @@ export interface Command {
  */
 export class CreateShapeCommand implements Command {
   readonly name: string;
+  readonly kind = "doc" as const;
 
   constructor(private readonly shape: ShapeRecord, private readonly pageId: string) {
     this.name = `Create ${shape.type}`;
@@ -79,6 +95,7 @@ export class CreateShapeCommand implements Command {
  */
 export class UpdateShapeCommand implements Command {
   readonly name: string;
+  readonly kind = "doc" as const;
 
   constructor(
     private readonly shapeId: string,
@@ -102,6 +119,7 @@ export class UpdateShapeCommand implements Command {
  */
 export class DeleteShapesCommand implements Command {
   readonly name: string;
+  readonly kind = "doc" as const;
 
   constructor(private readonly shapes: ShapeRecord[], private readonly pageId: string) {
     this.name = shapes.length === 1 ? `Delete ${shapes[0].type}` : `Delete ${shapes.length} shapes`;
@@ -162,6 +180,7 @@ export class DeleteShapesCommand implements Command {
  */
 export class SetSelectionCommand implements Command {
   readonly name = "Change selection";
+  readonly kind = "ui" as const;
 
   constructor(private readonly before: string[], private readonly after: string[]) {}
 
@@ -179,6 +198,7 @@ export class SetSelectionCommand implements Command {
  */
 export class SetCameraCommand implements Command {
   readonly name = "Move camera";
+  readonly kind = "camera" as const;
 
   constructor(private readonly before: Camera, private readonly after: Camera) {}
 

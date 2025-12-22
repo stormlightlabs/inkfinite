@@ -1,64 +1,52 @@
 <script lang="ts">
+	import HistoryViewer from '$lib/components/HistoryViewer.svelte';
+	import Toolbar from '$lib/components/Toolbar.svelte';
+	import { createInputAdapter, type InputAdapter } from '$lib/input';
 	import {
 		ArrowTool,
 		EllipseTool,
+		InkfiniteDB,
 		LineTool,
-		PageRecord,
 		RectTool,
 		SelectTool,
-		ShapeRecord,
 		Store,
 		TextTool,
+		createPersistenceSink,
 		createToolMap,
+		createWebDocRepo,
+		diffDoc,
 		routeAction,
 		switchTool,
 		type Action,
+		type LoadedDoc,
 		type ToolId,
 		type Viewport
 	} from 'inkfinite-core';
 	import { createRenderer, type Renderer } from 'inkfinite-renderer';
 	import { onDestroy, onMount } from 'svelte';
-	import HistoryViewer from '../components/HistoryViewer.svelte';
-	import Toolbar from '../components/Toolbar.svelte';
-	import { createInputAdapter, type InputAdapter } from '../input';
 
-	const store = new Store();
+	let repo: ReturnType<typeof createWebDocRepo> | null = null;
+	let sink: ReturnType<typeof createPersistenceSink> | null = null;
+	let activeBoardId: string | null = null;
 
-	store.setState((state) => {
-		const page = PageRecord.create('Page 1');
-		const rect1 = ShapeRecord.createRect(page.id, -200, -100, {
-			w: 150,
-			h: 100,
-			fill: '#ff6b6b',
-			stroke: '#c92a2a',
-			radius: 8
-		});
-		const rect2 = ShapeRecord.createRect(page.id, 50, -50, {
-			w: 120,
-			h: 80,
-			fill: '#4dabf7',
-			stroke: '#1971c2',
-			radius: 8
-		});
-		const ellipse = ShapeRecord.createEllipse(page.id, -100, 100, {
-			w: 100,
-			h: 100,
-			fill: '#51cf66',
-			stroke: '#2f9e44'
-		});
-
-		page.shapeIds.push(rect1.id, rect2.id, ellipse.id);
-
-		return {
-			...state,
-			doc: {
-				...state.doc,
-				pages: { [page.id]: page },
-				shapes: { [rect1.id]: rect1, [rect2.id]: rect2, [ellipse.id]: ellipse }
-			},
-			ui: { ...state.ui, currentPageId: page.id }
-		};
+	const store = new Store(undefined, {
+		onHistoryEvent: (event) => {
+			if (!activeBoardId || event.kind !== 'doc' || !sink) {
+				return;
+			}
+			const patch = diffDoc(event.beforeState.doc, event.afterState.doc);
+			sink.enqueueDocPatch(activeBoardId, patch);
+		}
 	});
+
+	function applyLoadedDoc(doc: LoadedDoc) {
+		const firstPageId = doc.order.pageIds[0] ?? Object.keys(doc.pages)[0] ?? null;
+		store.setState((state) => ({
+			...state,
+			doc: { pages: doc.pages, shapes: doc.shapes, bindings: doc.bindings },
+			ui: { ...state.ui, currentPageId: firstPageId }
+		}));
+	}
 
 	const selectTool = new SelectTool();
 	const rectTool = new RectTool();
@@ -112,7 +100,33 @@
 	let inputAdapter: InputAdapter | null = null;
 
 	onMount(() => {
-		renderer = createRenderer(canvas, store);
+		const db = new InkfiniteDB();
+		repo = createWebDocRepo(db);
+		sink = createPersistenceSink(repo, { debounceMs: 200 });
+		let disposed = false;
+
+		const hydrate = async () => {
+			const repoInstance = repo;
+			if (!repoInstance) {
+				return;
+			}
+			try {
+				const boards = await repoInstance.listBoards();
+				const id = boards[0]?.id ?? (await repoInstance.createBoard('My board'));
+				if (disposed) {
+					return;
+				}
+				activeBoardId = id;
+				const loaded = await repoInstance.loadDoc(id);
+				if (!disposed) {
+					applyLoadedDoc(loaded);
+				}
+			} catch (error) {
+				console.error('Failed to load board', error);
+			}
+		};
+
+		hydrate();
 
 		function getViewport(): Viewport {
 			const rect = canvas.getBoundingClientRect();
@@ -123,12 +137,32 @@
 			return store.getState().camera;
 		}
 
+		renderer = createRenderer(canvas, store);
 		inputAdapter = createInputAdapter({ canvas, getCamera, getViewport, onAction: handleAction });
+
+		function handleBeforeUnload() {
+			if (sink) {
+				void sink.flush();
+			}
+		}
+
+		window.addEventListener('beforeunload', handleBeforeUnload);
+
+		return () => {
+			disposed = true;
+			window.removeEventListener('beforeunload', handleBeforeUnload);
+		};
 	});
 
 	onDestroy(() => {
 		renderer?.dispose();
 		inputAdapter?.dispose();
+		if (sink) {
+			void sink.flush();
+		}
+		repo = null;
+		sink = null;
+		activeBoardId = null;
 	});
 </script>
 

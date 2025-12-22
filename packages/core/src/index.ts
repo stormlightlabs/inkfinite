@@ -4,5 +4,7 @@ export * from "./geom";
 export * from "./history";
 export * from "./math";
 export * from "./model";
+export * from "./persistence/db";
+export * from "./persistence/web";
 export * from "./reactivity";
 export * from "./tools";
