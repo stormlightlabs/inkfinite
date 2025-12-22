@@ -6,6 +6,7 @@ import {
   History,
   SetCameraCommand,
   SetSelectionCommand,
+  SnapshotCommand,
   UpdateShapeCommand,
 } from "../src/history";
 import { PageRecord, ShapeRecord } from "../src/model";
@@ -25,6 +26,49 @@ describe("History", () => {
 
       expect(History.canUndo(history)).toBe(false);
       expect(History.canRedo(history)).toBe(false);
+    });
+  });
+
+  describe("SnapshotCommand", () => {
+    it("clones before/after states so mutations do not leak", () => {
+      const before = EditorState.create();
+      const after = EditorState.clone(before);
+      const page = PageRecord.create("Snapshot Page");
+      after.doc.pages[page.id] = page;
+      const command = new SnapshotCommand("Snapshot", "doc", before, after);
+
+      const result = command.do(before);
+      expect(result).toEqual(after);
+      expect(result).not.toBe(after);
+
+      (result.doc.pages[page.id] as PageRecord).name = "Mutated";
+      expect(after.doc.pages[page.id]?.name).toBe("Snapshot Page");
+      const undoState = command.undo(after);
+      expect(undoState).toEqual(before);
+      expect(undoState).not.toBe(before);
+      expect(before.doc.pages[page.id]).toBeUndefined();
+    });
+
+    it("works with history execute/undo/redo flow", () => {
+      const before = EditorState.create();
+      const after = EditorState.clone(before);
+      const page = PageRecord.create("Snapshot Page");
+      after.doc.pages[page.id] = page;
+      const command = new SnapshotCommand("Snapshot", "doc", before, after);
+      const history = History.create();
+
+      const [historyAfterDo, stateAfterDo] = History.execute(history, before, command);
+      expect(stateAfterDo).toEqual(after);
+
+      const undoResult = History.undo(historyAfterDo, stateAfterDo);
+      expect(undoResult).not.toBeNull();
+      const [historyAfterUndo, stateAfterUndo] = undoResult!;
+      expect(stateAfterUndo).toEqual(before);
+
+      const redoResult = History.redo(historyAfterUndo, stateAfterUndo);
+      expect(redoResult).not.toBeNull();
+      const [, stateAfterRedo] = redoResult!;
+      expect(stateAfterRedo).toEqual(after);
     });
   });
 

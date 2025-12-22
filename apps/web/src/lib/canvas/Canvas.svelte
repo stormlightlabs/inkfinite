@@ -4,11 +4,13 @@
 	import { createInputAdapter, type InputAdapter } from '$lib/input';
 	import {
 		ArrowTool,
+		EditorState,
 		EllipseTool,
 		InkfiniteDB,
 		LineTool,
 		RectTool,
 		SelectTool,
+		SnapshotCommand,
 		Store,
 		TextTool,
 		createPersistenceSink,
@@ -18,6 +20,7 @@
 		routeAction,
 		switchTool,
 		type Action,
+		type CommandKind,
 		type LoadedDoc,
 		type ToolId,
 		type Viewport
@@ -75,6 +78,19 @@
 		historyViewerOpen = false;
 	}
 
+	function applyActionWithHistory(action: Action) {
+		const before = store.getState();
+		const nextState = routeAction(before, action, tools);
+		if (statesEqual(before, nextState)) {
+			return;
+		}
+
+		const kind = getCommandKind(before, nextState);
+		const commandName = describeAction(action, kind);
+		const command = new SnapshotCommand(commandName, kind, EditorState.clone(before), EditorState.clone(nextState));
+		store.executeCommand(command);
+	}
+
 	function handleAction(action: Action) {
 		if (action.type === 'key-down') {
 			const isPrimary =
@@ -92,7 +108,40 @@
 			}
 		}
 
-		store.setState((state) => routeAction(state, action, tools));
+		applyActionWithHistory(action);
+	}
+
+	function statesEqual(a: EditorState, b: EditorState): boolean {
+		return a.doc === b.doc && a.camera === b.camera && a.ui === b.ui;
+	}
+
+	function getCommandKind(before: EditorState, after: EditorState): CommandKind {
+		if (before.doc !== after.doc) {
+			return 'doc';
+		}
+		if (before.camera !== after.camera) {
+			return 'camera';
+		}
+		return 'ui';
+	}
+
+	function describeAction(action: Action, kind: CommandKind): string {
+		switch (action.type) {
+			case 'pointer-down':
+				return 'Pointer down';
+			case 'pointer-move':
+				return 'Pointer move';
+			case 'pointer-up':
+				return 'Pointer up';
+			case 'wheel':
+				return 'Wheel';
+			case 'key-down':
+				return 'Key down';
+			case 'key-up':
+				return 'Key up';
+			default:
+				return kind === 'doc' ? 'Edit' : kind === 'camera' ? 'Camera change' : 'UI change';
+		}
 	}
 
 	let canvas: HTMLCanvasElement;

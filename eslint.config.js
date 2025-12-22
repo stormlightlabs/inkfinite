@@ -23,6 +23,7 @@ export default defineConfig(
       "unicorn/prefer-ternary": "off",
       "unicorn/no-null": "off",
       "unicorn/no-array-reverse": "off",
+      "unicorn/prefer-structured-clone": "off",
       "unicorn/prevent-abbreviations": ["error", {
         "replacements": { "i": false, "props": false, "doc": false, "db": false },
       }],

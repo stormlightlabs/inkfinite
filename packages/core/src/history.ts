@@ -14,7 +14,6 @@ export type HistoryAppliedEvent = {
   beforeState: EditorState;
   afterState: EditorState;
 };
-
 /**
  * Command interface for undo/redo operations
  *
@@ -39,6 +38,31 @@ export interface Command {
    * @returns New editor state with command undone
    */
   undo(state: EditorState): EditorState;
+}
+
+/**
+ * Generic command that stores before/after state snapshots.
+ */
+export class SnapshotCommand implements Command {
+  readonly name: string;
+  readonly kind: CommandKind;
+  private readonly before: EditorState;
+  private readonly after: EditorState;
+
+  constructor(name: string, kind: CommandKind, before: EditorState, after: EditorState) {
+    this.name = name;
+    this.kind = kind;
+    this.before = deepCloneState(before);
+    this.after = deepCloneState(after);
+  }
+
+  do(_: EditorState): EditorState {
+    return deepCloneState(this.after);
+  }
+
+  undo(_: EditorState): EditorState {
+    return deepCloneState(this.before);
+  }
 }
 
 /**
@@ -312,3 +336,11 @@ export const History = {
     return History.create();
   },
 };
+
+function deepCloneState(state: EditorState): EditorState {
+  if (typeof structuredClone === "function") {
+    return structuredClone(state);
+  }
+
+  return JSON.parse(JSON.stringify(state)) as EditorState;
+}

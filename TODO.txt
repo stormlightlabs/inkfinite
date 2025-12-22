@@ -157,6 +157,7 @@ Goal: export drawings as shareable artifacts.
 [ ] Implement SVG export for basic shapes:
     - rect/ellipse/line/arrow/text
     - camera transform baked into output or removed-pick one and document
+    - show bottom bar, expandable with copyable SVG code
 
 Tests:
 [ ] exported SVG parses and contains expected elements
@@ -287,7 +288,7 @@ Goal: the UX crosses the "this is legit" threshold.
 
 [ ] Snapping:
     - snap move to grid
-    - snap to other shape edges/centers (basic)
+    - snap to other shape edges/centers
 [ ] Handles:
     - resize handles for rect/ellipse
     - rotate handle
