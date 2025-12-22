@@ -31,6 +31,10 @@ importers:
         version: 8.50.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
 
   apps/web:
+    dependencies:
+      inkfinite-core:
+        specifier: workspace:*
+        version: link:../../packages/core
     devDependencies:
       '@eslint/compat':
         specifier: ^1.4.0

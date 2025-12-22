@@ -218,20 +218,20 @@ Tests:
 Goal: normalize events into editor actions.
 
 Input adapter (/apps/web/src/lib/input):
-[ ] Capture pointerdown/move/up
-[ ] Convert screen coords -> world coords using camera
-[ ] Track pointer state: isDown, startWorld, lastWorld, buttons
+[x] Capture pointerdown/move/up
+[x] Convert screen coords -> world coords using camera
+[x] Track pointer state: isDown, startWorld, lastWorld, buttons
 
 Keyboard:
-[ ] Capture keydown/keyup
-[ ] Normalize modifiers (ctrl/cmd, shift, alt)
+[x] Capture keydown/keyup
+[x] Normalize modifiers (ctrl/cmd, shift, alt)
 
-Action bus (/packages/core/src/actions):
-[ ] Define Action union:
+Action bus (/packages/core/src/actions.ts):
+[x] Define Action union:
     - PointerDown, PointerMove, PointerUp
     - KeyDown, KeyUp
     - Wheel (for zoom)
-[ ] dispatch(action) -> store updates via tool state machine (next milestone)
+[x] dispatch(action) -> store updates via tool state machine (next milestone)
 
 (DoD):
 - You can pan/zoom camera via wheel/drag with a temporary "camera tool"
@@ -242,7 +242,7 @@ Action bus (/packages/core/src/actions):
 8. Milestone H: Tool state machine (foundation)                        *wb-H*
 ==============================================================================
 
-Goal: tools are explicit, testable state machines.
+Goal: tools are explicit, testable state machines (RxJS based)
 
 Tools (/packages/core/src/tools):
 [ ] Define ToolId: "select" | "rect" | "ellipse" | "line" | "arrow" | "text" | "pen"
