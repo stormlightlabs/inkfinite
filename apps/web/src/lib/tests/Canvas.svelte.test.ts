@@ -17,6 +17,17 @@ vi.mock("$lib/status", () => {
       setActiveBoard: () => {},
       dispose: () => {},
     }),
+    createStatusStore: () => ({
+      get: () => ({ backend: "indexeddb", state: "saved", pendingWrites: 0 }),
+      subscribe: () => () => {},
+      update: () => {},
+    }),
+    createSnapStore: () => ({
+      get: () => ({ snapEnabled: false, gridEnabled: false, gridSize: 10 }),
+      subscribe: () => () => {},
+      update: () => {},
+      set: () => {},
+    }),
   };
 });
 
@@ -84,6 +95,13 @@ describe("Canvas component", () => {
     const style = window.getComputedStyle(editor as Element);
     expect(style.display).toBe("flex");
     expect(style.flexDirection).toBe("column");
+  });
+
+  it("should render the status bar", () => {
+    const { container } = render(Canvas);
+    const statusBar = container.querySelector(".status-bar");
+
+    expect(statusBar).toBeTruthy();
   });
 
   it("should render all tool buttons in toolbar", () => {

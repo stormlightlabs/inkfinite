@@ -1,8 +1,15 @@
 <script lang="ts">
 	import HistoryViewer from '$lib/components/HistoryViewer.svelte';
+	import StatusBar from '$lib/components/StatusBar.svelte';
 	import Toolbar from '$lib/components/Toolbar.svelte';
 	import { createInputAdapter, type InputAdapter } from '$lib/input';
-	import { createPersistenceManager } from '$lib/status';
+	import {
+		createPersistenceManager,
+		createSnapStore,
+		createStatusStore,
+		type SnapStore,
+		type StatusStore
+	} from '$lib/status';
 	import {
 		ArrowTool,
 		CursorStore,
@@ -33,6 +40,8 @@
 	let repo: ReturnType<typeof createWebDocRepo> | null = null;
 	let sink: PersistenceSink | null = null;
 	let persistenceManager: ReturnType<typeof createPersistenceManager> | null = null;
+	const fallbackStatusStore = createStatusStore({ backend: 'indexeddb', state: 'saved', pendingWrites: 0 });
+	let persistenceStatusStore = $state<StatusStore>(fallbackStatusStore);
 	let activeBoardId: string | null = null;
 
 	const store = new Store(undefined, {
@@ -45,6 +54,7 @@
 		}
 	});
 	const cursorStore = new CursorStore();
+	const snapStore: SnapStore = createSnapStore();
 
 	function applyLoadedDoc(doc: LoadedDoc) {
 		const firstPageId = doc.order.pageIds[0] ?? Object.keys(doc.pages)[0] ?? null;
@@ -96,23 +106,24 @@
 	}
 
 	function handleAction(action: Action) {
-		if (action.type === 'key-down') {
+		const actionWithSnap = applySnapping(action);
+		if (actionWithSnap.type === 'key-down') {
 			const isPrimary =
-				(action.modifiers.meta && navigator.platform.toUpperCase().includes('MAC')) ||
-				(action.modifiers.ctrl && !navigator.platform.toUpperCase().includes('MAC'));
+				(actionWithSnap.modifiers.meta && navigator.platform.toUpperCase().includes('MAC')) ||
+				(actionWithSnap.modifiers.ctrl && !navigator.platform.toUpperCase().includes('MAC'));
 
-			if (isPrimary && !action.modifiers.shift && (action.key === 'z' || action.key === 'Z')) {
+			if (isPrimary && !actionWithSnap.modifiers.shift && (actionWithSnap.key === 'z' || actionWithSnap.key === 'Z')) {
 				store.undo();
 				return;
 			}
 
-			if (isPrimary && action.modifiers.shift && (action.key === 'z' || action.key === 'Z')) {
+			if (isPrimary && actionWithSnap.modifiers.shift && (actionWithSnap.key === 'z' || actionWithSnap.key === 'Z')) {
 				store.redo();
 				return;
 			}
 		}
 
-		applyActionWithHistory(action);
+		applyActionWithHistory(actionWithSnap);
 	}
 
 	function statesEqual(a: EditorState, b: EditorState): boolean {
@@ -148,15 +159,40 @@
 		}
 	}
 
+	function applySnapping(action: Action): Action {
+		const snap = snapStore.get();
+		if (!snap.snapEnabled || !snap.gridEnabled) {
+			return action;
+		}
+		if (!('world' in action)) {
+			return action;
+		}
+		const snapCoord = (value: number) => Math.round(value / snap.gridSize) * snap.gridSize;
+		const snappedWorld = { x: snapCoord(action.world.x), y: snapCoord(action.world.y) };
+		return { ...action, world: snappedWorld };
+	}
+
 	let canvas: HTMLCanvasElement;
 	let renderer: Renderer | null = null;
 	let inputAdapter: InputAdapter | null = null;
+
+	function getViewport(): Viewport {
+		if (canvas) {
+			const rect = canvas.getBoundingClientRect();
+			return { width: rect.width || 1, height: rect.height || 1 };
+		}
+		if (typeof window !== 'undefined') {
+			return { width: window.innerWidth || 1, height: window.innerHeight || 1 };
+		}
+		return { width: 1, height: 1 };
+	}
 
 	onMount(() => {
 		const db = new InkfiniteDB();
 		repo = createWebDocRepo(db);
 		persistenceManager = createPersistenceManager(db, repo, { sink: { debounceMs: 200 } });
 		sink = persistenceManager.sink;
+		persistenceStatusStore = persistenceManager.status;
 		let disposed = false;
 
 		const hydrate = async () => {
@@ -182,11 +218,6 @@
 		};
 
 		hydrate();
-
-		function getViewport(): Viewport {
-			const rect = canvas.getBoundingClientRect();
-			return { width: rect.width, height: rect.height };
-		}
 
 		function getCamera() {
 			return store.getState().camera;
@@ -226,6 +257,8 @@
 		activeBoardId = null;
 		persistenceManager?.dispose();
 		persistenceManager = null;
+		fallbackStatusStore.update(() => ({ backend: 'indexeddb', state: 'saved', pendingWrites: 0 }));
+		persistenceStatusStore = fallbackStatusStore;
 	});
 </script>
 
@@ -233,6 +266,7 @@
 	<Toolbar currentTool={currentToolId} onToolChange={handleToolChange} onHistoryClick={handleHistoryClick} />
 	<canvas bind:this={canvas}></canvas>
 	<HistoryViewer {store} bind:open={historyViewerOpen} onClose={handleHistoryClose} />
+	<StatusBar {store} cursor={cursorStore} persistence={persistenceStatusStore} snap={snapStore} {getViewport} />
 </div>
 
 <style>

@@ -20,6 +20,15 @@ type LiveQueryFactory = typeof liveQuery;
 
 export type PersistenceManagerOptions = { sink?: PersistenceSinkOptions; liveQueryFn?: LiveQueryFactory };
 
+export type SnapSettings = { snapEnabled: boolean; gridEnabled: boolean; gridSize: number };
+
+export type SnapStore = {
+  get(): SnapSettings;
+  subscribe(listener: (snap: SnapSettings) => void): () => void;
+  update(updater: (snap: SnapSettings) => SnapSettings): void;
+  set(next: SnapSettings): void;
+};
+
 export type PersistenceManager = {
   sink: PersistenceSink;
   status: StatusStore;
@@ -120,7 +129,7 @@ export function createPersistenceManager(
   };
 }
 
-function createStatusStore(initial: PersistenceStatus): StatusStore {
+export function createStatusStore(initial: PersistenceStatus): StatusStore {
   let value = initial;
   const listeners = new Set<StatusListener>();
 
@@ -165,4 +174,35 @@ function hasPatchChanges(patch: DocPatch): boolean {
   }
 
   return false;
+}
+
+export function createSnapStore(initial?: Partial<SnapSettings>): SnapStore {
+  const defaults: SnapSettings = { snapEnabled: false, gridEnabled: false, gridSize: 10 };
+  let value: SnapSettings = { ...defaults, ...initial };
+  const listeners = new Set<(snap: SnapSettings) => void>();
+
+  return {
+    get() {
+      return value;
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      listener(value);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    update(updater) {
+      value = updater(value);
+      for (const listener of listeners) {
+        listener(value);
+      }
+    },
+    set(next) {
+      value = next;
+      for (const listener of listeners) {
+        listener(value);
+      }
+    },
+  };
 }

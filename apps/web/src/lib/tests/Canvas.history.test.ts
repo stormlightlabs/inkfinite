@@ -43,7 +43,23 @@ vi.mock("../input", () => {
   };
 });
 
-vi.mock("$lib/status", () => ({ createPersistenceManager: persistenceMocks.createPersistenceManager }));
+vi.mock(
+  "$lib/status",
+  () => ({
+    createPersistenceManager: persistenceMocks.createPersistenceManager,
+    createStatusStore: () => ({
+      get: () => ({ backend: "indexeddb", state: "saved", pendingWrites: 0 }),
+      subscribe: () => () => {},
+      update: () => {},
+    }),
+    createSnapStore: () => ({
+      get: () => ({ snapEnabled: false, gridEnabled: false, gridSize: 10 }),
+      subscribe: () => () => {},
+      update: () => {},
+      set: () => {},
+    }),
+  }),
+);
 
 vi.mock("inkfinite-renderer", () => {
   return { createRenderer: vi.fn(() => ({ dispose: vi.fn(), markDirty: vi.fn() })) };
@@ -259,6 +275,18 @@ vi.mock("inkfinite-core", () => {
     },
     createWebDocRepo,
     createPersistenceSink: vi.fn(() => ({ enqueueDocPatch: sinkEnqueueSpy, flush: vi.fn() })),
+    buildStatusBarVM: () => ({
+      cursorWorld: { x: 0, y: 0 },
+      zoomPct: 100,
+      toolId: "select",
+      mode: "idle",
+      selection: { count: 0 },
+      snap: { enabled: false },
+      persistence: { backend: "indexeddb", state: "saved" },
+    }),
+    getSelectedShapes: () => [],
+    getShapesOnCurrentPage: () => [],
+    shapeBounds: () => ({ min: { x: 0, y: 0 }, max: { x: 0, y: 0 } }),
     diffDoc: vi.fn(() => ({})),
     InkfiniteDB: class {},
     __storeInstances: storeInstances,
