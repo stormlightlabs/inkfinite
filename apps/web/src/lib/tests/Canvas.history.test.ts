@@ -322,6 +322,25 @@ describe("Canvas history integration", () => {
       timestamp: Date.now(),
     });
 
+    handler?.({
+      type: "pointer-move",
+      screen: { x: 10, y: 10 },
+      world: { x: 10, y: 10 },
+      buttons: { left: true, middle: false, right: false },
+      modifiers: { ctrl: false, shift: false, alt: false, meta: false },
+      timestamp: Date.now(),
+    });
+
+    handler?.({
+      type: "pointer-up",
+      screen: { x: 10, y: 10 },
+      world: { x: 10, y: 10 },
+      button: 0,
+      buttons: { left: false, middle: false, right: false },
+      modifiers: { ctrl: false, shift: false, alt: false, meta: false },
+      timestamp: Date.now(),
+    });
+
     const stores = (InkfiniteCore as any).__storeInstances as Array<{ commands: any[] }>;
     expect(stores.at(-1)?.commands).toHaveLength(1);
     expect(stores.at(-1)?.commands[0].kind).toBe("doc");

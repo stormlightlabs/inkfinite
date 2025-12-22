@@ -55,6 +55,11 @@
 	});
 	const cursorStore = new CursorStore();
 	const snapStore: SnapStore = createSnapStore();
+	const pointerState = $state({ isPointerDown: false });
+	const snapProvider = { get: () => snapStore.get() };
+	const cursorProvider = { get: () => cursorStore.getState() };
+	const pointerStateProvider = { get: () => pointerState };
+	let pendingCommandStart: EditorState | null = null;
 
 	function applyLoadedDoc(doc: LoadedDoc) {
 		const firstPageId = doc.order.pageIds[0] ?? Object.keys(doc.pages)[0] ?? null;
@@ -107,6 +112,33 @@
 
 	function handleAction(action: Action) {
 		const actionWithSnap = applySnapping(action);
+
+		if (actionWithSnap.type === 'pointer-down' && actionWithSnap.button === 0) {
+			pointerState.isPointerDown = true;
+			pendingCommandStart = EditorState.clone(store.getState());
+			const changed = applyImmediateAction(actionWithSnap);
+			if (!changed) {
+				pendingCommandStart = null;
+			}
+			return;
+		}
+
+		if (actionWithSnap.type === 'pointer-move' && pointerState.isPointerDown && pendingCommandStart) {
+			void applyImmediateAction(actionWithSnap);
+			return;
+		}
+
+		if (actionWithSnap.type === 'pointer-up' && actionWithSnap.button === 0) {
+			pointerState.isPointerDown = false;
+			if (pendingCommandStart) {
+				const committed = commitPendingCommand(actionWithSnap, pendingCommandStart);
+				pendingCommandStart = null;
+				if (committed) {
+					return;
+				}
+			}
+		}
+
 		if (actionWithSnap.type === 'key-down') {
 			const isPrimary =
 				(actionWithSnap.modifiers.meta && navigator.platform.toUpperCase().includes('MAC')) ||
@@ -124,6 +156,35 @@
 		}
 
 		applyActionWithHistory(actionWithSnap);
+	}
+
+	function applyImmediateAction(action: Action): boolean {
+		const before = store.getState();
+		const nextState = routeAction(before, action, tools);
+		if (statesEqual(before, nextState)) {
+			return false;
+		}
+		store.setState(() => nextState);
+		return true;
+	}
+
+	function commitPendingCommand(action: Action, startState: EditorState): boolean {
+		const before = store.getState();
+		const nextState = routeAction(before, action, tools);
+		const finalState = statesEqual(before, nextState) ? before : nextState;
+		if (statesEqual(startState, finalState)) {
+			return false;
+		}
+		const kind = getCommandKind(startState, finalState);
+		const commandName = describeAction(action, kind);
+		const command = new SnapshotCommand(
+			commandName,
+			kind,
+			EditorState.clone(startState),
+			EditorState.clone(finalState)
+		);
+		store.executeCommand(command);
+		return true;
 	}
 
 	function statesEqual(a: EditorState, b: EditorState): boolean {
@@ -223,7 +284,7 @@
 			return store.getState().camera;
 		}
 
-		renderer = createRenderer(canvas, store);
+		renderer = createRenderer(canvas, store, { snapProvider, cursorProvider, pointerStateProvider });
 		inputAdapter = createInputAdapter({
 			canvas,
 			getCamera,
@@ -273,12 +334,14 @@
 	.editor {
 		width: 100%;
 		height: 100%;
+		min-height: 0;
 		display: flex;
 		flex-direction: column;
 	}
 
 	canvas {
 		flex: 1;
+		min-height: 0;
 		display: block;
 		touch-action: none;
 		cursor: default;

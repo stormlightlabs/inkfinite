@@ -177,7 +177,7 @@ function hasPatchChanges(patch: DocPatch): boolean {
 }
 
 export function createSnapStore(initial?: Partial<SnapSettings>): SnapStore {
-  const defaults: SnapSettings = { snapEnabled: false, gridEnabled: false, gridSize: 10 };
+  const defaults: SnapSettings = { snapEnabled: false, gridEnabled: true, gridSize: 25 };
   let value: SnapSettings = { ...defaults, ...initial };
   const listeners = new Set<(snap: SnapSettings) => void>();
 

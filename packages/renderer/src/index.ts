@@ -1,6 +1,7 @@
 import type {
   ArrowShape,
   Camera,
+  CursorState,
   EditorState,
   EllipseShape,
   LineShape,
@@ -24,6 +25,14 @@ export interface Renderer {
   markDirty(): void;
 }
 
+export type SnapSettings = { snapEnabled: boolean; gridEnabled: boolean; gridSize: number };
+
+export type RendererOptions = {
+  snapProvider?: { get(): SnapSettings };
+  cursorProvider?: { get(): CursorState };
+  pointerStateProvider?: { get(): { isPointerDown: boolean } };
+};
+
 /**
  * Create a canvas renderer
  *
@@ -33,9 +42,10 @@ export interface Renderer {
  *
  * @param canvas - The HTMLCanvasElement to render to
  * @param store - The editor state store
+ * @param gridProvider - Optional provider for grid settings (snap store)
  * @returns Renderer instance with dispose method
  */
-export function createRenderer(canvas: HTMLCanvasElement, store: Store): Renderer {
+export function createRenderer(canvas: HTMLCanvasElement, store: Store, options?: RendererOptions): Renderer {
   const maybeContext = canvas.getContext("2d");
   if (!maybeContext) {
     throw new Error("Failed to get 2D context from canvas");
@@ -81,7 +91,10 @@ export function createRenderer(canvas: HTMLCanvasElement, store: Store): Rendere
 
     const viewport: Viewport = { width: canvas.width / getPixelRatio(), height: canvas.height / getPixelRatio() };
 
-    drawScene(context, state, viewport);
+    const snapSettings = options?.snapProvider?.get();
+    const cursorState = options?.cursorProvider?.get();
+    const pointerState = options?.pointerStateProvider?.get();
+    drawScene(context, state, viewport, snapSettings, cursorState, pointerState);
   }
 
   /**
@@ -131,14 +144,21 @@ function getPixelRatio(): number {
 /**
  * Draw the entire scene
  */
-function drawScene(context: CanvasRenderingContext2D, state: EditorState, viewport: Viewport) {
+function drawScene(
+  context: CanvasRenderingContext2D,
+  state: EditorState,
+  viewport: Viewport,
+  snapSettings?: SnapSettings,
+  cursorState?: CursorState,
+  pointerState?: { isPointerDown: boolean },
+) {
   context.clearRect(0, 0, viewport.width, viewport.height);
 
   context.save();
 
   applyCameraTransform(context, state.camera, viewport);
 
-  drawGrid(context, state.camera, viewport);
+  drawGrid(context, state.camera, viewport, snapSettings);
 
   const shapes = getShapesOnCurrentPage(state);
   for (const shape of shapes) {
@@ -146,6 +166,8 @@ function drawScene(context: CanvasRenderingContext2D, state: EditorState, viewpo
   }
 
   drawSelection(context, state, shapes);
+
+  drawSnapGuides(context, state.camera, viewport, snapSettings, cursorState, pointerState);
 
   context.restore();
 }
@@ -170,8 +192,11 @@ function applyCameraTransform(context: CanvasRenderingContext2D, camera: Camera,
  * Draws a subtle grid that helps with spatial awareness and alignment.
  * The grid adapts to zoom level to maintain visual clarity.
  */
-function drawGrid(context: CanvasRenderingContext2D, camera: Camera, viewport: Viewport) {
-  const gridSize = 50;
+function drawGrid(context: CanvasRenderingContext2D, camera: Camera, viewport: Viewport, snapSettings?: SnapSettings) {
+  if (snapSettings && !snapSettings.gridEnabled) {
+    return;
+  }
+  const gridSize = snapSettings?.gridSize ?? 50;
   const minorGridColor = "rgba(128, 128, 128, 0.1)";
   const majorGridColor = "rgba(128, 128, 128, 0.2)";
 
@@ -208,6 +233,54 @@ function drawGrid(context: CanvasRenderingContext2D, camera: Camera, viewport: V
     context.lineTo(endX, y);
     context.stroke();
   }
+}
+
+function drawSnapGuides(
+  context: CanvasRenderingContext2D,
+  camera: Camera,
+  viewport: Viewport,
+  snapSettings?: SnapSettings,
+  cursorState?: CursorState,
+  pointerState?: { isPointerDown: boolean },
+) {
+  if (!snapSettings?.snapEnabled || !cursorState || !pointerState?.isPointerDown) {
+    return;
+  }
+
+  const gridSize = snapSettings.gridSize || 1;
+  const snappedX = Math.round(cursorState.cursorWorld.x / gridSize) * gridSize;
+  const snappedY = Math.round(cursorState.cursorWorld.y / gridSize) * gridSize;
+
+  const halfWidth = viewport.width / (2 * camera.zoom);
+  const halfHeight = viewport.height / (2 * camera.zoom);
+  const minX = camera.x - halfWidth;
+  const maxX = camera.x + halfWidth;
+  const minY = camera.y - halfHeight;
+  const maxY = camera.y + halfHeight;
+
+  context.save();
+  const dashLength = 4 / camera.zoom;
+  context.setLineDash([dashLength, dashLength]);
+  context.lineWidth = 1 / camera.zoom;
+  context.strokeStyle = "rgba(59, 130, 246, 0.6)";
+
+  context.beginPath();
+  context.moveTo(minX, snappedY);
+  context.lineTo(maxX, snappedY);
+  context.stroke();
+
+  context.beginPath();
+  context.moveTo(snappedX, minY);
+  context.lineTo(snappedX, maxY);
+  context.stroke();
+
+  context.setLineDash([]);
+  context.fillStyle = "rgba(59, 130, 246, 0.6)";
+  context.beginPath();
+  context.arc(snappedX, snappedY, 4 / camera.zoom, 0, Math.PI * 2);
+  context.fill();
+
+  context.restore();
 }
 
 /**

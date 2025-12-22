@@ -30,7 +30,7 @@
 	let editorSnapshot: EditorState = EditorStateOps.create();
 	let cursorSnapshot: CursorState = { cursorWorld: { x: 0, y: 0 }, lastMoveAt: Date.now() };
 	let persistenceSnapshot: PersistenceStatus = { backend: 'indexeddb', state: 'saved', pendingWrites: 0 };
-	let snapSnapshot = $state<SnapSettings>({ snapEnabled: false, gridEnabled: false, gridSize: 10 });
+	let snapSnapshot = $state<SnapSettings>({ snapEnabled: false, gridEnabled: true, gridSize: 25 });
 	let statusVm = $state(buildStatusBarVM(editorSnapshot, cursorSnapshot, persistenceSnapshot));
 	let zoomMenuOpen = $state(false);
 	let zoomMenuEl = $state<HTMLDivElement | null>(null);
