@@ -168,16 +168,13 @@ Renderer (/packages/renderer):
 [x] Implement render loop strategy:
     - requestAnimationFrame redraw on "dirty" flag
     - mark dirty on store updates
-
 [x] Implement draw pipeline:
     - clear canvas
     - apply camera transform
     - draw shapes (rect/ellipse/line/arrow/text)
     - draw selection outline if selectionIds non-empty
-
 [x] Implement text measurement fallback:
     - if text shape has w? else measureText and derive bounds
-
 [x] Implement pixel ratio handling:
     - set canvas width/height by devicePixelRatio
     - scale context accordingly
@@ -185,7 +182,6 @@ Renderer (/packages/renderer):
 (DoD):
 - With a hardcoded doc in the store, shapes appear at correct coordinates
   and stay stable while resizing the browser window.
-
 
 ==============================================================================
 6. Milestone F: Hit testing (picking)                                  *wb-F*
@@ -232,7 +228,6 @@ Action bus (/packages/core/src/actions.ts):
 (DoD):
 - You can pan/zoom camera via wheel/drag with a temporary "camera tool"
   (even before selection tool exists).
-
 
 ==============================================================================
 8. Milestone H: Tool state machine (foundation)                        *wb-H*
@@ -341,17 +336,14 @@ History model (/packages/core/src/history):
 [x] Define Command:
     - do(state) -> state
     - undo(state) -> state
-
 [x] Wrap mutations as commands:
     - CreateShapeCommand
     - UpdateShapeCommand (with before/after snapshot)
     - DeleteShapesCommand
     - SetSelectionCommand
     - SetCameraCommand
-
 [x] Implement stacks:
     - undoStack, redoStack
-
 [x] Wire shortcuts:
     - Ctrl/Cmd+Z undo
     - Ctrl/Cmd+Shift+Z redo
@@ -360,63 +352,182 @@ History model (/packages/core/src/history):
 - Undo/redo works for create/move/delete and camera changes.
 
 ==============================================================================
-13. Milestone M: Persistence (web) via Yjs + IndexedDB                 *wb-M*
+13. Milestone M: Persistence (web) via Dexie + History integration      *wb-M*
 ==============================================================================
 
-Goal: The web app persists boards locally using Yjs, with offline support via
-      IndexedDB (y-indexeddb).
+Goal:
+- Persist boards to IndexedDB using Dexie (with schema versions + data upgrades).
+- Integrate with the (already implemented) history/command system so:
+  - do/undo/redo that changes the document is persisted
+  - non-document UI changes (selection/tool/camera, etc.) are NOT persisted
 
-Web persistence primitives (/packages/core/src/persist/web):
-[ ] Add deps (web build):
-    - yjs
-    - y-indexeddb (IndexedDB persistence provider)
+Storage shape (v0 choice): Normalized tables
+- boards, pages, shapes, bindings + meta + migrations
 
-[ ] Define a Yjs schema for the drawing document (doc layer only):
-    - ydoc.getMap("pages"): Y.Map<pageId, PageRecord>
-    - ydoc.getMap("shapes"): Y.Map<shapeId, ShapeRecord>
-    - ydoc.getMap("bindings"): Y.Map<bindingId, BindingRecord>
-    - ydoc.getArray("pageOrder"): Y.Array<pageId>
-    - per-page shape order: ydoc.getArray(`page:${id}:shapeOrder`)
+------------------------------------------------------------------------------
+M1. Dexie DB + schema v1
+------------------------------------------------------------------------------
 
-[ ] Implement WebDocRepo (board-level API):
-    - listBoards(): Promise<BoardMeta[]>
-    - createBoard(name): Promise<boardId>
-    - openBoard(boardId): Promise<{ ydoc, provider, meta }>
-    - renameBoard(boardId, name): Promise<void>
-    - deleteBoard(boardId): Promise<void>
+/apps/web/src/lib/db.ts
+[ ] Create a Dexie DB class `InkfiniteDB` extending Dexie.
+[ ] db.version(1).stores({
+      boards:      'id, name, createdAt, updatedAt',
+      pages:       '[boardId+id], boardId, updatedAt',
+      shapes:      '[boardId+id], boardId, type, updatedAt',
+      bindings:    '[boardId+id], boardId, type, updatedAt',
+      meta:        'key',
+      migrations:  'id, appliedAt'
+    })
 
-    Notes:
-    - y-indexeddb persistence is keyed by a string name; use a stable boardId.
-    - Keep exactly ONE IndexeddbPersistence instance per (boardId, tab) to avoid
-      duplicated persistence work.
-
-[ ] Implement a tiny "board index" for listBoards():
-    - Store BoardMeta (id, name, createdAt, updatedAt) in:
-        - localStorage (v0), or
-        - a small IndexedDB store you control (v1)
-    - Update updatedAt whenever the Y.Doc changes.
-
-[ ] Bridge Yjs doc -> in-memory EditorState.doc snapshot:
-    - Add docSubscription:
-        - observe ydoc changes and rebuild/patch the in-memory doc snapshot
-    - Keep UI state out of Yjs for now:
-        - state.ui (selection/tool) remains local
-        - state.camera remains local
-
-[ ] Export/import (still useful for sharing/debugging):
-    - exportJSON(boardId): string (serialize to your plain JSON doc model)
-    - importJSON(json): createBoard + populate Y.Doc via Yjs transaction
-
-Tests (/packages/core/test):
-[ ] opening the same boardId twice reuses metadata and does not create duplicate
-    persistence instances (unit test at repo layer; integration test later).
-[ ] after mutating Y.Doc, closing and reopening loads the same content (offline).
-    (This is the expected y-indexeddb behavior.)
-[ ] board index updatedAt changes on Y.Doc update.
+[ ] Implement schema upgrade hook(s):
+    - db.version(N).upgrade(tx => runMigrations(tx))
 
 (DoD):
-- Web app: create a board, draw, refresh page, content is still there.
-- Renderer redraws when the Y.Doc changes (through your bridge layer).
+- DB opens; can insert + read a boards row.
+
+------------------------------------------------------------------------------
+M2. Repo API (what the editor uses)
+------------------------------------------------------------------------------
+
+/packages/core/src/persist/web.ts
+[ ] Define BoardMeta: { id, name, createdAt, updatedAt }.
+[ ] Implement DocRepo methods:
+    - listBoards(): Promise<BoardMeta[]>
+    - createBoard(name): Promise<boardId>
+    - renameBoard(boardId, name): Promise<void>
+    - deleteBoard(boardId): Promise<void>
+    - loadDoc(boardId): Promise<{ pages, shapes, bindings, order }>
+    - applyDocPatch(boardId, patch): Promise<void>
+
+Transactions:
+[ ] Ensure create/delete/applyDocPatch are atomic using db.transaction('rw', ...).
+
+Bulk writes:
+[ ] applyDocPatch uses bulkPut / bulkAdd when writing many shapes/pages/bindings.
+
+(DoD):
+- createBoard -> applyDocPatch -> loadDoc round-trips a simple doc.
+
+------------------------------------------------------------------------------
+M3. Migration system (schema + logical migrations)
+------------------------------------------------------------------------------
+
+Schema versions:
+[ ] When adding indexes/stores:
+    - bump db.version(N).stores(...)
+    - attach .upgrade(tx => ...) for data backfill/reshape
+
+Logical migrations:
+[ ] Create `runMigrations(tx)` called from Version.upgrade():
+    - reads applied ids from migrations table
+    - runs missing migrations in order
+    - writes (id, appliedAt) as each completes
+
+Smallest initial migrations:
+[ ] MIG-0001: backfill boards.createdAt / updatedAt if missing
+[ ] MIG-0002: ensure every board has a default page row
+
+(DoD):
+- Upgrading applies each logical migration exactly once.
+
+------------------------------------------------------------------------------
+M4. History integration (persist on do/undo/redo)
+------------------------------------------------------------------------------
+
+Goal:
+- Any history step that changes the document produces a persistence write.
+- Undo/redo produces persistence writes too.
+- UI-only commands do not touch IndexedDB.
+
+Step 1: Tag commands with persistence intent
+[ ] In your Command types (history layer), add a doc-impact tag:
+    - affectsDoc: boolean
+    - OR kind: 'doc' | 'ui' | 'camera'
+
+Rules (v0):
+- 'doc' commands persist
+- 'ui' and 'camera' do not persist
+
+Step 2: Provide a single hook point in history
+[ ] Add a history callback or event:
+    - onApplied({ kind, beforeState, afterState, commandId, op: 'do'|'undo'|'redo' })
+  This MUST fire after every do/undo/redo.
+
+Step 3: Compute a persistence patch (smallest practical approach)
+[ ] Implement `diffDoc(before.doc, after.doc) -> DocPatch` that outputs:
+    - upserts: pages[], shapes[], bindings[]
+    - deletes: pageIds[], shapeIds[], bindingIds[]
+    - order updates (page order, per-page shape order)
+
+  Note:
+  - Keep it minimal: only compare ids + updatedAt (or stable hash) initially.
+  - If this gets complicated, fall back to “persist full doc snapshot” v0 and
+    switch to patching later (but still behind applyDocPatch).
+
+Step 4: Persist after history events (with batching)
+[ ] Implement `createPersistenceSink(repo)` that exposes:
+    - enqueueDocPatch(boardId, patch): void
+    - flush(): Promise<void>
+
+[ ] Wire history -> sink:
+    - if event.kind === 'doc':
+        sink.enqueueDocPatch(boardId, diffDoc(before, after))
+    - else:
+        no-op
+
+[ ] Batch + flush policy:
+    - debounce 100–250ms
+    - force flush on:
+        - board switch
+        - page unload (best-effort)
+        - explicit Save action
+
+Step 5: Update updatedAt correctly
+[ ] On any persisted doc change, update:
+    - boards.updatedAt = now()
+    - updatedAt on modified rows (pages/shapes/bindings) if you store it
+
+(DoD):
+- Creating/moving/deleting shapes persists through refresh.
+- Undo and redo also persist through refresh.
+- Selection changes do NOT write to Dexie.
+
+------------------------------------------------------------------------------
+M5. Export / Import (backups + portability)
+------------------------------------------------------------------------------
+
+[ ] Export board:
+    - loadDoc(boardId) -> JSON (doc + meta)
+[ ] Import board:
+    - createBoard(name)
+    - applyDocPatch(full snapshot as upserts)
+
+(DoD):
+- Export -> Import recreates the same drawing.
+
+------------------------------------------------------------------------------
+Tests (vitest; use fake IndexedDB)
+------------------------------------------------------------------------------
+
+Dexie correctness:
+[ ] applyDocPatch uses a single transaction for multi-table writes
+[ ] deleteBoard deletes boards + related rows atomically
+
+History integration:
+[ ] doc command do => exactly 1 persistence flush (after debounce)
+[ ] undo => persists (document matches expected)
+[ ] redo => persists (document matches expected)
+[ ] ui-only command => 0 DB writes
+[ ] batching: 10 rapid doc commands => <= 2 writes (depending on debounce window)
+
+------------------------------------------------------------------------------
+Definition of Done
+------------------------------------------------------------------------------
+
+- Web: create board, draw, refresh -> content persists.
+- Undo/redo across refresh works.
+- Migration system exists and is exercised by at least one schema bump + upgrade.
+- Renderer redraws from in-memory state; persistence is driven by history events.
 
 ==============================================================================
 14. Milestone N: Desktop packaging (Tauri)                             *wb-N*
@@ -481,112 +592,94 @@ Goal: the editor stays responsive with many shapes.
 (DoD):
 - 10k simple shapes pans/zooms smoothly on a typical machine.
 
-
 ==============================================================================
-17. Milestone Q: File Browser (web: Yjs/IndexedDB peek, desktop: FS)    *wb-Q*
+17. Milestone Q: File Browser (web: Dexie inspector, desktop: FS)       *wb-Q*
 ==============================================================================
 
-Goal: A unified "Open board" experience:
-- Web: browse locally persisted Yjs boards + basic "storage inspector"
+Goal: A unified “Open board” experience:
+- Web: browse Dexie-backed boards + a useful persistence/migration inspector
 - Desktop: browse real directories/files (native file browser semantics)
 
 ------------------------------------------------------------------------------
-Q1. Shared UX + contracts (core)
+Q1. Shared UX contracts
 ------------------------------------------------------------------------------
 
-Contracts (/packages/core/src/persist):
-[ ] Define BoardMeta:
-    - id, name, createdAt, updatedAt
-    - optional: storageKind = "web-indexeddb" | "desktop-fs"
-
-[ ] Define DocRepo interface (implemented by web + desktop):
+/packages/core/src/persist/DocRepo.ts:
+[ ] Define DocRepo interface (web + desktop):
     - listBoards(): Promise<BoardMeta[]>
     - createBoard(name): Promise<string>
-    - openBoard(id): Promise<void> (or returns handle)
+    - openBoard(id): Promise<void>
     - renameBoard(id, name): Promise<void>
     - deleteBoard(id): Promise<void>
 
-[ ] Define a FileBrowserViewModel (pure data for UI):
-    - query string
-    - filtered list of BoardMeta
-    - selected board id
+[ ] Define FileBrowserViewModel:
+    - query, filteredBoards, selectedId
     - actions: open/create/rename/delete
 
 (DoD):
-- Svelte UI can render the browser from a single ViewModel shape.
+- Svelte UI can render the browser purely from the ViewModel.
 
 ------------------------------------------------------------------------------
-Q2. Web file browser: "Boards" + IndexedDB/Yjs inspector
+Q2. Web: Boards list + Dexie “Inspector” drawer
 ------------------------------------------------------------------------------
 
-UI (/apps/web/src/lib/filebrowser):
-[ ] Implement Boards panel:
-    - listBoards() -> render list
-    - search filter (client-side)
-    - create/rename/delete
-    - open on click
+/apps/web/src/lib/filebrowser/FileBrowser.svelte:
+[ ] Boards panel:
+    - listBoards() -> render
+    - search filter
+    - open / create / rename / delete
 
-[ ] Implement a "Storage inspector" drawer for the selected board:
-    - show boardId + y-indexeddb persistence name (same string)
-    - show "synced/loaded" status from the provider lifecycle (v0: boolean)
-    - show a rough persisted size indicator:
-        - compute encoded state size (bytes) from Yjs state vector/update
-          (v0: best-effort number; label it "approx")
-    - add buttons:
-        - Export JSON
-        - Export "Yjs update" (debug artifact)
+Inspector drawer (selected board):
+[ ] Show “Storage: IndexedDB (Dexie)”
+[ ] Show schema info:
+    - declared schema version (your constant)
+    - installed schema version (best-effort display)
+[ ] Show board-level stats (computed live):
+    - row counts: pages/shapes/bindings for this board (Option A)
+      OR doc size bytes for docs row (Option B)
+    - last updatedAt
+[ ] Show migration info:
+    - list applied migrations from migrations table (id + appliedAt)
+    - show “pending” migrations if any (based on known list vs applied)
 
-Svelte runes integration:
-[ ] Subscribe to repo changes using $effect and cleanup unsubscribe.
+Safe deletes:
+[ ] deleteBoard must be a single atomic transaction (boards + related tables)
 
 (DoD):
-- Web: you can browse boards, open one, and view basic persistence/debug info
-  that confirms it’s backed by y-indexeddb.
+- Web: you can browse boards, open one, and verify migrations + row counts.
 
 ------------------------------------------------------------------------------
-Q3. Desktop file browser: real directory + files (Tauri)
+Q3. Desktop: real directory + files (Tauri)
 ------------------------------------------------------------------------------
 
-Desktop behavior:
-[ ] Add "Workspace folder" concept:
-    - choose a directory using Tauri dialog open({ directory: true })
-    - remember last workspace path (v0: local settings file)
-
+[ ] Add “Workspace folder” concept:
+    - pick directory
+    - remember last workspace path
 [ ] Implement directory listing:
-    - read directories + files via Tauri FS plugin APIs
-    - display as:
-        - v0: flat list of "*.wanderboard.json" files, or
-        - v1: tree view (folders expandable)
-
+    - v0: show *.Inkfinite.json files in workspace
+    - v1: tree view with folders
 [ ] Implement file actions:
-    - New board: creates new file in workspace
-    - Rename: renames file
-    - Delete: deletes file
-    - Open: loads file into editor
-
-[ ] Scope/security note handling:
-    - paths returned by dialog are scoped for FS access; persist the chosen
-      workspace path yourself for the next launch.
+    - New: create new file
+    - Rename: rename file
+    - Delete: delete file
+    - Open: load file into editor
+    - Export: save JSON
 
 (DoD):
 - Desktop: pick a folder, browse files, open/save boards from disk.
 
 ------------------------------------------------------------------------------
-Q4. "Parity" behaviors (web + desktop)
+Q4. Parity behaviors
 ------------------------------------------------------------------------------
 
-[ ] Consistent command surface:
-    - Ctrl/Cmd+O opens the file browser modal
-    - Ctrl/Cmd+N creates a board
-    - rename/delete via context menu
-
-[ ] Consistent metadata:
-    - show updatedAt and name in both modes
+[ ] Same shortcuts:
+    - Ctrl/Cmd+O opens file browser
+    - Ctrl/Cmd+N creates board
+[ ] Consistent metadata display:
+    - name + updatedAt in both modes
 
 (DoD):
-- Switching between web and desktop feels like the same app, but the web mode
-  clearly indicates "local Yjs/IndexedDB" storage, while desktop is real files.
-
+- Web and desktop feel like the same app, with storage differences made explicit.
 
 ==============================================================================
 18. Milestone R: Quality polish (what makes it feel "real")            *wb-R*
@@ -597,17 +690,14 @@ Goal: the UX crosses the "this is legit" threshold.
 [ ] Snapping:
     - snap move to grid
     - snap to other shape edges/centers (basic)
-
 [ ] Handles:
     - resize handles for rect/ellipse
     - rotate handle
     - cursor affordances
-
 [ ] Keyboard affordances:
     - nudge with arrow keys
     - duplicate (Ctrl/Cmd+D)
     - bring forward/back
-
 [ ] Accessibility:
     - tool buttons navigable with keyboard
     - visible focus states
@@ -615,37 +705,6 @@ Goal: the UX crosses the "this is legit" threshold.
 
 (DoD):
 - A user can comfortably draw and edit without surprises.
-
-
-==============================================================================
-Appendix: Suggested file layout                                   *wb-files*
-==============================================================================
-
-packages/core/src/
-  actions/
-  camera/
-  geom/
-  history/
-  id/
-  model/
-  store/
-  tools/
-
-packages/renderer/src/
-  renderer.ts
-  draw/
-  text/
-
-apps/web/src/
-  routes/
-  lib/
-    canvas/
-    ui/
-
-apps/desktop/
-  src-tauri/
-  (wraps web build)
-
 
 ==============================================================================
 References (URLs)                                                   *wb-refs*
@@ -655,11 +714,6 @@ tldraw conceptual references (inspiration only):
 - https://tldraw.dev/docs/shapes
 - https://tldraw.dev/docs/editor
 - https://tldraw.dev/reference/editor/Editor
-
-Yjs collaboration option:
-- https://docs.yjs.dev/
-- https://docs.yjs.dev/getting-started/working-with-shared-types
-- https://github.com/yjs/yjs
 
 SvelteKit + Tauri packaging:
 - https://v2.tauri.app/start/frontend/sveltekit/
