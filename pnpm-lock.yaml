@@ -35,6 +35,9 @@ importers:
       inkfinite-core:
         specifier: workspace:*
         version: link:../../packages/core
+      inkfinite-renderer:
+        specifier: workspace:*
+        version: link:../../packages/renderer
     devDependencies:
       '@eslint/compat':
         specifier: ^1.4.0

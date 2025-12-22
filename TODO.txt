@@ -245,19 +245,19 @@ Action bus (/packages/core/src/actions.ts):
 Goal: tools are explicit, testable state machines (RxJS based)
 
 Tools (/packages/core/src/tools):
-[ ] Define ToolId: "select" | "rect" | "ellipse" | "line" | "arrow" | "text" | "pen"
-[ ] Define Tool interface:
+[x] Define ToolId: "select" | "rect" | "ellipse" | "line" | "arrow" | "text" | "pen"
+[x] Define Tool interface:
     - id
     - onEnter(state)
     - onAction(state, action) -> newState
     - onExit(state)
 
 Tool router:
-[ ] routeAction(state, action) -> newState (delegates to active tool)
+[x] routeAction(state, action) -> newState (delegates to active tool)
 
 Tests:
-[ ] Switching tools calls onExit/onEnter in correct order
-[ ] Tool ignores actions it doesn't care about
+[x] Switching tools calls onExit/onEnter in correct order
+[x] Tool ignores actions it doesn't care about
 
 (DoD):
 - A dummy tool can consume pointer events and update state deterministically.
@@ -270,31 +270,30 @@ Tests:
 Goal: select shapes and drag them.
 
 Selection:
-[ ] PointerDown:
+[x] PointerDown:
     - if hit shape: selection = [shapeId] (or add with shift)
     - else selection = []
-[ ] PointerMove while dragging selected:
+[x] PointerMove while dragging selected:
     - translate selected shapes by deltaWorld
-[ ] PointerUp:
+[x] PointerUp:
     - end drag
 
 Marquee select (smallest slices):
-[ ] Implement marquee start (on empty canvas pointerdown)
-[ ] Render marquee rectangle overlay
-[ ] On pointerup, select shapes whose bounds intersect marquee
+[x] Implement marquee start (on empty canvas pointerdown)
+[x] Render marquee rectangle overlay
+[x] On pointerup, select shapes whose bounds intersect marquee
 
 UX:
-[ ] Escape clears selection
-[ ] Delete removes selected shapes
+[x] Escape clears selection
+[x] Delete removes selected shapes
 
 Tests:
-[ ] drag moves exactly by delta
-[ ] shift-click toggles membership
-[ ] delete removes and clears selection
+[x] drag moves exactly by delta
+[x] shift-click toggles membership
+[x] delete removes and clears selection
 
 (DoD):
 - You can select and move shapes reliably.
-
 
 ==============================================================================
 10. Milestone J: Create basic shapes via tools                         *wb-J*
@@ -326,7 +325,6 @@ Tests:
 (DoD):
 - You can draw rect/ellipse/line/arrow/text on the canvas.
 
-
 ==============================================================================
 11. Milestone K: Bindings for arrows (v0)                              *wb-K*
 ==============================================================================
@@ -353,7 +351,6 @@ Tests:
 
 (DoD):
 - Arrows remain connected to moved shapes (center-to-center is fine for v0).
-
 
 ==============================================================================
 12. Milestone L: History (undo/redo)                                   *wb-L*
@@ -386,7 +383,6 @@ Tests:
 
 (DoD):
 - Undo/redo works for create/move/delete and camera changes.
-
 
 ==============================================================================
 13. Milestone M: Persistence (web)                                     *wb-M*
@@ -430,7 +426,6 @@ File dialogs + FS:
 
 (DoD):
 - Desktop app opens/saves JSON files on disk and reopens them correctly.
-
 
 ==============================================================================
 15. Milestone O: Export (PNG/SVG)                                      *wb-O*

@@ -20,6 +20,7 @@ export default defineConfig(
         "varsIgnorePattern": "^_",
         "ignoreRestSiblings": true,
       }],
+      "unicorn/prefer-ternary": "off",
       "unicorn/no-null": "off",
       "unicorn/prevent-abbreviations": ["error", { "replacements": { "i": false, "props": false, "doc": false } }],
     },
