@@ -19,6 +19,9 @@ export type DesktopDocRepo = PersistentDocRepo & {
   kind: "desktop";
   getCurrentFile(): FileHandle | null;
   openFromDialog(): Promise<{ boardId: string; doc: LoadedDoc }>;
+  getWorkspaceDir(): Promise<string | null>;
+  setWorkspaceDir(path: string | null): Promise<void>;
+  pickWorkspaceDir(): Promise<string | null>;
 };
 
 export function isDesktopRepo(repo: PersistentDocRepo): repo is DesktopDocRepo {
@@ -63,17 +66,42 @@ export function createDesktopDocRepo(fileOps: DesktopFileOps): DesktopDocRepo {
   }
 
   async function listBoards(): Promise<BoardMeta[]> {
-    const recent = await fileOps.getRecentFiles();
+    const workspaceDir = await fileOps.getWorkspaceDir();
     const boards: BoardMeta[] = [];
 
-    for (const handle of recent) {
+    if (workspaceDir) {
+      // Workspace mode: list files from workspace directory
       try {
-        const content = await fileOps.readFile(handle.path);
-        const fileData = parseDesktopFile(content);
-        boards.push(fileData.board);
-        boardFiles.set(fileData.board.id, handle);
-      } catch {
-        await fileOps.removeRecentFile(handle.path);
+        const entries = await fileOps.readDirectory(workspaceDir, "*.inkfinite.json");
+
+        for (const entry of entries) {
+          if (entry.isDir) continue;
+
+          try {
+            const content = await fileOps.readFile(entry.path);
+            const fileData = parseDesktopFile(content);
+            boards.push(fileData.board);
+            boardFiles.set(fileData.board.id, { path: entry.path, name: entry.name });
+          } catch (error) {
+            console.warn(`Failed to load board from ${entry.path}:`, error);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to read workspace directory:", error);
+      }
+    } else {
+      // Recent files mode
+      const recent = await fileOps.getRecentFiles();
+
+      for (const handle of recent) {
+        try {
+          const content = await fileOps.readFile(handle.path);
+          const fileData = parseDesktopFile(content);
+          boards.push(fileData.board);
+          boardFiles.set(fileData.board.id, handle);
+        } catch {
+          await fileOps.removeRecentFile(handle.path);
+        }
       }
     }
 
@@ -101,9 +129,19 @@ export function createDesktopDocRepo(fileOps: DesktopFileOps): DesktopDocRepo {
       shapeOrder: { [page.id]: [] },
     });
 
-    const path = await fileOps.showSaveDialog(`${name || "Untitled"}.inkfinite.json`);
-    if (!path) {
-      throw new Error("Save cancelled");
+    const workspaceDir = await fileOps.getWorkspaceDir();
+    let path: string | null;
+
+    if (workspaceDir) {
+      // Workspace mode: save directly in workspace directory
+      const fileName = `${name || "Untitled"}.inkfinite.json`;
+      path = `${workspaceDir}/${fileName}`;
+    } else {
+      // Recent files mode: show save dialog
+      path = await fileOps.showSaveDialog(`${name || "Untitled"}.inkfinite.json`);
+      if (!path) {
+        throw new Error("Save cancelled");
+      }
     }
 
     await fileOps.writeFile(path, serializeDesktopFile(fileData));
@@ -111,7 +149,10 @@ export function createDesktopDocRepo(fileOps: DesktopFileOps): DesktopDocRepo {
     const handle = { path, name: path.split("/").pop() || name };
     setCurrentState(handle, board, loadedDocFromFileData(fileData));
 
-    await fileOps.addRecentFile(handle);
+    if (!workspaceDir) {
+      await fileOps.addRecentFile(handle);
+    }
+
     return boardId;
   }
 
@@ -123,26 +164,78 @@ export function createDesktopDocRepo(fileOps: DesktopFileOps): DesktopDocRepo {
       throw new Error("No board loaded");
     }
 
-    currentBoard = { ...currentBoard, name, updatedAt: Date.now() };
+    const oldPath = currentFile.path;
+    const workspaceDir = await fileOps.getWorkspaceDir();
 
-    const fileData = createFileData(
-      currentBoard,
-      currentDoc.pages,
-      currentDoc.shapes,
-      currentDoc.bindings,
-      currentDoc.order,
-    );
+    // If we're renaming the file itself (in workspace mode)
+    if (workspaceDir) {
+      const dir = oldPath.substring(0, oldPath.lastIndexOf("/"));
+      const newFileName = `${name}.inkfinite.json`;
+      const newPath = `${dir}/${newFileName}`;
 
-    await fileOps.writeFile(currentFile.path, serializeDesktopFile(fileData));
-    boardFiles.set(currentBoard.id, currentFile);
+      // Update board metadata
+      currentBoard = { ...currentBoard, name, updatedAt: Date.now() };
+
+      const fileData = createFileData(
+        currentBoard,
+        currentDoc.pages,
+        currentDoc.shapes,
+        currentDoc.bindings,
+        currentDoc.order,
+      );
+
+      // Write to new path and delete old file (atomic rename not always possible cross-filesystem)
+      await fileOps.writeFile(newPath, serializeDesktopFile(fileData));
+
+      if (newPath !== oldPath) {
+        try {
+          await fileOps.deleteFile(oldPath);
+        } catch (error) {
+          console.warn("Failed to delete old file:", error);
+        }
+      }
+
+      // Update current file handle
+      const newHandle = { path: newPath, name: newFileName };
+      currentFile = newHandle;
+      boardFiles.set(currentBoard.id, newHandle);
+    } else {
+      // Recent files mode: just update the content
+      currentBoard = { ...currentBoard, name, updatedAt: Date.now() };
+
+      const fileData = createFileData(
+        currentBoard,
+        currentDoc.pages,
+        currentDoc.shapes,
+        currentDoc.bindings,
+        currentDoc.order,
+      );
+
+      await fileOps.writeFile(currentFile.path, serializeDesktopFile(fileData));
+      boardFiles.set(currentBoard.id, currentFile);
+    }
   }
 
   async function deleteBoard(boardId: string): Promise<void> {
     const handle = boardFiles.get(boardId);
+    const workspaceDir = await fileOps.getWorkspaceDir();
+
     if (handle) {
-      await fileOps.removeRecentFile(handle.path);
+      if (workspaceDir) {
+        // Workspace mode: actually delete the file
+        try {
+          await fileOps.deleteFile(handle.path);
+        } catch (error) {
+          console.error("Failed to delete file:", error);
+          throw error;
+        }
+      } else {
+        // Recent files mode: just remove from recent list
+        await fileOps.removeRecentFile(handle.path);
+      }
       boardFiles.delete(boardId);
     }
+
     if (currentBoard?.id === boardId) {
       currentFile = null;
       currentBoard = null;
@@ -300,6 +393,9 @@ export function createDesktopDocRepo(fileOps: DesktopFileOps): DesktopDocRepo {
     importBoard,
     getCurrentFile: () => currentFile,
     openFromDialog,
+    getWorkspaceDir: () => fileOps.getWorkspaceDir(),
+    setWorkspaceDir: (path: string | null) => fileOps.setWorkspaceDir(path),
+    pickWorkspaceDir: () => fileOps.pickWorkspaceDir(),
   };
 }
 

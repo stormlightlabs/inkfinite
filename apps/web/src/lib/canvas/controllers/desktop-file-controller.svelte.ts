@@ -15,6 +15,10 @@ export class DesktopFileController {
     private onLoadDoc: (boardId: string, doc: LoadedDoc) => void,
   ) {}
 
+  get repo(): DesktopDocRepo | null {
+    return this.getDesktopRepo();
+  }
+
   private updateFileState = () => {
     const desktopRepo = this.getDesktopRepo();
     if (!desktopRepo) {

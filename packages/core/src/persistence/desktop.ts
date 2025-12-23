@@ -13,6 +13,11 @@ export type DesktopFileData = { board: BoardMeta; doc: Document; order: DocOrder
 export type FileHandle = { path: string; name: string };
 
 /**
+ * Directory entry from file system
+ */
+export type DirectoryEntry = { path: string; name: string; isDir: boolean };
+
+/**
  * Desktop-specific operations interface.
  * Implementation lives in apps/desktop using @tauri-apps/plugin-* APIs.
  */
@@ -56,6 +61,36 @@ export interface DesktopFileOps {
    * Clear all recent files
    */
   clearRecentFiles(): Promise<void>;
+
+  /**
+   * Get current workspace directory
+   */
+  getWorkspaceDir(): Promise<string | null>;
+
+  /**
+   * Set workspace directory
+   */
+  setWorkspaceDir(path: string | null): Promise<void>;
+
+  /**
+   * Show directory picker and set as workspace
+   */
+  pickWorkspaceDir(): Promise<string | null>;
+
+  /**
+   * Read directory contents (filtered by pattern)
+   */
+  readDirectory(directory: string, pattern?: string): Promise<DirectoryEntry[]>;
+
+  /**
+   * Rename a file on disk
+   */
+  renameFile(oldPath: string, newPath: string): Promise<void>;
+
+  /**
+   * Delete a file from disk
+   */
+  deleteFile(path: string): Promise<void>;
 }
 
 /**

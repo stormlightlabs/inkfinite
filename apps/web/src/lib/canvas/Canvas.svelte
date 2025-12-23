@@ -82,7 +82,8 @@
 			bind:open={c.fileBrowser.open}
 			onUpdate={c.fileBrowser.handleUpdate}
 			fetchInspectorData={c.fileBrowser.fetchInspectorData}
-			onClose={c.fileBrowser.handleClose} />
+			onClose={c.fileBrowser.handleClose}
+			desktopRepo={c.desktop.repo} />
 	{/if}
 </div>
 

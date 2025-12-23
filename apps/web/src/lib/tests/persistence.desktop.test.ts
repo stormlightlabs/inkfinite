@@ -14,6 +14,7 @@ function createFakeFileOps() {
   const recent: FileHandle[] = [];
   let nextOpen: string | null = null;
   let nextSave: string | null = null;
+  let workspaceDir: string | null = null;
 
   const ops: DesktopFileOps = {
     async showOpenDialog() {
@@ -51,6 +52,33 @@ function createFakeFileOps() {
     },
     async clearRecentFiles() {
       recent.splice(0, recent.length);
+    },
+    async getWorkspaceDir() {
+      return workspaceDir;
+    },
+    async setWorkspaceDir(path) {
+      workspaceDir = path;
+    },
+    async pickWorkspaceDir() {
+      workspaceDir = "/tmp/workspace";
+      return workspaceDir;
+    },
+    async readDirectory(_directory, _pattern) {
+      return [];
+    },
+    async renameFile(oldPath, newPath) {
+      const content = files.get(oldPath);
+      if (content === undefined) {
+        throw new Error(`Missing file: ${oldPath}`);
+      }
+      files.set(newPath, content);
+      files.delete(oldPath);
+    },
+    async deleteFile(path) {
+      if (!files.has(path)) {
+        throw new Error(`Missing file: ${path}`);
+      }
+      files.delete(path);
     },
   };
 

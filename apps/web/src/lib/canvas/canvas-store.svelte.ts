@@ -1,15 +1,10 @@
-import { createInputAdapter, type InputAdapter } from "$lib/input";
+import { createInputAdapter } from "$lib/input";
+import type { InputAdapter } from "$lib/input";
 import type { DesktopDocRepo } from "$lib/persistence/desktop";
 import { createPlatformRepo, detectPlatform } from "$lib/platform";
+import { createPersistenceManager, createSnapStore, createStatusStore } from "$lib/status";
+import type { SnapStore, StatusStore } from "$lib/status";
 import {
-  createPersistenceManager,
-  createSnapStore,
-  createStatusStore,
-  type SnapStore,
-  type StatusStore,
-} from "$lib/status";
-import {
-  type Action,
   ArrowTool,
   Camera,
   createId,
@@ -21,9 +16,6 @@ import {
   getShapesOnCurrentPage,
   InkfiniteDB,
   LineTool,
-  type LoadedDoc,
-  type PersistenceSink,
-  type PersistentDocRepo,
   RectTool,
   routeAction,
   SelectTool,
@@ -32,8 +24,8 @@ import {
   SnapshotCommand,
   Store,
   TextTool,
-  type Viewport,
 } from "inkfinite-core";
+import type { Action, LoadedDoc, PersistenceSink, PersistentDocRepo, Viewport } from "inkfinite-core";
 import { createRenderer, type Renderer } from "inkfinite-renderer";
 import { onDestroy, onMount } from "svelte";
 import { SvelteSet } from "svelte/reactivity";
@@ -251,6 +243,22 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     if (action.type !== "key-down") {
       return null;
     }
+
+    const primaryModifier = action.modifiers.meta || action.modifiers.ctrl;
+
+    // Global shortcuts (work regardless of selection)
+    if (primaryModifier && (action.key === "o" || action.key === "O")) {
+      // Open file browser
+      fileBrowser.handleOpen();
+      return null;
+    }
+
+    if (primaryModifier && (action.key === "n" || action.key === "N")) {
+      // New board - open file browser in create mode
+      fileBrowser.handleOpen();
+      return null;
+    }
+
     const selectionIds = state.ui.selectionIds;
     if (selectionIds.length === 0) {
       return null;
@@ -290,7 +298,6 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
       }
     }
 
-    const primaryModifier = action.modifiers.meta || action.modifiers.ctrl;
     if (primaryModifier && (action.key === "d" || action.key === "D")) {
       return duplicateSelection(state);
     }

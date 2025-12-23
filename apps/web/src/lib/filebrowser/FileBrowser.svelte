@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Icon from '$lib/components/Icon.svelte';
 	import Sheet from '$lib/components/Sheet.svelte';
+	import type { DesktopDocRepo } from '$lib/persistence/desktop';
 	import type {
 		BoardInspectorData,
 		BoardMeta,
@@ -20,6 +21,7 @@
 		open?: boolean;
 		onClose?: () => void;
 		children?: Snippet;
+		desktopRepo?: DesktopDocRepo | null;
 	};
 
 	let {
@@ -28,7 +30,8 @@
 		fetchInspectorData,
 		open = $bindable(false),
 		onClose: handleClose,
-		children: _children
+		children: _children,
+		desktopRepo = null
 	}: Props = $props();
 
 	let searchQuery = $state(vm.query);
@@ -41,6 +44,16 @@
 	let newBoardName = $state('');
 	let editingBoardId = $state<string | null>(null);
 	let editingBoardName = $state('');
+
+	let workspaceDir = $state<string | null>(null);
+
+	$effect(() => {
+		if (desktopRepo && open) {
+			desktopRepo.getWorkspaceDir().then((dir) => {
+				workspaceDir = dir;
+			});
+		}
+	});
 
 	function handleSearchInput(event: Event) {
 		const target = event.target as HTMLInputElement;
@@ -142,6 +155,30 @@
 		editingBoardId = null;
 		editingBoardName = '';
 	}
+
+	async function handlePickWorkspace() {
+		if (!desktopRepo) return;
+		try {
+			const dir = await desktopRepo.pickWorkspaceDir();
+			if (dir) {
+				workspaceDir = dir;
+				onUpdate?.(vm);
+			}
+		} catch (error) {
+			console.error('Failed to pick workspace:', error);
+		}
+	}
+
+	async function handleClearWorkspace() {
+		if (!desktopRepo) return;
+		try {
+			await desktopRepo.setWorkspaceDir(null);
+			workspaceDir = null;
+			onUpdate?.(vm);
+		} catch (error) {
+			console.error('Failed to clear workspace:', error);
+		}
+	}
 </script>
 
 <Sheet bind:open onClose={closeBrowser} title="Boards" side="left" class="filebrowser-sheet">
@@ -165,6 +202,40 @@
 				+ New
 			</button>
 		</div>
+
+		{#if desktopRepo}
+			<div class="filebrowser__workspace">
+				{#if workspaceDir}
+					<div class="filebrowser__workspace-info">
+						<Icon name="folder" size={16} />
+						<span class="filebrowser__workspace-path" title={workspaceDir}>
+							{workspaceDir.split('/').pop() || workspaceDir}
+						</span>
+						<button
+							class="filebrowser__workspace-change"
+							onclick={handlePickWorkspace}
+							aria-label="Change workspace">
+							Change
+						</button>
+						<button
+							class="filebrowser__workspace-clear"
+							onclick={handleClearWorkspace}
+							aria-label="Clear workspace">
+							×
+						</button>
+					</div>
+				{:else}
+					<button
+						class="filebrowser__workspace-pick"
+						onclick={handlePickWorkspace}
+						aria-label="Pick workspace folder">
+						<Icon name="folder" size={16} />
+						Pick Workspace Folder
+					</button>
+					<div class="filebrowser__workspace-hint">Recent files mode</div>
+				{/if}
+			</div>
+		{/if}
 
 		<div class="filebrowser__search">
 			<!-- FIXME: reactivity is broken -->
@@ -441,6 +512,69 @@
 
 	.filebrowser__action:hover {
 		background-color: var(--primary-hover, #0056b3);
+	}
+
+	.filebrowser__workspace {
+		padding: 0.75rem 1rem;
+		border-bottom: 1px solid var(--border, #e0e0e0);
+		background-color: var(--surface-secondary, #f9f9f9);
+	}
+
+	.filebrowser__workspace-info {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.875rem;
+	}
+
+	.filebrowser__workspace-path {
+		flex: 1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-family: monospace;
+		color: var(--text);
+	}
+
+	.filebrowser__workspace-change,
+	.filebrowser__workspace-clear {
+		padding: 0.25rem 0.5rem;
+		background-color: transparent;
+		border: 1px solid var(--border, #e0e0e0);
+		border-radius: 4px;
+		cursor: pointer;
+		font-size: 0.75rem;
+		color: var(--text);
+	}
+
+	.filebrowser__workspace-change:hover,
+	.filebrowser__workspace-clear:hover {
+		background-color: var(--surface-hover, #f5f5f5);
+	}
+
+	.filebrowser__workspace-pick {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		width: 100%;
+		padding: 0.5rem;
+		background-color: var(--primary, #007bff);
+		color: white;
+		border: none;
+		border-radius: 4px;
+		cursor: pointer;
+		font-size: 0.875rem;
+	}
+
+	.filebrowser__workspace-pick:hover {
+		background-color: var(--primary-hover, #0056b3);
+	}
+
+	.filebrowser__workspace-hint {
+		margin-top: 0.5rem;
+		font-size: 0.75rem;
+		color: var(--text-muted, #6c757d);
+		text-align: center;
 	}
 
 	.filebrowser__search {

@@ -219,16 +219,16 @@ Safe deletes:
 R3. Desktop: real directory + files (Tauri)
 --------------------------------------------------------------------------------
 
-[ ] Add "Workspace folder" concept:
+[x] Add "Workspace folder" concept:
     - pick directory
     - remember last workspace path
-[ ] Implement directory listing:
+[x] Implement directory listing:
     - show *.inkfinite.json files in workspace
     - tree view with folders
-[ ] Implement file actions:
+[x] Implement file actions:
     - [x] New: create new file
-    - [ ] Rename: rename file (Tauri command needed)
-    - [ ] Delete: delete file (Tauri command needed)
+    - [x] Rename: rename file (Tauri command needed)
+    - [x] Delete: delete file (Tauri command needed)
     - [x] Open: load file into editor
     - [x] Export: save JSON
 
@@ -239,10 +239,10 @@ R3. Desktop: real directory + files (Tauri)
 R4. Parity behaviors
 --------------------------------------------------------------------------------
 
-[ ] Same shortcuts:
+[x] Same shortcuts:
     - Ctrl/Cmd+O opens file browser
     - Ctrl/Cmd+N creates board
-[ ] Consistent metadata display:
+[x] Consistent metadata display:
     - name + updatedAt in both modes
 
 (DoD):
