@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { DocRepo } from "../src/persist/DocRepo";
+import type { DocRepo } from "../src/persistence/repo";
 import { FileBrowserVM } from "../src/ui/filebrowser";
 
 function createRepoMock(): DocRepo {

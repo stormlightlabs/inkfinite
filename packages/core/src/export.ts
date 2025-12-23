@@ -59,18 +59,15 @@ export async function exportSelectionToPNG(
     return null;
   }
 
-  // Calculate combined bounds
   const bounds = combineBounds(shapes.map((s) => shapeBounds(s)));
   if (!bounds) {
     return null;
   }
 
-  // Add padding
   const padding = 20;
   const width = Box2Ops.width(bounds) + padding * 2;
   const height = Box2Ops.height(bounds) + padding * 2;
 
-  // Create temporary canvas
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -80,20 +77,16 @@ export async function exportSelectionToPNG(
     throw new Error("Failed to get 2D context");
   }
 
-  // Clear background (white)
   context.fillStyle = "white";
   context.fillRect(0, 0, width, height);
 
-  // Translate to handle bounds offset + padding
   context.save();
   context.translate(-bounds.min.x + padding, -bounds.min.y + padding);
 
-  // Let caller render the shapes
   renderFunction(context, shapes, bounds);
 
   context.restore();
 
-  // Export to PNG
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (blob) {
@@ -122,7 +115,6 @@ export function exportToSVG(state: EditorState, options: ExportOptions = {}): st
     return "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\"></svg>";
   }
 
-  // Calculate bounds
   const bounds = combineBounds(shapes.map((s) => shapeBounds(s)));
   if (!bounds) {
     return "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\"></svg>";
@@ -136,9 +128,6 @@ export function exportToSVG(state: EditorState, options: ExportOptions = {}): st
 
   const elements: string[] = [`<rect x="${offsetX}" y="${offsetY}" width="${width}" height="${height}" fill="white"/>`];
 
-  // Add white background
-
-  // Render each shape
   for (const shape of shapes) {
     const svg = shapeToSVG(shape, state);
     if (svg) {
@@ -217,7 +206,6 @@ function lineToSVG(shape: LineShape, transform: string): string {
 function arrowToSVG(shape: ArrowShape, transform: string, _state: EditorState): string {
   const { a, b, stroke, width } = shape.props;
 
-  // Calculate arrow head
   const angle = Math.atan2(b.y - a.y, b.x - a.x);
   const arrowLength = 15;
   const arrowAngle = Math.PI / 6;

@@ -430,7 +430,6 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
   let inputAdapter: InputAdapter | null = null;
   let canvasInitialized = false;
 
-  // Initialize canvas-dependent systems when canvas becomes available
   $effect(() => {
     if (!canvas || canvasInitialized) return;
 

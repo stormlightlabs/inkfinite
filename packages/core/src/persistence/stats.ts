@@ -1,4 +1,4 @@
-import type { Timestamp } from "../persist/DocRepo";
+import type { Timestamp } from "./repo";
 
 export type BoardStats = {
   pageCount: number;

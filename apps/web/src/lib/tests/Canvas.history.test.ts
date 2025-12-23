@@ -332,7 +332,7 @@ describe("Canvas history integration", () => {
 
   it("wraps pointer actions in SnapshotCommands and enqueues persistence", async () => {
     render(Canvas);
-    // Wait for onMount to complete and input adapter to be created
+
     await vi.waitFor(() => {
       expect(actionHandlers.length).toBeGreaterThan(0);
     });

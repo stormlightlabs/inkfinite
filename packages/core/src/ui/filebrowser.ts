@@ -1,4 +1,4 @@
-import type { BoardMeta, DocRepo } from "../persist/DocRepo";
+import type { BoardMeta, DocRepo } from "../persistence/repo";
 
 export type FileBrowserActions = {
   open(boardId: string): Promise<void>;

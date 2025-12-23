@@ -4,7 +4,6 @@ export type BoardMeta = { id: string; name: string; createdAt: Timestamp; update
 
 /**
  * Shared document repository contract used by both web and desktop persistence layers.
- * Provides the minimal operations required for listing and managing boards.
  */
 export interface DocRepo {
   /**

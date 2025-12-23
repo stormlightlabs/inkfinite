@@ -9,7 +9,7 @@ import {
   type ShapeRecord,
   ShapeRecord as ShapeOps,
 } from "../model";
-import type { BoardMeta, DocRepo, Timestamp } from "../persist/DocRepo";
+import type { BoardMeta, DocRepo, Timestamp } from "./repo";
 import type { BoardInspectorData, BoardStats, MigrationInfo, SchemaInfo } from "./stats";
 import { BoardStatsOps, getPendingMigrations } from "./stats";
 

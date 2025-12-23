@@ -192,25 +192,25 @@ R2. Web: Boards list + Dexie "Inspector" drawer
 --------------------------------------------------------------------------------
 
 /apps/web/src/lib/filebrowser/FileBrowser.svelte:
-[ ] Boards panel:
+[x] Boards panel:
     - listBoards() -> render
     - search filter
     - open / create / rename / delete
 
 Inspector drawer (selected board):
-[ ] Show "Storage"
-[ ] Show schema info:
+[x] Show "Storage"
+[x] Show schema info:
     - declared schema version
     - installed schema version
-[ ] Show board-level stats (computed live):
+[x] Show board-level stats (computed live):
     - row counts: pages/shapes/bindings for this board & doc size bytes for docs row
     - last updatedAt
-[ ] Show migration info:
+[x] Show migration info:
     - list applied migrations from migrations table (id + appliedAt)
     - show "pending" migrations if any (based on known list vs applied)
 
 Safe deletes:
-[ ] deleteBoard must be a single atomic transaction (boards + related tables)
+[x] deleteBoard must be a single atomic transaction (boards + related tables)
 
 (DoD):
 - Web: you can browse boards, open one, and verify migrations + row counts.
@@ -227,8 +227,8 @@ R3. Desktop: real directory + files (Tauri)
     - tree view with folders
 [ ] Implement file actions:
     - [x] New: create new file
-    - [ ] Rename: rename file
-    - [ ] Delete: delete file
+    - [ ] Rename: rename file (Tauri command needed)
+    - [ ] Delete: delete file (Tauri command needed)
     - [x] Open: load file into editor
     - [x] Export: save JSON
 

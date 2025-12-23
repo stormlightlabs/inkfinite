@@ -1,5 +1,5 @@
 import type { BindingRecord, Document, PageRecord, ShapeRecord } from "../model";
-import type { BoardMeta } from "../persist/DocRepo";
+import type { BoardMeta } from "./repo";
 import type { DocOrder, LoadedDoc } from "./web";
 
 /**
