@@ -34,7 +34,37 @@ export type LineProps = { a: Vec2; b: Vec2; stroke: string; width: number };
 export type ArrowProps = { a: Vec2; b: Vec2; stroke: string; width: number };
 export type TextProps = { text: string; fontSize: number; fontFamily: string; color: string; w?: number };
 
-export type ShapeType = "rect" | "ellipse" | "line" | "arrow" | "text";
+/**
+ * Point with optional pressure value (0-1)
+ * Format: [x, y, pressure?]
+ */
+export type StrokePoint = [number, number, number?];
+
+/**
+ * Brush configuration for stroke rendering
+ * Maps to perfect-freehand options
+ */
+export type BrushConfig = {
+  size: number;
+  thinning: number;
+  smoothing: number;
+  streamline: number;
+  simulatePressure: boolean;
+};
+
+/**
+ * Style properties for stroke appearance
+ */
+export type StrokeStyle = { color: string; opacity: number };
+
+/**
+ * Properties for freehand stroke shapes
+ * Points are in world coordinates
+ * Outline and bounds are computed lazily and not persisted
+ */
+export type StrokeProps = { points: StrokePoint[]; style: StrokeStyle; brush: BrushConfig };
+
+export type ShapeType = "rect" | "ellipse" | "line" | "arrow" | "text" | "stroke";
 
 export type BaseShape = { id: string; type: ShapeType; pageId: string; x: number; y: number; rot: number };
 export type RectShape = BaseShape & { type: "rect"; props: RectProps };
@@ -42,8 +72,9 @@ export type EllipseShape = BaseShape & { type: "ellipse"; props: EllipseProps };
 export type LineShape = BaseShape & { type: "line"; props: LineProps };
 export type ArrowShape = BaseShape & { type: "arrow"; props: ArrowProps };
 export type TextShape = BaseShape & { type: "text"; props: TextProps };
+export type StrokeShape = BaseShape & { type: "stroke"; props: StrokeProps };
 
-export type ShapeRecord = RectShape | EllipseShape | LineShape | ArrowShape | TextShape;
+export type ShapeRecord = RectShape | EllipseShape | LineShape | ArrowShape | TextShape | StrokeShape;
 
 export const ShapeRecord = {
   /**
@@ -82,9 +113,27 @@ export const ShapeRecord = {
   },
 
   /**
+   * Create a stroke shape
+   */
+  createStroke(pageId: string, x: number, y: number, properties: StrokeProps, id?: string): StrokeShape {
+    return { id: id ?? createId("shape"), type: "stroke", pageId, x, y, rot: 0, props: properties };
+  },
+
+  /**
    * Clone a shape record
    */
   clone(shape: ShapeRecord): ShapeRecord {
+    if (shape.type === "stroke") {
+      return {
+        ...shape,
+        props: {
+          ...shape.props,
+          points: shape.props.points.map((p) => [...p] as StrokePoint),
+          style: { ...shape.props.style },
+          brush: { ...shape.props.brush },
+        },
+      };
+    }
     return { ...shape, props: { ...shape.props } } as ShapeRecord;
   },
 };
@@ -209,6 +258,19 @@ export function validateDoc(document: Document): ValidationResult {
         if (shape.props.fontSize <= 0) errors.push(`Text shape '${shapeId}' has invalid fontSize`);
         if (shape.props.w !== undefined && shape.props.w < 0) {
           errors.push(`Text shape '${shapeId}' has negative width`);
+        }
+
+        break;
+      }
+      case "stroke": {
+        if (shape.props.points.length < 2) {
+          errors.push(`Stroke shape '${shapeId}' has fewer than 2 points`);
+        }
+        if (shape.props.brush.size <= 0) {
+          errors.push(`Stroke shape '${shapeId}' has invalid brush size`);
+        }
+        if (shape.props.style.opacity < 0 || shape.props.style.opacity > 1) {
+          errors.push(`Stroke shape '${shapeId}' has invalid opacity`);
         }
 
         break;

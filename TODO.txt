@@ -273,15 +273,15 @@ Refs:
 T1. Data model: Stroke shape
 ------------------------------------------------------------------------------
 
-/packages/core/src/model:
-[ ] Add ShapeType: 'stroke'
-[ ] StrokeShape props (persisted):
+/packages/core/src/model.ts:
+[x] Add ShapeType: 'stroke'
+[x] StrokeShape props (persisted):
     - points: Array<[x,y,p?]>          " world coords + optional pressure
     - style: { color, opacity }
     - brush: { size, thinning, smoothing, streamline, simulatePressure }
-[ ] Derived (NOT persisted):
-    - outline?: Array<[x,y]>           " computed polygon
-    - bounds?: Box2
+[x] Derived (NOT persisted):
+    - outline: computed via computeOutline() from geom.ts
+    - bounds: computed via shapeBounds() from geom.ts
 
 (DoD): stroke serializes to JSON and loads back identically.
 
@@ -289,13 +289,13 @@ T1. Data model: Stroke shape
 T2. Tool: pen (state machine)
 ------------------------------------------------------------------------------
 
-/packages/core/src/tools.ts (PenTool)
-[ ] PointerDown: start draft, push first point
-[ ] PointerMove: append point if moved > eps; include pressure if available
-[ ] PointerUp: create ONE history command that inserts the stroke; clear draft
+/packages/core/src/tools/pen.ts (PenTool)
+[x] PointerDown: start draft, push first point
+[x] PointerMove: append point if moved > eps; include pressure if available
+[x] PointerUp: create ONE history command that inserts the stroke; clear draft
 
 Perf:
-[ ] Coalesce draft updates (rAF) so you don’t recompute per event.
+[ ] Coalesce draft updates (rAF) so you don't recompute per event.
 
 (DoD): one stroke == one undo step; no DB writes until finalize (via M).
 
@@ -304,8 +304,8 @@ T3. Geometry: compute outline via perfect-freehand
 ------------------------------------------------------------------------------
 
 /packages/core/src/geom.ts:
-[ ] computeOutline(points, brush) -> outlinePoints using getStroke()
-[ ] boundsFromOutline(outline) -> Box2
+[x] computeOutline(points, brush) -> outlinePoints using getStroke()
+[x] boundsFromOutline(outline) -> Box2
 
 (DoD): outline non-empty for >= 2 points; bounds contain outline.
 
@@ -313,11 +313,12 @@ T3. Geometry: compute outline via perfect-freehand
 T4. Rendering: fill the outline polygon
 ------------------------------------------------------------------------------
 
-/packages/renderer/src/draw.ts:
-[ ] drawStroke(ctx, stroke):
-    - outline = cached || computeOutline(...)
+/packages/renderer/src/index.ts:
+[x] drawStroke(ctx, stroke):
+    - outline = computeOutline(...) (computed on each draw)
     - ctx.beginPath(); moveTo/lineTo...; closePath(); fill()
-[ ] Render draft stroke above shapes, below selection UI.
+[x] Render draft stroke inline with shapes (using same rendering path)
+[x] Selection outline for strokes
 
 (DoD): strokes look stable while drawing; committed strokes match preview.
 
@@ -326,9 +327,10 @@ T5. Hit testing
 ------------------------------------------------------------------------------
 
 /packages/core/src/geom.ts:
-[ ] hitTestStroke(p, stroke):
+[x] hitTestStroke(p, stroke):
     - bounds check first
-    - inside-outline polygon test (ray cast) (or tolerance-to-segment fallback)
+    - inside-outline polygon test (ray cast)
+[x] Add stroke case to hitTestPoint
 
 (DoD): clicking a stroke selects it reliably.
 
@@ -347,10 +349,20 @@ T6. Brush settings (thin UI slice)
 T7. Tests
 ------------------------------------------------------------------------------
 
-/packages/core/test/pen.test.ts:
-[ ] outline computed for a simple polyline
-[ ] bounds correctness
-[ ] hit test inside/outside sanity
+/packages/core/tests/geom-stroke.test.ts:
+[x] outline computed for simple polyline
+[x] bounds correctness
+[x] hit test inside/outside sanity
+[x] bounds from outline helper
+[x] shapeBounds for stroke shapes
+
+/packages/core/tests/pen-tool.test.ts:
+[x] Tool lifecycle tests
+[x] Drawing strokes (pointer down/move/up)
+[x] Keyboard interactions (Escape to cancel)
+[x] Edge cases
+
+(DoD): All tests passing
 
 Integration:
 [ ] one history command per stroke; undo/redo persists through refresh (M).

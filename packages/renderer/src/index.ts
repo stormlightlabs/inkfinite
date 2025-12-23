@@ -8,11 +8,12 @@ import type {
   RectShape,
   ShapeRecord,
   Store,
+  StrokeShape,
   TextShape,
   Vec2,
   Viewport,
 } from "inkfinite-core";
-import { getShapesOnCurrentPage, resolveArrowEndpoints, shapeBounds } from "inkfinite-core";
+import { computeOutline, getShapesOnCurrentPage, resolveArrowEndpoints, shapeBounds } from "inkfinite-core";
 
 export interface Renderer {
   /**
@@ -331,6 +332,10 @@ function drawShape(context: CanvasRenderingContext2D, state: EditorState, shape:
       drawText(context, shape);
       break;
     }
+    case "stroke": {
+      drawStroke(context, shape);
+      break;
+    }
   }
 
   context.restore();
@@ -463,6 +468,36 @@ function drawText(context: CanvasRenderingContext2D, shape: TextShape) {
 }
 
 /**
+ * Draw a stroke shape (freehand drawing)
+ */
+function drawStroke(context: CanvasRenderingContext2D, shape: StrokeShape) {
+  const { points, brush, style } = shape.props;
+
+  if (points.length < 2) {
+    return;
+  }
+
+  const outline = computeOutline(points, brush);
+
+  if (outline.length === 0) {
+    return;
+  }
+
+  context.globalAlpha = style.opacity;
+  context.fillStyle = style.color;
+  context.beginPath();
+  context.moveTo(outline[0].x, outline[0].y);
+
+  for (let i = 1; i < outline.length; i++) {
+    context.lineTo(outline[i].x, outline[i].y);
+  }
+
+  context.closePath();
+  context.fill();
+  context.globalAlpha = 1.0;
+}
+
+/**
  * Wrap text to fit within a given width
  */
 function wrapText(context: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
@@ -543,6 +578,28 @@ function drawSelection(
         const width = w ?? metrics.width;
         const height = fontSize * 1.2;
         context.strokeRect(0, 0, width, height);
+        break;
+      }
+      case "stroke": {
+        const { points, brush } = shape.props;
+        if (points.length >= 2) {
+          const outline = computeOutline(points, brush);
+          if (outline.length > 0) {
+            let minX = outline[0].x;
+            let maxX = outline[0].x;
+            let minY = outline[0].y;
+            let maxY = outline[0].y;
+
+            for (const point of outline) {
+              minX = Math.min(minX, point.x);
+              maxX = Math.max(maxX, point.x);
+              minY = Math.min(minY, point.y);
+              maxY = Math.max(maxY, point.y);
+            }
+
+            context.strokeRect(minX, minY, maxX - minX, maxY - minY);
+          }
+        }
         break;
       }
     }

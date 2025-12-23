@@ -1,6 +1,17 @@
+import getStroke from "perfect-freehand";
 import type { Box2, Vec2 } from "./math";
 import { Box2 as Box2Ops, Vec2 as Vec2Ops } from "./math";
-import type { ArrowShape, EllipseShape, LineShape, RectShape, ShapeRecord, TextShape } from "./model";
+import type {
+  ArrowShape,
+  BrushConfig,
+  EllipseShape,
+  LineShape,
+  RectShape,
+  ShapeRecord,
+  StrokePoint,
+  StrokeShape,
+  TextShape,
+} from "./model";
 import type { EditorState } from "./reactivity";
 import { getShapesOnCurrentPage } from "./reactivity";
 
@@ -29,6 +40,9 @@ export function shapeBounds(shape: ShapeRecord): Box2 {
     }
     case "text": {
       return textBounds(shape);
+    }
+    case "stroke": {
+      return strokeBounds(shape);
     }
   }
 }
@@ -124,6 +138,68 @@ function textBounds(shape: TextShape): Box2 {
   const rotatedCorners = corners.map((corner) => rotatePoint(corner, rot));
   const translatedCorners = rotatedCorners.map((corner) => ({ x: corner.x + x, y: corner.y + y }));
   return Box2Ops.fromPoints(translatedCorners);
+}
+
+/**
+ * Compute outline polygon points for a stroke using perfect-freehand
+ *
+ * @param points - Array of stroke points [x, y, pressure?]
+ * @param brush - Brush configuration
+ * @returns Array of outline points [x, y]
+ */
+export function computeOutline(points: StrokePoint[], brush: BrushConfig): Vec2[] {
+  if (points.length < 2) {
+    return [];
+  }
+
+  const formattedPoints = points.map((p) => {
+    if (p.length === 3 && p[2] !== undefined) {
+      return [p[0], p[1], p[2]];
+    }
+    return [p[0], p[1]];
+  });
+
+  const outlinePoints = getStroke(formattedPoints, {
+    size: brush.size,
+    thinning: brush.thinning,
+    smoothing: brush.smoothing,
+    streamline: brush.streamline,
+    simulatePressure: brush.simulatePressure,
+  });
+
+  return outlinePoints.map((p) => ({ x: p[0], y: p[1] }));
+}
+
+/**
+ * Compute bounding box from outline points
+ *
+ * @param outline - Array of outline points
+ * @returns Bounding box containing all outline points
+ */
+export function boundsFromOutline(outline: Vec2[]): Box2 {
+  if (outline.length === 0) {
+    return Box2Ops.create(0, 0, 0, 0);
+  }
+
+  return Box2Ops.fromPoints(outline);
+}
+
+/**
+ * Get bounds for a stroke shape
+ *
+ * Computes the outline polygon and returns its bounding box
+ */
+function strokeBounds(shape: StrokeShape): Box2 {
+  const { points, brush } = shape.props;
+  const { x, y } = shape;
+
+  if (points.length < 2) {
+    return Box2Ops.create(x, y, x, y);
+  }
+
+  const outline = computeOutline(points, brush);
+  const localBounds = boundsFromOutline(outline);
+  return Box2Ops.create(localBounds.min.x + x, localBounds.min.y + y, localBounds.max.x + x, localBounds.max.y + y);
 }
 
 /**
@@ -232,6 +308,56 @@ export function pointInText(p: Vec2, shape: TextShape): boolean {
 }
 
 /**
+ * Check if a point is inside a polygon using ray casting algorithm
+ *
+ * @param p - Point to test
+ * @param polygon - Array of polygon vertices
+ * @returns True if point is inside the polygon
+ */
+function pointInPolygon(p: Vec2, polygon: Vec2[]): boolean {
+  if (polygon.length < 3) return false;
+
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x;
+    const yi = polygon[i].y;
+    const xj = polygon[j].x;
+    const yj = polygon[j].y;
+
+    const intersect = yi > p.y !== yj > p.y && p.x < ((xj - xi) * (p.y - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+
+  return inside;
+}
+
+/**
+ * Check if a point is inside a stroke shape
+ *
+ * Uses bounds check first for performance, then polygon containment test
+ *
+ * @param p - Point in world coordinates
+ * @param shape - Stroke shape
+ * @returns True if point is inside the stroke
+ */
+export function hitTestStroke(p: Vec2, shape: StrokeShape): boolean {
+  const { x, y } = shape;
+  const { points, brush } = shape.props;
+
+  if (points.length < 2) return false;
+
+  const bounds = strokeBounds(shape);
+  if (p.x < bounds.min.x || p.x > bounds.max.x || p.y < bounds.min.y || p.y > bounds.max.y) {
+    return false;
+  }
+
+  const localP = { x: p.x - x, y: p.y - y };
+
+  const outline = computeOutline(points, brush);
+  return pointInPolygon(localP, outline);
+}
+
+/**
  * Transform a point from world coordinates to shape-local coordinates
  *
  * @param p - Point in world coordinates
@@ -289,6 +415,12 @@ export function hitTestPoint(state: EditorState, worldPoint: Vec2, tolerance = 5
       }
       case "text": {
         if (pointInText(worldPoint, shape)) {
+          return shape.id;
+        }
+        break;
+      }
+      case "stroke": {
+        if (hitTestStroke(worldPoint, shape)) {
           return shape.id;
         }
         break;
