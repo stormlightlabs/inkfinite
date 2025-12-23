@@ -19,6 +19,7 @@
 	let platform = $derived(c.platform());
 	let textEditorCurrent = $derived(c.textEditor.current);
 	let persistenceStatusStore = $derived(c.persistenceStatusStore());
+	let marqueeRect = $derived(c.marqueeRect());
 
 	$effect(() => {
 		c.setCanvasRef(canvasEl);
@@ -69,6 +70,12 @@
 					onblur={c.textEditor.handleBlur}
 					spellcheck="false"></textarea>
 			{/if}
+		{/if}
+		{#if marqueeRect}
+			<div
+				class="canvas-marquee"
+				style={`left:${marqueeRect.left}px;top:${marqueeRect.top}px;width:${marqueeRect.width}px;height:${marqueeRect.height}px;`}>
+			</div>
 		{/if}
 	</div>
 	<HistoryViewer store={c.store} bind:open={historyViewerOpen} onClose={c.history.handleClose} />
@@ -126,5 +133,14 @@
 		box-shadow:
 			0 0 0 1px rgba(0, 0, 0, 0.05),
 			0 8px 20px rgba(0, 0, 0, 0.15);
+	}
+
+	.canvas-marquee {
+		position: absolute;
+		border: 1px solid rgba(136, 192, 208, 0.7);
+		background-color: rgba(136, 192, 208, 0.2);
+		box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+		pointer-events: none;
+		z-index: 1;
 	}
 </style>

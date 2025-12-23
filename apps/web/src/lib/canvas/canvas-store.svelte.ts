@@ -26,7 +26,7 @@ import {
   Store,
   TextTool,
 } from "inkfinite-core";
-import type { Action, LoadedDoc, PersistenceSink, PersistentDocRepo, Viewport } from "inkfinite-core";
+import type { Action, Box2, LoadedDoc, PersistenceSink, PersistentDocRepo, Viewport } from "inkfinite-core";
 import { createRenderer, type Renderer } from "inkfinite-renderer";
 import { onDestroy, onMount } from "svelte";
 import { SvelteSet } from "svelte/reactivity";
@@ -58,6 +58,14 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
   let activeBoardId: string | null = null;
   let desktopRepo: DesktopDocRepo | null = null;
   let removeBeforeUnload: (() => void) | null = null;
+  const handleResize = () => {
+    if (marqueeBounds) {
+      updateMarquee(marqueeBounds);
+    }
+  };
+  if (typeof window !== "undefined") {
+    window.addEventListener("resize", handleResize);
+  }
   let webDb: InkfiniteDB | null = null;
   let canvas = $state<HTMLCanvasElement | null>(null);
 
@@ -78,6 +86,26 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
   const cursorStore = new CursorStore();
   const snapStore: SnapStore = createSnapStore();
   const brushStore: BrushStore = createBrushStore();
+  type ScreenRect = { left: number; top: number; width: number; height: number };
+  let marqueeBounds: Box2 | null = null;
+  let marqueeRect = $state<ScreenRect | null>(null);
+
+  function updateMarquee(bounds: Box2 | null, cameraOverride?: Camera) {
+    marqueeBounds = bounds ? { min: { ...bounds.min }, max: { ...bounds.max } } : null;
+    if (!marqueeBounds) {
+      marqueeRect = null;
+      return;
+    }
+    const viewport = getViewport();
+    const cameraState = cameraOverride ?? store.getState().camera;
+    const minScreen = Camera.worldToScreen(cameraState, marqueeBounds.min, viewport);
+    const maxScreen = Camera.worldToScreen(cameraState, marqueeBounds.max, viewport);
+    const left = Math.min(minScreen.x, maxScreen.x);
+    const top = Math.min(minScreen.y, maxScreen.y);
+    const width = Math.abs(maxScreen.x - minScreen.x);
+    const height = Math.abs(maxScreen.y - minScreen.y);
+    marqueeRect = { left, top, width, height };
+  }
 
   function getViewport(): Viewport {
     if (canvas) {
@@ -117,7 +145,10 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     }));
   }
 
-  const selectTool = new SelectTool();
+  const handleMarqueeChange = (bounds: Box2 | null) => {
+    updateMarquee(bounds);
+  };
+  const selectTool = new SelectTool(handleMarqueeChange);
   const rectTool = new RectTool();
   const ellipseTool = new EllipseTool();
   const lineTool = new LineTool();
@@ -136,6 +167,11 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
 
   const textEditor = new TextEditorController(store, getViewport, refreshCursor);
   const toolController = new ToolController(store, tools);
+  const unsubscribeMarqueeCamera = store.subscribe((state) => {
+    if (marqueeBounds) {
+      updateMarquee(marqueeBounds, state.camera);
+    }
+  });
   const history = new HistoryController(bindings);
   const desktop = new DesktopFileController(() => repo, () => desktopRepo, (boardId, doc) => {
     setActiveBoardId(boardId);
@@ -521,7 +557,11 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     renderer?.dispose();
     inputAdapter?.dispose();
     persistenceManager?.dispose();
+    unsubscribeMarqueeCamera();
     removeBeforeUnload?.();
+    if (typeof window !== "undefined") {
+      window.removeEventListener("resize", handleResize);
+    }
     fallbackStatusStore.update(() => ({ backend: "indexeddb", state: "saved", pendingWrites: 0 }));
     persistenceStatusStore = fallbackStatusStore;
   });
@@ -542,5 +582,6 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     snapStore,
     brushStore,
     setCanvasRef,
+    marqueeRect: () => marqueeRect,
   };
 }

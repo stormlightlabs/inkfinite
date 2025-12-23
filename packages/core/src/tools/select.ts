@@ -55,8 +55,10 @@ const MIN_RESIZE_SIZE = 5;
 export class SelectTool implements Tool {
   readonly id: ToolId = "select";
   private toolState: SelectToolState;
+  private readonly marqueeListener?: (bounds: Box2 | null) => void;
 
-  constructor() {
+  constructor(onMarqueeChange?: (bounds: Box2 | null) => void) {
+    this.marqueeListener = onMarqueeChange;
     this.toolState = {
       isDragging: false,
       dragStartWorld: null,
@@ -198,6 +200,7 @@ export class SelectTool implements Tool {
     if (!isShiftHeld) {
       this.toolState.marqueeStart = action.world;
       this.toolState.marqueeEnd = action.world;
+      this.notifyMarqueeChange();
 
       return { ...state, ui: { ...state.ui, selectionIds: [] } };
     }
@@ -283,6 +286,7 @@ export class SelectTool implements Tool {
     if (action.type !== "pointer-move") return state;
 
     this.toolState.marqueeEnd = action.world;
+    this.notifyMarqueeChange();
 
     return state;
   }
@@ -310,6 +314,7 @@ export class SelectTool implements Tool {
     this.toolState.initialShapePositions.clear();
     this.toolState.marqueeStart = null;
     this.toolState.marqueeEnd = null;
+    this.notifyMarqueeChange();
 
     return newState;
   }
@@ -410,6 +415,7 @@ export class SelectTool implements Tool {
       rotationCenter: null,
       rotationStartAngle: null,
     };
+    this.notifyMarqueeChange();
   }
 
   /**
@@ -418,6 +424,12 @@ export class SelectTool implements Tool {
   getMarqueeBounds(): Box2 | null {
     if (!this.toolState.marqueeStart || !this.toolState.marqueeEnd) return null;
     return Box2.fromPoints([this.toolState.marqueeStart, this.toolState.marqueeEnd]);
+  }
+
+  private notifyMarqueeChange(): void {
+    if (this.marqueeListener) {
+      this.marqueeListener(this.getMarqueeBounds());
+    }
   }
 
   getHandleAtPoint(state: EditorState, point: Vec2): HandleKind | null {
