@@ -153,76 +153,9 @@ Goal: the editor stays responsive with many shapes.
 18. Milestone R: File Browser (web: Dexie inspector, desktop: FS)         *wb-R*
 ================================================================================
 
-Goal: A unified "Open board" experience:
-- Web: browse Dexie-backed boards + a useful persistence/migration inspector
-- Desktop: browse real directories/files (native file browser semantics)
-
---------------------------------------------------------------------------------
-R1. Shared UX contracts
---------------------------------------------------------------------------------
-
-/packages/core/src/persist/DocRepo.ts:
-[x] Define DocRepo interface (web + desktop):
-    - listBoards(): Promise<BoardMeta[]>
-    - createBoard(name): Promise<string>
-    - openBoard(id): Promise<void>
-    - renameBoard(id, name): Promise<void>
-    - deleteBoard(id): Promise<void>
-
-[x] Define FileBrowserViewModel:
-    - query, filteredBoards, selectedId
-    - actions: open/create/rename/delete
-
-(DoD):
-- Svelte UI can render the browser purely from the ViewModel.
-
---------------------------------------------------------------------------------
-R2. Web: Boards list + Dexie "Inspector" drawer
---------------------------------------------------------------------------------
-
-/apps/web/src/lib/filebrowser/FileBrowser.svelte:
-[x] Boards panel:
-    - listBoards() -> render
-    - search filter
-    - open / create / rename / delete
-
-Inspector drawer (selected board):
-[x] Show "Storage"
-[x] Show schema info:
-    - declared schema version
-    - installed schema version
-[x] Show board-level stats (computed live):
-    - row counts: pages/shapes/bindings for this board & doc size bytes for docs row
-    - last updatedAt
-[x] Show migration info:
-    - list applied migrations from migrations table (id + appliedAt)
-    - show "pending" migrations if any (based on known list vs applied)
-
-Safe deletes:
-[x] deleteBoard must be a single atomic transaction (boards + related tables)
-
-(DoD):
-- Web: you can browse boards, open one, and verify migrations + row counts.
-
---------------------------------------------------------------------------------
-R3. Desktop: real directory + files (Tauri)
---------------------------------------------------------------------------------
-
-[x] Add "Workspace folder" concept:
-    - pick directory
-    - remember last workspace path
-[x] Implement directory listing:
-    - show *.inkfinite.json files in workspace
-    - tree view with folders
-[x] Implement file actions:
-    - [x] New: create new file
-    - [x] Rename: rename file (Tauri command needed)
-    - [x] Delete: delete file (Tauri command needed)
-    - [x] Open: load file into editor
-    - [x] Export: save JSON
-
-(DoD):
-- Desktop: pick a folder, browse files, open/save boards from disk.
+The shared file browser now offers Dexie-backed search + inspector tooling on
+web and full workspace navigation on desktop, all driven by the view model
+contracts.
 
 --------------------------------------------------------------------------------
 R4. Parity behaviors
@@ -242,14 +175,25 @@ R4. Parity behaviors
 ================================================================================
 
 Comprehensive UX polish adds BEM CSS, space-drag panning, richer keyboard
-affordances, improved accessibility and styling, refined snapping, and handles
-so drawing feels production-ready.
+affordances, improved accessibility and styling, refined snapping, and handles.
 
 ================================================================================
 20. Milestone T: Sketching / Pen Tool (perfect-freehand)                  *wb-T*
 ================================================================================
 
-Perfect-freehand pen strokes now behave like first-class shapes with frame-coalesced drafting, geometry/rendering integration, brush controls, and thorough tests across core and web layers.
+Perfect-freehand pen strokes now behave like first-class shapes with frame
+coalesced drafting, geometry/rendering integration, and brush controls.
+
+================================================================================
+Parking Lot                                                              *wb-pl*
+================================================================================
+
+- [ ] Opacity for shapes
+    - expose fill/stroke opacity controls so translucent layering is possible
+      without exporting.
+- [ ] Snapping/binding for arrows
+    - extend the binding system to keep arrow endpoints magnetized to shapes
+    even when snapping/grid options are enabled.
 
 ================================================================================
 References (URLs)                                                      *wb-refs*
@@ -271,4 +215,3 @@ Canvas/infinite-canvas performance ideas:
 
 Perfect Freehand
 - https://github.com/steveruizok/perfect-freehand
-- (Options) https://github.com/steveruizok/perfect-freehand/blob/main/packages/perfect-freehand/src/types.ts
