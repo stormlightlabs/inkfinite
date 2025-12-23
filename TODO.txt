@@ -339,11 +339,13 @@ T6. Brush settings (thin UI slice)
 ------------------------------------------------------------------------------
 
 /apps/web/src/lib/components/BrushPopover.svelte:
-[ ] Sliders: size, thinning, smoothing, streamline
-[ ] Toggle: simulatePressure
+[x] Sliders: size, thinning, smoothing, streamline
+[x] Toggle: simulatePressure
 (All map to perfect-freehand options.)
 
-(DoD): settings affect newly drawn strokes immediately.
+(DoD):
+- settings affect newly drawn strokes immediately.
+- tests in BrushPopover.svelte.test.ts
 
 ------------------------------------------------------------------------------
 T7. Tests
@@ -365,7 +367,7 @@ T7. Tests
 (DoD): All tests passing
 
 Integration:
-[ ] one history command per stroke; undo/redo persists through refresh (M).
+[x] one history command per stroke (tested in pen-tool.test.ts)
 
 ------------------------------------------------------------------------------
 Definition of Done

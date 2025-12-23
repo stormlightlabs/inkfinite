@@ -2,8 +2,8 @@ import { createInputAdapter } from "$lib/input";
 import type { InputAdapter } from "$lib/input";
 import type { DesktopDocRepo } from "$lib/persistence/desktop";
 import { createPlatformRepo, detectPlatform } from "$lib/platform";
-import { createPersistenceManager, createSnapStore, createStatusStore } from "$lib/status";
-import type { SnapStore, StatusStore } from "$lib/status";
+import { createBrushStore, createPersistenceManager, createSnapStore, createStatusStore } from "$lib/status";
+import type { BrushStore, SnapStore, StatusStore } from "$lib/status";
 import {
   ArrowTool,
   Camera,
@@ -16,6 +16,7 @@ import {
   getShapesOnCurrentPage,
   InkfiniteDB,
   LineTool,
+  PenTool,
   RectTool,
   routeAction,
   SelectTool,
@@ -76,6 +77,7 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
 
   const cursorStore = new CursorStore();
   const snapStore: SnapStore = createSnapStore();
+  const brushStore: BrushStore = createBrushStore();
 
   function getViewport(): Viewport {
     if (canvas) {
@@ -121,7 +123,8 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
   const lineTool = new LineTool();
   const arrowTool = new ArrowTool();
   const textTool = new TextTool();
-  const tools = createToolMap([selectTool, rectTool, ellipseTool, lineTool, arrowTool, textTool]);
+  const penTool = new PenTool(() => brushStore.get());
+  const tools = createToolMap([selectTool, rectTool, ellipseTool, lineTool, arrowTool, textTool, penTool]);
 
   const textEditor = new TextEditorController(store, getViewport, refreshCursor);
   const toolController = new ToolController(store, tools);
@@ -246,15 +249,12 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
 
     const primaryModifier = action.modifiers.meta || action.modifiers.ctrl;
 
-    // Global shortcuts (work regardless of selection)
     if (primaryModifier && (action.key === "o" || action.key === "O")) {
-      // Open file browser
       fileBrowser.handleOpen();
       return null;
     }
 
     if (primaryModifier && (action.key === "n" || action.key === "N")) {
-      // New board - open file browser in create mode
       fileBrowser.handleOpen();
       return null;
     }
@@ -532,6 +532,7 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     cursorStore,
     persistenceStatusStore: () => persistenceStatusStore,
     snapStore,
+    brushStore,
     setCanvasRef,
   };
 }

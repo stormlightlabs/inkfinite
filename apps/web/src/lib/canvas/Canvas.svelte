@@ -49,7 +49,8 @@
 		onHistoryClick={c.history.handleClick}
 		store={c.store}
 		getViewport={c.getViewport}
-		canvas={canvasEl ?? undefined} />
+		canvas={canvasEl ?? undefined}
+		brushStore={c.brushStore} />
 	<div class="canvas-container">
 		<canvas
 			bind:this={canvasEl}

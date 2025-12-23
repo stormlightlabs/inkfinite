@@ -2,6 +2,7 @@ import { EditorState, ShapeRecord, Store } from "inkfinite-core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { cleanup, render } from "vitest-browser-svelte";
 import Toolbar from "../components/Toolbar.svelte";
+import { createBrushStore } from "../status";
 
 function createStoreWithRect() {
   const store = new Store();
@@ -56,9 +57,16 @@ describe("Toolbar color controls", () => {
   function renderToolbar(store: Store) {
     const target = document.createElement("div");
     document.body.appendChild(target);
+    const brushStore = createBrushStore();
     return render(Toolbar, {
       target,
-      props: { currentTool: "select", onToolChange: () => {}, store, getViewport: () => ({ width: 800, height: 600 }) },
+      props: {
+        currentTool: "select",
+        onToolChange: () => {},
+        store,
+        getViewport: () => ({ width: 800, height: 600 }),
+        brushStore,
+      },
     });
   }
 

@@ -1,7 +1,9 @@
 <script lang="ts">
+	import type { BrushStore } from '$lib/status';
 	import type {
 		ArrowShape,
 		Box2,
+		BrushConfig,
 		EditorState as EditorStateType,
 		EllipseShape,
 		LineShape,
@@ -20,6 +22,7 @@
 		shapeBounds,
 		SnapshotCommand
 	} from 'inkfinite-core';
+	import BrushPopover from './BrushPopover.svelte';
 
 	type Viewport = { width: number; height: number };
 
@@ -30,9 +33,18 @@
 		store: Store;
 		getViewport: () => Viewport;
 		canvas?: HTMLCanvasElement;
+		brushStore: BrushStore;
 	};
 
-	let { currentTool, onToolChange, onHistoryClick, store, getViewport, canvas }: Props = $props();
+	let {
+		currentTool,
+		onToolChange,
+		onHistoryClick,
+		store,
+		getViewport,
+		canvas,
+		brushStore
+	}: Props = $props();
 
 	const DEFAULT_FILL_COLOR = '#4a90e2';
 	const DEFAULT_STROKE_COLOR = '#2e5c8a';
@@ -49,6 +61,7 @@
 	let strokeColorValue = $state(DEFAULT_STROKE_COLOR);
 	let fillDisabled = $state(true);
 	let strokeDisabled = $state(true);
+	let brush = $derived<BrushConfig>(brushStore.get());
 
 	$effect(() => {
 		editorState = store.getState();
@@ -56,6 +69,13 @@
 			editorState = state;
 		});
 		return () => unsubscribe();
+	});
+
+	$effect(() => {
+		const unsubscribeBrush = brushStore.subscribe((b) => {
+			brush = b;
+		});
+		return () => unsubscribeBrush();
 	});
 
 	$effect(() => {
@@ -124,7 +144,8 @@
 		{ id: 'ellipse', label: 'Ellipse', icon: '○' },
 		{ id: 'line', label: 'Line', icon: '╱' },
 		{ id: 'arrow', label: 'Arrow', icon: '→' },
-		{ id: 'text', label: 'Text', icon: 'T' }
+		{ id: 'text', label: 'Text', icon: 'T' },
+		{ id: 'pen', label: 'Pen', icon: '✎' }
 	];
 
 	const zoomPresets = [
@@ -363,6 +384,10 @@
 		strokeColorValue = input.value;
 		applyStrokeColor(input.value);
 	}
+
+	function handleBrushChange(newBrush: BrushConfig) {
+		brushStore.set(newBrush);
+	}
 </script>
 
 <div class="toolbar" role="toolbar" aria-label="Drawing tools">
@@ -402,6 +427,8 @@
 	</div>
 
 	<div class="toolbar__divider"></div>
+
+	<BrushPopover {brush} onBrushChange={handleBrushChange} disabled={currentTool !== 'pen'} />
 
 	<div class="toolbar__zoom">
 		<button

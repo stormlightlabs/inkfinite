@@ -1,5 +1,5 @@
 import type { Action } from "../actions";
-import type { StrokePoint } from "../model";
+import type { BrushConfig, StrokePoint } from "../model";
 import { createId, ShapeRecord } from "../model";
 import type { EditorState, ToolId } from "../reactivity";
 import { getCurrentPage } from "../reactivity";
@@ -49,9 +49,11 @@ const DEFAULT_STYLE = { color: "#000000", opacity: 1.0 };
 export class PenTool implements Tool {
   readonly id: ToolId = "pen";
   private toolState: PenToolState;
+  private getBrush: () => BrushConfig;
 
-  constructor() {
+  constructor(getBrush?: () => BrushConfig) {
     this.toolState = { isDrawing: false, draftPoints: [], draftShapeId: null };
+    this.getBrush = getBrush ?? (() => DEFAULT_BRUSH);
   }
 
   onEnter(state: EditorState): EditorState {
@@ -95,13 +97,11 @@ export class PenTool implements Tool {
     if (!currentPage) return state;
 
     const shapeId = createId("shape");
-
-    // Start with first point
     const firstPoint: StrokePoint = [action.world.x, action.world.y];
 
     const shape = ShapeRecord.createStroke(currentPage.id, 0, 0, {
       points: [firstPoint],
-      brush: DEFAULT_BRUSH,
+      brush: this.getBrush(),
       style: DEFAULT_STYLE,
     }, shapeId);
 
