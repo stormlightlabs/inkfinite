@@ -3,8 +3,8 @@ import { Action, Modifiers, PointerButtons } from "../src/actions";
 import { Vec2 } from "../src/math";
 import type { TextProps } from "../src/model";
 import { EditorState } from "../src/reactivity";
-import type { Tool } from "../src/tools";
 import { createToolMap, routeAction, switchTool, TextTool } from "../src/tools";
+import type { Tool } from "../src/tools";
 
 describe("Tools", () => {
   describe("Tool interface", () => {

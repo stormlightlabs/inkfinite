@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Camera, Viewport } from "../src/camera";
+import { Camera, type Viewport } from "../src/camera";
 
 const viewport: Viewport = { width: 800, height: 600 };
 
