@@ -32,9 +32,9 @@
 		onSelectBoard?: (boardId: string) => void | Promise<void>;
 	};
 
-	type Props = { platform?: Platform; desktop?: DesktopControls };
+	type Props = { platform?: Platform; desktop?: DesktopControls; onOpenBrowser?: () => void };
 
-	let { platform = 'web', desktop }: Props = $props();
+	let { platform = 'web', desktop, onOpenBrowser }: Props = $props();
 
 	let infoOpen = $state(false);
 	function openInfo() {
@@ -117,6 +117,12 @@
 		</div>
 	{/if}
 	<div class="titlebar__spacer"></div>
+	{#if platform === 'web' && onOpenBrowser}
+		<button class="titlebar__info" onclick={onOpenBrowser} aria-label="Browse boards">
+			<span aria-hidden="true">📁</span>
+			<span class="titlebar__info-label">Boards</span>
+		</button>
+	{/if}
 	<button class="titlebar__info" onclick={openInfo} aria-label="About Inkfinite">
 		<span aria-hidden="true">ℹ︎</span>
 		<span class="titlebar__info-label">Info</span>

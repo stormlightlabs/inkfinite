@@ -3,61 +3,31 @@
 	import StatusBar from '$lib/components/StatusBar.svelte';
 	import TitleBar from '$lib/components/TitleBar.svelte';
 	import Toolbar from '$lib/components/Toolbar.svelte';
+	import FileBrowser from '$lib/filebrowser/FileBrowser.svelte';
 	import { createCanvasController } from './canvas-store.svelte.ts';
 
 	let canvasEl = $state<HTMLCanvasElement | null>(null);
 	let textEditorEl = $state<HTMLTextAreaElement | null>(null);
 	let historyViewerOpen = $state(false);
 
-	const controller = createCanvasController({
+	const c = createCanvasController({
 		setHistoryViewerOpen(value: boolean) {
 			historyViewerOpen = value;
 		}
 	});
 
-	const {
-		platform: readPlatform,
-		desktopBoards: readDesktopBoards,
-		desktopFileName: readDesktopFileName,
-		handleDesktopOpen,
-		handleDesktopNewBoard,
-		handleDesktopSaveAs,
-		handleDesktopRecentSelect,
-		currentToolId: readCurrentToolId,
-		handleToolChange,
-		handleHistoryClick,
-		handleHistoryClose,
-		store,
-		getViewport,
-		handleCanvasDoubleClick,
-		handlePointerLeave,
-		textEditor: readTextEditor,
-		getTextEditorLayout,
-		handleTextEditorInput,
-		handleTextEditorKeyDown,
-		handleTextEditorBlur,
-		cursorStore,
-		persistenceStatusStore: readPersistenceStatusStore,
-		snapStore,
-		setCanvasRef,
-		setTextEditorElRef
-	} = controller;
-
-	let platform = $derived(readPlatform());
-	let desktopBoards = $derived(readDesktopBoards());
-	let desktopFileName = $derived(readDesktopFileName());
-	let currentToolId = $derived(readCurrentToolId());
-	let textEditor = $derived(readTextEditor());
-	let persistenceStatusStore = $derived(readPersistenceStatusStore());
+	let platform = $derived(c.platform());
+	let textEditorCurrent = $derived(c.textEditor.current);
+	let persistenceStatusStore = $derived(c.persistenceStatusStore());
 
 	$effect(() => {
-		setCanvasRef(canvasEl);
-		return () => setCanvasRef(null);
+		c.setCanvasRef(canvasEl);
+		return () => c.setCanvasRef(null);
 	});
 
 	$effect(() => {
-		setTextEditorElRef(textEditorEl);
-		return () => setTextEditorElRef(null);
+		c.textEditor.setRef(textEditorEl);
+		return () => c.textEditor.setRef(null);
 	});
 </script>
 
@@ -65,42 +35,55 @@
 	<TitleBar
 		{platform}
 		desktop={{
-			fileName: desktopFileName,
-			recentBoards: desktopBoards,
-			onOpen: handleDesktopOpen,
-			onNew: handleDesktopNewBoard,
-			onSaveAs: handleDesktopSaveAs,
-			onSelectBoard: handleDesktopRecentSelect
-		}} />
+			fileName: c.desktop.fileName,
+			recentBoards: c.desktop.boards,
+			onOpen: c.desktop.handleOpen,
+			onNew: c.desktop.handleNew,
+			onSaveAs: () => c.desktop.handleSaveAs(null),
+			onSelectBoard: c.desktop.handleRecentSelect
+		}}
+		onOpenBrowser={c.fileBrowser.handleOpen} />
 	<Toolbar
-		currentTool={currentToolId}
-		onToolChange={handleToolChange}
-		onHistoryClick={handleHistoryClick}
-		{store}
-		{getViewport}
+		currentTool={c.tools.currentToolId}
+		onToolChange={c.tools.handleChange}
+		onHistoryClick={c.history.handleClick}
+		store={c.store}
+		getViewport={c.getViewport}
 		canvas={canvasEl ?? undefined} />
 	<div class="canvas-container">
 		<canvas
 			bind:this={canvasEl}
-			ondblclick={handleCanvasDoubleClick}
-			onpointerleave={handlePointerLeave}></canvas>
-		{#if textEditor}
-			{@const layout = getTextEditorLayout()}
+			ondblclick={c.handleCanvasDoubleClick}
+			onpointerleave={c.handlePointerLeave}></canvas>
+		{#if textEditorCurrent}
+			{@const layout = c.textEditor.getLayout()}
 			{#if layout}
 				<textarea
 					bind:this={textEditorEl}
 					class="canvas-text-editor"
 					style={`left:${layout.left}px;top:${layout.top}px;width:${layout.width}px;height:${layout.height}px;font-size:${layout.fontSize}px;`}
-					value={textEditor.value}
-					oninput={handleTextEditorInput}
-					onkeydown={handleTextEditorKeyDown}
-					onblur={handleTextEditorBlur}
+					value={textEditorCurrent.value}
+					oninput={c.textEditor.handleInput}
+					onkeydown={c.textEditor.handleKeyDown}
+					onblur={c.textEditor.handleBlur}
 					spellcheck="false"></textarea>
 			{/if}
 		{/if}
 	</div>
-	<HistoryViewer {store} bind:open={historyViewerOpen} onClose={handleHistoryClose} />
-	<StatusBar {store} cursor={cursorStore} persistence={persistenceStatusStore} snap={snapStore} />
+	<HistoryViewer store={c.store} bind:open={historyViewerOpen} onClose={c.history.handleClose} />
+	<StatusBar
+		store={c.store}
+		cursor={c.cursorStore}
+		persistence={persistenceStatusStore}
+		snap={c.snapStore} />
+	{#if c.fileBrowser.vm}
+		<FileBrowser
+			bind:vm={c.fileBrowser.vm}
+			bind:open={c.fileBrowser.open}
+			onUpdate={c.fileBrowser.handleUpdate}
+			fetchInspectorData={c.fileBrowser.fetchInspectorData}
+			onClose={c.fileBrowser.handleClose} />
+	{/if}
 </div>
 
 <style>

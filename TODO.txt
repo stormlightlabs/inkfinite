@@ -198,13 +198,12 @@ R2. Web: Boards list + Dexie "Inspector" drawer
     - open / create / rename / delete
 
 Inspector drawer (selected board):
-[ ] Show "Storage: IndexedDB (Dexie)"
+[ ] Show "Storage"
 [ ] Show schema info:
-    - declared schema version (your constant)
-    - installed schema version (best-effort display)
+    - declared schema version
+    - installed schema version
 [ ] Show board-level stats (computed live):
-    - row counts: pages/shapes/bindings for this board (Option A)
-      OR doc size bytes for docs row (Option B)
+    - row counts: pages/shapes/bindings for this board & doc size bytes for docs row
     - last updatedAt
 [ ] Show migration info:
     - list applied migrations from migrations table (id + appliedAt)

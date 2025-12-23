@@ -10,6 +10,8 @@ import {
   ShapeRecord as ShapeOps,
 } from "../model";
 import type { BoardMeta, DocRepo, Timestamp } from "../persist/DocRepo";
+import type { BoardInspectorData, BoardStats, MigrationInfo, SchemaInfo } from "./stats";
+import { BoardStatsOps, getPendingMigrations } from "./stats";
 
 export type PageRow = PageRecord & { boardId: string; updatedAt: Timestamp };
 
@@ -466,4 +468,71 @@ function isPatchEmpty(patch: DocPatch): boolean {
     || Boolean(patch.order?.shapeOrder && Object.keys(patch.order.shapeOrder).length > 0);
 
   return !(hasUpserts || hasDeletes || hasOrder);
+}
+
+/**
+ * Fetch board statistics for a given board.
+ */
+export async function getBoardStats(database: DexieLike, boardId: string): Promise<BoardStats> {
+  const pages = database.table<PageRow>("pages");
+  const shapes = database.table<ShapeRow>("shapes");
+  const bindings = database.table<BindingRow>("bindings");
+  const boards = database.table<BoardMeta>("boards");
+
+  const [pageCount, shapeCount, bindingCount, board] = await Promise.all([
+    pages.where("boardId").equals(boardId).count(),
+    shapes.where("boardId").equals(boardId).count(),
+    bindings.where("boardId").equals(boardId).count(),
+    boards.get(boardId),
+  ]);
+
+  const allRows = await Promise.all([
+    pages.where("boardId").equals(boardId).toArray(),
+    shapes.where("boardId").equals(boardId).toArray(),
+    bindings.where("boardId").equals(boardId).toArray(),
+  ]);
+
+  const docSizeBytes = JSON.stringify({ pages: allRows[0], shapes: allRows[1], bindings: allRows[2] }).length;
+
+  return BoardStatsOps.create({
+    pageCount,
+    shapeCount,
+    bindingCount,
+    docSizeBytes,
+    lastUpdated: board?.updatedAt ?? 0,
+  });
+}
+
+/**
+ * Fetch schema information from the database.
+ */
+export async function getSchemaInfo(database: Dexie): Promise<SchemaInfo> {
+  return { declaredVersion: database.verno, installedVersion: database.verno };
+}
+
+/**
+ * Fetch applied migrations from the migrations table.
+ */
+export async function getAppliedMigrations(database: DexieLike): Promise<MigrationInfo[]> {
+  const migrations = database.table<MigrationRow>("migrations");
+  return migrations.orderBy("appliedAt").toArray();
+}
+
+/**
+ * Fetch complete inspector data for a board including stats, schema, and migrations.
+ */
+export async function getBoardInspectorData(
+  database: Dexie,
+  boardId: string,
+  knownMigrationIds: string[],
+): Promise<BoardInspectorData> {
+  const [stats, schema, migrations] = await Promise.all([
+    getBoardStats(database, boardId),
+    getSchemaInfo(database),
+    getAppliedMigrations(database),
+  ]);
+
+  const pendingMigrations = getPendingMigrations(knownMigrationIds, migrations);
+
+  return { stats, schema, migrations, pendingMigrations };
 }

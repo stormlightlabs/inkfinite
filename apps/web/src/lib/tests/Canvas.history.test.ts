@@ -35,7 +35,7 @@ const persistenceMocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("../input", () => {
+vi.mock("$lib/input", () => {
   return {
     createInputAdapter: vi.fn((config) => {
       actionHandlers.push(config.onAction);
@@ -332,7 +332,13 @@ describe("Canvas history integration", () => {
 
   it("wraps pointer actions in SnapshotCommands and enqueues persistence", async () => {
     render(Canvas);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    // Wait for onMount to complete and input adapter to be created
+    await vi.waitFor(() => {
+      expect(actionHandlers.length).toBeGreaterThan(0);
+    });
+    await vi.waitFor(() => {
+      expect(persistenceMocks.createPersistenceManager).toHaveBeenCalled();
+    });
     const handler = actionHandlers.at(-1);
     expect(handler).toBeTypeOf("function");
 
@@ -368,6 +374,6 @@ describe("Canvas history integration", () => {
     const stores = (InkfiniteCore as any).__storeInstances as Array<{ commands: any[] }>;
     expect(stores.at(-1)?.commands).toHaveLength(1);
     expect(stores.at(-1)?.commands[0].kind).toBe("doc");
-    expect(persistenceMocks.state.instance?.sink.enqueueDocPatch).toHaveBeenCalledTimes(1);
+    expect(sinkEnqueueSpy).toHaveBeenCalledTimes(1);
   });
 });

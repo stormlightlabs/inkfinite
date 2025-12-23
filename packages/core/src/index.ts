@@ -9,6 +9,7 @@ export * from "./model";
 export * from "./persist/DocRepo";
 export * from "./persistence/db";
 export * from "./persistence/desktop";
+export * from "./persistence/stats";
 export * from "./persistence/web";
 export * from "./reactivity";
 export * from "./tools";

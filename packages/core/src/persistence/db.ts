@@ -86,6 +86,11 @@ const MIGRATIONS: Migration[] = [{
 }];
 
 /**
+ * Known migration IDs for tracking pending migrations in the inspector.
+ */
+export const KNOWN_MIGRATION_IDS = MIGRATIONS.map((m) => m.id);
+
+/**
  * Run pending logical migrations during schema upgrades
  */
 export async function runMigrations(tx: Transaction): Promise<void> {

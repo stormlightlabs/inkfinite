@@ -1,11 +1,51 @@
-import type { Action, Command } from "inkfinite-core";
+import type { Action, Command, Store } from "inkfinite-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render } from "vitest-browser-svelte";
 
 const actionHandlers: Array<(action: Action) => void> = [];
-const coreMocks = vi.hoisted(() => ({ storeInstances: [] as unknown[], executeCommandSpy: vi.fn() }));
+const coreMocks = vi.hoisted(() => ({ storeInstances: [] as Store[], executeCommandSpy: vi.fn() }));
 
-vi.mock("../input", () => {
+async function selectShapeAt(handler: (action: Action) => void, position: { x: number; y: number }) {
+  const timestamp = Date.now();
+  handler({
+    type: "pointer-down",
+    button: 0,
+    buttons: { left: true, middle: false, right: false },
+    world: position,
+    screen: position,
+    modifiers: { ctrl: false, shift: false, alt: false, meta: false },
+    timestamp,
+  });
+  handler({
+    type: "pointer-up",
+    button: 0,
+    buttons: { left: false, middle: false, right: false },
+    world: position,
+    screen: position,
+    modifiers: { ctrl: false, shift: false, alt: false, meta: false },
+    timestamp: timestamp + 16,
+  });
+  await Promise.resolve();
+}
+
+async function selectDefaultShape(handler: (action: Action) => void) {
+  await selectShapeAt(handler, { x: 110, y: 110 });
+}
+
+async function selectSecondaryShape(handler: (action: Action) => void) {
+  await selectShapeAt(handler, { x: 210, y: 210 });
+}
+
+async function waitForDocumentReady() {
+  await vi.waitFor(() => {
+    const store = coreMocks.storeInstances.at(-1);
+    expect(store).toBeTruthy();
+    const pages = Object.keys(store!.getState().doc.pages);
+    expect(pages.length).toBeGreaterThan(0);
+  });
+}
+
+vi.mock("$lib/input", () => {
   return {
     createInputAdapter: vi.fn((config) => {
       actionHandlers.push(config.onAction);
@@ -50,6 +90,11 @@ vi.mock("inkfinite-core", async () => {
   const { executeCommandSpy } = coreMocks;
 
   class MockStore extends actual.Store {
+    constructor(...args: ConstructorParameters<typeof actual.Store>) {
+      super(...args);
+      coreMocks.storeInstances.push(this as unknown as Store);
+    }
+
     executeCommand(command: unknown) {
       executeCommandSpy(command);
       return super.executeCommand(command as Command);
@@ -72,7 +117,7 @@ vi.mock("inkfinite-core", async () => {
       renameBoard: async () => {},
       deleteBoard: async () => {},
       loadDoc: async () => ({
-        pages: { "page:1": { id: "page:1", name: "Page 1", shapeIds: ["shape:1"] } },
+        pages: { "page:1": { id: "page:1", name: "Page 1", shapeIds: ["shape:1", "shape:2"] } },
         shapes: {
           "shape:1": {
             id: "shape:1",
@@ -82,6 +127,15 @@ vi.mock("inkfinite-core", async () => {
             y: 100,
             rot: 0,
             props: { w: 50, h: 50, fill: "#ff0000", stroke: "#000000", radius: 0 },
+          },
+          "shape:2": {
+            id: "shape:2",
+            type: "ellipse",
+            pageId: "page:1",
+            x: 200,
+            y: 200,
+            rot: 0,
+            props: { w: 40, h: 40, fill: "#00ff00", stroke: "#000000" },
           },
         },
         bindings: {},
@@ -110,7 +164,6 @@ describe("Canvas keyboard shortcuts", () => {
   it("should handle space key for panning mode", async () => {
     render(Canvas);
     await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
-    await vi.waitFor(() => expect(coreMocks.executeCommandSpy).toHaveBeenCalled(), { timeout: 2000 });
     coreMocks.executeCommandSpy.mockClear();
 
     const handler = actionHandlers[0];
@@ -140,10 +193,11 @@ describe("Canvas keyboard shortcuts", () => {
   it("should nudge selected shapes with arrow keys", async () => {
     render(Canvas);
     await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
+    await waitForDocumentReady();
 
     const handler = actionHandlers[0];
+    await selectDefaultShape(handler);
 
-    await vi.waitFor(() => expect(coreMocks.executeCommandSpy).toHaveBeenCalled(), { timeout: 2000 });
     coreMocks.executeCommandSpy.mockClear();
 
     handler({
@@ -165,9 +219,10 @@ describe("Canvas keyboard shortcuts", () => {
   it("should nudge by 10px with shift modifier", async () => {
     render(Canvas);
     await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
+    await waitForDocumentReady();
 
     const handler = actionHandlers[0];
-    await vi.waitFor(() => expect(coreMocks.executeCommandSpy).toHaveBeenCalled(), { timeout: 2000 });
+    await selectDefaultShape(handler);
     coreMocks.executeCommandSpy.mockClear();
 
     handler({
@@ -189,9 +244,10 @@ describe("Canvas keyboard shortcuts", () => {
   it("should duplicate selected shapes with Cmd/Ctrl+D", async () => {
     render(Canvas);
     await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
+    await waitForDocumentReady();
 
     const handler = actionHandlers[0];
-    await vi.waitFor(() => expect(coreMocks.executeCommandSpy).toHaveBeenCalled(), { timeout: 2000 });
+    await selectDefaultShape(handler);
     coreMocks.executeCommandSpy.mockClear();
 
     const isMac = navigator.userAgent.toUpperCase().includes("MAC");
@@ -214,9 +270,10 @@ describe("Canvas keyboard shortcuts", () => {
   it("should bring shapes forward with Cmd/Ctrl+]", async () => {
     render(Canvas);
     await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
+    await waitForDocumentReady();
 
     const handler = actionHandlers[0];
-    await vi.waitFor(() => expect(coreMocks.executeCommandSpy).toHaveBeenCalled(), { timeout: 2000 });
+    await selectDefaultShape(handler);
     coreMocks.executeCommandSpy.mockClear();
 
     const isMac = navigator.userAgent.toUpperCase().includes("MAC");
@@ -239,9 +296,10 @@ describe("Canvas keyboard shortcuts", () => {
   it("should send shapes backward with Cmd/Ctrl+[", async () => {
     render(Canvas);
     await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
+    await waitForDocumentReady();
 
     const handler = actionHandlers[0];
-    await vi.waitFor(() => expect(coreMocks.executeCommandSpy).toHaveBeenCalled(), { timeout: 2000 });
+    await selectSecondaryShape(handler);
     coreMocks.executeCommandSpy.mockClear();
 
     const isMac = navigator.userAgent.toUpperCase().includes("MAC");
@@ -264,9 +322,10 @@ describe("Canvas keyboard shortcuts", () => {
   it("should not process tool actions while space is held", async () => {
     render(Canvas);
     await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
+    await waitForDocumentReady();
 
     const handler = actionHandlers[0];
-    await vi.waitFor(() => expect(coreMocks.executeCommandSpy).toHaveBeenCalled(), { timeout: 2000 });
+    await selectDefaultShape(handler);
     coreMocks.executeCommandSpy.mockClear();
 
     handler({

@@ -11,15 +11,15 @@ import {
 import {
   type Action,
   ArrowTool,
-  type BoardMeta,
   Camera,
-  type CommandKind,
+  createId,
   createToolMap,
   CursorStore,
   diffDoc,
   EditorState,
   EllipseTool,
   getShapesOnCurrentPage,
+  InkfiniteDB,
   LineTool,
   type LoadedDoc,
   type PersistenceSink,
@@ -31,13 +31,21 @@ import {
   ShapeRecord,
   SnapshotCommand,
   Store,
-  switchTool,
   TextTool,
-  type ToolId,
   type Viewport,
 } from "inkfinite-core";
 import { createRenderer, type Renderer } from "inkfinite-renderer";
 import { onDestroy, onMount } from "svelte";
+import { SvelteSet } from "svelte/reactivity";
+import { computeCursor, describeAction, getCommandKind, statesEqual } from "./canvas-helpers";
+import { DesktopFileController } from "./controllers/desktop-file-controller.svelte";
+import { FileBrowserController } from "./controllers/filebrowser-controller.svelte";
+import { HistoryController } from "./controllers/history-controller";
+import { TextEditorController } from "./controllers/texteditor-controller.svelte";
+import { ToolController } from "./controllers/tool-controller.svelte";
+import { HandleState } from "./store/handle-state.svelte";
+import { PanState } from "./store/pan-state.svelte";
+import { PointerState } from "./store/pointer-state.svelte";
 
 export type CanvasControllerBindings = { setHistoryViewerOpen(value: boolean): void };
 
@@ -56,9 +64,13 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
   let persistenceStatusStore = $state<StatusStore>(fallbackStatusStore);
   let activeBoardId: string | null = null;
   let desktopRepo: DesktopDocRepo | null = null;
-  let desktopBoards = $state<BoardMeta[]>([]);
-  let desktopFileName = $state<string | null>(null);
   let removeBeforeUnload: (() => void) | null = null;
+  let webDb: InkfiniteDB | null = null;
+  let canvas = $state<HTMLCanvasElement | null>(null);
+
+  const pointerState = new PointerState();
+  const handleState = new HandleState();
+  const panState = new PanState();
 
   const store = new Store(undefined, {
     onHistoryEvent: (event) => {
@@ -69,26 +81,37 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
       sink.enqueueDocPatch(activeBoardId, patch);
     },
   });
+
   const cursorStore = new CursorStore();
   const snapStore: SnapStore = createSnapStore();
-  const pointerState = $state({ isPointerDown: false, snappedWorld: null as { x: number; y: number } | null });
-  const handleState = $state<{ hover: string | null; active: string | null }>({ hover: null, active: null });
-  let textEditor = $state<{ shapeId: string; value: string } | null>(null);
-  let textEditorEl: HTMLTextAreaElement | null = null;
-  const panState = $state({ isPanning: false, spaceHeld: false, lastScreen: { x: 0, y: 0 } });
-  const snapProvider = { get: () => snapStore.get() };
-  const cursorProvider = { get: () => cursorStore.getState() };
-  const pointerStateProvider = { get: () => pointerState };
-  const handleProvider = { get: () => ({ ...handleState }) };
-  let pendingCommandStart: EditorState | null = null;
-  let canvas: HTMLCanvasElement | null = null;
 
-  function setCanvasRef(node: HTMLCanvasElement | null) {
-    canvas = node;
+  function getViewport(): Viewport {
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      return { width: rect.width || 1, height: rect.height || 1 };
+    }
+    if (typeof window !== "undefined") {
+      return { width: window.innerWidth || 1, height: window.innerHeight || 1 };
+    }
+    return { width: 1, height: 1 };
   }
 
-  function setTextEditorElRef(node: HTMLTextAreaElement | null) {
-    textEditorEl = node;
+  function refreshCursor() {
+    if (!canvas) {
+      return;
+    }
+    const cursor = computeCursor(
+      textEditor.isEditing,
+      { isPanning: panState.isPanning, spaceHeld: panState.spaceHeld },
+      { hover: handleState.hover, active: handleState.active },
+      pointerState.isPointerDown,
+    );
+    canvas.style.cursor = cursor;
+  }
+
+  function setActiveBoardId(boardId: string) {
+    activeBoardId = boardId;
+    persistenceManager?.setActiveBoard(boardId);
   }
 
   function applyLoadedDoc(doc: LoadedDoc) {
@@ -98,100 +121,24 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
       doc: { pages: doc.pages, shapes: doc.shapes, bindings: doc.bindings },
       ui: { ...state.ui, currentPageId: firstPageId, selectionIds: [] },
     }));
-    initializeSelection(firstPageId, doc);
   }
 
-  function initializeSelection(pageId: string | null, doc: LoadedDoc) {
-    if (!pageId) {
-      return;
-    }
-    const page = doc.pages[pageId];
-    const firstShapeId = page?.shapeIds[0];
-    if (!firstShapeId) {
-      return;
-    }
-    const state = editorSnapshot;
-    if (state.ui.selectionIds.length === 1 && state.ui.selectionIds[0] === firstShapeId) {
-      return;
-    }
-    const before = EditorState.clone(state);
-    const after = { ...state, ui: { ...state.ui, selectionIds: [firstShapeId] } };
-    const command = new SnapshotCommand("Initialize Selection", "ui", before, EditorState.clone(after));
-    store.executeCommand(command);
-    syncHandleState();
-  }
+  const selectTool = new SelectTool();
+  const rectTool = new RectTool();
+  const ellipseTool = new EllipseTool();
+  const lineTool = new LineTool();
+  const arrowTool = new ArrowTool();
+  const textTool = new TextTool();
+  const tools = createToolMap([selectTool, rectTool, ellipseTool, lineTool, arrowTool, textTool]);
 
-  function setActiveBoardId(boardId: string) {
-    activeBoardId = boardId;
-    persistenceManager?.setActiveBoard(boardId);
-  }
-
-  function updateDesktopFileState() {
-    if (!desktopRepo) {
-      desktopFileName = null;
-      return;
-    }
-    const handle = desktopRepo.getCurrentFile();
-    desktopFileName = handle?.name ?? null;
-  }
-
-  async function refreshDesktopBoards(): Promise<BoardMeta[]> {
-    if (!desktopRepo) {
-      desktopBoards = [];
-      return [];
-    }
-    try {
-      const boards = await desktopRepo.listBoards();
-      desktopBoards = boards;
-      return boards;
-    } catch (error) {
-      console.error("Failed to list boards", error);
-      desktopBoards = [];
-      return [];
-    }
-  }
-
-  function isUserCancelled(error: unknown) {
-    return error instanceof Error && /cancel/i.test(error.message);
-  }
-
-  const handleCursorMap: Record<string, string> = {
-    n: "ns-resize",
-    s: "ns-resize",
-    e: "ew-resize",
-    w: "ew-resize",
-    ne: "nesw-resize",
-    sw: "nesw-resize",
-    nw: "nwse-resize",
-    se: "nwse-resize",
-    rotate: "alias",
-    "line-start": "crosshair",
-    "line-end": "crosshair",
-  };
-
-  function refreshCursor() {
-    if (!canvas) {
-      return;
-    }
-    let cursor = "default";
-    if (textEditor) {
-      cursor = "text";
-    } else if (panState.isPanning) {
-      cursor = "grabbing";
-    } else if (panState.spaceHeld) {
-      cursor = "grab";
-    } else {
-      const activeHandle = handleState.active;
-      const hoverHandle = handleState.hover;
-      const targetHandle = activeHandle ?? hoverHandle;
-      if (targetHandle) {
-        cursor = handleCursorMap[targetHandle] ?? "default";
-      } else if (pointerState.isPointerDown) {
-        cursor = "grabbing";
-      }
-    }
-    canvas.style.cursor = cursor;
-  }
+  const textEditor = new TextEditorController(store, getViewport, refreshCursor);
+  const toolController = new ToolController(store, tools);
+  const history = new HistoryController(bindings);
+  const desktop = new DesktopFileController(() => repo, () => desktopRepo, (boardId, doc) => {
+    setActiveBoardId(boardId);
+    applyLoadedDoc(doc);
+  });
+  const fileBrowser = new FileBrowserController(() => repo);
 
   function setHandleHover(handle: string | null) {
     if (handleState.hover === handle) {
@@ -206,335 +153,168 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     refreshCursor();
   }
 
-  function getTextEditorLayout() {
-    if (!textEditor) {
-      return null;
+  function applySnapping(action: Action): Action {
+    if (!("world" in action) || !action.world) {
+      return action;
     }
-    const state = store.getState();
-    const shape = state.doc.shapes[textEditor.shapeId];
-    if (!shape || shape.type !== "text") {
-      return null;
+    const snap = snapStore.get();
+    if (!snap.snapEnabled || !snap.gridEnabled) {
+      return action;
     }
-    const viewport = getViewport();
-    const screenPos = Camera.worldToScreen(state.camera, { x: shape.x, y: shape.y }, viewport);
-    const widthWorld = shape.props.w ?? 240;
-    const zoom = state.camera.zoom;
-    return {
-      left: screenPos.x,
-      top: screenPos.y,
-      width: widthWorld * zoom,
-      height: shape.props.fontSize * 1.4 * zoom,
-      fontSize: shape.props.fontSize * zoom,
-    };
+    const gridSize = snap.gridSize;
+    const snappedX = Math.round(action.world.x / gridSize) * gridSize;
+    const snappedY = Math.round(action.world.y / gridSize) * gridSize;
+    return { ...action, world: { x: snappedX, y: snappedY } };
   }
 
-  function startTextEditing(shapeId: string) {
-    const state = store.getState();
-    const shape = state.doc.shapes[shapeId];
-    if (!shape || shape.type !== "text") {
-      return;
-    }
-    textEditor = { shapeId, value: shape.props.text };
-    refreshCursor();
-    queueMicrotask(() => {
-      textEditorEl?.focus();
-      textEditorEl?.select();
-    });
-  }
+  let pendingCommandStart: EditorState | null = null;
 
-  function commitTextEditing() {
-    if (!textEditor) {
-      return;
-    }
-    const { shapeId, value } = textEditor;
-    const currentState = store.getState();
-    const shape = currentState.doc.shapes[shapeId];
-    textEditor = null;
-    refreshCursor();
-    if (!shape || shape.type !== "text" || shape.props.text === value) {
-      return;
-    }
-    const before = EditorState.clone(currentState);
-    const updatedShape = { ...shape, props: { ...shape.props, text: value } };
-    const newShapes = { ...currentState.doc.shapes, [shapeId]: updatedShape };
-    const after = { ...currentState, doc: { ...currentState.doc, shapes: newShapes } };
-    const command = new SnapshotCommand("Edit text", "doc", before, EditorState.clone(after));
-    store.executeCommand(command);
-  }
-
-  function cancelTextEditing() {
-    textEditor = null;
-    refreshCursor();
-  }
-
-  function handleCanvasDoubleClick(event: MouseEvent) {
-    if (!canvas) {
-      return;
-    }
-    const rect = canvas.getBoundingClientRect();
-    const screen = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-    const world = Camera.screenToWorld(store.getState().camera, screen, getViewport());
-    const shapeId = findTextShapeAt(world);
-    if (shapeId) {
-      startTextEditing(shapeId);
-    }
-  }
-
-  function findTextShapeAt(point: { x: number; y: number }): string | null {
-    const shapes = getShapesOnCurrentPage(store.getState());
-    for (let index = shapes.length - 1; index >= 0; index--) {
-      const shape = shapes[index];
-      if (!shape || shape.type !== "text") {
-        continue;
-      }
-      const bounds = shapeBounds(shape);
-      if (point.x >= bounds.min.x && point.x <= bounds.max.x && point.y >= bounds.min.y && point.y <= bounds.max.y) {
-        return shape.id;
-      }
-    }
-    return null;
-  }
-
-  function handleTextEditorInput(event: Event) {
-    if (!textEditor) {
-      return;
-    }
-    const target = event.currentTarget as HTMLTextAreaElement;
-    textEditor = { ...textEditor, value: target.value };
-  }
-
-  function handleTextEditorKeyDown(event: KeyboardEvent) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      cancelTextEditing();
-      return;
-    }
-    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-      event.preventDefault();
-      commitTextEditing();
-    }
-  }
-
-  function handleTextEditorBlur() {
-    commitTextEditing();
-  }
-
-  function handlePointerLeave() {
-    setHandleHover(null);
-  }
-
-  const selectTool = new SelectTool();
-  const rectTool = new RectTool();
-  const ellipseTool = new EllipseTool();
-  const lineTool = new LineTool();
-  const arrowTool = new ArrowTool();
-  const textTool = new TextTool();
-  const tools = createToolMap([selectTool, rectTool, ellipseTool, lineTool, arrowTool, textTool]);
-
-  let currentToolId = $state<ToolId>("select");
-  let editorSnapshot = $state(store.getState());
-
-  store.subscribe((state) => {
-    currentToolId = state.ui.toolId;
-    editorSnapshot = state;
-  });
-
-  function handleToolChange(toolId: ToolId) {
-    store.setState((state) => switchTool(state, toolId, tools));
-  }
-
-  function handleHistoryClick() {
-    bindings.setHistoryViewerOpen(true);
-  }
-
-  function handleHistoryClose() {
-    bindings.setHistoryViewerOpen(false);
-  }
-
-  function handleBringForward() {
-    const currentState = store.getState();
-    const selectedIds = currentState.ui.selectionIds;
-    const currentPageId = currentState.ui.currentPageId;
-
-    if (selectedIds.length === 0 || !currentPageId) {
-      return;
-    }
-
-    const before = EditorState.clone(currentState);
-    const page = currentState.doc.pages[currentPageId];
-    if (!page) return;
-
-    const newShapeIds = [...page.shapeIds];
-
-    for (const shapeId of selectedIds) {
-      const currentIndex = newShapeIds.indexOf(shapeId);
-      if (currentIndex !== -1 && currentIndex < newShapeIds.length - 1) {
-        [newShapeIds[currentIndex], newShapeIds[currentIndex + 1]] = [
-          newShapeIds[currentIndex + 1],
-          newShapeIds[currentIndex],
-        ];
-      }
-    }
-
-    const after = {
-      ...currentState,
-      doc: {
-        ...currentState.doc,
-        pages: { ...currentState.doc.pages, [currentPageId]: { ...page, shapeIds: newShapeIds } },
-      },
-    };
-
-    const command = new SnapshotCommand("Bring Forward", "doc", before, EditorState.clone(after));
-    store.executeCommand(command);
-    syncHandleState();
-  }
-
-  function handleSendBackward() {
-    const currentState = store.getState();
-    const selectedIds = currentState.ui.selectionIds;
-    const currentPageId = currentState.ui.currentPageId;
-
-    if (selectedIds.length === 0 || !currentPageId) {
-      return;
-    }
-
-    const before = EditorState.clone(currentState);
-    const page = currentState.doc.pages[currentPageId];
-    if (!page) return;
-
-    const newShapeIds = [...page.shapeIds];
-
-    for (let i = selectedIds.length - 1; i >= 0; i--) {
-      const shapeId = selectedIds[i];
-      const currentIndex = newShapeIds.indexOf(shapeId);
-      if (currentIndex > 0) {
-        [newShapeIds[currentIndex], newShapeIds[currentIndex - 1]] = [
-          newShapeIds[currentIndex - 1],
-          newShapeIds[currentIndex],
-        ];
-      }
-    }
-
-    const after = {
-      ...currentState,
-      doc: {
-        ...currentState.doc,
-        pages: { ...currentState.doc.pages, [currentPageId]: { ...page, shapeIds: newShapeIds } },
-      },
-    };
-
-    const command = new SnapshotCommand("Send Backward", "doc", before, EditorState.clone(after));
-    store.executeCommand(command);
-    syncHandleState();
-  }
-
-  function handleDuplicate() {
-    const currentState = store.getState();
-    const selectedIds = currentState.ui.selectionIds;
-
+  function duplicateSelection(state: EditorState): EditorState | null {
+    const selectedIds = state.ui.selectionIds;
     if (selectedIds.length === 0) {
-      return;
+      return null;
+    }
+    const shapes = { ...state.doc.shapes };
+    const pages = { ...state.doc.pages };
+    const nextSelection: string[] = [];
+
+    for (const id of selectedIds) {
+      const shape = shapes[id];
+      if (!shape) continue;
+      const cloned = ShapeRecord.clone(shape);
+      const newId = createId("shape");
+      const shifted = { ...cloned, id: newId, x: cloned.x + 12, y: cloned.y + 12 };
+      shapes[newId] = shifted;
+      const originalPage = state.doc.pages[shape.pageId];
+      if (!originalPage) continue;
+      const existingPage = pages[shape.pageId];
+      const pageClone = !existingPage || existingPage === originalPage
+        ? { ...originalPage, shapeIds: [...originalPage.shapeIds] }
+        : { ...existingPage, shapeIds: [...existingPage.shapeIds] };
+      pageClone.shapeIds.push(newId);
+      pages[shape.pageId] = pageClone;
+      nextSelection.push(newId);
     }
 
-    const before = EditorState.clone(currentState);
-    const newShapes = { ...currentState.doc.shapes };
-    const newPages = { ...currentState.doc.pages };
-    const duplicatedIds: string[] = [];
+    if (!nextSelection.length) {
+      return null;
+    }
 
-    const DUPLICATE_OFFSET = 20;
+    return { ...state, doc: { ...state.doc, shapes, pages }, ui: { ...state.ui, selectionIds: nextSelection } };
+  }
 
-    for (const shapeId of selectedIds) {
-      const shape = currentState.doc.shapes[shapeId];
-      if (!shape) continue;
+  function reorderSelection(state: EditorState, direction: "forward" | "backward"): EditorState | null {
+    const pageId = state.ui.currentPageId;
+    if (!pageId) return null;
+    const page = state.doc.pages[pageId];
+    if (!page) return null;
+    const selection = new SvelteSet(state.ui.selectionIds);
+    if (selection.size === 0) {
+      return null;
+    }
 
-      const cloned = ShapeRecord.clone(shape);
-      const newId = `shape:${crypto.randomUUID()}`;
-      const duplicated = { ...cloned, id: newId, x: shape.x + DUPLICATE_OFFSET, y: shape.y + DUPLICATE_OFFSET };
+    const shapeIds = [...page.shapeIds];
+    let changed = false;
 
-      newShapes[newId] = duplicated;
-      duplicatedIds.push(newId);
-
-      const currentPageId = currentState.ui.currentPageId;
-      if (currentPageId) {
-        const page = newPages[currentPageId];
-        if (page) {
-          newPages[currentPageId] = { ...page, shapeIds: [...page.shapeIds, newId] };
+    if (direction === "forward") {
+      for (let index = shapeIds.length - 2; index >= 0; index--) {
+        const id = shapeIds[index];
+        if (!selection.has(id)) continue;
+        const nextId = shapeIds[index + 1];
+        if (nextId && !selection.has(nextId)) {
+          shapeIds[index] = nextId;
+          shapeIds[index + 1] = id;
+          changed = true;
+        }
+      }
+    } else {
+      for (let index = 1; index < shapeIds.length; index++) {
+        const id = shapeIds[index];
+        if (!selection.has(id)) continue;
+        const prevId = shapeIds[index - 1];
+        if (prevId && !selection.has(prevId)) {
+          shapeIds[index] = prevId;
+          shapeIds[index - 1] = id;
+          changed = true;
         }
       }
     }
 
-    const after = {
-      ...currentState,
-      doc: { ...currentState.doc, shapes: newShapes, pages: newPages },
-      ui: { ...currentState.ui, selectionIds: duplicatedIds },
-    };
+    if (!changed) {
+      return null;
+    }
 
-    const command = new SnapshotCommand("Duplicate", "doc", before, EditorState.clone(after));
-    store.executeCommand(command);
-    syncHandleState();
+    return { ...state, doc: { ...state.doc, pages: { ...state.doc.pages, [pageId]: { ...page, shapeIds } } } };
   }
 
-  function handleNudge(arrowKey: string, largeNudge: boolean) {
-    const currentState = store.getState();
-    const selectedIds = currentState.ui.selectionIds;
-
-    if (selectedIds.length === 0) {
-      return;
+  function handleKeyboardShortcuts(state: EditorState, action: Action): EditorState | null {
+    if (action.type !== "key-down") {
+      return null;
+    }
+    const selectionIds = state.ui.selectionIds;
+    if (selectionIds.length === 0) {
+      return null;
     }
 
-    const nudgeDistance = largeNudge ? 10 : 1;
-    let deltaX = 0;
-    let deltaY = 0;
-
-    switch (arrowKey) {
-      case "ArrowLeft":
-        deltaX = -nudgeDistance;
-        break;
-      case "ArrowRight":
-        deltaX = nudgeDistance;
-        break;
-      case "ArrowUp":
-        deltaY = -nudgeDistance;
-        break;
-      case "ArrowDown":
-        deltaY = nudgeDistance;
-        break;
-    }
-
-    const before = EditorState.clone(currentState);
-    const newShapes = { ...currentState.doc.shapes };
-
-    for (const shapeId of selectedIds) {
-      const shape = newShapes[shapeId];
-      if (shape) {
-        newShapes[shapeId] = { ...shape, x: shape.x + deltaX, y: shape.y + deltaY };
+    if (action.key.startsWith("Arrow")) {
+      const step = action.modifiers.shift ? 10 : 1;
+      let dx = 0;
+      let dy = 0;
+      switch (action.key) {
+        case "ArrowLeft":
+          dx = -step;
+          break;
+        case "ArrowRight":
+          dx = step;
+          break;
+        case "ArrowUp":
+          dy = -step;
+          break;
+        case "ArrowDown":
+          dy = step;
+          break;
+      }
+      if (dx !== 0 || dy !== 0) {
+        const shapes = { ...state.doc.shapes };
+        let changed = false;
+        for (const id of selectionIds) {
+          const shape = shapes[id];
+          if (!shape) continue;
+          shapes[id] = { ...shape, x: shape.x + dx, y: shape.y + dy };
+          changed = true;
+        }
+        if (!changed) {
+          return null;
+        }
+        return { ...state, doc: { ...state.doc, shapes } };
       }
     }
 
-    const after = { ...currentState, doc: { ...currentState.doc, shapes: newShapes } };
-    const command = new SnapshotCommand("Nudge", "doc", before, EditorState.clone(after));
-    store.executeCommand(command);
-    syncHandleState();
-  }
-
-  function applyActionWithHistory(action: Action) {
-    const before = store.getState();
-    const nextState = routeAction(before, action, tools);
-    if (statesEqual(before, nextState)) {
-      syncHandleState();
-      return;
+    const primaryModifier = action.modifiers.meta || action.modifiers.ctrl;
+    if (primaryModifier && (action.key === "d" || action.key === "D")) {
+      return duplicateSelection(state);
+    }
+    if (primaryModifier && action.key === "]") {
+      return reorderSelection(state, "forward");
+    }
+    if (primaryModifier && action.key === "[") {
+      return reorderSelection(state, "backward");
     }
 
-    const kind = getCommandKind(before, nextState);
-    const commandName = describeAction(action, kind);
-    const command = new SnapshotCommand(commandName, kind, EditorState.clone(before), EditorState.clone(nextState));
+    return null;
+  }
+
+  function commitSnapshot(beforeState: EditorState, afterState: EditorState, action: Action) {
+    const kind = getCommandKind(beforeState, afterState);
+    const name = describeAction(action, kind);
+    const command = new SnapshotCommand(name, kind, EditorState.clone(beforeState), EditorState.clone(afterState));
     store.executeCommand(command);
     syncHandleState();
   }
 
   function handleAction(action: Action) {
-    if (textEditor && (action.type === "pointer-down" || action.type === "pointer-up")) {
-      commitTextEditing();
+    if (textEditor.isEditing && (action.type === "pointer-down" || action.type === "pointer-up")) {
+      textEditor.commit();
     }
 
     if (action.type === "pointer-move" && "world" in action && !panState.isPanning && !panState.spaceHeld) {
@@ -542,13 +322,8 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
       setHandleHover(hover);
     }
 
-    if (action.type === "pointer-move" && (panState.isPanning || panState.spaceHeld)) {
-      setHandleHover(null);
-    }
-
-    if (action.type === "key-down" && action.key === " ") {
+    if (action.type === "key-down" && action.key === " " && !action.repeat) {
       panState.spaceHeld = true;
-      setHandleHover(null);
       refreshCursor();
       return;
     }
@@ -560,25 +335,21 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
       return;
     }
 
-    if (action.type === "pointer-down" && action.button === 0 && panState.spaceHeld) {
+    if (action.type === "pointer-down" && (action.button === 1 || (action.button === 0 && panState.spaceHeld))) {
       panState.isPanning = true;
-      panState.lastScreen = { x: action.screen.x, y: action.screen.y };
+      panState.lastScreen = action.screen;
       refreshCursor();
       return;
     }
 
     if (action.type === "pointer-move" && panState.isPanning) {
-      const deltaX = action.screen.x - panState.lastScreen.x;
-      const deltaY = action.screen.y - panState.lastScreen.y;
-      const currentCamera = store.getState().camera;
-      const newCamera = Camera.pan(currentCamera, { x: deltaX, y: deltaY });
-      store.setState((state) => ({ ...state, camera: newCamera }));
-      panState.lastScreen = { x: action.screen.x, y: action.screen.y };
-      refreshCursor();
+      const delta = { x: action.screen.x - panState.lastScreen.x, y: action.screen.y - panState.lastScreen.y };
+      panState.lastScreen = action.screen;
+      store.setState((state) => ({ ...state, camera: Camera.pan(state.camera, delta) }));
       return;
     }
 
-    if (action.type === "pointer-up" && action.button === 0 && panState.isPanning) {
+    if (action.type === "pointer-up" && panState.isPanning) {
       panState.isPanning = false;
       refreshCursor();
       return;
@@ -590,404 +361,174 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
 
     const actionWithSnap = applySnapping(action);
     if ("world" in actionWithSnap) {
-      pointerState.snappedWorld = actionWithSnap.world ?? null;
+      pointerState.snappedWorld = actionWithSnap.world;
     }
 
     if (actionWithSnap.type === "pointer-down" && actionWithSnap.button === 0) {
       pointerState.isPointerDown = true;
       setHandleHover(null);
-      refreshCursor();
       pendingCommandStart = EditorState.clone(store.getState());
-      const changed = applyImmediateAction(actionWithSnap);
-      if (!changed) {
-        pendingCommandStart = null;
-      }
-      return;
     }
 
-    if (actionWithSnap.type === "pointer-move" && pointerState.isPointerDown && pendingCommandStart) {
-      void applyImmediateAction(actionWithSnap);
-      return;
+    const before = store.getState();
+    const shortcutResult = handleKeyboardShortcuts(before, actionWithSnap);
+    const after = shortcutResult ?? routeAction(before, actionWithSnap, tools);
+
+    if (!statesEqual(before, after)) {
+      const kind = getCommandKind(before, after);
+      const shouldCommitImmediately = !pendingCommandStart && kind === "doc";
+
+      if (shouldCommitImmediately) {
+        commitSnapshot(before, after, actionWithSnap);
+      } else {
+        store.setState(() => after);
+        syncHandleState();
+      }
     }
 
     if (actionWithSnap.type === "pointer-up" && actionWithSnap.button === 0) {
       pointerState.isPointerDown = false;
-      setHandleHover(null);
       refreshCursor();
-      if (pendingCommandStart) {
-        const committed = commitPendingCommand(actionWithSnap, pendingCommandStart);
-        pendingCommandStart = null;
-        if (committed) {
+
+      if (pendingCommandStart && !statesEqual(pendingCommandStart, after)) {
+        commitSnapshot(pendingCommandStart, after, actionWithSnap);
+      }
+      pendingCommandStart = null;
+    }
+  }
+
+  function handleCanvasDoubleClick(event: MouseEvent) {
+    if (!canvas) {
+      return;
+    }
+    const rect = canvas.getBoundingClientRect();
+    const screen = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    const world = Camera.screenToWorld(store.getState().camera, screen, getViewport());
+
+    const shapes = getShapesOnCurrentPage(store.getState());
+    for (let index = shapes.length - 1; index >= 0; index--) {
+      const shape = shapes[index];
+      if (shape.type === "text") {
+        const bounds = shapeBounds(shape);
+        if (world.x >= bounds.min.x && world.x <= bounds.max.x && world.y >= bounds.min.y && world.y <= bounds.max.y) {
+          textEditor.start(shape.id);
           return;
         }
       }
-      pointerState.snappedWorld = null;
-    }
-
-    if (actionWithSnap.type === "key-down") {
-      const isPrimary = (actionWithSnap.modifiers.meta && navigator.platform.toUpperCase().includes("MAC"))
-        || (actionWithSnap.modifiers.ctrl && !navigator.platform.toUpperCase().includes("MAC"));
-
-      if (isPrimary && !actionWithSnap.modifiers.shift && (actionWithSnap.key === "z" || actionWithSnap.key === "Z")) {
-        store.undo();
-        return;
-      }
-
-      if (isPrimary && actionWithSnap.modifiers.shift && (actionWithSnap.key === "z" || actionWithSnap.key === "Z")) {
-        store.redo();
-        return;
-      }
-
-      if (isPrimary && (actionWithSnap.key === "d" || actionWithSnap.key === "D")) {
-        handleDuplicate();
-        return;
-      }
-
-      if (isPrimary && actionWithSnap.key === "]") {
-        handleBringForward();
-        return;
-      }
-
-      if (isPrimary && actionWithSnap.key === "[") {
-        handleSendBackward();
-        return;
-      }
-
-      if (actionWithSnap.key.startsWith("Arrow")) {
-        handleNudge(actionWithSnap.key, actionWithSnap.modifiers.shift);
-        return;
-      }
-    }
-
-    applyActionWithHistory(actionWithSnap);
-  }
-
-  function applyImmediateAction(action: Action): boolean {
-    const before = store.getState();
-    const nextState = routeAction(before, action, tools);
-    if (statesEqual(before, nextState)) {
-      syncHandleState();
-      return false;
-    }
-    store.setState(() => nextState);
-    syncHandleState();
-    return true;
-  }
-
-  function commitPendingCommand(action: Action, startState: EditorState): boolean {
-    const before = store.getState();
-    const nextState = routeAction(before, action, tools);
-    const finalState = statesEqual(before, nextState) ? before : nextState;
-    if (statesEqual(startState, finalState)) {
-      syncHandleState();
-      return false;
-    }
-    const kind = getCommandKind(startState, finalState);
-    const commandName = describeAction(action, kind);
-    const command = new SnapshotCommand(
-      commandName,
-      kind,
-      EditorState.clone(startState),
-      EditorState.clone(finalState),
-    );
-    store.executeCommand(command);
-    syncHandleState();
-    return true;
-  }
-
-  function statesEqual(a: EditorState, b: EditorState): boolean {
-    return a.doc === b.doc && a.camera === b.camera && a.ui === b.ui;
-  }
-
-  function getCommandKind(before: EditorState, after: EditorState): CommandKind {
-    if (before.doc !== after.doc) {
-      return "doc";
-    }
-    if (before.camera !== after.camera) {
-      return "camera";
-    }
-    return "ui";
-  }
-
-  function describeAction(action: Action, kind: CommandKind): string {
-    switch (action.type) {
-      case "pointer-down":
-        return "Pointer down";
-      case "pointer-move":
-        return "Pointer move";
-      case "pointer-up":
-        return "Pointer up";
-      case "wheel":
-        return "Wheel";
-      case "key-down":
-        return "Key down";
-      case "key-up":
-        return "Key up";
-      default:
-        return kind === "doc" ? "Edit" : kind === "camera" ? "Camera change" : "UI change";
     }
   }
 
-  async function handleDesktopOpen() {
-    if (!desktopRepo || !repo) {
-      return;
-    }
-    try {
-      const opened = await desktopRepo.openFromDialog();
-      setActiveBoardId(opened.boardId);
-      applyLoadedDoc(opened.doc);
-      updateDesktopFileState();
-      await refreshDesktopBoards();
-    } catch (error) {
-      if (isUserCancelled(error)) {
-        return;
-      }
-      console.error("Failed to open board", error);
-    }
+  function handlePointerLeave() {
+    setHandleHover(null);
   }
 
-  async function handleDesktopNewBoard() {
-    if (!repo) {
-      return;
-    }
-    try {
-      const boardId = await repo.createBoard("Untitled");
-      const loaded = await repo.loadDoc(boardId);
-      setActiveBoardId(boardId);
-      applyLoadedDoc(loaded);
-      updateDesktopFileState();
-      await refreshDesktopBoards();
-    } catch (error) {
-      if (isUserCancelled(error)) {
-        return;
-      }
-      console.error("Failed to create board", error);
-    }
-  }
-
-  async function handleDesktopSaveAs() {
-    if (!repo || !activeBoardId) {
-      return;
-    }
-    try {
-      const snapshot = await repo.exportBoard(activeBoardId);
-      const newBoardId = await repo.importBoard(snapshot);
-      const loaded = await repo.loadDoc(newBoardId);
-      setActiveBoardId(newBoardId);
-      applyLoadedDoc(loaded);
-      updateDesktopFileState();
-      await refreshDesktopBoards();
-    } catch (error) {
-      if (isUserCancelled(error)) {
-        return;
-      }
-      console.error("Failed to save board", error);
-    }
-  }
-
-  async function handleDesktopRecentSelect(boardId: string) {
-    if (!repo) {
-      return;
-    }
-    try {
-      const loaded = await repo.loadDoc(boardId);
-      setActiveBoardId(boardId);
-      applyLoadedDoc(loaded);
-      updateDesktopFileState();
-      await refreshDesktopBoards();
-    } catch (error) {
-      console.error("Failed to load board", error);
-    }
-  }
-
-  function applySnapping(action: Action): Action {
-    const snap = snapStore.get();
-    if (!snap.snapEnabled || !snap.gridEnabled) {
-      return action;
-    }
-    if (!("world" in action)) {
-      return action;
-    }
-    const snapCoord = (value: number) => Math.round(value / snap.gridSize) * snap.gridSize;
-    const snappedWorld = { x: snapCoord(action.world.x), y: snapCoord(action.world.y) };
-    return { ...action, world: snappedWorld };
+  function setCanvasRef(node: HTMLCanvasElement | null) {
+    canvas = node;
   }
 
   let renderer: Renderer | null = null;
   let inputAdapter: InputAdapter | null = null;
+  let canvasInitialized = false;
 
-  function getViewport(): Viewport {
-    if (canvas) {
-      const rect = canvas.getBoundingClientRect();
-      return { width: rect.width || 1, height: rect.height || 1 };
-    }
-    if (typeof window !== "undefined") {
-      return { width: window.innerWidth || 1, height: window.innerHeight || 1 };
-    }
-    return { width: 1, height: 1 };
-  }
+  // Initialize canvas-dependent systems when canvas becomes available
+  $effect(() => {
+    if (!canvas || canvasInitialized) return;
 
-  onMount(() => {
-    let disposed = false;
+    canvasInitialized = true;
 
-    const initialize = async () => {
-      const { repo: platformRepo, platform: detectedPlatform, db, desktop: desktopInstance } =
-        await createPlatformRepo();
-      if (disposed) {
-        return;
-      }
-      repo = platformRepo;
-      if (detectedPlatform === "desktop" && desktopInstance) {
-        desktopRepo = desktopInstance;
-      } else {
-        desktopRepo = null;
-        desktopBoards = [];
-        desktopFileName = null;
-      }
+    renderer = createRenderer(canvas, store, {
+      snapProvider: { get: () => snapStore.get() },
+      cursorProvider: { get: () => cursorStore.getState() },
+      pointerStateProvider: {
+        get: () => ({ isPointerDown: pointerState.isPointerDown, snappedWorld: pointerState.snappedWorld }),
+      },
+      handleProvider: { get: () => handleState.getSnapshot() },
+    });
 
-      if (detectedPlatform === "web" && db) {
-        persistenceManager = createPersistenceManager(db, repo, { sink: { debounceMs: 200 } });
-        sink = persistenceManager.sink;
-        persistenceStatusStore = persistenceManager.status;
-      } else {
-        const { createPersistenceSink } = await import("inkfinite-core");
-        if (disposed) {
-          return;
-        }
-        sink = createPersistenceSink(repo, { debounceMs: 500 });
-      }
+    const unsubStore = store.subscribe(() => renderer?.markDirty());
+    const unsubSnap = snapStore.subscribe(() => renderer?.markDirty());
 
-      const hydrate = async () => {
-        const repoInstance = repo;
-        if (!repoInstance) {
-          return;
-        }
-        try {
-          if (detectedPlatform === "web") {
-            const boards = await repoInstance.listBoards();
-            const id = boards[0]?.id ?? (await repoInstance.createBoard("My board"));
-            if (disposed) {
-              return;
-            }
-            setActiveBoardId(id);
-            const loaded = await repoInstance.loadDoc(id);
-            if (!disposed) {
-              applyLoadedDoc(loaded);
-            }
-          } else {
-            const boards = await refreshDesktopBoards();
-            let id = boards[0]?.id ?? null;
-            if (!id) {
-              id = await repoInstance.createBoard("Untitled");
-            }
-            if (disposed) {
-              return;
-            }
-            setActiveBoardId(id);
-            const loaded = await repoInstance.loadDoc(id);
-            if (!disposed) {
-              applyLoadedDoc(loaded);
-              updateDesktopFileState();
-            }
-            await refreshDesktopBoards();
-          }
-        } catch (error) {
-          console.error("Failed to load board", error);
-        }
-      };
-
-      await hydrate();
-      if (disposed) {
-        return;
-      }
-
-      function getCamera() {
-        return store.getState().camera;
-      }
-
-      const currentCanvas = canvas;
-      if (!currentCanvas) {
-        return;
-      }
-
-      renderer = createRenderer(currentCanvas, store, {
-        snapProvider,
-        cursorProvider,
-        pointerStateProvider,
-        handleProvider,
-      });
-      inputAdapter = createInputAdapter({
-        canvas: currentCanvas,
-        getCamera,
-        getViewport,
-        onAction: handleAction,
-        onCursorUpdate: (world, screen) => cursorStore.updateCursor(world, screen),
-      });
-
-      if (typeof window !== "undefined") {
-        function handleBeforeUnload() {
-          if (sink) {
-            void sink.flush();
-          }
-        }
-
-        window.addEventListener("beforeunload", handleBeforeUnload);
-        removeBeforeUnload = () => window.removeEventListener("beforeunload", handleBeforeUnload);
-      }
-    };
-
-    void initialize();
+    inputAdapter = createInputAdapter({
+      canvas,
+      getCamera: () => store.getState().camera,
+      getViewport,
+      onAction: handleAction,
+      onCursorUpdate: (world, screen) => cursorStore.updateCursor(world, screen),
+    });
 
     return () => {
-      disposed = true;
+      unsubStore();
+      unsubSnap();
+      inputAdapter?.dispose();
+      inputAdapter = null;
+      renderer?.dispose();
+      renderer = null;
+      canvasInitialized = false;
     };
   });
 
+  onMount(async () => {
+    if (platform === "desktop") {
+      const desktopPlatformRepo = await createPlatformRepo();
+      if (desktopPlatformRepo && "type" in desktopPlatformRepo && desktopPlatformRepo.type === "desktop") {
+        desktopRepo = desktopPlatformRepo.repo as DesktopDocRepo;
+        repo = desktopRepo;
+        await desktop.refreshBoards();
+      }
+    } else {
+      webDb = new InkfiniteDB();
+      const { createWebDocRepo, createPersistenceSink } = await import("inkfinite-core");
+      const { liveQuery } = await import("dexie");
+      repo = createWebDocRepo(webDb);
+      sink = createPersistenceSink(repo);
+      persistenceManager = createPersistenceManager(webDb, repo, { liveQueryFn: liveQuery });
+      persistenceStatusStore = persistenceManager.status;
+
+      const boards = await repo.listBoards();
+      if (boards.length > 0) {
+        const boardId = boards[0].id;
+        const doc = await repo.loadDoc(boardId);
+        setActiveBoardId(boardId);
+        applyLoadedDoc(doc);
+      }
+
+      removeBeforeUnload = () => {
+        window.removeEventListener("beforeunload", handleBeforeUnload);
+      };
+      window.addEventListener("beforeunload", handleBeforeUnload);
+    }
+  });
+
+  function handleBeforeUnload() {
+    sink?.flush();
+  }
+
   onDestroy(() => {
-    removeBeforeUnload?.();
-    removeBeforeUnload = null;
     renderer?.dispose();
     inputAdapter?.dispose();
-    if (sink) {
-      void sink.flush();
-    }
-    repo = null;
-    desktopRepo = null;
-    desktopBoards = [];
-    desktopFileName = null;
-    sink = null;
-    activeBoardId = null;
     persistenceManager?.dispose();
-    persistenceManager = null;
+    removeBeforeUnload?.();
     fallbackStatusStore.update(() => ({ backend: "indexeddb", state: "saved", pendingWrites: 0 }));
     persistenceStatusStore = fallbackStatusStore;
   });
 
   return {
     platform: () => platform,
-    desktopBoards: () => desktopBoards,
-    desktopFileName: () => desktopFileName,
-    handleDesktopOpen,
-    handleDesktopNewBoard,
-    handleDesktopSaveAs,
-    handleDesktopRecentSelect,
-    currentToolId: () => currentToolId,
-    handleToolChange,
-    handleHistoryClick,
-    handleHistoryClose,
+    desktop,
+    fileBrowser: {
+      ...fileBrowser,
+      fetchInspectorData: (boardId: string) => fileBrowser.fetchInspectorData(boardId, webDb),
+    },
+    tools: toolController,
+    history,
+    textEditor,
     store,
     getViewport,
     handleCanvasDoubleClick,
     handlePointerLeave,
-    textEditor: () => textEditor,
-    getTextEditorLayout,
-    handleTextEditorInput,
-    handleTextEditorKeyDown,
-    handleTextEditorBlur,
     cursorStore,
     persistenceStatusStore: () => persistenceStatusStore,
     snapStore,
     setCanvasRef,
-    setTextEditorElRef,
   };
 }
