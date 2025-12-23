@@ -1,29 +1,16 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 
-	/**
-	 * Sheet (Drawer) component
-	 *
-	 * A sliding panel that appears from the side of the screen.
-	 * Built on top of Dialog primitive with custom positioning.
-	 */
-
+	/** Which side the sheet slides in from */
 	type Side = 'left' | 'right' | 'top' | 'bottom';
 
 	type Props = {
-		/** Whether the sheet is open */
 		open: boolean;
-		/** Callback when sheet should close */
 		onClose?: () => void;
-		/** Sheet title (for accessibility) */
 		title?: string;
-		/** Which side the sheet slides in from (default: 'right') */
 		side?: Side;
-		/** Whether clicking backdrop closes sheet (default: true) */
 		closeOnBackdrop?: boolean;
-		/** Whether escape key closes sheet (default: true) */
 		closeOnEscape?: boolean;
-		/** Custom class for the sheet content */
 		class?: string;
 		children?: Snippet;
 	};

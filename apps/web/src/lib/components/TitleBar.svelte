@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Dialog from '$lib/components/Dialog.svelte';
+	import Icon from '$lib/components/Icon.svelte';
 	import type { Platform } from '$lib/platform';
 	import type { BoardMeta } from 'inkfinite-core';
 	import icon from '../assets/favicon.svg';
@@ -119,12 +120,12 @@
 	<div class="titlebar__spacer"></div>
 	{#if platform === 'web' && onOpenBrowser}
 		<button class="titlebar__info" onclick={onOpenBrowser} aria-label="Browse boards">
-			<span aria-hidden="true">📁</span>
+			<Icon name="folder" size={16} />
 			<span class="titlebar__info-label">Boards</span>
 		</button>
 	{/if}
 	<button class="titlebar__info" onclick={openInfo} aria-label="About Inkfinite">
-		<span aria-hidden="true">ℹ︎</span>
+		<Icon name="info-circle" size={16} />
 		<span class="titlebar__info-label">Info</span>
 	</button>
 </header>
@@ -258,7 +259,7 @@
 	.titlebar__info {
 		display: inline-flex;
 		align-items: center;
-		gap: 6px;
+		gap: 8px;
 		border: 1px solid var(--border);
 		background: var(--surface);
 		color: var(--text);

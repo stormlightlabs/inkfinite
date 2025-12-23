@@ -257,6 +257,113 @@ affordances, improved accessibility and styling, refined snapping, and handles
 so drawing feels production-ready.
 
 ================================================================================
+20. Milestone T: Sketching / Pen Tool (perfect-freehand)                  *wb-T*
+================================================================================
+
+Goal:
+Add a pen tool that produces smooth freehand strokes using perfect-freehand.
+Strokes are shapes, undo/redo-able (L), persisted (M), selectable, and render on
+Canvas2D.
+
+Refs:
+- perfect-freehand getStroke returns outline polygon points.
+- Options: size/thinning/smoothing/streamline/simulatePressure.
+
+------------------------------------------------------------------------------
+T1. Data model: Stroke shape
+------------------------------------------------------------------------------
+
+/packages/core/src/model:
+[ ] Add ShapeType: 'stroke'
+[ ] StrokeShape props (persisted):
+    - points: Array<[x,y,p?]>          " world coords + optional pressure
+    - style: { color, opacity }
+    - brush: { size, thinning, smoothing, streamline, simulatePressure }
+[ ] Derived (NOT persisted):
+    - outline?: Array<[x,y]>           " computed polygon
+    - bounds?: Box2
+
+(DoD): stroke serializes to JSON and loads back identically.
+
+------------------------------------------------------------------------------
+T2. Tool: pen (state machine)
+------------------------------------------------------------------------------
+
+/packages/core/src/tools.ts (PenTool)
+[ ] PointerDown: start draft, push first point
+[ ] PointerMove: append point if moved > eps; include pressure if available
+[ ] PointerUp: create ONE history command that inserts the stroke; clear draft
+
+Perf:
+[ ] Coalesce draft updates (rAF) so you don’t recompute per event.
+
+(DoD): one stroke == one undo step; no DB writes until finalize (via M).
+
+------------------------------------------------------------------------------
+T3. Geometry: compute outline via perfect-freehand
+------------------------------------------------------------------------------
+
+/packages/core/src/geom.ts:
+[ ] computeOutline(points, brush) -> outlinePoints using getStroke()
+[ ] boundsFromOutline(outline) -> Box2
+
+(DoD): outline non-empty for >= 2 points; bounds contain outline.
+
+------------------------------------------------------------------------------
+T4. Rendering: fill the outline polygon
+------------------------------------------------------------------------------
+
+/packages/renderer/src/draw.ts:
+[ ] drawStroke(ctx, stroke):
+    - outline = cached || computeOutline(...)
+    - ctx.beginPath(); moveTo/lineTo...; closePath(); fill()
+[ ] Render draft stroke above shapes, below selection UI.
+
+(DoD): strokes look stable while drawing; committed strokes match preview.
+
+------------------------------------------------------------------------------
+T5. Hit testing
+------------------------------------------------------------------------------
+
+/packages/core/src/geom.ts:
+[ ] hitTestStroke(p, stroke):
+    - bounds check first
+    - inside-outline polygon test (ray cast) (or tolerance-to-segment fallback)
+
+(DoD): clicking a stroke selects it reliably.
+
+------------------------------------------------------------------------------
+T6. Brush settings (thin UI slice)
+------------------------------------------------------------------------------
+
+/apps/web/src/lib/components/BrushPopover.svelte:
+[ ] Sliders: size, thinning, smoothing, streamline
+[ ] Toggle: simulatePressure
+(All map to perfect-freehand options.)
+
+(DoD): settings affect newly drawn strokes immediately.
+
+------------------------------------------------------------------------------
+T7. Tests
+------------------------------------------------------------------------------
+
+/packages/core/test/pen.test.ts:
+[ ] outline computed for a simple polyline
+[ ] bounds correctness
+[ ] hit test inside/outside sanity
+
+Integration:
+[ ] one history command per stroke; undo/redo persists through refresh (M).
+
+------------------------------------------------------------------------------
+Definition of Done
+------------------------------------------------------------------------------
+
+- Pen tool draws smooth strokes using perfect-freehand outlines.
+- Strokes are selectable, undo/redo-able in one step, and persisted via Dexie.
+- Brush controls change appearance of new strokes.
+
+================================================================================
 References (URLs)                                                      *wb-refs*
 ================================================================================
 
@@ -273,3 +380,7 @@ SvelteKit + Tauri packaging:
 Canvas/infinite-canvas performance ideas:
 - https://antv.vision/infinite-canvas-tutorial/guide/lesson-008
 - https://harrisonmilbradt.com/blog/canvas-panning-and-zooming
+
+Perfect Freehand
+- https://github.com/steveruizok/perfect-freehand
+- (Options) https://github.com/steveruizok/perfect-freehand/blob/main/packages/perfect-freehand/src/types.ts

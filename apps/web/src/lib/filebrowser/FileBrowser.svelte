@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Icon from '$lib/components/Icon.svelte';
 	import Sheet from '$lib/components/Sheet.svelte';
 	import type {
 		BoardInspectorData,
@@ -154,7 +155,7 @@
 					type="button"
 					onclick={closeBrowser}
 					aria-label="Close board browser">
-					×
+					<Icon name="close" size={20} color="#e27878" />
 				</button>
 			</div>
 			<button
@@ -166,6 +167,7 @@
 		</div>
 
 		<div class="filebrowser__search">
+			<!-- FIXME: reactivity is broken -->
 			<input
 				type="search"
 				class="filebrowser__search-input"
@@ -173,7 +175,8 @@
 				value={searchQuery}
 				oninput={handleSearchInput}
 				onchange={handleSearchChange}
-				aria-label="Search boards" />
+				aria-label="Search boards"
+				disabled />
 		</div>
 
 		{#if isCreating}
@@ -247,7 +250,7 @@
 										handleInspectBoard(board);
 									}}
 									aria-label="Inspect board">
-									ℹ️
+									<Icon name="info-circle" size={16} />
 								</button>
 								<button
 									class="filebrowser__board-action"
@@ -256,7 +259,7 @@
 										startRename(board);
 									}}
 									aria-label="Rename board">
-									✏️
+									<Icon name="pencil" size={16} />
 								</button>
 								<button
 									class="filebrowser__board-action"
@@ -265,7 +268,7 @@
 										handleDeleteBoard(board.id);
 									}}
 									aria-label="Delete board">
-									🗑️
+									<Icon name="trash" size={16} />
 								</button>
 							</div>
 						{/if}
@@ -284,7 +287,7 @@
 				class="inspector__close"
 				onclick={() => (inspectorOpen = false)}
 				aria-label="Close inspector">
-				×
+				<Icon name="close" size={20} color="#e27878" />
 			</button>
 		</div>
 
@@ -298,6 +301,7 @@
 					<h4 class="inspector__section-title">Storage</h4>
 					<div class="inspector__item">
 						<span class="inspector__label">Storage Type:</span>
+						<!-- TODO: local? browser? -->
 						<span class="inspector__value">IndexedDB (Dexie)</span>
 					</div>
 				</section>
@@ -335,8 +339,9 @@
 					</div>
 					<div class="inspector__item">
 						<span class="inspector__label">Last Updated:</span>
-						<span class="inspector__value"
-							>{formatTimestamp(inspectorData.stats.lastUpdated)}</span>
+						<span class="inspector__value">
+							{formatTimestamp(inspectorData.stats.lastUpdated)}
+						</span>
 					</div>
 				</section>
 
@@ -349,8 +354,9 @@
 							{#each inspectorData.migrations as migration (migration.id)}
 								<div class="inspector__migration">
 									<span class="inspector__migration-id">{migration.id}</span>
-									<span class="inspector__migration-date"
-										>{formatTimestamp(migration.appliedAt)}</span>
+									<span class="inspector__migration-date">
+										{formatTimestamp(migration.appliedAt)}
+									</span>
 								</div>
 							{/each}
 						</div>
@@ -405,18 +411,21 @@
 
 	.filebrowser__close {
 		background: none;
-		border: none;
+		border: 1px solid transparent;
 		color: var(--text-secondary, #666);
-		font-size: 1.25rem;
+		font-size: 1.5rem;
 		cursor: pointer;
 		padding: 4px;
 		border-radius: 4px;
+		display: flex;
+		align-items: center;
 	}
 
 	.filebrowser__close:hover,
 	.filebrowser__close:focus-visible {
 		background-color: rgba(0, 0, 0, 0.05);
 		color: var(--text);
+		border: 1px solid #e27878;
 	}
 
 	.filebrowser__action {

@@ -167,8 +167,9 @@
 		<span class="status-bar__label">Sync</span>
 		<span
 			class="status-bar__value"
-			class:status-bar__value--error={statusVm.persistence.state === 'error'}
-			>{formatPersistenceSummary()}</span>
+			class:status-bar__value--error={statusVm.persistence.state === 'error'}>
+			{formatPersistenceSummary()}
+		</span>
 	</div>
 </div>
 
