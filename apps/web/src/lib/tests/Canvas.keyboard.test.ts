@@ -68,6 +68,9 @@ vi.mock("inkfinite-core", async () => {
     createWebDocRepo: vi.fn(() => ({
       listBoards: async () => [{ id: "board-1", name: "Test Board", createdAt: 0, updatedAt: 0 }],
       createBoard: async () => "board-1",
+      openBoard: async () => {},
+      renameBoard: async () => {},
+      deleteBoard: async () => {},
       loadDoc: async () => ({
         pages: { "page:1": { id: "page:1", name: "Page 1", shapeIds: ["shape:1"] } },
         shapes: {
@@ -84,6 +87,13 @@ vi.mock("inkfinite-core", async () => {
         bindings: {},
         order: { pageIds: ["page:1"] },
       }),
+      applyDocPatch: async () => {},
+      exportBoard: async () => ({
+        board: { id: "board-1", name: "Test Board", createdAt: 0, updatedAt: 0 },
+        doc: { pages: {}, shapes: {}, bindings: {} },
+        order: { pageIds: [], shapeOrder: {} },
+      }),
+      importBoard: async () => "board-1",
     })),
   };
 });

@@ -1,12 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Observable, Observer, Subscription } from "dexie";
-import type { DocPatch, DocRepo, InkfiniteDB, PageRecord } from "inkfinite-core";
+import type { DocPatch, InkfiniteDB, PageRecord, PersistentDocRepo } from "inkfinite-core";
 import { describe, expect, it, vi } from "vitest";
 import { createPersistenceManager, type PersistenceManagerOptions } from "../status";
 
-function createMockRepo(): DocRepo {
+function createMockRepo(): PersistentDocRepo {
   return {
     listBoards: vi.fn(async () => []),
     createBoard: vi.fn(async () => "board:mock"),
+    openBoard: vi.fn(async () => {}),
     renameBoard: vi.fn(async () => {}),
     deleteBoard: vi.fn(async () => {}),
     loadDoc: vi.fn(async () => ({ pages: {}, shapes: {}, bindings: {}, order: { pageIds: [], shapeOrder: {} } })),
@@ -71,7 +73,7 @@ function createMockLiveQuery() {
 }
 
 function createStatusTracker(
-  overrides?: { repo?: DocRepo; options?: PersistenceManagerOptions; db?: Partial<InkfiniteDB> },
+  overrides?: { repo?: PersistentDocRepo; options?: PersistenceManagerOptions; db?: Partial<InkfiniteDB> },
 ) {
   const repo = overrides?.repo ?? createMockRepo();
   const live = overrides?.options?.liveQueryFn ? null : createMockLiveQuery();

@@ -2,9 +2,9 @@ import { liveQuery } from "dexie";
 import {
   createPersistenceSink,
   type DocPatch,
-  type DocRepo,
   type PersistenceSink,
   type PersistenceSinkOptions,
+  type PersistentDocRepo,
 } from "inkfinite-core";
 import type { InkfiniteDB, PersistenceStatus } from "inkfinite-core";
 
@@ -38,7 +38,7 @@ export type PersistenceManager = {
 
 export function createPersistenceManager(
   db: InkfiniteDB,
-  repo: DocRepo,
+  repo: PersistentDocRepo,
   options?: PersistenceManagerOptions,
 ): PersistenceManager {
   const sink = createPersistenceSink(repo, options?.sink);

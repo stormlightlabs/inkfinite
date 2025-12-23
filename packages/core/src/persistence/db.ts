@@ -1,6 +1,7 @@
 import Dexie, { type Transaction } from "dexie";
 import { PageRecord as PageOps } from "../model";
-import type { BindingRow, BoardMeta, MetaRow, MigrationRow, PageRow, ShapeRow, Timestamp } from "./web";
+import type { BoardMeta, Timestamp } from "../persist/DocRepo";
+import type { BindingRow, MetaRow, MigrationRow, PageRow, ShapeRow } from "./web";
 
 export const DB_NAME = "inkfinite";
 

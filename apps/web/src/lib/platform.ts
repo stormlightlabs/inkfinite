@@ -1,4 +1,4 @@
-import type { DocRepo } from "inkfinite-core";
+import type { PersistentDocRepo } from "inkfinite-core";
 import { createWebDocRepo, InkfiniteDB } from "inkfinite-core";
 import { createDesktopFileOps } from "./fileops";
 import { createDesktopDocRepo, type DesktopDocRepo } from "./persistence/desktop";
@@ -12,7 +12,12 @@ export function detectPlatform(): Platform {
   return "web";
 }
 
-export type PlatformRepoResult = { repo: DocRepo; platform: Platform; db?: InkfiniteDB; desktop?: DesktopDocRepo };
+export type PlatformRepoResult = {
+  repo: PersistentDocRepo;
+  platform: Platform;
+  db?: InkfiniteDB;
+  desktop?: DesktopDocRepo;
+};
 
 /**
  * Create the appropriate DocRepo based on platform

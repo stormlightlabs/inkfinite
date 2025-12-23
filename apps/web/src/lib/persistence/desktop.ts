@@ -3,7 +3,7 @@
  * Used when the web app is running inside Tauri
  */
 
-import type { BoardExport, BoardMeta, DocPatch, DocRepo, LoadedDoc, PageRecord } from "inkfinite-core";
+import type { BoardExport, BoardMeta, DocPatch, LoadedDoc, PageRecord, PersistentDocRepo } from "inkfinite-core";
 import {
   createFileData,
   createId,
@@ -15,13 +15,13 @@ import {
 } from "inkfinite-core";
 import type { DesktopFileOps } from "../fileops";
 
-export type DesktopDocRepo = DocRepo & {
+export type DesktopDocRepo = PersistentDocRepo & {
   kind: "desktop";
   getCurrentFile(): FileHandle | null;
   openFromDialog(): Promise<{ boardId: string; doc: LoadedDoc }>;
 };
 
-export function isDesktopRepo(repo: DocRepo): repo is DesktopDocRepo {
+export function isDesktopRepo(repo: PersistentDocRepo): repo is DesktopDocRepo {
   return (repo as DesktopDocRepo).kind === "desktop";
 }
 
@@ -167,6 +167,10 @@ export function createDesktopDocRepo(fileOps: DesktopFileOps): DesktopDocRepo {
     }
   }
 
+  async function openBoard(boardId: string): Promise<void> {
+    await loadDoc(boardId);
+  }
+
   async function applyDocPatch(boardId: string, patch: DocPatch): Promise<void> {
     if (!currentBoard || !currentDoc || !currentFile) {
       throw new Error("No board loaded");
@@ -287,6 +291,7 @@ export function createDesktopDocRepo(fileOps: DesktopFileOps): DesktopDocRepo {
     kind: "desktop",
     listBoards,
     createBoard,
+    openBoard,
     renameBoard,
     deleteBoard,
     loadDoc,
@@ -301,7 +306,7 @@ export function createDesktopDocRepo(fileOps: DesktopFileOps): DesktopDocRepo {
 /**
  * Get current file handle (for showing in title bar, etc.)
  */
-export function getCurrentFile(repo: DocRepo): FileHandle | null {
+export function getCurrentFile(repo: PersistentDocRepo): FileHandle | null {
   if (isDesktopRepo(repo)) {
     return repo.getCurrentFile();
   }

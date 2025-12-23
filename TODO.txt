@@ -173,14 +173,14 @@ R1. Shared UX contracts
 --------------------------------------------------------------------------------
 
 /packages/core/src/persist/DocRepo.ts:
-[ ] Define DocRepo interface (web + desktop):
+[x] Define DocRepo interface (web + desktop):
     - listBoards(): Promise<BoardMeta[]>
     - createBoard(name): Promise<string>
     - openBoard(id): Promise<void>
     - renameBoard(id, name): Promise<void>
     - deleteBoard(id): Promise<void>
 
-[ ] Define FileBrowserViewModel:
+[x] Define FileBrowserViewModel:
     - query, filteredBoards, selectedId
     - actions: open/create/rename/delete
 
@@ -224,8 +224,8 @@ R3. Desktop: real directory + files (Tauri)
     - pick directory
     - remember last workspace path
 [ ] Implement directory listing:
-    - v0: show *.Inkfinite.json files in workspace
-    - v1: tree view with folders
+    - show *.inkfinite.json files in workspace
+    - tree view with folders
 [ ] Implement file actions:
     - [x] New: create new file
     - [ ] Rename: rename file
@@ -247,10 +247,10 @@ R4. Parity behaviors
     - name + updatedAt in both modes
 
 (DoD):
-- Web and desktop feel like the same app, with storage differences made explicit.
+- Web and desktop feel like the same app, with storage differences made explicit
 
 ================================================================================
-19. Milestone S: Quality polish (what makes it feel "real")               *wb-S*
+19. Milestone S: Quality polish.                                          *wb-S*
 ================================================================================
 
 Comprehensive UX polish adds BEM CSS, space-drag panning, richer keyboard

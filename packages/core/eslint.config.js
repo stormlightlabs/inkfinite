@@ -8,9 +8,7 @@ import ts from "typescript-eslint";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig(
-  {
-    ignores: ["dist/**", "*.config.js"],
-  },
+  { ignores: ["dist/**", "*.config.js"] },
   js.configs.recommended,
   ...ts.configs.recommended,
   {
@@ -19,14 +17,11 @@ export default defineConfig(
       parserOptions: { tsconfigRootDir: __dirname, project: "./tsconfig.json" },
     },
     rules: {
-      "@typescript-eslint/no-unused-vars": [
-        "error",
-        {
-          argsIgnorePattern: "^_",
-          varsIgnorePattern: "^_",
-          caughtErrorsIgnorePattern: "^_",
-        },
-      ],
+      "@typescript-eslint/no-unused-vars": ["error", {
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_",
+      }],
     },
   },
 );

@@ -1,4 +1,3 @@
-/* eslint-disable unicorn/no-await-expression-member */
 import Dexie from "dexie";
 import {
   type BindingRecord,
@@ -10,10 +9,7 @@ import {
   type ShapeRecord,
   ShapeRecord as ShapeOps,
 } from "../model";
-
-export type Timestamp = number;
-
-export type BoardMeta = { id: string; name: string; createdAt: Timestamp; updatedAt: Timestamp };
+import type { BoardMeta, DocRepo, Timestamp } from "../persist/DocRepo";
 
 export type PageRow = PageRecord & { boardId: string; updatedAt: Timestamp };
 
@@ -50,11 +46,7 @@ export type PersistenceSink = { enqueueDocPatch(boardId: string, patch: DocPatch
 
 export type PersistenceSinkOptions = { debounceMs?: number };
 
-export interface DocRepo {
-  listBoards(): Promise<BoardMeta[]>;
-  createBoard(name: string): Promise<string>;
-  renameBoard(boardId: string, name: string): Promise<void>;
-  deleteBoard(boardId: string): Promise<void>;
+export interface PersistentDocRepo extends DocRepo {
   loadDoc(boardId: string): Promise<LoadedDoc>;
   applyDocPatch(boardId: string, patch: DocPatch): Promise<void>;
   exportBoard(boardId: string): Promise<BoardExport>;
@@ -74,9 +66,9 @@ const pageOrderKey = (boardId: string) => `${PAGE_ORDER_META_PREFIX}${boardId}`;
 const shapeOrderKey = (boardId: string) => `${SHAPE_ORDER_META_PREFIX}${boardId}`;
 
 /**
- * Create a Dexie-backed DocRepo used by the web app.
+ * Create a Dexie-backed persistent DocRepo used by the web app.
  */
-export function createWebDocRepo(database: DexieLike, options?: WebRepoOptions): DocRepo {
+export function createWebDocRepo(database: DexieLike, options?: WebRepoOptions): PersistentDocRepo {
   const now = () => options?.now?.() ?? Date.now();
 
   const boards = () => database.table<BoardMeta>("boards");
@@ -256,7 +248,24 @@ export function createWebDocRepo(database: DexieLike, options?: WebRepoOptions):
     return boardId;
   }
 
-  return { listBoards, createBoard, renameBoard, deleteBoard, loadDoc, applyDocPatch, exportBoard, importBoard };
+  async function openBoard(boardId: string): Promise<void> {
+    const exists = await boards().get(boardId);
+    if (!exists) {
+      throw new Error(`Board ${boardId} not found`);
+    }
+  }
+
+  return {
+    listBoards,
+    createBoard,
+    openBoard,
+    renameBoard,
+    deleteBoard,
+    loadDoc,
+    applyDocPatch,
+    exportBoard,
+    importBoard,
+  };
 }
 
 /**
@@ -295,7 +304,7 @@ export function diffDoc(before: Document, after: Document): DocPatch {
 /**
  * Batch doc patches and flush them with a debounce to cut down on Dexie writes.
  */
-export function createPersistenceSink(repo: DocRepo, options?: PersistenceSinkOptions): PersistenceSink {
+export function createPersistenceSink(repo: PersistentDocRepo, options?: PersistenceSinkOptions): PersistenceSink {
   const debounceMs = options?.debounceMs ?? 200;
   let pendingBoardId: string | null = null;
   let pendingPatch: DocPatch | null = null;

@@ -178,10 +178,17 @@ vi.mock("inkfinite-core", async () => {
   const createWebDocRepo = vi.fn(() => ({
     listBoards: vi.fn(async () => [{ id: "board:1", name: "Board 1", createdAt: 0, updatedAt: 0 }]),
     createBoard: vi.fn(async () => "board:new"),
+    openBoard: vi.fn(async () => {}),
     renameBoard: vi.fn(),
     deleteBoard: vi.fn(),
     loadDoc: vi.fn(async () => createDoc()),
     applyDocPatch: vi.fn(),
+    exportBoard: vi.fn(async () => ({
+      board: { id: "board:1", name: "", createdAt: 0, updatedAt: 0 },
+      doc: createDoc(),
+      order: { pageIds: [], shapeOrder: {} },
+    })),
+    importBoard: vi.fn(async () => "board:new"),
   }));
 
   const routeAction = vi.fn((state: any, action: any) => {

@@ -1,4 +1,11 @@
-import { createFileData, type DesktopFileOps, type FileHandle, PageRecord, serializeDesktopFile } from "inkfinite-core";
+import {
+  type BoardMeta,
+  createFileData,
+  type DesktopFileOps,
+  type FileHandle,
+  PageRecord,
+  serializeDesktopFile,
+} from "inkfinite-core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDesktopDocRepo } from "../persistence/desktop";
 
@@ -101,7 +108,7 @@ describe("createDesktopDocRepo", () => {
     expect(Object.keys(opened.doc.pages)).toEqual([page.id]);
 
     const boards = await repo.listBoards();
-    expect(boards.some((entry) => entry.id === "board-dialog")).toBe(true);
+    expect(boards.some((entry: BoardMeta) => entry.id === "board-dialog")).toBe(true);
   });
 
   it("renames the current board and updates the file", async () => {
