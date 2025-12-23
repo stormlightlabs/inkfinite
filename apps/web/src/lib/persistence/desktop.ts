@@ -3,38 +3,91 @@
  * Used when the web app is running inside Tauri
  */
 
-import type { BoardExport, BoardMeta, DocPatch, DocRepo, LoadedDoc } from "inkfinite-core";
+import type { BoardExport, BoardMeta, DocPatch, DocRepo, LoadedDoc, PageRecord } from "inkfinite-core";
 import {
   createFileData,
   createId,
   type DesktopFileData,
   type FileHandle,
   loadedDocFromFileData,
-  PageRecord,
   parseDesktopFile,
   serializeDesktopFile,
 } from "inkfinite-core";
 import type { DesktopFileOps } from "../fileops";
 
+export type DesktopDocRepo = DocRepo & {
+  kind: "desktop";
+  getCurrentFile(): FileHandle | null;
+  openFromDialog(): Promise<{ boardId: string; doc: LoadedDoc }>;
+};
+
+export function isDesktopRepo(repo: DocRepo): repo is DesktopDocRepo {
+  return (repo as DesktopDocRepo).kind === "desktop";
+}
+
 /**
  * Create a desktop file-based DocRepo
  * This implementation manages a single document loaded from disk
  */
-export function createDesktopDocRepo(fileOps: DesktopFileOps): DocRepo {
+export function createDesktopDocRepo(fileOps: DesktopFileOps): DesktopDocRepo {
   let currentFile: FileHandle | null = null;
   let currentBoard: BoardMeta | null = null;
   let currentDoc: LoadedDoc | null = null;
+  const boardFiles = new Map<string, FileHandle>();
+
+  type StoredHandle = { path: string; name?: string };
+
+  function setCurrentState(file: FileHandle, board: BoardMeta, doc: LoadedDoc) {
+    currentFile = file;
+    currentBoard = board;
+    currentDoc = doc;
+    boardFiles.set(board.id, file);
+  }
+
+  async function loadFromHandle(handle: StoredHandle): Promise<LoadedDoc> {
+    const content = await fileOps.readFile(handle.path);
+    const fileData = parseDesktopFile(content);
+    const doc = loadedDocFromFileData(fileData);
+    const normalizedHandle: FileHandle = {
+      path: handle.path,
+      name: handle.name ?? handle.path.split("/").pop() ?? "Untitled",
+    };
+    setCurrentState(normalizedHandle, fileData.board, doc);
+    await fileOps.addRecentFile(normalizedHandle);
+    return doc;
+  }
+
+  async function loadFromPath(path: string): Promise<LoadedDoc> {
+    const handle: FileHandle = { path, name: path.split("/").pop() || "Untitled" };
+    return loadFromHandle(handle);
+  }
 
   async function listBoards(): Promise<BoardMeta[]> {
-    // TODO: cache metadata or read it from files
-    // const recent = await fileOps.getRecentFiles();
-    return [];
+    const recent = await fileOps.getRecentFiles();
+    const boards: BoardMeta[] = [];
+
+    for (const handle of recent) {
+      try {
+        const content = await fileOps.readFile(handle.path);
+        const fileData = parseDesktopFile(content);
+        boards.push(fileData.board);
+        boardFiles.set(fileData.board.id, handle);
+      } catch {
+        await fileOps.removeRecentFile(handle.path);
+      }
+    }
+
+    return boards.sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
+  function createDefaultPage(name: string): PageRecord {
+    return { id: createId("page"), name, shapeIds: [] };
   }
 
   async function createBoard(name: string): Promise<string> {
     const boardId = createId("board");
     const timestamp = Date.now();
-    const page = PageRecord.create("Page 1");
+    const page = createDefaultPage("Page 1");
 
     const board: BoardMeta = {
       id: boardId,
@@ -55,15 +108,17 @@ export function createDesktopDocRepo(fileOps: DesktopFileOps): DocRepo {
 
     await fileOps.writeFile(path, serializeDesktopFile(fileData));
 
-    currentFile = { path, name: path.split("/").pop() || name };
-    currentBoard = board;
-    currentDoc = loadedDocFromFileData(fileData);
+    const handle = { path, name: path.split("/").pop() || name };
+    setCurrentState(handle, board, loadedDocFromFileData(fileData));
 
-    await fileOps.addRecentFile(currentFile);
+    await fileOps.addRecentFile(handle);
     return boardId;
   }
 
   async function renameBoard(boardId: string, name: string): Promise<void> {
+    if (!currentBoard || currentBoard.id !== boardId) {
+      await loadDoc(boardId);
+    }
     if (!currentBoard || !currentDoc || !currentFile) {
       throw new Error("No board loaded");
     }
@@ -79,11 +134,16 @@ export function createDesktopDocRepo(fileOps: DesktopFileOps): DocRepo {
     );
 
     await fileOps.writeFile(currentFile.path, serializeDesktopFile(fileData));
+    boardFiles.set(currentBoard.id, currentFile);
   }
 
-  async function deleteBoard(_boardId: string): Promise<void> {
-    if (currentFile) {
-      await fileOps.removeRecentFile(currentFile.path);
+  async function deleteBoard(boardId: string): Promise<void> {
+    const handle = boardFiles.get(boardId);
+    if (handle) {
+      await fileOps.removeRecentFile(handle.path);
+      boardFiles.delete(boardId);
+    }
+    if (currentBoard?.id === boardId) {
       currentFile = null;
       currentBoard = null;
       currentDoc = null;
@@ -94,22 +154,17 @@ export function createDesktopDocRepo(fileOps: DesktopFileOps): DocRepo {
     if (currentDoc && currentBoard?.id === boardId) {
       return currentDoc;
     }
-
-    const path = await fileOps.showOpenDialog();
-    if (!path) {
-      throw new Error("Open cancelled");
+    const handle = boardFiles.get(boardId);
+    if (!handle) {
+      throw new Error(`Unknown board: ${boardId}`);
     }
-
-    const content = await fileOps.readFile(path);
-    const fileData = parseDesktopFile(content);
-
-    currentFile = { path, name: path.split("/").pop() || "Untitled" };
-    currentBoard = fileData.board;
-    currentDoc = loadedDocFromFileData(fileData);
-
-    await fileOps.addRecentFile(currentFile);
-
-    return currentDoc;
+    try {
+      return await loadFromHandle(handle);
+    } catch (error) {
+      await fileOps.removeRecentFile(handle.path);
+      boardFiles.delete(boardId);
+      throw error;
+    }
   }
 
   async function applyDocPatch(boardId: string, patch: DocPatch): Promise<void> {
@@ -173,6 +228,7 @@ export function createDesktopDocRepo(fileOps: DesktopFileOps): DocRepo {
     );
 
     await fileOps.writeFile(currentFile.path, serializeDesktopFile(fileData));
+    boardFiles.set(currentBoard.id, currentFile);
   }
 
   async function exportBoard(_boardId: string): Promise<BoardExport> {
@@ -207,22 +263,47 @@ export function createDesktopDocRepo(fileOps: DesktopFileOps): DocRepo {
 
     await fileOps.writeFile(path, serializeDesktopFile(fileData));
 
-    currentFile = { path, name: path.split("/").pop() || board.name };
-    currentBoard = board;
-    currentDoc = loadedDocFromFileData(fileData);
+    const handle = { path, name: path.split("/").pop() || board.name };
+    setCurrentState(handle, board, loadedDocFromFileData(fileData));
 
-    await fileOps.addRecentFile(currentFile);
+    await fileOps.addRecentFile(handle);
 
     return boardId;
   }
 
-  return { listBoards, createBoard, renameBoard, deleteBoard, loadDoc, applyDocPatch, exportBoard, importBoard };
+  async function openFromDialog(): Promise<{ boardId: string; doc: LoadedDoc }> {
+    const path = await fileOps.showOpenDialog();
+    if (!path) {
+      throw new Error("Open cancelled");
+    }
+    const doc = await loadFromPath(path);
+    if (!currentBoard) {
+      throw new Error("Failed to open file");
+    }
+    return { boardId: currentBoard.id, doc };
+  }
+
+  return {
+    kind: "desktop",
+    listBoards,
+    createBoard,
+    renameBoard,
+    deleteBoard,
+    loadDoc,
+    applyDocPatch,
+    exportBoard,
+    importBoard,
+    getCurrentFile: () => currentFile,
+    openFromDialog,
+  };
 }
 
 /**
  * Get current file handle (for showing in title bar, etc.)
  */
-export function getCurrentFile(_repo: unknown): FileHandle | null {
-  // TODO: expose this properly
+export function getCurrentFile(repo: DocRepo): FileHandle | null {
+  if (isDesktopRepo(repo)) {
+    return repo.getCurrentFile();
+  }
   return null;
 }

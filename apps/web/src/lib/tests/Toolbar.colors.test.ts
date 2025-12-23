@@ -53,12 +53,18 @@ describe("Toolbar color controls", () => {
     cleanup();
   });
 
-  it("updates fill color for selected shapes", () => {
-    const store = createStoreWithRect();
-    const { container } = render(Toolbar, {
-      target: document.body,
+  function renderToolbar(store: Store) {
+    const target = document.createElement("div");
+    document.body.appendChild(target);
+    return render(Toolbar, {
+      target,
       props: { currentTool: "select", onToolChange: () => {}, store, getViewport: () => ({ width: 800, height: 600 }) },
     });
+  }
+
+  it("updates fill color for selected shapes", () => {
+    const store = createStoreWithRect();
+    const { container } = renderToolbar(store);
 
     const input = container.querySelector("input[aria-label=\"Fill color\"]") as HTMLInputElement | null;
     expect(input).toBeTruthy();
@@ -76,10 +82,7 @@ describe("Toolbar color controls", () => {
 
   it("updates stroke color for selectable shapes", () => {
     const store = createStoreWithRect();
-    const { container } = render(Toolbar, {
-      target: document.body,
-      props: { currentTool: "select", onToolChange: () => {}, store, getViewport: () => ({ width: 800, height: 600 }) },
-    });
+    const { container } = renderToolbar(store);
 
     const input = container.querySelector("input[aria-label=\"Stroke color\"]") as HTMLInputElement | null;
     expect(input).toBeTruthy();
@@ -97,10 +100,7 @@ describe("Toolbar color controls", () => {
 
   it("disables fill control when selection has no fillable shapes", () => {
     const store = createStoreWithLine();
-    const { container } = render(Toolbar, {
-      target: document.body,
-      props: { currentTool: "select", onToolChange: () => {}, store, getViewport: () => ({ width: 800, height: 600 }) },
-    });
+    const { container } = renderToolbar(store);
 
     const fillInput = container.querySelector("input[aria-label=\"Fill color\"]") as HTMLInputElement | null;
     const strokeInput = container.querySelector("input[aria-label=\"Stroke color\"]") as HTMLInputElement | null;

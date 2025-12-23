@@ -126,14 +126,14 @@ the Toolbar across web and desktop builds.
 Goal: same app works as a desktop app with filesystem access.
 
 Tauri + SvelteKit integration:
-[ ] Configure SvelteKit for static/SPA output
-[ ] Ensure SSR is disabled for desktop build
-[ ] Configure Tauri to load the built assets
+[x] Configure SvelteKit for static/SPA output
+[x] Ensure SSR is disabled for desktop build
+[x] Configure Tauri to load the built assets
 
 File dialogs + FS:
-[ ] Implement "Save As…" using Tauri dialog + fs APIs
-[ ] Implement "Open…" using Tauri dialog + fs APIs
-[ ] Add recent files list (v0: store paths in Tauri local storage)
+[x] Implement "Save As…" using Tauri dialog + fs APIs
+[x] Implement "Open…" using Tauri dialog + fs APIs
+[x] Add recent files list (v0: store paths in Tauri local storage)
 
 (DoD):
 - Desktop app opens/saves JSON files on disk and reopens them correctly.
@@ -227,11 +227,11 @@ R3. Desktop: real directory + files (Tauri)
     - v0: show *.Inkfinite.json files in workspace
     - v1: tree view with folders
 [ ] Implement file actions:
-    - New: create new file
-    - Rename: rename file
-    - Delete: delete file
-    - Open: load file into editor
-    - Export: save JSON
+    - [x] New: create new file
+    - [ ] Rename: rename file
+    - [ ] Delete: delete file
+    - [x] Open: load file into editor
+    - [x] Export: save JSON
 
 (DoD):
 - Desktop: pick a folder, browse files, open/save boards from disk.

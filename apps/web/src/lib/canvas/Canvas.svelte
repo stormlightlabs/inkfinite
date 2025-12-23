@@ -4,6 +4,7 @@
 	import TitleBar from '$lib/components/TitleBar.svelte';
 	import Toolbar from '$lib/components/Toolbar.svelte';
 	import { createInputAdapter, type InputAdapter } from '$lib/input';
+	import type { DesktopDocRepo } from '$lib/persistence/desktop';
 	import { createPlatformRepo, detectPlatform } from '$lib/platform';
 	import {
 		createPersistenceManager,
@@ -32,6 +33,7 @@
 		shapeBounds,
 		switchTool,
 		type Action,
+		type BoardMeta,
 		type CommandKind,
 		type DocRepo,
 		type LoadedDoc,
@@ -53,6 +55,10 @@
 	});
 	let persistenceStatusStore = $state<StatusStore>(fallbackStatusStore);
 	let activeBoardId: string | null = null;
+	let desktopRepo: DesktopDocRepo | null = null;
+	let desktopBoards = $state<BoardMeta[]>([]);
+	let desktopFileName = $state<string | null>(null);
+	let removeBeforeUnload: (() => void) | null = null;
 
 	const store = new Store(undefined, {
 		onHistoryEvent: (event) => {
@@ -115,6 +121,40 @@
 		);
 		store.executeCommand(command);
 		syncHandleState();
+	}
+
+	function setActiveBoardId(boardId: string) {
+		activeBoardId = boardId;
+		persistenceManager?.setActiveBoard(boardId);
+	}
+
+	function updateDesktopFileState() {
+		if (!desktopRepo) {
+			desktopFileName = null;
+			return;
+		}
+		const handle = desktopRepo.getCurrentFile();
+		desktopFileName = handle?.name ?? null;
+	}
+
+	async function refreshDesktopBoards(): Promise<BoardMeta[]> {
+		if (!desktopRepo) {
+			desktopBoards = [];
+			return [];
+		}
+		try {
+			const boards = await desktopRepo.listBoards();
+			desktopBoards = boards;
+			return boards;
+		} catch (error) {
+			console.error('Failed to list boards', error);
+			desktopBoards = [];
+			return [];
+		}
+	}
+
+	function isUserCancelled(error: unknown) {
+		return error instanceof Error && /cancel/i.test(error.message);
 	}
 
 	const handleCursorMap: Record<string, string> = {
@@ -724,6 +764,78 @@
 		}
 	}
 
+	async function handleDesktopOpen() {
+		if (!desktopRepo || !repo) {
+			return;
+		}
+		try {
+			const opened = await desktopRepo.openFromDialog();
+			setActiveBoardId(opened.boardId);
+			applyLoadedDoc(opened.doc);
+			updateDesktopFileState();
+			await refreshDesktopBoards();
+		} catch (error) {
+			if (isUserCancelled(error)) {
+				return;
+			}
+			console.error('Failed to open board', error);
+		}
+	}
+
+	async function handleDesktopNewBoard() {
+		if (!repo) {
+			return;
+		}
+		try {
+			const boardId = await repo.createBoard('Untitled');
+			const loaded = await repo.loadDoc(boardId);
+			setActiveBoardId(boardId);
+			applyLoadedDoc(loaded);
+			updateDesktopFileState();
+			await refreshDesktopBoards();
+		} catch (error) {
+			if (isUserCancelled(error)) {
+				return;
+			}
+			console.error('Failed to create board', error);
+		}
+	}
+
+	async function handleDesktopSaveAs() {
+		if (!repo || !activeBoardId) {
+			return;
+		}
+		try {
+			const snapshot = await repo.exportBoard(activeBoardId);
+			const newBoardId = await repo.importBoard(snapshot);
+			const loaded = await repo.loadDoc(newBoardId);
+			setActiveBoardId(newBoardId);
+			applyLoadedDoc(loaded);
+			updateDesktopFileState();
+			await refreshDesktopBoards();
+		} catch (error) {
+			if (isUserCancelled(error)) {
+				return;
+			}
+			console.error('Failed to save board', error);
+		}
+	}
+
+	async function handleDesktopRecentSelect(boardId: string) {
+		if (!repo) {
+			return;
+		}
+		try {
+			const loaded = await repo.loadDoc(boardId);
+			setActiveBoardId(boardId);
+			applyLoadedDoc(loaded);
+			updateDesktopFileState();
+			await refreshDesktopBoards();
+		} catch (error) {
+			console.error('Failed to load board', error);
+		}
+	}
+
 	function applySnapping(action: Action): Action {
 		const snap = snapStore.get();
 		if (!snap.snapEnabled || !snap.gridEnabled) {
@@ -756,8 +868,23 @@
 		let disposed = false;
 
 		const initialize = async () => {
-			const { repo: platformRepo, platform: detectedPlatform, db } = await createPlatformRepo();
+			const {
+				repo: platformRepo,
+				platform: detectedPlatform,
+				db,
+				desktop: desktopInstance
+			} = await createPlatformRepo();
+			if (disposed) {
+				return;
+			}
 			repo = platformRepo;
+			if (detectedPlatform === 'desktop' && desktopInstance) {
+				desktopRepo = desktopInstance;
+			} else {
+				desktopRepo = null;
+				desktopBoards = [];
+				desktopFileName = null;
+			}
 
 			if (detectedPlatform === 'web' && db) {
 				persistenceManager = createPersistenceManager(db, repo, { sink: { debounceMs: 200 } });
@@ -765,6 +892,9 @@
 				persistenceStatusStore = persistenceManager.status;
 			} else {
 				const { createPersistenceSink } = await import('inkfinite-core');
+				if (disposed) {
+					return;
+				}
 				sink = createPersistenceSink(repo, { debounceMs: 500 });
 			}
 
@@ -780,22 +910,27 @@
 						if (disposed) {
 							return;
 						}
-						activeBoardId = id;
+						setActiveBoardId(id);
 						const loaded = await repoInstance.loadDoc(id);
 						if (!disposed) {
-							persistenceManager?.setActiveBoard(id);
 							applyLoadedDoc(loaded);
 						}
 					} else {
-						const id = await repoInstance.createBoard('Untitled');
+						const boards = await refreshDesktopBoards();
+						let id = boards[0]?.id ?? null;
+						if (!id) {
+							id = await repoInstance.createBoard('Untitled');
+						}
 						if (disposed) {
 							return;
 						}
-						activeBoardId = id;
+						setActiveBoardId(id);
 						const loaded = await repoInstance.loadDoc(id);
 						if (!disposed) {
 							applyLoadedDoc(loaded);
+							updateDesktopFileState();
 						}
+						await refreshDesktopBoards();
 					}
 				} catch (error) {
 					console.error('Failed to load board', error);
@@ -803,35 +938,46 @@
 			};
 
 			await hydrate();
+			if (disposed) {
+				return;
+			}
 
 			function getCamera() {
 				return store.getState().camera;
 			}
 
-			renderer = createRenderer(canvas!, store, {
+			const currentCanvas = canvas;
+			if (!currentCanvas) {
+				return;
+			}
+
+			renderer = createRenderer(currentCanvas, store, {
 				snapProvider,
 				cursorProvider,
 				pointerStateProvider,
 				handleProvider
 			});
 			inputAdapter = createInputAdapter({
-				canvas: canvas!,
+				canvas: currentCanvas,
 				getCamera,
 				getViewport,
 				onAction: handleAction,
 				onCursorUpdate: (world, screen) => cursorStore.updateCursor(world, screen)
 			});
 
-			function handleBeforeUnload() {
-				if (sink) {
-					void sink.flush();
+			if (typeof window !== 'undefined') {
+				function handleBeforeUnload() {
+					if (sink) {
+						void sink.flush();
+					}
 				}
-			}
 
-			window.addEventListener('beforeunload', handleBeforeUnload);
+				window.addEventListener('beforeunload', handleBeforeUnload);
+				removeBeforeUnload = () => window.removeEventListener('beforeunload', handleBeforeUnload);
+			}
 		};
 
-		initialize();
+		void initialize();
 
 		return () => {
 			disposed = true;
@@ -839,12 +985,17 @@
 	});
 
 	onDestroy(() => {
+		removeBeforeUnload?.();
+		removeBeforeUnload = null;
 		renderer?.dispose();
 		inputAdapter?.dispose();
 		if (sink) {
 			void sink.flush();
 		}
 		repo = null;
+		desktopRepo = null;
+		desktopBoards = [];
+		desktopFileName = null;
 		sink = null;
 		activeBoardId = null;
 		persistenceManager?.dispose();
@@ -855,7 +1006,16 @@
 </script>
 
 <div class="editor">
-	<TitleBar />
+	<TitleBar
+		{platform}
+		desktop={{
+			fileName: desktopFileName,
+			recentBoards: desktopBoards,
+			onOpen: handleDesktopOpen,
+			onNew: handleDesktopNewBoard,
+			onSaveAs: handleDesktopSaveAs,
+			onSelectBoard: handleDesktopRecentSelect
+		}} />
 	<Toolbar
 		currentTool={currentToolId}
 		onToolChange={handleToolChange}

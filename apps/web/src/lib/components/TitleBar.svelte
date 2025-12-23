@@ -1,10 +1,20 @@
 <script lang="ts">
 	import Dialog from '$lib/components/Dialog.svelte';
+	import type { Platform } from '$lib/platform';
+	import type { BoardMeta } from 'inkfinite-core';
 	import icon from '../assets/favicon.svg';
 
 	const helpLinks = [
-		{ label: 'Project README', href: 'https://github.com/stormlightlabs/inkfinite', external: true },
-		{ label: 'Issue Tracker', href: 'https://github.com/stormlightlabs/inkfinite/issues', external: true }
+		{
+			label: 'Project README',
+			href: 'https://github.com/stormlightlabs/inkfinite',
+			external: true
+		},
+		{
+			label: 'Issue Tracker',
+			href: 'https://github.com/stormlightlabs/inkfinite/issues',
+			external: true
+		}
 	];
 
 	const keyboardTips = [
@@ -13,12 +23,47 @@
 		'Scroll to zoom, double-click to reset view'
 	];
 
+	type DesktopControls = {
+		fileName: string | null;
+		recentBoards: BoardMeta[];
+		onOpen?: () => void | Promise<void>;
+		onNew?: () => void | Promise<void>;
+		onSaveAs?: () => void | Promise<void>;
+		onSelectBoard?: (boardId: string) => void | Promise<void>;
+	};
+
+	type Props = { platform?: Platform; desktop?: DesktopControls };
+
+	let { platform = 'web', desktop }: Props = $props();
+
 	let infoOpen = $state(false);
 	function openInfo() {
 		infoOpen = true;
 	}
 	function closeInfo() {
 		infoOpen = false;
+	}
+
+	function invokeDesktopAction(action?: () => void | Promise<void>) {
+		if (action) {
+			void action();
+		}
+	}
+
+	function handleRecentSelect(event: Event) {
+		if (!desktop?.onSelectBoard) {
+			return;
+		}
+		const select = event.currentTarget as HTMLSelectElement;
+		const boardId = select.value;
+		if (boardId) {
+			void desktop.onSelectBoard(boardId);
+		}
+		select.value = '';
+	}
+
+	function desktopFileLabel() {
+		return desktop?.fileName ?? 'Unsaved board';
 	}
 </script>
 
@@ -32,6 +77,45 @@
 			<div class="titlebar__tagline">Infinite canvas playground</div>
 		</div>
 	</div>
+	{#if platform === 'desktop' && desktop}
+		<div class="titlebar__desktop">
+			<div class="titlebar__file" aria-live="polite">{desktopFileLabel()}</div>
+			<div class="titlebar__desktop-actions">
+				<button
+					class="titlebar__desktop-button"
+					type="button"
+					onclick={() => invokeDesktopAction(desktop.onNew)}
+					aria-label="Create new board">
+					New…
+				</button>
+				<button
+					class="titlebar__desktop-button"
+					type="button"
+					onclick={() => invokeDesktopAction(desktop.onOpen)}
+					aria-label="Open board from disk">
+					Open…
+				</button>
+				<button
+					class="titlebar__desktop-button"
+					type="button"
+					onclick={() => invokeDesktopAction(desktop.onSaveAs)}
+					aria-label="Save board as new file">
+					Save As…
+				</button>
+				{#if desktop.recentBoards.length > 0}
+					<label class="titlebar__recent">
+						<span>Recent</span>
+						<select onchange={handleRecentSelect} aria-label="Switch to recent board">
+							<option value="">Select…</option>
+							{#each desktop.recentBoards as board (`${board.id}:${board.name}`)}
+								<option value={board.id}>{board.name}</option>
+							{/each}
+						</select>
+					</label>
+				{/if}
+			</div>
+		</div>
+	{/if}
 	<div class="titlebar__spacer"></div>
 	<button class="titlebar__info" onclick={openInfo} aria-label="About Inkfinite">
 		<span aria-hidden="true">ℹ︎</span>
@@ -43,14 +127,15 @@
 	<section class="about">
 		<h1>About Inkfinite</h1>
 		<p>
-			Inkfinite is a Svelte-native infinite canvas prototype. The goal is to build a cross-platform editor with a
-			framework-agnostic core so the same engine powers both the web and desktop apps.
+			Inkfinite is a Svelte-native infinite canvas prototype. The goal is to build a cross-platform
+			editor with a framework-agnostic core so the same engine powers both the web and desktop
+			apps.
 		</p>
 
 		<div class="about__section">
 			<h2>Quick Tips</h2>
 			<ul>
-				{#each keyboardTips as tip}
+				{#each keyboardTips as tip (tip)}
 					<li>{tip}</li>
 				{/each}
 			</ul>
@@ -59,8 +144,9 @@
 		<div class="about__section">
 			<h2>Need help?</h2>
 			<ul>
-				{#each helpLinks as link}
+				{#each helpLinks as link (link.href)}
 					<li>
+						<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 						<a href={link.href} target={link.external ? '_blank' : undefined} rel="noreferrer">
 							{link.label}
 						</a>
@@ -85,6 +171,55 @@
 		display: flex;
 		align-items: center;
 		gap: 12px;
+	}
+
+	.titlebar__desktop {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+
+	.titlebar__file {
+		font-size: 13px;
+		color: var(--text-secondary);
+	}
+
+	.titlebar__desktop-actions {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-wrap: wrap;
+	}
+
+	.titlebar__desktop-button {
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--text);
+		border-radius: 6px;
+		padding: 4px 10px;
+		font-size: 13px;
+		cursor: pointer;
+	}
+
+	.titlebar__desktop-button:hover {
+		background: var(--surface-elevated);
+	}
+
+	.titlebar__recent {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 12px;
+		color: var(--text-secondary);
+	}
+
+	.titlebar__recent select {
+		font-size: 12px;
+		padding: 4px 6px;
+		border-radius: 4px;
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--text);
 	}
 
 	.titlebar__logo {

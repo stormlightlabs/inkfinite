@@ -73,7 +73,8 @@ const createDoc = () => ({
   order: { pageIds: ["page:1"], shapeOrder: { "page:1": [] } },
 });
 
-vi.mock("inkfinite-core", () => {
+vi.mock("inkfinite-core", async () => {
+  const actual = await vi.importActual<typeof import("inkfinite-core")>("inkfinite-core");
   const { sinkEnqueueSpy, storeInstances } = coreMocks;
 
   class BaseTool {
@@ -235,6 +236,7 @@ vi.mock("inkfinite-core", () => {
   }
 
   return {
+    ...actual,
     ArrowTool: class extends BaseTool {
       constructor() {
         super("arrow");

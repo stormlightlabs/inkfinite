@@ -3,6 +3,16 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { cleanup, render } from "vitest-browser-svelte";
 import Toolbar from "../components/Toolbar.svelte";
 
+// TODO: reuse this pattern
+function renderToolbar(store: Store) {
+  const target = document.createElement("div");
+  document.body.appendChild(target);
+  return render(Toolbar, {
+    target,
+    props: { currentTool: "select", onToolChange: () => {}, store, getViewport: () => ({ width: 800, height: 600 }) },
+  });
+}
+
 describe("Toolbar accessibility", () => {
   beforeEach(() => {
     cleanup();
@@ -10,10 +20,7 @@ describe("Toolbar accessibility", () => {
 
   it("should have proper ARIA labels on tool buttons", () => {
     const store = new Store();
-    const { container } = render(Toolbar, {
-      target: document.body,
-      props: { currentTool: "select", onToolChange: () => {}, store, getViewport: () => ({ width: 800, height: 600 }) },
-    });
+    const { container } = renderToolbar(store);
 
     const selectButton = container.querySelector("[data-tool-id=\"select\"]");
     expect(selectButton?.getAttribute("aria-label")).toBe("Select");
@@ -26,10 +33,7 @@ describe("Toolbar accessibility", () => {
 
   it("should have ARIA attributes on zoom button", () => {
     const store = new Store();
-    const { container } = render(Toolbar, {
-      target: document.body,
-      props: { currentTool: "select", onToolChange: () => {}, store, getViewport: () => ({ width: 800, height: 600 }) },
-    });
+    const { container } = renderToolbar(store);
 
     const zoomButton = container.querySelector(".toolbar__zoom-button");
     expect(zoomButton?.getAttribute("aria-label")).toBe("Zoom level");
@@ -39,10 +43,7 @@ describe("Toolbar accessibility", () => {
 
   it("should have proper menu roles when zoom menu is open", async () => {
     const store = new Store();
-    const { container } = render(Toolbar, {
-      target: document.body,
-      props: { currentTool: "select", onToolChange: () => {}, store, getViewport: () => ({ width: 800, height: 600 }) },
-    });
+    const { container } = renderToolbar(store);
 
     const zoomButton = container.querySelector(".toolbar__zoom-button") as HTMLButtonElement;
     zoomButton.click();
@@ -62,10 +63,7 @@ describe("Toolbar accessibility", () => {
 
   it("should have ARIA attributes on export button", () => {
     const store = new Store();
-    const { container } = render(Toolbar, {
-      target: document.body,
-      props: { currentTool: "select", onToolChange: () => {}, store, getViewport: () => ({ width: 800, height: 600 }) },
-    });
+    const { container } = renderToolbar(store);
 
     const exportButton = container.querySelector(".toolbar__export-button");
     expect(exportButton?.getAttribute("aria-label")).toBe("Export drawing");
@@ -75,10 +73,7 @@ describe("Toolbar accessibility", () => {
 
   it("should have proper menu roles when export menu is open", async () => {
     const store = new Store();
-    const { container } = render(Toolbar, {
-      target: document.body,
-      props: { currentTool: "select", onToolChange: () => {}, store, getViewport: () => ({ width: 800, height: 600 }) },
-    });
+    const { container } = renderToolbar(store);
 
     const exportButton = container.querySelector(".toolbar__export-button") as HTMLButtonElement;
     exportButton.click();
@@ -99,10 +94,7 @@ describe("Toolbar accessibility", () => {
 
   it("should have visible focus states on buttons", () => {
     const store = new Store();
-    const { container } = render(Toolbar, {
-      target: document.body,
-      props: { currentTool: "select", onToolChange: () => {}, store, getViewport: () => ({ width: 800, height: 600 }) },
-    });
+    const { container } = renderToolbar(store);
 
     const selectButton = container.querySelector(".toolbar__tool-button") as HTMLElement;
     selectButton.focus();
@@ -112,10 +104,7 @@ describe("Toolbar accessibility", () => {
 
   it("should update aria-expanded when menus are toggled", async () => {
     const store = new Store();
-    const { container } = render(Toolbar, {
-      target: document.body,
-      props: { currentTool: "select", onToolChange: () => {}, store, getViewport: () => ({ width: 800, height: 600 }) },
-    });
+    const { container } = renderToolbar(store);
 
     const zoomButton = container.querySelector(".toolbar__zoom-button") as HTMLButtonElement;
 

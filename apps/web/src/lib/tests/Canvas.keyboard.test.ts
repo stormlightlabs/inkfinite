@@ -100,10 +100,11 @@ describe("Canvas keyboard shortcuts", () => {
   it("should handle space key for panning mode", async () => {
     render(Canvas);
     await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(coreMocks.executeCommandSpy).toHaveBeenCalled(), { timeout: 2000 });
+    coreMocks.executeCommandSpy.mockClear();
 
     const handler = actionHandlers[0];
 
-    // Press space key
     handler({
       type: "key-down",
       key: " ",
@@ -113,10 +114,8 @@ describe("Canvas keyboard shortcuts", () => {
       timestamp: Date.now(),
     });
 
-    // Space key should enable panning mode (no command executed)
     expect(coreMocks.executeCommandSpy).not.toHaveBeenCalled();
 
-    // Release space key
     handler({
       type: "key-up",
       key: " ",
@@ -134,11 +133,9 @@ describe("Canvas keyboard shortcuts", () => {
 
     const handler = actionHandlers[0];
 
-    // Wait for shapes to load
     await vi.waitFor(() => expect(coreMocks.executeCommandSpy).toHaveBeenCalled(), { timeout: 2000 });
     coreMocks.executeCommandSpy.mockClear();
 
-    // Press ArrowRight to nudge
     handler({
       type: "key-down",
       key: "ArrowRight",
@@ -148,7 +145,6 @@ describe("Canvas keyboard shortcuts", () => {
       timestamp: Date.now(),
     });
 
-    // Should execute a nudge command
     await vi.waitFor(() => {
       const calls = coreMocks.executeCommandSpy.mock.calls;
       const nudgeCalls = calls.filter((call) => call[0]?.name === "Nudge");
@@ -164,7 +160,6 @@ describe("Canvas keyboard shortcuts", () => {
     await vi.waitFor(() => expect(coreMocks.executeCommandSpy).toHaveBeenCalled(), { timeout: 2000 });
     coreMocks.executeCommandSpy.mockClear();
 
-    // Press ArrowDown with Shift
     handler({
       type: "key-down",
       key: "ArrowDown",
@@ -189,7 +184,6 @@ describe("Canvas keyboard shortcuts", () => {
     await vi.waitFor(() => expect(coreMocks.executeCommandSpy).toHaveBeenCalled(), { timeout: 2000 });
     coreMocks.executeCommandSpy.mockClear();
 
-    // Press Cmd+D (on Mac) or Ctrl+D (on other platforms)
     const isMac = navigator.userAgent.toUpperCase().includes("MAC");
     handler({
       type: "key-down",
@@ -265,7 +259,6 @@ describe("Canvas keyboard shortcuts", () => {
     await vi.waitFor(() => expect(coreMocks.executeCommandSpy).toHaveBeenCalled(), { timeout: 2000 });
     coreMocks.executeCommandSpy.mockClear();
 
-    // Press space
     handler({
       type: "key-down",
       key: " ",
@@ -275,7 +268,6 @@ describe("Canvas keyboard shortcuts", () => {
       timestamp: Date.now(),
     });
 
-    // Try to nudge with arrow key while space is held
     handler({
       type: "key-down",
       key: "ArrowRight",
@@ -285,7 +277,6 @@ describe("Canvas keyboard shortcuts", () => {
       timestamp: Date.now(),
     });
 
-    // Should not execute nudge command while panning mode is active
     expect(coreMocks.executeCommandSpy).not.toHaveBeenCalled();
   });
 });
