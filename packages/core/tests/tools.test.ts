@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { Action, Modifiers, PointerButtons } from "../src/actions";
 import { Vec2 } from "../src/math";
+import type { TextProps } from "../src/model";
 import { EditorState } from "../src/reactivity";
 import type { Tool } from "../src/tools";
-import { createToolMap, routeAction, switchTool } from "../src/tools";
+import { createToolMap, routeAction, switchTool, TextTool } from "../src/tools";
 
 describe("Tools", () => {
   describe("Tool interface", () => {
@@ -444,6 +445,33 @@ describe("Tools", () => {
         "rect:exit",
         "select:enter",
       ]);
+    });
+  });
+
+  describe("TextTool", () => {
+    it("uses a readable default color", () => {
+      const tool = new TextTool();
+      const state = EditorState.create();
+      const pageId = "page:default";
+      const withPage = {
+        ...state,
+        doc: { ...state.doc, pages: { [pageId]: { id: pageId, name: "Page", shapeIds: [] } } },
+        ui: { ...state.ui, currentPageId: pageId },
+      };
+
+      const action = Action.pointerDown(
+        Vec2.create(0, 0),
+        Vec2.create(100, 200),
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      );
+      const nextState = tool.onAction(withPage, action);
+      const shapeId = nextState.ui.selectionIds[0];
+      const createdShape = shapeId ? nextState.doc.shapes[shapeId] : null;
+
+      expect(createdShape?.type).toBe("text");
+      expect((createdShape?.props as TextProps).color).toBe("#1f2933");
     });
   });
 });

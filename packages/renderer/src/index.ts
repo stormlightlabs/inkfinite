@@ -9,9 +9,10 @@ import type {
   ShapeRecord,
   Store,
   TextShape,
+  Vec2,
   Viewport,
 } from "inkfinite-core";
-import { getShapesOnCurrentPage, resolveArrowEndpoints } from "inkfinite-core";
+import { getShapesOnCurrentPage, resolveArrowEndpoints, shapeBounds } from "inkfinite-core";
 
 export interface Renderer {
   /**
@@ -27,10 +28,15 @@ export interface Renderer {
 
 export type SnapSettings = { snapEnabled: boolean; gridEnabled: boolean; gridSize: number };
 
+export type PointerVisualState = { isPointerDown: boolean; snappedWorld?: Vec2 | null };
+
+export type HandleRenderState = { hover: string | null; active: string | null } | null | undefined;
+
 export type RendererOptions = {
   snapProvider?: { get(): SnapSettings };
   cursorProvider?: { get(): CursorState };
-  pointerStateProvider?: { get(): { isPointerDown: boolean } };
+  pointerStateProvider?: { get(): PointerVisualState };
+  handleProvider?: { get(): HandleRenderState };
 };
 
 /**
@@ -94,7 +100,8 @@ export function createRenderer(canvas: HTMLCanvasElement, store: Store, options?
     const snapSettings = options?.snapProvider?.get();
     const cursorState = options?.cursorProvider?.get();
     const pointerState = options?.pointerStateProvider?.get();
-    drawScene(context, state, viewport, snapSettings, cursorState, pointerState);
+    const handleState = options?.handleProvider?.get();
+    drawScene(context, state, viewport, snapSettings, cursorState, pointerState, handleState);
   }
 
   /**
@@ -150,7 +157,8 @@ function drawScene(
   viewport: Viewport,
   snapSettings?: SnapSettings,
   cursorState?: CursorState,
-  pointerState?: { isPointerDown: boolean },
+  pointerState?: PointerVisualState,
+  handleState?: HandleRenderState,
 ) {
   context.clearRect(0, 0, viewport.width, viewport.height);
 
@@ -165,7 +173,7 @@ function drawScene(
     drawShape(context, state, shape);
   }
 
-  drawSelection(context, state, shapes);
+  drawSelection(context, state, shapes, handleState);
 
   drawSnapGuides(context, state.camera, viewport, snapSettings, cursorState, pointerState);
 
@@ -241,15 +249,23 @@ function drawSnapGuides(
   viewport: Viewport,
   snapSettings?: SnapSettings,
   cursorState?: CursorState,
-  pointerState?: { isPointerDown: boolean },
+  pointerState?: PointerVisualState,
 ) {
-  if (!snapSettings?.snapEnabled || !cursorState || !pointerState?.isPointerDown) {
+  if (!snapSettings?.snapEnabled || !pointerState?.isPointerDown) {
     return;
   }
 
   const gridSize = snapSettings.gridSize || 1;
-  const snappedX = Math.round(cursorState.cursorWorld.x / gridSize) * gridSize;
-  const snappedY = Math.round(cursorState.cursorWorld.y / gridSize) * gridSize;
+  const guideWorld = pointerState.snappedWorld ?? cursorState?.cursorWorld;
+  if (!guideWorld) {
+    return;
+  }
+  const snappedX = pointerState.snappedWorld
+    ? pointerState.snappedWorld.x
+    : Math.round(guideWorld.x / gridSize) * gridSize;
+  const snappedY = pointerState.snappedWorld
+    ? pointerState.snappedWorld.y
+    : Math.round(guideWorld.y / gridSize) * gridSize;
 
   const halfWidth = viewport.width / (2 * camera.zoom);
   const halfHeight = viewport.height / (2 * camera.zoom);
@@ -476,8 +492,14 @@ function wrapText(context: CanvasRenderingContext2D, text: string, maxWidth: num
 /**
  * Draw selection outlines for selected shapes
  */
-function drawSelection(context: CanvasRenderingContext2D, state: EditorState, shapes: ShapeRecord[]) {
+function drawSelection(
+  context: CanvasRenderingContext2D,
+  state: EditorState,
+  shapes: ShapeRecord[],
+  handleState?: HandleRenderState,
+) {
   const selectedIds = new Set(state.ui.selectionIds);
+  const singleSelectionId = state.ui.selectionIds.length === 1 ? state.ui.selectionIds[0] : null;
 
   for (const shape of shapes) {
     if (!selectedIds.has(shape.id)) continue;
@@ -526,5 +548,122 @@ function drawSelection(context: CanvasRenderingContext2D, state: EditorState, sh
     }
 
     context.restore();
+
+    if (singleSelectionId === shape.id) {
+      drawHandles(context, state, shape, handleState);
+    }
   }
+}
+
+type HandleVisual = { id: string; position: Vec2; connectorFrom?: Vec2 };
+const ROTATE_HANDLE_OFFSET = 40;
+
+function drawHandles(
+  context: CanvasRenderingContext2D,
+  state: EditorState,
+  shape: ShapeRecord,
+  handleState?: HandleRenderState,
+) {
+  if (!handleState) {
+    return;
+  }
+  const handles = getHandlesForShape(state, shape);
+  if (handles.length === 0) {
+    return;
+  }
+
+  for (const handle of handles) {
+    if (handle.connectorFrom) {
+      context.save();
+      context.strokeStyle = "rgba(37, 99, 235, 0.6)";
+      context.lineWidth = 1 / state.camera.zoom;
+      context.beginPath();
+      context.moveTo(handle.connectorFrom.x, handle.connectorFrom.y);
+      context.lineTo(handle.position.x, handle.position.y);
+      context.stroke();
+      context.restore();
+    }
+
+    context.save();
+    const isActive = handleState.active === handle.id;
+    const isHover = handleState.hover === handle.id;
+    const fill = isActive ? "#2563eb" : (isHover ? "#3b82f6" : "#ffffff");
+    const stroke = isActive || isHover ? "#2563eb" : "#1f2933";
+    const size = handle.id === "rotate" ? 6 / state.camera.zoom : 5 / state.camera.zoom;
+
+    context.translate(handle.position.x, handle.position.y);
+    context.lineWidth = 1 / state.camera.zoom;
+    context.strokeStyle = stroke;
+    context.fillStyle = fill;
+
+    if (handle.id === "rotate") {
+      context.beginPath();
+      context.arc(0, 0, size, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+    } else {
+      const d = size;
+      context.beginPath();
+      context.rect(-d, -d, d * 2, d * 2);
+      context.fill();
+      context.stroke();
+    }
+
+    context.restore();
+  }
+}
+
+function getHandlesForShape(state: EditorState, shape: ShapeRecord): HandleVisual[] {
+  const handles: HandleVisual[] = [];
+  if (shape.type === "rect" || shape.type === "ellipse" || shape.type === "text") {
+    const bounds = shapeBounds(shape);
+    const minX = bounds.min.x;
+    const maxX = bounds.max.x;
+    const minY = bounds.min.y;
+    const maxY = bounds.max.y;
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    handles.push(
+      { id: "nw", position: { x: minX, y: minY } },
+      { id: "n", position: { x: centerX, y: minY } },
+      { id: "ne", position: { x: maxX, y: minY } },
+      { id: "e", position: { x: maxX, y: centerY } },
+      { id: "se", position: { x: maxX, y: maxY } },
+      { id: "s", position: { x: centerX, y: maxY } },
+      { id: "sw", position: { x: minX, y: maxY } },
+      { id: "w", position: { x: minX, y: centerY } },
+      {
+        id: "rotate",
+        position: { x: centerX, y: minY - ROTATE_HANDLE_OFFSET },
+        connectorFrom: { x: centerX, y: minY },
+      },
+    );
+    return handles;
+  }
+
+  if (shape.type === "line") {
+    const start = localToWorld(shape, shape.props.a);
+    const end = localToWorld(shape, shape.props.b);
+    handles.push({ id: "line-start", position: start }, { id: "line-end", position: end });
+    return handles;
+  }
+
+  if (shape.type === "arrow") {
+    const resolved = resolveArrowEndpoints(state, shape.id);
+    if (resolved) {
+      handles.push({ id: "line-start", position: resolved.a }, { id: "line-end", position: resolved.b });
+    }
+    return handles;
+  }
+
+  return handles;
+}
+
+function localToWorld(shape: ShapeRecord, point: Vec2): Vec2 {
+  if (shape.rot === 0) {
+    return { x: shape.x + point.x, y: shape.y + point.y };
+  }
+  const cos = Math.cos(shape.rot);
+  const sin = Math.sin(shape.rot);
+  return { x: shape.x + point.x * cos - point.y * sin, y: shape.y + point.x * sin + point.y * cos };
 }

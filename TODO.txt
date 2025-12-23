@@ -14,33 +14,7 @@ Conventions:
 1. Milestone A: Repo skeleton + dev loop                                  *wb-A*
 ================================================================================
 
-Goal: a monorepo that can run a blank canvas in web + desktop.
-
-[ ] Create workspace:
-    - /apps/web (SvelteKit)
-    - /apps/desktop (Tauri wrapper)
-    - /packages/core (pure TS engine)
-    - /packages/renderer (Canvas2D renderer)
-
-[ ] Add TypeScript config(s):
-    - one shared tsconfig.base.json
-    - package-level tsconfig.json extends base
-
-[ ] Add lint/format:
-    - eslint + prettier
-    - one command: pnpm lint / pnpm fmt
-
-[ ] Add test runner for core:
-    - vitest in /packages/core
-    - one command: pnpm test
-
-[ ] Add CI:
-    - install, lint, test (core only)
-
-(DoD):
-- `pnpm dev:web` shows an empty page with a <canvas>.
-- `pnpm dev:desktop` launches a Tauri window that shows the same canvas.
-- `pnpm test` runs at least 1 passing core test.
+Created a project monorepo/workspace.
 
 ================================================================================
 2. Milestone B: Math + coordinate systems                                 *wb-B*
@@ -142,20 +116,8 @@ Note: Zoom controls were moved to Toolbar in Milestone O for better UX.
 15. Milestone O: Export (PNG/SVG)                                         *wb-O*
 ================================================================================
 
-Goal: export drawings as shareable artifacts.
-
-[x] Implement exportViewportToPNG(canvas) (screen export)
-[x] Implement exportSelectionToPNG (render selection bounds)
-[x] Implement SVG export for basic shapes:
-    - rect/ellipse/line/arrow/text
-    - camera transform NOT included (exports in world coordinates)
-[x] Export controls are in Toolbar (between zoom & history)
-
-Tests:
-[x] exported SVG parses and contains expected elements
-
-(DoD):
-- One-click export works in both web and desktop. ✓
+PNG/SVG export flows now deliver one-click viewport or selection exports from
+the Toolbar across web and desktop builds.
 
 ================================================================================
 16. Milestone P: Desktop packaging (Tauri)                                *wb-P*
@@ -291,37 +253,9 @@ R4. Parity behaviors
 19. Milestone S: Quality polish (what makes it feel "real")               *wb-S*
 ================================================================================
 
-Goal: the UX crosses the "this is legit" threshold.
-
-[x] BEM-ify CSS classes
-    - Dialog, Sheet, Toolbar, and StatusBar now use BEM naming
-    - Fixed hardcoded white backgrounds in Dialog/Sheet (now use CSS vars)
-    - All text colors use proper CSS variables for dark mode support
-[x] Panning viewport
-    - Hold space + drag to pan the canvas
-    - Camera.pan integration in Canvas.svelte
-[x] Keyboard affordances:
-    - Arrow keys nudge selected shapes (1px, 10px with Shift)
-    - Ctrl/Cmd+D duplicates selected shapes
-    - Ctrl/Cmd+] brings shapes forward
-    - Ctrl/Cmd+[ sends shapes backward
-[x] Accessibility:
-    - Tool buttons have ARIA labels and aria-pressed states
-    - Zoom and Export menus have proper ARIA attributes (haspopup, expanded, role=menu)
-    - Visible focus states on all interactive elements
-    - Checkboxes in StatusBar have ARIA labels
-    - All controls keyboard-navigable with Tab
-
-[ ] Editable Text
-[ ] Snapping refinement
-    - Guideline positioning
-[ ] Handles:
-    - resize handles for rect/ellipse
-    - rotate handle
-    - cursor affordances
-
-(DoD):
-- A user can comfortably draw and edit without surprises.
+Comprehensive UX polish adds BEM CSS, space-drag panning, richer keyboard
+affordances, improved accessibility and styling, refined snapping, and handles
+so drawing feels production-ready.
 
 ================================================================================
 References (URLs)                                                      *wb-refs*

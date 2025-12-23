@@ -28,7 +28,9 @@
 		createToolMap,
 		createWebDocRepo,
 		diffDoc,
+		getShapesOnCurrentPage,
 		routeAction,
+		shapeBounds,
 		switchTool,
 		type Action,
 		type CommandKind,
@@ -62,11 +64,21 @@
 	});
 	const cursorStore = new CursorStore();
 	const snapStore: SnapStore = createSnapStore();
-	const pointerState = $state({ isPointerDown: false });
+	const pointerState = $state({
+		isPointerDown: false,
+		snappedWorld: null as { x: number; y: number } | null
+	});
+	const handleState = $state<{ hover: string | null; active: string | null }>({
+		hover: null,
+		active: null
+	});
+	let textEditor = $state<{ shapeId: string; value: string } | null>(null);
+	let textEditorEl = $state<HTMLTextAreaElement | null>(null);
 	const panState = $state({ isPanning: false, spaceHeld: false, lastScreen: { x: 0, y: 0 } });
 	const snapProvider = { get: () => snapStore.get() };
 	const cursorProvider = { get: () => cursorStore.getState() };
 	const pointerStateProvider = { get: () => pointerState };
+	const handleProvider = { get: () => ({ ...handleState }) };
 	let pendingCommandStart: EditorState | null = null;
 
 	function applyLoadedDoc(doc: LoadedDoc) {
@@ -88,7 +100,7 @@
 		if (!firstShapeId) {
 			return;
 		}
-		const state = store.getState();
+		const state = editorSnapshot;
 		if (state.ui.selectionIds.length === 1 && state.ui.selectionIds[0] === firstShapeId) {
 			return;
 		}
@@ -101,6 +113,180 @@
 			EditorState.clone(after)
 		);
 		store.executeCommand(command);
+		syncHandleState();
+	}
+
+	const handleCursorMap: Record<string, string> = {
+		n: 'ns-resize',
+		s: 'ns-resize',
+		e: 'ew-resize',
+		w: 'ew-resize',
+		ne: 'nesw-resize',
+		sw: 'nesw-resize',
+		nw: 'nwse-resize',
+		se: 'nwse-resize',
+		rotate: 'alias',
+		'line-start': 'crosshair',
+		'line-end': 'crosshair'
+	};
+
+	function refreshCursor() {
+		if (!canvas) {
+			return;
+		}
+		let cursor = 'default';
+		if (textEditor) {
+			cursor = 'text';
+		} else if (panState.isPanning) {
+			cursor = 'grabbing';
+		} else if (panState.spaceHeld) {
+			cursor = 'grab';
+		} else {
+			const activeHandle = handleState.active;
+			const hoverHandle = handleState.hover;
+			const targetHandle = activeHandle ?? hoverHandle;
+			if (targetHandle) {
+				cursor = handleCursorMap[targetHandle] ?? 'default';
+			} else if (pointerState.isPointerDown) {
+				cursor = 'grabbing';
+			}
+		}
+		canvas.style.cursor = cursor;
+	}
+
+	function setHandleHover(handle: string | null) {
+		if (handleState.hover === handle) {
+			return;
+		}
+		handleState.hover = handle;
+		refreshCursor();
+	}
+
+	function syncHandleState() {
+		handleState.active = selectTool.getActiveHandle ? selectTool.getActiveHandle() : null;
+		refreshCursor();
+	}
+
+	function getTextEditorLayout() {
+		if (!textEditor) {
+			return null;
+		}
+		const state = store.getState();
+		const shape = state.doc.shapes[textEditor.shapeId];
+		if (!shape || shape.type !== 'text') {
+			return null;
+		}
+		const viewport = getViewport();
+		const screenPos = Camera.worldToScreen(state.camera, { x: shape.x, y: shape.y }, viewport);
+		const widthWorld = shape.props.w ?? 240;
+		const zoom = state.camera.zoom;
+		return {
+			left: screenPos.x,
+			top: screenPos.y,
+			width: widthWorld * zoom,
+			height: shape.props.fontSize * 1.4 * zoom,
+			fontSize: shape.props.fontSize * zoom
+		};
+	}
+
+	function startTextEditing(shapeId: string) {
+		const state = store.getState();
+		const shape = state.doc.shapes[shapeId];
+		if (!shape || shape.type !== 'text') {
+			return;
+		}
+		textEditor = { shapeId, value: shape.props.text };
+		refreshCursor();
+		queueMicrotask(() => {
+			textEditorEl?.focus();
+			textEditorEl?.select();
+		});
+	}
+
+	function commitTextEditing() {
+		if (!textEditor) {
+			return;
+		}
+		const { shapeId, value } = textEditor;
+		const currentState = store.getState();
+		const shape = currentState.doc.shapes[shapeId];
+		textEditor = null;
+		refreshCursor();
+		if (!shape || shape.type !== 'text' || shape.props.text === value) {
+			return;
+		}
+		const before = EditorState.clone(currentState);
+		const updatedShape = { ...shape, props: { ...shape.props, text: value } };
+		const newShapes = { ...currentState.doc.shapes, [shapeId]: updatedShape };
+		const after = { ...currentState, doc: { ...currentState.doc, shapes: newShapes } };
+		const command = new SnapshotCommand('Edit text', 'doc', before, EditorState.clone(after));
+		store.executeCommand(command);
+	}
+
+	function cancelTextEditing() {
+		textEditor = null;
+		refreshCursor();
+	}
+
+	function handleCanvasDoubleClick(event: MouseEvent) {
+		if (!canvas) {
+			return;
+		}
+		const rect = canvas.getBoundingClientRect();
+		const screen = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+		const world = Camera.screenToWorld(store.getState().camera, screen, getViewport());
+		const shapeId = findTextShapeAt(world);
+		if (shapeId) {
+			startTextEditing(shapeId);
+		}
+	}
+
+	function findTextShapeAt(point: { x: number; y: number }): string | null {
+		const shapes = getShapesOnCurrentPage(store.getState());
+		for (let index = shapes.length - 1; index >= 0; index--) {
+			const shape = shapes[index];
+			if (!shape || shape.type !== 'text') {
+				continue;
+			}
+			const bounds = shapeBounds(shape);
+			if (
+				point.x >= bounds.min.x &&
+				point.x <= bounds.max.x &&
+				point.y >= bounds.min.y &&
+				point.y <= bounds.max.y
+			) {
+				return shape.id;
+			}
+		}
+		return null;
+	}
+
+	function handleTextEditorInput(event: Event) {
+		if (!textEditor) {
+			return;
+		}
+		const target = event.currentTarget as HTMLTextAreaElement;
+		textEditor = { ...textEditor, value: target.value };
+	}
+
+	function handleTextEditorKeyDown(event: KeyboardEvent) {
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			cancelTextEditing();
+			return;
+		}
+		if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+			event.preventDefault();
+			commitTextEditing();
+		}
+	}
+
+	function handleTextEditorBlur() {
+		commitTextEditing();
+	}
+
+	function handlePointerLeave() {
+		setHandleHover(null);
 	}
 
 	const selectTool = new SelectTool();
@@ -112,10 +298,12 @@
 	const tools = createToolMap([selectTool, rectTool, ellipseTool, lineTool, arrowTool, textTool]);
 
 	let currentToolId = $state<ToolId>('select');
+	let editorSnapshot = $state(store.getState());
 	let historyViewerOpen = $state(false);
 
 	store.subscribe((state) => {
 		currentToolId = state.ui.toolId;
+		editorSnapshot = state;
 	});
 
 	function handleToolChange(toolId: ToolId) {
@@ -165,6 +353,7 @@
 
 		const command = new SnapshotCommand('Bring Forward', 'doc', before, EditorState.clone(after));
 		store.executeCommand(command);
+		syncHandleState();
 	}
 
 	function handleSendBackward() {
@@ -203,6 +392,7 @@
 
 		const command = new SnapshotCommand('Send Backward', 'doc', before, EditorState.clone(after));
 		store.executeCommand(command);
+		syncHandleState();
 	}
 
 	function handleDuplicate() {
@@ -253,6 +443,7 @@
 
 		const command = new SnapshotCommand('Duplicate', 'doc', before, EditorState.clone(after));
 		store.executeCommand(command);
+		syncHandleState();
 	}
 
 	function handleNudge(arrowKey: string, largeNudge: boolean) {
@@ -295,12 +486,14 @@
 		const after = { ...currentState, doc: { ...currentState.doc, shapes: newShapes } };
 		const command = new SnapshotCommand('Nudge', 'doc', before, EditorState.clone(after));
 		store.executeCommand(command);
+		syncHandleState();
 	}
 
 	function applyActionWithHistory(action: Action) {
 		const before = store.getState();
 		const nextState = routeAction(before, action, tools);
 		if (statesEqual(before, nextState)) {
+			syncHandleState();
 			return;
 		}
 
@@ -313,23 +506,46 @@
 			EditorState.clone(nextState)
 		);
 		store.executeCommand(command);
+		syncHandleState();
 	}
 
 	function handleAction(action: Action) {
+		if (textEditor && (action.type === 'pointer-down' || action.type === 'pointer-up')) {
+			commitTextEditing();
+		}
+
+		if (
+			action.type === 'pointer-move' &&
+			'world' in action &&
+			!panState.isPanning &&
+			!panState.spaceHeld
+		) {
+			const hover = selectTool.getHandleAtPoint(store.getState(), action.world);
+			setHandleHover(hover);
+		}
+
+		if (action.type === 'pointer-move' && (panState.isPanning || panState.spaceHeld)) {
+			setHandleHover(null);
+		}
+
 		if (action.type === 'key-down' && action.key === ' ') {
 			panState.spaceHeld = true;
+			setHandleHover(null);
+			refreshCursor();
 			return;
 		}
 
 		if (action.type === 'key-up' && action.key === ' ') {
 			panState.spaceHeld = false;
 			panState.isPanning = false;
+			refreshCursor();
 			return;
 		}
 
 		if (action.type === 'pointer-down' && action.button === 0 && panState.spaceHeld) {
 			panState.isPanning = true;
 			panState.lastScreen = { x: action.screen.x, y: action.screen.y };
+			refreshCursor();
 			return;
 		}
 
@@ -340,11 +556,13 @@
 			const newCamera = Camera.pan(currentCamera, { x: deltaX, y: deltaY });
 			store.setState((state) => ({ ...state, camera: newCamera }));
 			panState.lastScreen = { x: action.screen.x, y: action.screen.y };
+			refreshCursor();
 			return;
 		}
 
 		if (action.type === 'pointer-up' && action.button === 0 && panState.isPanning) {
 			panState.isPanning = false;
+			refreshCursor();
 			return;
 		}
 
@@ -353,9 +571,14 @@
 		}
 
 		const actionWithSnap = applySnapping(action);
+		if ('world' in actionWithSnap) {
+			pointerState.snappedWorld = actionWithSnap.world ?? null;
+		}
 
 		if (actionWithSnap.type === 'pointer-down' && actionWithSnap.button === 0) {
 			pointerState.isPointerDown = true;
+			setHandleHover(null);
+			refreshCursor();
 			pendingCommandStart = EditorState.clone(store.getState());
 			const changed = applyImmediateAction(actionWithSnap);
 			if (!changed) {
@@ -375,6 +598,8 @@
 
 		if (actionWithSnap.type === 'pointer-up' && actionWithSnap.button === 0) {
 			pointerState.isPointerDown = false;
+			setHandleHover(null);
+			refreshCursor();
 			if (pendingCommandStart) {
 				const committed = commitPendingCommand(actionWithSnap, pendingCommandStart);
 				pendingCommandStart = null;
@@ -382,6 +607,7 @@
 					return;
 				}
 			}
+			pointerState.snappedWorld = null;
 		}
 
 		if (actionWithSnap.type === 'key-down') {
@@ -435,9 +661,11 @@
 		const before = store.getState();
 		const nextState = routeAction(before, action, tools);
 		if (statesEqual(before, nextState)) {
+			syncHandleState();
 			return false;
 		}
 		store.setState(() => nextState);
+		syncHandleState();
 		return true;
 	}
 
@@ -446,6 +674,7 @@
 		const nextState = routeAction(before, action, tools);
 		const finalState = statesEqual(before, nextState) ? before : nextState;
 		if (statesEqual(startState, finalState)) {
+			syncHandleState();
 			return false;
 		}
 		const kind = getCommandKind(startState, finalState);
@@ -457,6 +686,7 @@
 			EditorState.clone(finalState)
 		);
 		store.executeCommand(command);
+		syncHandleState();
 		return true;
 	}
 
@@ -560,7 +790,8 @@
 		renderer = createRenderer(canvas!, store, {
 			snapProvider,
 			cursorProvider,
-			pointerStateProvider
+			pointerStateProvider,
+			handleProvider
 		});
 		inputAdapter = createInputAdapter({
 			canvas: canvas!,
@@ -609,7 +840,26 @@
 		{store}
 		{getViewport}
 		{canvas} />
-	<canvas bind:this={canvas}></canvas>
+	<div class="canvas-container">
+		<canvas
+			bind:this={canvas}
+			ondblclick={handleCanvasDoubleClick}
+			onpointerleave={handlePointerLeave}></canvas>
+		{#if textEditor}
+			{@const layout = getTextEditorLayout()}
+			{#if layout}
+				<textarea
+					bind:this={textEditorEl}
+					class="canvas-text-editor"
+					style={`left:${layout.left}px;top:${layout.top}px;width:${layout.width}px;height:${layout.height}px;font-size:${layout.fontSize}px;`}
+					value={textEditor.value}
+					oninput={handleTextEditorInput}
+					onkeydown={handleTextEditorKeyDown}
+					onblur={handleTextEditorBlur}
+					spellcheck="false"></textarea>
+			{/if}
+		{/if}
+	</div>
 	<HistoryViewer {store} bind:open={historyViewerOpen} onClose={handleHistoryClose} />
 	<StatusBar {store} cursor={cursorStore} persistence={persistenceStatusStore} snap={snapStore} />
 </div>
@@ -623,11 +873,34 @@
 		flex-direction: column;
 	}
 
-	canvas {
+	.canvas-container {
 		flex: 1;
 		min-height: 0;
+		position: relative;
+	}
+
+	.canvas-container canvas {
+		width: 100%;
+		height: 100%;
 		display: block;
 		touch-action: none;
 		cursor: default;
+	}
+
+	.canvas-text-editor {
+		position: absolute;
+		border: 1px solid var(--accent);
+		background: var(--surface);
+		color: var(--text);
+		padding: 4px;
+		transform-origin: top left;
+		resize: none;
+		outline: none;
+		line-height: 1.2;
+		font-family: inherit;
+		z-index: 2;
+		box-shadow:
+			0 0 0 1px rgba(0, 0, 0, 0.05),
+			0 8px 20px rgba(0, 0, 0, 0.15);
 	}
 </style>

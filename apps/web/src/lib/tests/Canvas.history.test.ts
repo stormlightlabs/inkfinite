@@ -87,6 +87,12 @@ vi.mock("inkfinite-core", () => {
     onAction(state: any) {
       return state;
     }
+    getHandleAtPoint() {
+      return null;
+    }
+    getActiveHandle() {
+      return null;
+    }
   }
 
   class MockStore {

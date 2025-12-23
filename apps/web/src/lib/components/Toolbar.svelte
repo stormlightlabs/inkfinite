@@ -1,11 +1,24 @@
 <script lang="ts">
-	import type { Box2, EditorState, Store, ToolId } from 'inkfinite-core';
+	import type {
+		ArrowShape,
+		Box2,
+		EditorState as EditorStateType,
+		EllipseShape,
+		LineShape,
+		RectShape,
+		ShapeRecord,
+		Store,
+		TextShape,
+		ToolId
+	} from 'inkfinite-core';
 	import {
+		EditorState,
 		exportToSVG,
 		exportViewportToPNG,
 		getSelectedShapes,
 		getShapesOnCurrentPage,
-		shapeBounds
+		shapeBounds,
+		SnapshotCommand
 	} from 'inkfinite-core';
 
 	type Viewport = { width: number; height: number };
@@ -21,7 +34,10 @@
 
 	let { currentTool, onToolChange, onHistoryClick, store, getViewport, canvas }: Props = $props();
 
-	let editorState = $derived<EditorState>(store.getState());
+	const DEFAULT_FILL_COLOR = '#4a90e2';
+	const DEFAULT_STROKE_COLOR = '#2e5c8a';
+
+	let editorState = $derived<EditorStateType>(store.getState());
 	let zoomMenuOpen = $state(false);
 	let zoomMenuEl = $state<HTMLDivElement | null>(null);
 	let zoomButtonEl = $state<HTMLButtonElement | null>(null);
@@ -29,12 +45,39 @@
 	let exportMenuEl = $state<HTMLDivElement | null>(null);
 	let exportButtonEl = $state<HTMLButtonElement | null>(null);
 
+	let fillColorValue = $state(DEFAULT_FILL_COLOR);
+	let strokeColorValue = $state(DEFAULT_STROKE_COLOR);
+	let fillDisabled = $state(true);
+	let strokeDisabled = $state(true);
+
 	$effect(() => {
 		editorState = store.getState();
 		const unsubscribe = store.subscribe((state) => {
 			editorState = state;
 		});
 		return () => unsubscribe();
+	});
+
+	$effect(() => {
+		const selection = getSelectedShapes(editorState);
+		const fillable = selection.filter(shapeSupportsFill);
+		const strokable = selection.filter(shapeSupportsStroke);
+		fillDisabled = fillable.length === 0;
+		strokeDisabled = strokable.length === 0;
+		if (fillable.length > 0) {
+			const shared = getSharedColor(fillable, (shape) =>
+				shape.type === 'text' ? shape.props.color : 'fill' in shape.props ? shape.props.fill : null
+			);
+			if (shared) {
+				fillColorValue = shared;
+			}
+		}
+		if (strokable.length > 0) {
+			const shared = getSharedColor(strokable, (shape) => shape.props.stroke ?? null);
+			if (shared) {
+				strokeColorValue = shared;
+			}
+		}
 	});
 
 	$effect(() => {
@@ -207,6 +250,119 @@
 		const blob = new Blob([text], { type: 'text/plain' });
 		downloadBlob(blob, filename);
 	}
+
+	function shapeSupportsFill(shape: ShapeRecord): shape is RectShape | EllipseShape | TextShape {
+		return shape.type === 'rect' || shape.type === 'ellipse' || shape.type === 'text';
+	}
+
+	function shapeSupportsStroke(
+		shape: ShapeRecord
+	): shape is RectShape | EllipseShape | LineShape | ArrowShape {
+		return (
+			shape.type === 'rect' ||
+			shape.type === 'ellipse' ||
+			shape.type === 'line' ||
+			shape.type === 'arrow'
+		);
+	}
+
+	function getSharedColor<T extends ShapeRecord>(
+		shapes: T[],
+		extract: (shape: T) => string | null | undefined
+	): string | null {
+		if (shapes.length === 0) {
+			return null;
+		}
+		const first = extract(shapes[0]);
+		if (!first) {
+			return null;
+		}
+		for (let index = 1; index < shapes.length; index++) {
+			if (extract(shapes[index]) !== first) {
+				return null;
+			}
+		}
+		return first;
+	}
+
+	function applyFillColor(color: string) {
+		const state = store.getState();
+		const targets = getSelectedShapes(state).filter(shapeSupportsFill);
+		if (targets.length === 0) {
+			return;
+		}
+		const before = EditorState.clone(state);
+		const newShapes = { ...state.doc.shapes };
+		for (const shape of targets) {
+			if (shape.type === 'text') {
+				const updated: TextShape = { ...shape, props: { ...shape.props, color } };
+				newShapes[shape.id] = updated;
+			} else if (shape.type === 'rect') {
+				const updated: RectShape = { ...shape, props: { ...shape.props, fill: color } };
+				newShapes[shape.id] = updated;
+			} else if (shape.type === 'ellipse') {
+				const updated: EllipseShape = { ...shape, props: { ...shape.props, fill: color } };
+				newShapes[shape.id] = updated;
+			}
+		}
+		const after = { ...state, doc: { ...state.doc, shapes: newShapes } };
+		const command = new SnapshotCommand('Set fill color', 'doc', before, EditorState.clone(after));
+		store.executeCommand(command);
+	}
+
+	function applyStrokeColor(color: string) {
+		const state = store.getState();
+		const targets = getSelectedShapes(state).filter(shapeSupportsStroke);
+		if (targets.length === 0) {
+			return;
+		}
+		const before = EditorState.clone(state);
+		const newShapes = { ...state.doc.shapes };
+		for (const shape of targets) {
+			switch (shape.type) {
+				case 'rect': {
+					const updated: RectShape = { ...shape, props: { ...shape.props, stroke: color } };
+					newShapes[shape.id] = updated;
+					break;
+				}
+				case 'ellipse': {
+					const updated: EllipseShape = { ...shape, props: { ...shape.props, stroke: color } };
+					newShapes[shape.id] = updated;
+					break;
+				}
+				case 'line': {
+					const updated: LineShape = { ...shape, props: { ...shape.props, stroke: color } };
+					newShapes[shape.id] = updated;
+					break;
+				}
+				case 'arrow': {
+					const updated: ArrowShape = { ...shape, props: { ...shape.props, stroke: color } };
+					newShapes[shape.id] = updated;
+					break;
+				}
+			}
+		}
+		const after = { ...state, doc: { ...state.doc, shapes: newShapes } };
+		const command = new SnapshotCommand(
+			'Set stroke color',
+			'doc',
+			before,
+			EditorState.clone(after)
+		);
+		store.executeCommand(command);
+	}
+
+	function handleFillChange(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		fillColorValue = input.value;
+		applyFillColor(input.value);
+	}
+
+	function handleStrokeChange(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		strokeColorValue = input.value;
+		applyStrokeColor(input.value);
+	}
 </script>
 
 <div class="toolbar" role="toolbar" aria-label="Drawing tools">
@@ -223,6 +379,27 @@
 			<span class="toolbar__tool-label">{tool.label}</span>
 		</button>
 	{/each}
+
+	<div class="toolbar__colors" aria-label="Color controls">
+		<label class="toolbar__color-control">
+			<span>Fill</span>
+			<input
+				type="color"
+				value={fillColorValue}
+				onchange={handleFillChange}
+				disabled={fillDisabled}
+				aria-label="Fill color" />
+		</label>
+		<label class="toolbar__color-control">
+			<span>Stroke</span>
+			<input
+				type="color"
+				value={strokeColorValue}
+				onchange={handleStrokeChange}
+				disabled={strokeDisabled}
+				aria-label="Stroke color" />
+		</label>
+	</div>
 
 	<div class="toolbar__divider"></div>
 
@@ -382,6 +559,35 @@
 		background-color: var(--border);
 		margin: 0 8px;
 		height: 40px;
+	}
+
+	.toolbar__colors {
+		display: flex;
+		gap: 12px;
+		align-items: center;
+	}
+
+	.toolbar__color-control {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		font-size: 11px;
+		color: var(--text-muted);
+	}
+
+	.toolbar__color-control input[type='color'] {
+		width: 40px;
+		height: 30px;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		padding: 0;
+		background: transparent;
+		cursor: pointer;
+	}
+
+	.toolbar__color-control input[type='color']:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
 	}
 
 	.toolbar__zoom,
