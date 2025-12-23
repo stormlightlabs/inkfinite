@@ -4,6 +4,6 @@
   "description": "Inkfinite desktop app (Tauri wrapper for web app)",
   "type": "module",
   "scripts": { "tauri": "tauri" },
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "devDependencies": { "@tauri-apps/cli": "^2" }
 }
