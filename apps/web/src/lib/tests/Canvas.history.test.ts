@@ -59,6 +59,12 @@ vi.mock(
       update: () => {},
       set: () => {},
     }),
+    createBrushStore: () => ({
+      get: () => ({ size: 16, thinning: 0.5, smoothing: 0.5, streamline: 0.5, simulatePressure: true }),
+      subscribe: () => () => {},
+      update: () => {},
+      set: () => {},
+    }),
   }),
 );
 

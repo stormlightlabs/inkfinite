@@ -15,6 +15,10 @@ type PenToolState = {
   draftPoints: StrokePoint[];
   /** ID of the shape being created */
   draftShapeId: string | null;
+  /** Whether draft points are unsynced with document */
+  draftNeedsSync: boolean;
+  /** Frame bucket when draft was last synced */
+  lastUpdateFrame: number | null;
 };
 
 /**
@@ -26,6 +30,11 @@ const MIN_POINTS = 2;
  * Minimum distance (in world units) between points to avoid redundant data
  */
 const MIN_POINT_DISTANCE = 1;
+
+/**
+ * Duration for a render frame (~60 FPS)
+ */
+const FRAME_DURATION_MS = 1000 / 60;
 
 /**
  * Default brush configuration
@@ -52,7 +61,13 @@ export class PenTool implements Tool {
   private getBrush: () => BrushConfig;
 
   constructor(getBrush?: () => BrushConfig) {
-    this.toolState = { isDrawing: false, draftPoints: [], draftShapeId: null };
+    this.toolState = {
+      isDrawing: false,
+      draftPoints: [],
+      draftShapeId: null,
+      draftNeedsSync: false,
+      lastUpdateFrame: null,
+    };
     this.getBrush = getBrush ?? (() => DEFAULT_BRUSH);
   }
 
@@ -108,6 +123,8 @@ export class PenTool implements Tool {
     this.toolState.isDrawing = true;
     this.toolState.draftPoints = [firstPoint];
     this.toolState.draftShapeId = shapeId;
+    this.toolState.draftNeedsSync = false;
+    this.toolState.lastUpdateFrame = frameFromTimestamp(action.timestamp);
 
     const newPage = { ...currentPage, shapeIds: [...currentPage.shapeIds, shapeId] };
 
@@ -140,27 +157,31 @@ export class PenTool implements Tool {
 
     const newPoint: StrokePoint = [action.world.x, action.world.y];
     this.toolState.draftPoints.push(newPoint);
+    this.toolState.draftNeedsSync = true;
 
-    const updatedShape = { ...shape, props: { ...shape.props, points: [...this.toolState.draftPoints] } };
+    if (this.shouldSyncNow(action.timestamp)) {
+      return this.syncDraftShape(state);
+    }
 
-    return {
-      ...state,
-      doc: { ...state.doc, shapes: { ...state.doc.shapes, [this.toolState.draftShapeId]: updatedShape } },
-    };
+    return state;
   }
 
   private handlePointerUp(state: EditorState, action: Action): EditorState {
     if (action.type !== "pointer-up" || !this.toolState.draftShapeId) return state;
 
-    const shape = state.doc.shapes[this.toolState.draftShapeId];
-    if (!shape || shape.type !== "stroke") return state;
+    let newState = this.syncDraftShape(state);
 
-    let newState = state;
-
-    if (this.toolState.draftPoints.length < MIN_POINTS) {
-      newState = this.cancelStroke(state);
+    const shape = newState.doc.shapes[this.toolState.draftShapeId];
+    if (!shape || shape.type !== "stroke") {
+      this.resetToolState();
+      return newState;
     }
 
+    if (this.toolState.draftPoints.length < MIN_POINTS) {
+      newState = this.cancelStroke(newState);
+    }
+
+    this.toolState.lastUpdateFrame = frameFromTimestamp(action.timestamp);
     this.resetToolState();
     return newState;
   }
@@ -202,6 +223,52 @@ export class PenTool implements Tool {
   }
 
   private resetToolState(): void {
-    this.toolState = { isDrawing: false, draftPoints: [], draftShapeId: null };
+    this.toolState = {
+      isDrawing: false,
+      draftPoints: [],
+      draftShapeId: null,
+      draftNeedsSync: false,
+      lastUpdateFrame: null,
+    };
   }
+
+  private shouldSyncNow(timestamp: number): boolean {
+    const frame = frameFromTimestamp(timestamp);
+    if (this.toolState.lastUpdateFrame === null) {
+      this.toolState.lastUpdateFrame = frame;
+      return true;
+    }
+    if (frame !== this.toolState.lastUpdateFrame) {
+      this.toolState.lastUpdateFrame = frame;
+      return true;
+    }
+    return false;
+  }
+
+  private syncDraftShape(state: EditorState): EditorState {
+    if (!this.toolState.draftShapeId || !this.toolState.draftNeedsSync) {
+      return state;
+    }
+
+    const shape = state.doc.shapes[this.toolState.draftShapeId];
+    if (!shape || shape.type !== "stroke") {
+      this.toolState.draftNeedsSync = false;
+      return state;
+    }
+
+    const updatedShape = { ...shape, props: { ...shape.props, points: [...this.toolState.draftPoints] } };
+    this.toolState.draftNeedsSync = false;
+
+    return {
+      ...state,
+      doc: { ...state.doc, shapes: { ...state.doc.shapes, [this.toolState.draftShapeId]: updatedShape } },
+    };
+  }
+}
+
+function frameFromTimestamp(timestamp: number): number {
+  if (!Number.isFinite(timestamp) || timestamp < 0) {
+    return 0;
+  }
+  return Math.floor(timestamp / FRAME_DURATION_MS);
 }

@@ -123,20 +123,9 @@ the Toolbar across web and desktop builds.
 16. Milestone P: Desktop packaging (Tauri)                                *wb-P*
 ================================================================================
 
-Goal: same app works as a desktop app with filesystem access.
-
-Tauri + SvelteKit integration:
-[x] Configure SvelteKit for static/SPA output
-[x] Ensure SSR is disabled for desktop build
-[x] Configure Tauri to load the built assets
-
-File dialogs + FS:
-[x] Implement "Save As…" using Tauri dialog + fs APIs
-[x] Implement "Open…" using Tauri dialog + fs APIs
-[x] Add recent files list (v0: store paths in Tauri local storage)
-
-(DoD):
-- Desktop app opens/saves JSON files on disk and reopens them correctly.
+The Tauri build now ships the static SvelteKit bundle with native file dialogs
+for open/save/new/rename/delete workflows so the desktop app works end-to-end
+offline.
 
 ================================================================================
 17. Milestone Q: Performance + big docs (pragmatic)                       *wb-Q*
@@ -260,122 +249,7 @@ so drawing feels production-ready.
 20. Milestone T: Sketching / Pen Tool (perfect-freehand)                  *wb-T*
 ================================================================================
 
-Goal:
-Add a pen tool that produces smooth freehand strokes using perfect-freehand.
-Strokes are shapes, undo/redo-able (L), persisted (M), selectable, and render on
-Canvas2D.
-
-Refs:
-- perfect-freehand getStroke returns outline polygon points.
-- Options: size/thinning/smoothing/streamline/simulatePressure.
-
-------------------------------------------------------------------------------
-T1. Data model: Stroke shape
-------------------------------------------------------------------------------
-
-/packages/core/src/model.ts:
-[x] Add ShapeType: 'stroke'
-[x] StrokeShape props (persisted):
-    - points: Array<[x,y,p?]>          " world coords + optional pressure
-    - style: { color, opacity }
-    - brush: { size, thinning, smoothing, streamline, simulatePressure }
-[x] Derived (NOT persisted):
-    - outline: computed via computeOutline() from geom.ts
-    - bounds: computed via shapeBounds() from geom.ts
-
-(DoD): stroke serializes to JSON and loads back identically.
-
-------------------------------------------------------------------------------
-T2. Tool: pen (state machine)
-------------------------------------------------------------------------------
-
-/packages/core/src/tools/pen.ts (PenTool)
-[x] PointerDown: start draft, push first point
-[x] PointerMove: append point if moved > eps; include pressure if available
-[x] PointerUp: create ONE history command that inserts the stroke; clear draft
-
-Perf:
-[ ] Coalesce draft updates (rAF) so you don't recompute per event.
-
-(DoD): one stroke == one undo step; no DB writes until finalize (via M).
-
-------------------------------------------------------------------------------
-T3. Geometry: compute outline via perfect-freehand
-------------------------------------------------------------------------------
-
-/packages/core/src/geom.ts:
-[x] computeOutline(points, brush) -> outlinePoints using getStroke()
-[x] boundsFromOutline(outline) -> Box2
-
-(DoD): outline non-empty for >= 2 points; bounds contain outline.
-
-------------------------------------------------------------------------------
-T4. Rendering: fill the outline polygon
-------------------------------------------------------------------------------
-
-/packages/renderer/src/index.ts:
-[x] drawStroke(ctx, stroke):
-    - outline = computeOutline(...) (computed on each draw)
-    - ctx.beginPath(); moveTo/lineTo...; closePath(); fill()
-[x] Render draft stroke inline with shapes (using same rendering path)
-[x] Selection outline for strokes
-
-(DoD): strokes look stable while drawing; committed strokes match preview.
-
-------------------------------------------------------------------------------
-T5. Hit testing
-------------------------------------------------------------------------------
-
-/packages/core/src/geom.ts:
-[x] hitTestStroke(p, stroke):
-    - bounds check first
-    - inside-outline polygon test (ray cast)
-[x] Add stroke case to hitTestPoint
-
-(DoD): clicking a stroke selects it reliably.
-
-------------------------------------------------------------------------------
-T6. Brush settings (thin UI slice)
-------------------------------------------------------------------------------
-
-/apps/web/src/lib/components/BrushPopover.svelte:
-[x] Sliders: size, thinning, smoothing, streamline
-[x] Toggle: simulatePressure
-(All map to perfect-freehand options.)
-
-(DoD):
-- settings affect newly drawn strokes immediately.
-- tests in BrushPopover.svelte.test.ts
-
-------------------------------------------------------------------------------
-T7. Tests
-------------------------------------------------------------------------------
-
-/packages/core/tests/geom-stroke.test.ts:
-[x] outline computed for simple polyline
-[x] bounds correctness
-[x] hit test inside/outside sanity
-[x] bounds from outline helper
-[x] shapeBounds for stroke shapes
-
-/packages/core/tests/pen-tool.test.ts:
-[x] Tool lifecycle tests
-[x] Drawing strokes (pointer down/move/up)
-[x] Keyboard interactions (Escape to cancel)
-[x] Edge cases
-
-(DoD): All tests passing
-
-Integration:
-[x] one history command per stroke (tested in pen-tool.test.ts)
-
-------------------------------------------------------------------------------
-Definition of Done
-------------------------------------------------------------------------------
-
-- Pen tool draws smooth strokes using perfect-freehand outlines.
-- Strokes are selectable, undo/redo-able in one step, and persisted via Dexie.
-- Brush controls change appearance of new strokes.
+Perfect-freehand pen strokes now behave like first-class shapes with frame-coalesced drafting, geometry/rendering integration, brush controls, and thorough tests across core and web layers.
 
 ================================================================================
 References (URLs)                                                      *wb-refs*

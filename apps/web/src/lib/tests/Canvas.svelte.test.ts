@@ -28,6 +28,12 @@ vi.mock("$lib/status", () => {
       update: () => {},
       set: () => {},
     }),
+    createBrushStore: () => ({
+      get: () => ({ size: 16, thinning: 0.5, smoothing: 0.5, streamline: 0.5, simulatePressure: true }),
+      subscribe: () => () => {},
+      update: () => {},
+      set: () => {},
+    }),
   };
 });
 
@@ -115,10 +121,11 @@ describe("Canvas component", () => {
     const { container } = render(Canvas);
     const toolButtons = container.querySelectorAll(".tool-button");
 
-    expect(toolButtons.length).toBe(7);
+    expect(toolButtons.length).toBe(8);
 
     const toolIds = Array.from(toolButtons).map((btn) => btn.getAttribute("data-tool-id"));
-    expect(toolIds.slice(0, 6)).toEqual(["select", "rect", "ellipse", "line", "arrow", "text"]);
+    const coreToolIds = toolIds.filter((id) => id && id !== "history");
+    expect(coreToolIds).toEqual(["select", "rect", "ellipse", "line", "arrow", "text", "pen"]);
 
     const historyButton = container.querySelector(".tool-button.history-button");
     expect(historyButton).toBeTruthy();

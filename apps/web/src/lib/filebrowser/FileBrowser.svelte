@@ -8,7 +8,7 @@
 		FileBrowserViewModel,
 		InkfiniteDB
 	} from 'inkfinite-core';
-	import { BoardStatsOps } from 'inkfinite-core';
+	import { BoardStatsOps, FileBrowserVM } from 'inkfinite-core';
 	import type { Snippet } from 'svelte';
 
 	type Props = {
@@ -34,7 +34,7 @@
 		desktopRepo = null
 	}: Props = $props();
 
-	let searchQuery = $state(vm.query);
+	let searchQuery = $derived(vm.query);
 	let inspectorOpen = $state(false);
 	let inspectorData = $state<BoardInspectorData | null>(null);
 	let inspectorLoading = $state(false);
@@ -55,16 +55,20 @@
 		}
 	});
 
-	function handleSearchInput(event: Event) {
-		const target = event.target as HTMLInputElement;
-		searchQuery = target.value;
-		const updated = vm;
+	function applySearchQuery(nextQuery: string) {
+		searchQuery = nextQuery;
+		const updated = FileBrowserVM.setQuery(vm, nextQuery);
+		vm = updated;
 		onUpdate?.(updated);
 	}
 
+	function handleSearchInput(event: Event) {
+		const target = event.target as HTMLInputElement;
+		applySearchQuery(target.value);
+	}
+
 	function handleSearchChange() {
-		const updated = { ...vm, query: searchQuery };
-		onUpdate?.(updated);
+		applySearchQuery(searchQuery);
 	}
 
 	function closeBrowser() {
@@ -238,16 +242,14 @@
 		{/if}
 
 		<div class="filebrowser__search">
-			<!-- FIXME: reactivity is broken -->
 			<input
 				type="search"
 				class="filebrowser__search-input"
 				placeholder="Search boards..."
-				value={searchQuery}
+				bind:value={searchQuery}
 				oninput={handleSearchInput}
 				onchange={handleSearchChange}
-				aria-label="Search boards"
-				disabled />
+				aria-label="Search boards" />
 		</div>
 
 		{#if isCreating}

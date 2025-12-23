@@ -1,10 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { PageRecord, Store } from "../src";
 import type { Action } from "../src/actions";
 import { Modifiers, PointerButtons } from "../src/actions";
 import { PenTool } from "../src/tools/pen";
 
-function createPointerDownAction(worldX: number, worldY: number): Action {
+let currentTimestamp = 1_000;
+
+function resetTimestamp(): void {
+  currentTimestamp = 1_000;
+}
+
+function nextTimestamp(step = 17): number {
+  currentTimestamp += step;
+  return currentTimestamp;
+}
+
+function createPointerDownAction(worldX: number, worldY: number, timestamp = nextTimestamp()): Action {
   return {
     type: "pointer-down",
     world: { x: worldX, y: worldY },
@@ -12,22 +23,22 @@ function createPointerDownAction(worldX: number, worldY: number): Action {
     button: 0,
     buttons: PointerButtons.create(true, false, false),
     modifiers: Modifiers.create(false, false, false, false),
-    timestamp: Date.now(),
+    timestamp,
   };
 }
 
-function createPointerMoveAction(worldX: number, worldY: number): Action {
+function createPointerMoveAction(worldX: number, worldY: number, timestamp = nextTimestamp()): Action {
   return {
     type: "pointer-move",
     world: { x: worldX, y: worldY },
     screen: { x: worldX, y: worldY },
     buttons: PointerButtons.create(true, false, false),
     modifiers: Modifiers.create(false, false, false, false),
-    timestamp: Date.now(),
+    timestamp,
   };
 }
 
-function createPointerUpAction(worldX: number, worldY: number): Action {
+function createPointerUpAction(worldX: number, worldY: number, timestamp = nextTimestamp()): Action {
   return {
     type: "pointer-up",
     world: { x: worldX, y: worldY },
@@ -35,22 +46,26 @@ function createPointerUpAction(worldX: number, worldY: number): Action {
     button: 0,
     buttons: PointerButtons.create(false, false, false),
     modifiers: Modifiers.create(false, false, false, false),
-    timestamp: Date.now(),
+    timestamp,
   };
 }
 
-function createKeyDownAction(key: string): Action {
+function createKeyDownAction(key: string, timestamp = nextTimestamp()): Action {
   return {
     type: "key-down",
     key,
     code: key,
     modifiers: Modifiers.create(false, false, false, false),
     repeat: false,
-    timestamp: Date.now(),
+    timestamp,
   };
 }
 
 describe("PenTool", () => {
+  beforeEach(() => {
+    resetTimestamp();
+  });
+
   describe("Tool lifecycle", () => {
     it("should have correct id", () => {
       const tool = new PenTool();
@@ -147,6 +162,65 @@ describe("PenTool", () => {
       expect(shape.type).toBe("stroke");
       if (shape.type === "stroke") {
         expect(shape.props.points.length).toBe(3);
+      }
+    });
+
+    it("coalesces pointer updates within the same frame", () => {
+      const tool = new PenTool();
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page:1");
+
+      store.setState((state) => ({
+        ...state,
+        doc: { ...state.doc, pages: { [page.id]: page } },
+        ui: { ...state.ui, currentPageId: page.id },
+      }));
+
+      let state = store.getState();
+
+      const downTimestamp = nextTimestamp();
+      state = tool.onAction(state, createPointerDownAction(100, 100, downTimestamp));
+
+      state = tool.onAction(state, createPointerMoveAction(110, 110, downTimestamp));
+      let shape = state.doc.shapes[Object.keys(state.doc.shapes)[0]];
+      if (shape?.type === "stroke") {
+        expect(shape.props.points.length).toBe(1);
+      }
+
+      state = tool.onAction(state, createPointerMoveAction(120, 120, nextTimestamp()));
+      shape = state.doc.shapes[Object.keys(state.doc.shapes)[0]];
+      if (shape?.type === "stroke") {
+        expect(shape.props.points.length).toBe(3);
+      }
+    });
+
+    it("flushes pending points on pointer up even without a new frame", () => {
+      const tool = new PenTool();
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page:1");
+
+      store.setState((state) => ({
+        ...state,
+        doc: { ...state.doc, pages: { [page.id]: page } },
+        ui: { ...state.ui, currentPageId: page.id },
+      }));
+
+      let state = store.getState();
+
+      const downTimestamp = nextTimestamp();
+      state = tool.onAction(state, createPointerDownAction(100, 100, downTimestamp));
+
+      state = tool.onAction(state, createPointerMoveAction(110, 110, downTimestamp));
+
+      state = tool.onAction(state, createPointerUpAction(110, 110, downTimestamp));
+
+      const shapeId = Object.keys(state.doc.shapes)[0];
+      const shape = state.doc.shapes[shapeId];
+
+      expect(shape?.type).toBe("stroke");
+      if (shape?.type === "stroke") {
+        expect(shape.props.points.length).toBe(2);
+        expect(shape.props.points[1]).toEqual([110, 110]);
       }
     });
 
