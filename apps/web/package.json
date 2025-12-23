@@ -15,7 +15,15 @@
     "test": "npm run test:unit -- --run",
     "format": "prettier --write ."
   },
-  "dependencies": { "dexie": "^4.2.1", "inkfinite-core": "workspace:*", "inkfinite-renderer": "workspace:*" },
+  "dependencies": {
+    "@tauri-apps/api": "^2.9.1",
+    "@tauri-apps/plugin-dialog": "^2.4.2",
+    "@tauri-apps/plugin-fs": "^2.4.4",
+    "@tauri-apps/plugin-store": "^2.4.1",
+    "dexie": "^4.2.1",
+    "inkfinite-core": "workspace:*",
+    "inkfinite-renderer": "workspace:*"
+  },
   "devDependencies": {
     "@eslint/compat": "^1.4.0",
     "@eslint/js": "^9.39.1",

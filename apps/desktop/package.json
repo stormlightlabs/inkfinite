@@ -1,0 +1,9 @@
+{
+  "name": "desktop",
+  "version": "0.1.0",
+  "description": "Inkfinite desktop app (Tauri wrapper for web app)",
+  "type": "module",
+  "scripts": { "tauri": "tauri" },
+  "license": "MIT",
+  "devDependencies": { "@tauri-apps/cli": "^2" }
+}
