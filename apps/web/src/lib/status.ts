@@ -24,11 +24,13 @@ export type SnapStore = {
   set(next: SnapSettings): void;
 };
 
+export type BrushSettings = BrushConfig & { color: string };
+
 export type BrushStore = {
-  get(): BrushConfig;
-  subscribe(listener: (brush: BrushConfig) => void): () => void;
-  update(updater: (brush: BrushConfig) => BrushConfig): void;
-  set(next: BrushConfig): void;
+  get(): BrushSettings;
+  subscribe(listener: (brush: BrushSettings) => void): () => void;
+  update(updater: (brush: BrushSettings) => BrushSettings): void;
+  set(next: BrushSettings): void;
 };
 
 export type PersistenceManager = {
@@ -209,10 +211,17 @@ export function createSnapStore(initial?: Partial<SnapSettings>): SnapStore {
   };
 }
 
-export function createBrushStore(initial?: Partial<BrushConfig>): BrushStore {
-  const defaults: BrushConfig = { size: 16, thinning: 0.5, smoothing: 0.5, streamline: 0.5, simulatePressure: true };
-  let value: BrushConfig = { ...defaults, ...initial };
-  const listeners = new Set<(brush: BrushConfig) => void>();
+export function createBrushStore(initial?: Partial<BrushSettings>): BrushStore {
+  const defaults: BrushSettings = {
+    size: 16,
+    thinning: 0.5,
+    smoothing: 0.5,
+    streamline: 0.5,
+    simulatePressure: true,
+    color: "#88c0d0",
+  };
+  let value: BrushSettings = { ...defaults, ...initial };
+  const listeners = new Set<(brush: BrushSettings) => void>();
 
   return {
     get() {

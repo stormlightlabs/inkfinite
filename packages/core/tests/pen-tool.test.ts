@@ -224,6 +224,31 @@ describe("PenTool", () => {
       }
     });
 
+    it("applies injected stroke style when creating strokes", () => {
+      const tool = new PenTool(undefined, () => ({ color: "#88c0d0", opacity: 0.75 }));
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page:1");
+
+      store.setState((state) => ({
+        ...state,
+        doc: { ...state.doc, pages: { [page.id]: page } },
+        ui: { ...state.ui, currentPageId: page.id },
+      }));
+
+      let state = store.getState();
+
+      state = tool.onAction(state, createPointerDownAction(0, 0));
+      state = tool.onAction(state, createPointerMoveAction(10, 0));
+      state = tool.onAction(state, createPointerUpAction(10, 0));
+
+      const shape = state.doc.shapes[Object.keys(state.doc.shapes)[0]];
+      expect(shape?.type).toBe("stroke");
+      if (shape?.type === "stroke") {
+        expect(shape.props.style.color).toBe("#88c0d0");
+        expect(shape.props.style.opacity).toBeCloseTo(0.75);
+      }
+    });
+
     it("should not add point if moved less than minimum distance", () => {
       const tool = new PenTool();
       const store = new Store();

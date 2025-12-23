@@ -1,16 +1,17 @@
 import BrushPopover from "$lib/components/BrushPopover.svelte";
-import type { BrushConfig } from "inkfinite-core";
+import type { BrushSettings } from "$lib/status";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page } from "vitest/browser";
 
 describe("BrushPopover", () => {
-  const defaultBrush: BrushConfig = {
+  const defaultBrush: BrushSettings = {
     size: 16,
     thinning: 0.5,
     smoothing: 0.5,
     streamline: 0.5,
     simulatePressure: true,
+    color: "#88c0d0",
   };
 
   beforeEach(async () => {
@@ -79,7 +80,7 @@ describe("BrushPopover", () => {
   });
 
   describe("Brush Controls", () => {
-    it("displays all brush sliders when open", async () => {
+    it("displays all brush controls when open", async () => {
       const onBrushChange = vi.fn();
       render(BrushPopover, { brush: defaultBrush, onBrushChange });
 
@@ -90,16 +91,18 @@ describe("BrushPopover", () => {
       await expect.element(page.getByLabelText(/brush thinning/i)).toBeInTheDocument();
       await expect.element(page.getByLabelText(/brush smoothing/i)).toBeInTheDocument();
       await expect.element(page.getByLabelText(/brush streamline/i)).toBeInTheDocument();
+      await expect.element(page.getByLabelText(/brush color/i)).toBeInTheDocument();
       await expect.element(page.getByLabelText(/simulate pressure/i)).toBeInTheDocument();
     });
 
     it("displays current brush values", async () => {
-      const customBrush: BrushConfig = {
+      const customBrush: BrushSettings = {
         size: 20,
         thinning: 0.7,
         smoothing: 0.3,
         streamline: 0.9,
         simulatePressure: false,
+        color: "#ff6600",
       };
       const onBrushChange = vi.fn();
       render(BrushPopover, { brush: customBrush, onBrushChange });
@@ -141,6 +144,19 @@ describe("BrushPopover", () => {
       await checkbox.click();
 
       expect(onBrushChange).toHaveBeenCalledWith({ ...defaultBrush, simulatePressure: false });
+    });
+
+    it("calls onBrushChange when color input changes", async () => {
+      const onBrushChange = vi.fn();
+      render(BrushPopover, { brush: defaultBrush, onBrushChange });
+
+      const button = page.getByRole("button", { name: /brush settings/i });
+      await button.click();
+
+      const colorInput = page.getByLabelText(/brush color/i);
+      await colorInput.fill("#ff5577");
+
+      expect(onBrushChange).toHaveBeenCalledWith({ ...defaultBrush, color: "#ff5577" });
     });
   });
 });

@@ -1,5 +1,5 @@
 import type { Action } from "../actions";
-import type { BrushConfig, StrokePoint } from "../model";
+import type { BrushConfig, StrokePoint, StrokeStyle } from "../model";
 import { createId, ShapeRecord } from "../model";
 import type { EditorState, ToolId } from "../reactivity";
 import { getCurrentPage } from "../reactivity";
@@ -44,7 +44,7 @@ const DEFAULT_BRUSH = { size: 16, thinning: 0.5, smoothing: 0.5, streamline: 0.5
 /**
  * Default stroke style
  */
-const DEFAULT_STYLE = { color: "#000000", opacity: 1.0 };
+const DEFAULT_STYLE: StrokeStyle = { color: "#000000", opacity: 1.0 };
 
 /**
  * Pen tool - creates freehand stroke shapes using perfect-freehand
@@ -59,8 +59,9 @@ export class PenTool implements Tool {
   readonly id: ToolId = "pen";
   private toolState: PenToolState;
   private getBrush: () => BrushConfig;
+  private getStrokeStyle: () => StrokeStyle;
 
-  constructor(getBrush?: () => BrushConfig) {
+  constructor(getBrush?: () => BrushConfig, getStrokeStyle?: () => StrokeStyle) {
     this.toolState = {
       isDrawing: false,
       draftPoints: [],
@@ -69,6 +70,7 @@ export class PenTool implements Tool {
       lastUpdateFrame: null,
     };
     this.getBrush = getBrush ?? (() => DEFAULT_BRUSH);
+    this.getStrokeStyle = getStrokeStyle ?? (() => DEFAULT_STYLE);
   }
 
   onEnter(state: EditorState): EditorState {
@@ -114,10 +116,12 @@ export class PenTool implements Tool {
     const shapeId = createId("shape");
     const firstPoint: StrokePoint = [action.world.x, action.world.y];
 
+    const strokeStyle = { ...this.getStrokeStyle() };
+
     const shape = ShapeRecord.createStroke(currentPage.id, 0, 0, {
       points: [firstPoint],
       brush: this.getBrush(),
-      style: DEFAULT_STYLE,
+      style: strokeStyle,
     }, shapeId);
 
     this.toolState.isDrawing = true;

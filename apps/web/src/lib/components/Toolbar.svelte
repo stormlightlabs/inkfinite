@@ -1,9 +1,8 @@
 <script lang="ts">
-	import type { BrushStore } from '$lib/status';
+	import type { BrushSettings, BrushStore } from '$lib/status';
 	import type {
 		ArrowShape,
 		Box2,
-		BrushConfig,
 		EditorState as EditorStateType,
 		EllipseShape,
 		LineShape,
@@ -61,7 +60,7 @@
 	let strokeColorValue = $state(DEFAULT_STROKE_COLOR);
 	let fillDisabled = $state(true);
 	let strokeDisabled = $state(true);
-	let brush = $derived<BrushConfig>(brushStore.get());
+	let brush = $derived<BrushSettings>(brushStore.get());
 
 	$effect(() => {
 		editorState = store.getState();
@@ -385,7 +384,7 @@
 		applyStrokeColor(input.value);
 	}
 
-	function handleBrushChange(newBrush: BrushConfig) {
+	function handleBrushChange(newBrush: BrushSettings) {
 		brushStore.set(newBrush);
 	}
 </script>

@@ -1,9 +1,9 @@
 <script lang="ts">
-	import type { BrushConfig } from 'inkfinite-core';
+	import type { BrushSettings } from '$lib/status';
 
 	type Props = {
-		brush: BrushConfig;
-		onBrushChange: (brush: BrushConfig) => void;
+		brush: BrushSettings;
+		onBrushChange: (brush: BrushSettings) => void;
 		disabled?: boolean;
 	};
 
@@ -18,6 +18,7 @@
 	let smoothing = $derived(brush.smoothing);
 	let streamline = $derived(brush.streamline);
 	let simulatePressure = $derived(brush.simulatePressure);
+	let color = $derived(brush.color);
 
 	$effect(() => {
 		size = brush.size;
@@ -25,6 +26,7 @@
 		smoothing = brush.smoothing;
 		streamline = brush.streamline;
 		simulatePressure = brush.simulatePressure;
+		color = brush.color;
 	});
 
 	$effect(() => {
@@ -58,7 +60,7 @@
 	}
 
 	function handleSizeChange() {
-		onBrushChange({ size, thinning, smoothing, streamline, simulatePressure });
+		onBrushChange({ size, thinning, smoothing, streamline, simulatePressure, color });
 	}
 
 	function handleThinningInput(event: Event) {
@@ -67,7 +69,7 @@
 	}
 
 	function handleThinningChange() {
-		onBrushChange({ size, thinning, smoothing, streamline, simulatePressure });
+		onBrushChange({ size, thinning, smoothing, streamline, simulatePressure, color });
 	}
 
 	function handleSmoothingInput(event: Event) {
@@ -76,7 +78,7 @@
 	}
 
 	function handleSmoothingChange() {
-		onBrushChange({ size, thinning, smoothing, streamline, simulatePressure });
+		onBrushChange({ size, thinning, smoothing, streamline, simulatePressure, color });
 	}
 
 	function handleStreamlineInput(event: Event) {
@@ -85,13 +87,22 @@
 	}
 
 	function handleStreamlineChange() {
-		onBrushChange({ size, thinning, smoothing, streamline, simulatePressure });
+		onBrushChange({ size, thinning, smoothing, streamline, simulatePressure, color });
 	}
 
 	function handleSimulatePressureChange(event: Event) {
 		const input = event.currentTarget as HTMLInputElement;
 		simulatePressure = input.checked;
-		onBrushChange({ size, thinning, smoothing, streamline, simulatePressure });
+		onBrushChange({ size, thinning, smoothing, streamline, simulatePressure, color });
+	}
+
+	function handleColorInput(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		color = input.value;
+	}
+
+	function handleColorChange() {
+		onBrushChange({ size, thinning, smoothing, streamline, simulatePressure, color });
 	}
 </script>
 
@@ -179,6 +190,20 @@
 					oninput={handleStreamlineInput}
 					onchange={handleStreamlineChange}
 					aria-label="Brush streamline" />
+			</div>
+
+			<div class="brush-popover__control brush-popover__control--color">
+				<label for="brush-color">
+					<span class="brush-popover__label">Color</span>
+					<span class="brush-popover__value">{color}</span>
+				</label>
+				<input
+					id="brush-color"
+					type="color"
+					value={color}
+					oninput={handleColorInput}
+					onchange={handleColorChange}
+					aria-label="Brush color" />
 			</div>
 
 			<div class="brush-popover__control brush-popover__control--checkbox">
@@ -308,6 +333,15 @@
 	.brush-popover__control--checkbox label {
 		flex-direction: row;
 		gap: 8px;
+	}
+
+	.brush-popover__control--color input[type='color'] {
+		width: 100%;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		height: 32px;
+		background: var(--surface);
+		cursor: pointer;
 	}
 
 	.brush-popover__control--checkbox input[type='checkbox'] {

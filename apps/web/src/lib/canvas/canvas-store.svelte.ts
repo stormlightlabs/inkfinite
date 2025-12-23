@@ -123,7 +123,15 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
   const lineTool = new LineTool();
   const arrowTool = new ArrowTool();
   const textTool = new TextTool();
-  const penTool = new PenTool(() => brushStore.get());
+  const getPenBrushConfig = () => {
+    const { color: _color, ...config } = brushStore.get();
+    return config;
+  };
+  const getPenStrokeStyle = () => {
+    const brush = brushStore.get();
+    return { color: brush.color, opacity: 1 };
+  };
+  const penTool = new PenTool(getPenBrushConfig, getPenStrokeStyle);
   const tools = createToolMap([selectTool, rectTool, ellipseTool, lineTool, arrowTool, textTool, penTool]);
 
   const textEditor = new TextEditorController(store, getViewport, refreshCursor);
