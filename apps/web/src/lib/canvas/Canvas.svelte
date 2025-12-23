@@ -76,7 +76,7 @@
 		cursor={c.cursorStore}
 		persistence={persistenceStatusStore}
 		snap={c.snapStore} />
-	{#if c.fileBrowser.vm}
+	{#if c.fileBrowser.vm && c.fileBrowser.open}
 		<FileBrowser
 			bind:vm={c.fileBrowser.vm}
 			bind:open={c.fileBrowser.open}

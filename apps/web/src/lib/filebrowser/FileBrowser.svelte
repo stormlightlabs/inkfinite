@@ -1,13 +1,21 @@
 <script lang="ts">
 	import Sheet from '$lib/components/Sheet.svelte';
-	import type { BoardInspectorData, BoardMeta, FileBrowserViewModel } from 'inkfinite-core';
+	import type {
+		BoardInspectorData,
+		BoardMeta,
+		FileBrowserViewModel,
+		InkfiniteDB
+	} from 'inkfinite-core';
 	import { BoardStatsOps } from 'inkfinite-core';
 	import type { Snippet } from 'svelte';
 
 	type Props = {
 		vm: FileBrowserViewModel;
 		onUpdate?: (vm: FileBrowserViewModel) => void;
-		fetchInspectorData?: (boardId: string) => Promise<BoardInspectorData>;
+		fetchInspectorData?: (
+			boardId: string,
+			webDb: InkfiniteDB | null
+		) => Promise<BoardInspectorData>;
 		open?: boolean;
 		onClose?: () => void;
 		children?: Snippet;
@@ -18,7 +26,7 @@
 		onUpdate,
 		fetchInspectorData,
 		open = $bindable(false),
-		onClose,
+		onClose: handleClose,
 		children: _children
 	}: Props = $props();
 
@@ -45,10 +53,15 @@
 		onUpdate?.(updated);
 	}
 
+	function closeBrowser() {
+		open = false;
+		handleClose?.();
+	}
+
 	async function handleOpenBoard(boardId: string) {
 		try {
 			await vm.actions.open(boardId);
-			onClose?.();
+			closeBrowser();
 		} catch (error) {
 			console.error('Failed to open board:', error);
 		}
@@ -106,7 +119,7 @@
 		inspectorError = null;
 
 		try {
-			inspectorData = await fetchInspectorData(board.id);
+			inspectorData = await fetchInspectorData(board.id, null);
 		} catch (error) {
 			inspectorError = error instanceof Error ? error.message : 'Failed to load inspector data';
 			inspectorData = null;
@@ -130,127 +143,138 @@
 	}
 </script>
 
-<!-- svelte-ignore a11y_autofocus -->
-<div class="filebrowser">
-	<div class="filebrowser__header">
-		<h2 class="filebrowser__title">Boards</h2>
-		<button
-			class="filebrowser__action filebrowser__action--create"
-			onclick={() => (isCreating = true)}
-			aria-label="Create new board">
-			+ New
-		</button>
-	</div>
-
-	<div class="filebrowser__search">
-		<input
-			type="search"
-			class="filebrowser__search-input"
-			placeholder="Search boards..."
-			value={searchQuery}
-			oninput={handleSearchInput}
-			onchange={handleSearchChange}
-			aria-label="Search boards" />
-	</div>
-
-	{#if isCreating}
-		<div class="filebrowser__create-form">
-			<input
-				type="text"
-				class="filebrowser__input"
-				placeholder="Board name"
-				bind:value={newBoardName}
-				aria-label="New board name"
-				autofocus />
-			<div class="filebrowser__create-actions">
-				<button class="filebrowser__btn filebrowser__btn--primary" onclick={handleCreateBoard}>
-					Create
-				</button>
+<Sheet bind:open onClose={closeBrowser} title="Boards" side="left" class="filebrowser-sheet">
+	<!-- svelte-ignore a11y_autofocus -->
+	<div class="filebrowser">
+		<div class="filebrowser__header">
+			<div class="filebrowser__title-row">
+				<h2 class="filebrowser__title">Boards</h2>
 				<button
-					class="filebrowser__btn filebrowser__btn--secondary"
-					onclick={() => {
-						isCreating = false;
-						newBoardName = '';
-					}}>
-					Cancel
+					class="filebrowser__close"
+					type="button"
+					onclick={closeBrowser}
+					aria-label="Close board browser">
+					×
 				</button>
 			</div>
+			<button
+				class="filebrowser__action filebrowser__action--create"
+				onclick={() => (isCreating = true)}
+				aria-label="Create new board">
+				+ New
+			</button>
 		</div>
-	{/if}
 
-	<div class="filebrowser__list">
-		{#if vm.filteredBoards.length === 0}
-			<div class="filebrowser__empty">
-				{vm.query ? 'No boards match your search' : 'No boards yet'}
-			</div>
-		{:else}
-			{#each vm.filteredBoards as board (board.id)}
-				<div class="filebrowser__board">
-					{#if editingBoardId === board.id}
-						<div class="filebrowser__edit-form">
-							<input
-								type="text"
-								class="filebrowser__input"
-								bind:value={editingBoardName}
-								aria-label="Board name"
-								autofocus />
-							<div class="filebrowser__edit-actions">
-								<button
-									class="filebrowser__btn filebrowser__btn--primary"
-									onclick={() => handleRenameBoard(board.id)}>
-									Save
-								</button>
-								<button
-									class="filebrowser__btn filebrowser__btn--secondary"
-									onclick={cancelRename}>
-									Cancel
-								</button>
-							</div>
-						</div>
-					{:else}
-						<!-- svelte-ignore a11y_click_events_have_key_events -->
-						<!-- svelte-ignore a11y_no_static_element_interactions -->
-						<div class="filebrowser__board-info" onclick={() => handleOpenBoard(board.id)}>
-							<div class="filebrowser__board-name">{board.name}</div>
-							<div class="filebrowser__board-meta">
-								Updated: {formatTimestamp(board.updatedAt)}
-							</div>
-						</div>
-						<div class="filebrowser__board-actions">
-							<button
-								class="filebrowser__board-action"
-								onclick={(e) => {
-									e.stopPropagation();
-									handleInspectBoard(board);
-								}}
-								aria-label="Inspect board">
-								ℹ️
-							</button>
-							<button
-								class="filebrowser__board-action"
-								onclick={(e) => {
-									e.stopPropagation();
-									startRename(board);
-								}}
-								aria-label="Rename board">
-								✏️
-							</button>
-							<button
-								class="filebrowser__board-action"
-								onclick={(e) => {
-									e.stopPropagation();
-									handleDeleteBoard(board.id);
-								}}
-								aria-label="Delete board">
-								🗑️
-							</button>
-						</div>
-					{/if}
+		<div class="filebrowser__search">
+			<input
+				type="search"
+				class="filebrowser__search-input"
+				placeholder="Search boards..."
+				value={searchQuery}
+				oninput={handleSearchInput}
+				onchange={handleSearchChange}
+				aria-label="Search boards" />
+		</div>
+
+		{#if isCreating}
+			<div class="filebrowser__create-form">
+				<input
+					type="text"
+					class="filebrowser__input"
+					placeholder="Board name"
+					bind:value={newBoardName}
+					aria-label="New board name"
+					autofocus />
+				<div class="filebrowser__create-actions">
+					<button class="filebrowser__btn filebrowser__btn--primary" onclick={handleCreateBoard}>
+						Create
+					</button>
+					<button
+						class="filebrowser__btn filebrowser__btn--secondary"
+						onclick={() => {
+							isCreating = false;
+							newBoardName = '';
+						}}>
+						Cancel
+					</button>
 				</div>
-			{/each}
+			</div>
 		{/if}
+
+		<div class="filebrowser__list">
+			{#if vm.filteredBoards.length === 0}
+				<div class="filebrowser__empty">
+					{vm.query ? 'No boards match your search' : 'No boards yet'}
+				</div>
+			{:else}
+				{#each vm.filteredBoards as board (board.id)}
+					<div class="filebrowser__board">
+						{#if editingBoardId === board.id}
+							<div class="filebrowser__edit-form">
+								<input
+									type="text"
+									class="filebrowser__input"
+									bind:value={editingBoardName}
+									aria-label="Board name"
+									autofocus />
+								<div class="filebrowser__edit-actions">
+									<button
+										class="filebrowser__btn filebrowser__btn--primary"
+										onclick={() => handleRenameBoard(board.id)}>
+										Save
+									</button>
+									<button
+										class="filebrowser__btn filebrowser__btn--secondary"
+										onclick={cancelRename}>
+										Cancel
+									</button>
+								</div>
+							</div>
+						{:else}
+							<!-- svelte-ignore a11y_click_events_have_key_events -->
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
+							<div class="filebrowser__board-info" onclick={() => handleOpenBoard(board.id)}>
+								<div class="filebrowser__board-name">{board.name}</div>
+								<div class="filebrowser__board-meta">
+									Updated: {formatTimestamp(board.updatedAt)}
+								</div>
+							</div>
+							<div class="filebrowser__board-actions">
+								<button
+									class="filebrowser__board-action"
+									onclick={(e) => {
+										e.stopPropagation();
+										handleInspectBoard(board);
+									}}
+									aria-label="Inspect board">
+									ℹ️
+								</button>
+								<button
+									class="filebrowser__board-action"
+									onclick={(e) => {
+										e.stopPropagation();
+										startRename(board);
+									}}
+									aria-label="Rename board">
+									✏️
+								</button>
+								<button
+									class="filebrowser__board-action"
+									onclick={(e) => {
+										e.stopPropagation();
+										handleDeleteBoard(board.id);
+									}}
+									aria-label="Delete board">
+									🗑️
+								</button>
+							</div>
+						{/if}
+					</div>
+				{/each}
+			{/if}
+		</div>
 	</div>
-</div>
+</Sheet>
 
 <Sheet bind:open={inspectorOpen} title="Board Inspector" side="right">
 	<div class="inspector">
@@ -346,6 +370,11 @@
 </Sheet>
 
 <style>
+	:global(.filebrowser-sheet) {
+		padding: 0;
+		width: min(520px, 90vw);
+	}
+
 	.filebrowser {
 		display: flex;
 		flex-direction: column;
@@ -362,10 +391,32 @@
 		border-bottom: 1px solid var(--border, #e0e0e0);
 	}
 
+	.filebrowser__title-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
 	.filebrowser__title {
 		margin: 0;
 		font-size: 1.25rem;
 		font-weight: 600;
+	}
+
+	.filebrowser__close {
+		background: none;
+		border: none;
+		color: var(--text-secondary, #666);
+		font-size: 1.25rem;
+		cursor: pointer;
+		padding: 4px;
+		border-radius: 4px;
+	}
+
+	.filebrowser__close:hover,
+	.filebrowser__close:focus-visible {
+		background-color: rgba(0, 0, 0, 0.05);
+		color: var(--text);
 	}
 
 	.filebrowser__action {

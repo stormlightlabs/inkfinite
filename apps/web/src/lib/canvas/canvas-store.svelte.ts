@@ -514,10 +514,7 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
   return {
     platform: () => platform,
     desktop,
-    fileBrowser: {
-      ...fileBrowser,
-      fetchInspectorData: (boardId: string) => fileBrowser.fetchInspectorData(boardId, webDb),
-    },
+    fileBrowser,
     tools: toolController,
     history,
     textEditor,

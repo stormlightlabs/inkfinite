@@ -269,6 +269,36 @@ describe("FileBrowser", () => {
     });
   });
 
+  describe("overlay behavior", () => {
+    it("should render a close button that closes the browser", async () => {
+      const boards = createMockBoards();
+      const vm = createMockVM(boards);
+      const onClose = vi.fn();
+
+      render(FileBrowser, { vm, open: true, onClose });
+
+      const closeButton = page.getByLabelText(/close board browser/i);
+      await closeButton.click();
+
+      await expect.poll(() => onClose).toHaveBeenCalled();
+    });
+
+    it("should close when clicking the backdrop", async () => {
+      const boards = createMockBoards();
+      const vm = createMockVM(boards);
+      const onClose = vi.fn();
+
+      render(FileBrowser, { vm, open: true, onClose });
+
+      await expect.poll(() => document.querySelector(".sheet__backdrop")).not.toBeNull();
+
+      const backdrop = document.querySelector(".sheet__backdrop");
+      backdrop?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+      await expect.poll(() => onClose).toHaveBeenCalled();
+    });
+  });
+
   describe("callbacks", () => {
     it("should call onUpdate when search changes", async () => {
       const boards = createMockBoards();
