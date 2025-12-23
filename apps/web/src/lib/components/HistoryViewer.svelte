@@ -53,7 +53,7 @@
 				<p class="empty-state">No actions to undo</p>
 			{:else}
 				<ul class="history-list">
-					{#each history.undoStack as entry, index}
+					{#each history.undoStack as entry, index (`UNDO:${entry.command.kind}:${entry.timestamp}`)}
 						<li class="history-entry">
 							<div class="entry-info">
 								<span class="entry-name">{entry.command.name}</span>
@@ -72,7 +72,7 @@
 				<p class="empty-state">No actions to redo</p>
 			{:else}
 				<ul class="history-list">
-					{#each history.redoStack as entry, index}
+					{#each history.redoStack as entry, index (`REDO:${entry.command.kind}:${entry.timestamp}`)}
 						<li class="history-entry redo">
 							<div class="entry-info">
 								<span class="entry-name">{entry.command.name}</span>

@@ -4,6 +4,7 @@
 	import TitleBar from '$lib/components/TitleBar.svelte';
 	import Toolbar from '$lib/components/Toolbar.svelte';
 	import { createInputAdapter, type InputAdapter } from '$lib/input';
+	import { createPlatformRepo, detectPlatform } from '$lib/platform';
 	import {
 		createPersistenceManager,
 		createSnapStore,
@@ -17,7 +18,6 @@
 		CursorStore,
 		EditorState,
 		EllipseTool,
-		InkfiniteDB,
 		LineTool,
 		RectTool,
 		SelectTool,
@@ -26,7 +26,6 @@
 		Store,
 		TextTool,
 		createToolMap,
-		createWebDocRepo,
 		diffDoc,
 		getShapesOnCurrentPage,
 		routeAction,
@@ -34,6 +33,7 @@
 		switchTool,
 		type Action,
 		type CommandKind,
+		type DocRepo,
 		type LoadedDoc,
 		type PersistenceSink,
 		type ToolId,
@@ -42,11 +42,12 @@
 	import { createRenderer, type Renderer } from 'inkfinite-renderer';
 	import { onDestroy, onMount } from 'svelte';
 
-	let repo: ReturnType<typeof createWebDocRepo> | null = null;
+	let repo: DocRepo | null = null;
 	let sink: PersistenceSink | null = null;
 	let persistenceManager: ReturnType<typeof createPersistenceManager> | null = null;
+	const platform = detectPlatform();
 	const fallbackStatusStore = createStatusStore({
-		backend: 'indexeddb',
+		backend: platform === 'desktop' ? 'filesystem' : 'indexeddb',
 		state: 'saved',
 		pendingWrites: 0
 	});
@@ -752,66 +753,88 @@
 	}
 
 	onMount(() => {
-		const db = new InkfiniteDB();
-		repo = createWebDocRepo(db);
-		persistenceManager = createPersistenceManager(db, repo, { sink: { debounceMs: 200 } });
-		sink = persistenceManager.sink;
-		persistenceStatusStore = persistenceManager.status;
 		let disposed = false;
 
-		const hydrate = async () => {
-			const repoInstance = repo;
-			if (!repoInstance) {
-				return;
+		const initialize = async () => {
+			const { repo: platformRepo, platform: detectedPlatform, db } = await createPlatformRepo();
+			repo = platformRepo;
+
+			if (detectedPlatform === 'web' && db) {
+				persistenceManager = createPersistenceManager(db, repo, { sink: { debounceMs: 200 } });
+				sink = persistenceManager.sink;
+				persistenceStatusStore = persistenceManager.status;
+			} else {
+				const { createPersistenceSink } = await import('inkfinite-core');
+				sink = createPersistenceSink(repo, { debounceMs: 500 });
 			}
-			try {
-				const boards = await repoInstance.listBoards();
-				const id = boards[0]?.id ?? (await repoInstance.createBoard('My board'));
-				if (disposed) {
+
+			const hydrate = async () => {
+				const repoInstance = repo;
+				if (!repoInstance) {
 					return;
 				}
-				activeBoardId = id;
-				const loaded = await repoInstance.loadDoc(id);
-				if (!disposed) {
-					persistenceManager?.setActiveBoard(id);
-					applyLoadedDoc(loaded);
+				try {
+					if (detectedPlatform === 'web') {
+						const boards = await repoInstance.listBoards();
+						const id = boards[0]?.id ?? (await repoInstance.createBoard('My board'));
+						if (disposed) {
+							return;
+						}
+						activeBoardId = id;
+						const loaded = await repoInstance.loadDoc(id);
+						if (!disposed) {
+							persistenceManager?.setActiveBoard(id);
+							applyLoadedDoc(loaded);
+						}
+					} else {
+						const id = await repoInstance.createBoard('Untitled');
+						if (disposed) {
+							return;
+						}
+						activeBoardId = id;
+						const loaded = await repoInstance.loadDoc(id);
+						if (!disposed) {
+							applyLoadedDoc(loaded);
+						}
+					}
+				} catch (error) {
+					console.error('Failed to load board', error);
 				}
-			} catch (error) {
-				console.error('Failed to load board', error);
+			};
+
+			await hydrate();
+
+			function getCamera() {
+				return store.getState().camera;
 			}
+
+			renderer = createRenderer(canvas!, store, {
+				snapProvider,
+				cursorProvider,
+				pointerStateProvider,
+				handleProvider
+			});
+			inputAdapter = createInputAdapter({
+				canvas: canvas!,
+				getCamera,
+				getViewport,
+				onAction: handleAction,
+				onCursorUpdate: (world, screen) => cursorStore.updateCursor(world, screen)
+			});
+
+			function handleBeforeUnload() {
+				if (sink) {
+					void sink.flush();
+				}
+			}
+
+			window.addEventListener('beforeunload', handleBeforeUnload);
 		};
 
-		hydrate();
-
-		function getCamera() {
-			return store.getState().camera;
-		}
-
-		renderer = createRenderer(canvas!, store, {
-			snapProvider,
-			cursorProvider,
-			pointerStateProvider,
-			handleProvider
-		});
-		inputAdapter = createInputAdapter({
-			canvas: canvas!,
-			getCamera,
-			getViewport,
-			onAction: handleAction,
-			onCursorUpdate: (world, screen) => cursorStore.updateCursor(world, screen)
-		});
-
-		function handleBeforeUnload() {
-			if (sink) {
-				void sink.flush();
-			}
-		}
-
-		window.addEventListener('beforeunload', handleBeforeUnload);
+		initialize();
 
 		return () => {
 			disposed = true;
-			window.removeEventListener('beforeunload', handleBeforeUnload);
 		};
 	});
 

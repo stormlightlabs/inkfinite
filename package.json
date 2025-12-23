@@ -5,15 +5,7 @@
   "type": "module",
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {},
-  "devDependencies": {
-    "@eslint/js": "^9.39.2",
-    "dprint": "^0.50.2",
-    "eslint": "^9.39.2",
-    "eslint-plugin-unicorn": "^62.0.0",
-    "globals": "^16.5.0",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.50.0"
-  },
+  "devDependencies": { "dprint": "^0.50.2", "typescript": "^5.9.3" },
   "engines": { "node": ">=18.0.0", "pnpm": ">=8.0.0" },
   "packageManager": "pnpm@10.26.1"
 }

@@ -9,7 +9,7 @@ export type SelectionSummary = { count: number; kind?: string; bounds?: { w: num
 export type SnapSummary = { enabled: boolean; gridSize?: number; angleStepDeg?: number };
 
 export type PersistenceStatus = {
-  backend: "indexeddb";
+  backend: "indexeddb" | "filesystem";
   state: "saved" | "saving" | "error";
   lastSavedAt?: number;
   pendingWrites?: number;
