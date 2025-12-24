@@ -1,7 +1,7 @@
 import type { Action } from "../actions";
-import { hitTestPoint, shapeBounds } from "../geom";
+import { computeNormalizedAnchor, hitTestPoint, shapeBounds } from "../geom";
 import { Box2, type Vec2, Vec2 as Vec2Ops } from "../math";
-import { ShapeRecord } from "../model";
+import { BindingRecord, ShapeRecord } from "../model";
 import { EditorState, getCurrentPage, type ToolId } from "../reactivity";
 import type { Tool } from "./base";
 
@@ -301,6 +301,13 @@ export class SelectTool implements Tool {
 
     if (this.toolState.marqueeStart && this.toolState.marqueeEnd) {
       newState = this.completeMarqueeSelection(state);
+    }
+
+    if (
+      this.toolState.handleShapeId
+      && (this.toolState.activeHandle === "line-start" || this.toolState.activeHandle === "line-end")
+    ) {
+      newState = this.updateArrowBindings(newState, this.toolState.handleShapeId, action.world);
     }
 
     this.toolState.activeHandle = null;
@@ -616,5 +623,52 @@ export class SelectTool implements Tool {
     const cos = Math.cos(shape.rot);
     const sin = Math.sin(shape.rot);
     return { x: shape.x + point.x * cos - point.y * sin, y: shape.y + point.x * sin + point.y * cos };
+  }
+
+  /**
+   * Update arrow bindings when an endpoint is dragged
+   *
+   * Creates or updates bindings for arrow endpoints based on hit testing.
+   * If the endpoint is over a shape, creates/updates an edge anchor binding.
+   * If the endpoint is not over a shape, removes any existing binding.
+   */
+  private updateArrowBindings(state: EditorState, arrowId: string, endpointWorld: Vec2): EditorState {
+    const arrow = state.doc.shapes[arrowId];
+    if (!arrow || arrow.type !== "arrow") return state;
+
+    const handle = this.toolState.activeHandle === "line-start" ? "start" : "end";
+
+    const stateWithoutArrow = {
+      ...state,
+      doc: {
+        ...state.doc,
+        shapes: Object.fromEntries(Object.entries(state.doc.shapes).filter(([id]) => id !== arrowId)),
+      },
+    };
+
+    const hitShapeId = hitTestPoint(stateWithoutArrow, endpointWorld);
+
+    const newBindings = { ...state.doc.bindings };
+
+    for (const [bindingId, binding] of Object.entries(newBindings)) {
+      if (binding.fromShapeId === arrowId && binding.handle === handle) {
+        delete newBindings[bindingId];
+      }
+    }
+
+    if (hitShapeId) {
+      const targetShape = state.doc.shapes[hitShapeId];
+      if (targetShape) {
+        const anchor = computeNormalizedAnchor(endpointWorld, targetShape);
+        const binding = BindingRecord.create(arrowId, hitShapeId, handle, {
+          kind: "edge",
+          nx: anchor.nx,
+          ny: anchor.ny,
+        });
+        newBindings[binding.id] = binding;
+      }
+    }
+
+    return { ...state, doc: { ...state.doc, bindings: newBindings } };
   }
 }

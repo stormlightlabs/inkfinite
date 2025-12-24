@@ -462,10 +462,49 @@ export function shapeCenter(shape: ShapeRecord): Vec2 {
 }
 
 /**
+ * Compute anchor point on a shape's bounds given normalized coordinates
+ *
+ * @param shape - Target shape
+ * @param nx - Normalized x coordinate in [-1, 1] where -1 is left edge, 1 is right edge, 0 is center
+ * @param ny - Normalized y coordinate in [-1, 1] where -1 is top edge, 1 is bottom edge, 0 is center
+ * @returns World coordinates of the anchor point
+ */
+export function computeEdgeAnchor(shape: ShapeRecord, nx: number, ny: number): Vec2 {
+  const bounds = shapeBounds(shape);
+  const centerX = (bounds.min.x + bounds.max.x) / 2;
+  const centerY = (bounds.min.y + bounds.max.y) / 2;
+  const halfWidth = (bounds.max.x - bounds.min.x) / 2;
+  const halfHeight = (bounds.max.y - bounds.min.y) / 2;
+
+  return { x: centerX + nx * halfWidth, y: centerY + ny * halfHeight };
+}
+
+/**
+ * Compute normalized anchor coordinates from a world point and target shape
+ *
+ * @param point - World coordinates of the point to anchor
+ * @param shape - Target shape to anchor to
+ * @returns Normalized coordinates {nx, ny} in [-1, 1]
+ */
+export function computeNormalizedAnchor(point: Vec2, shape: ShapeRecord): { nx: number; ny: number } {
+  const bounds = shapeBounds(shape);
+  const centerX = (bounds.min.x + bounds.max.x) / 2;
+  const centerY = (bounds.min.y + bounds.max.y) / 2;
+  const halfWidth = Math.max((bounds.max.x - bounds.min.x) / 2, 1);
+  const halfHeight = Math.max((bounds.max.y - bounds.min.y) / 2, 1);
+
+  const nx = Math.max(-1, Math.min(1, (point.x - centerX) / halfWidth));
+  const ny = Math.max(-1, Math.min(1, (point.y - centerY) / halfHeight));
+
+  return { nx, ny };
+}
+
+/**
  * Resolve arrow endpoints considering bindings
  *
  * If an arrow endpoint is bound to a target shape, returns the bound position
- * (center of target shape for v0). Otherwise returns the arrow's stored endpoint.
+ * based on the binding anchor (center or edge with normalized coordinates).
+ * Otherwise returns the arrow's stored endpoint.
  *
  * @param state - Editor state
  * @param arrowId - ID of the arrow shape
@@ -494,14 +533,50 @@ export function resolveArrowEndpoints(state: EditorState, arrowId: string): { a:
     const targetShape = state.doc.shapes[binding.toShapeId];
     if (!targetShape) continue;
 
-    const targetCenter = shapeCenter(targetShape);
+    let anchorPoint: Vec2;
+    if (binding.anchor.kind === "center") {
+      anchorPoint = shapeCenter(targetShape);
+    } else {
+      anchorPoint = computeEdgeAnchor(targetShape, binding.anchor.nx, binding.anchor.ny);
+    }
 
     if (binding.handle === "start") {
-      a = targetCenter;
+      a = anchorPoint;
     } else if (binding.handle === "end") {
-      b = targetCenter;
+      b = anchorPoint;
     }
   }
 
   return { a, b };
+}
+
+/**
+ * Compute orthogonal (Manhattan-style) routing between two points
+ *
+ * Creates a path with 2-4 segments that connects start to end using only horizontal and vertical lines.
+ * The path avoids overlapping segments and creates clean right angles.
+ *
+ * @param start - Starting point
+ * @param end - Ending point
+ * @returns Array of points forming the orthogonal path (includes start and end)
+ */
+export function computeOrthogonalPath(start: Vec2, end: Vec2): Vec2[] {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+
+  if (Math.abs(dx) < 0.1 && Math.abs(dy) < 0.1) {
+    return [start, end];
+  }
+
+  if (Math.abs(dx) < 0.1) {
+    return [start, end];
+  }
+
+  if (Math.abs(dy) < 0.1) {
+    return [start, end];
+  }
+
+  const midX = start.x + dx / 2;
+
+  return [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
 }

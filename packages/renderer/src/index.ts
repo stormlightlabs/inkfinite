@@ -416,7 +416,10 @@ function drawLine(context: CanvasRenderingContext2D, shape: LineShape) {
  * Draw an arrow shape
  */
 function drawArrow(context: CanvasRenderingContext2D, state: EditorState, shape: ArrowShape) {
-  const { stroke, width } = shape.props;
+  const legacyStroke = shape.props.stroke;
+  const legacyWidth = shape.props.width;
+  const modernStyle = shape.props.style;
+  const style = modernStyle ?? { stroke: legacyStroke ?? "#000", width: legacyWidth ?? 2 };
 
   const resolved = resolveArrowEndpoints(state, shape.id);
   if (!resolved) return;
@@ -424,27 +427,150 @@ function drawArrow(context: CanvasRenderingContext2D, state: EditorState, shape:
   const a = { x: resolved.a.x - shape.x, y: resolved.a.y - shape.y };
   const b = { x: resolved.b.x - shape.x, y: resolved.b.y - shape.y };
 
+  let points: Vec2[];
+  const modernPoints = shape.props.points;
+  if (modernPoints && modernPoints.length >= 2) {
+    points = modernPoints.map((p: Vec2, index: number) => {
+      if (index === 0) return a;
+      if (index === modernPoints.length - 1) return b;
+      return p;
+    });
+  } else {
+    points = [a, b];
+  }
+
   context.beginPath();
-  context.moveTo(a.x, a.y);
-  context.lineTo(b.x, b.y);
+  context.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    context.lineTo(points[i].x, points[i].y);
+  }
 
-  context.strokeStyle = stroke;
-  context.lineWidth = width;
+  context.strokeStyle = style.stroke;
+  context.lineWidth = style.width;
+  if (style.dash) {
+    context.setLineDash(style.dash);
+  }
   context.stroke();
+  if (style.dash) {
+    context.setLineDash([]);
+  }
 
-  const angle = Math.atan2(b.y - a.y, b.x - a.x);
+  const lastSegment = { from: points[points.length - 2], to: points[points.length - 1] };
+  const angle = Math.atan2(lastSegment.to.y - lastSegment.from.y, lastSegment.to.x - lastSegment.from.x);
   const arrowLength = 15;
   const arrowAngle = Math.PI / 6;
 
-  context.beginPath();
-  context.moveTo(b.x, b.y);
-  context.lineTo(b.x - arrowLength * Math.cos(angle - arrowAngle), b.y - arrowLength * Math.sin(angle - arrowAngle));
-  context.moveTo(b.x, b.y);
-  context.lineTo(b.x - arrowLength * Math.cos(angle + arrowAngle), b.y - arrowLength * Math.sin(angle + arrowAngle));
+  const drawHead = (at: Vec2, reverse: boolean) => {
+    const dir = reverse ? angle + Math.PI : angle;
+    context.beginPath();
+    context.moveTo(at.x, at.y);
+    context.lineTo(at.x - arrowLength * Math.cos(dir - arrowAngle), at.y - arrowLength * Math.sin(dir - arrowAngle));
+    context.moveTo(at.x, at.y);
+    context.lineTo(at.x - arrowLength * Math.cos(dir + arrowAngle), at.y - arrowLength * Math.sin(dir + arrowAngle));
+    context.strokeStyle = style.stroke;
+    context.lineWidth = style.width;
+    context.stroke();
+  };
 
-  context.strokeStyle = stroke;
-  context.lineWidth = width;
-  context.stroke();
+  if (style.headEnd !== false) {
+    drawHead(lastSegment.to, false);
+  }
+
+  if (style.headStart) {
+    const firstSegment = { from: points[0], to: points[1] };
+    const startAngle = Math.atan2(firstSegment.to.y - firstSegment.from.y, firstSegment.to.x - firstSegment.from.x);
+    const startDir = startAngle + Math.PI;
+    context.beginPath();
+    context.moveTo(firstSegment.from.x, firstSegment.from.y);
+    context.lineTo(
+      firstSegment.from.x - arrowLength * Math.cos(startDir - arrowAngle),
+      firstSegment.from.y - arrowLength * Math.sin(startDir - arrowAngle),
+    );
+    context.moveTo(firstSegment.from.x, firstSegment.from.y);
+    context.lineTo(
+      firstSegment.from.x - arrowLength * Math.cos(startDir + arrowAngle),
+      firstSegment.from.y - arrowLength * Math.sin(startDir + arrowAngle),
+    );
+    context.strokeStyle = style.stroke;
+    context.lineWidth = style.width;
+    context.stroke();
+  }
+
+  const label = shape.props.label;
+  if (label) {
+    drawArrowLabel(context, state, points, label);
+  }
+}
+
+/**
+ * Draw an arrow label
+ */
+function drawArrowLabel(
+  context: CanvasRenderingContext2D,
+  state: EditorState,
+  points: Vec2[],
+  label: { text: string; align: string; offset: number },
+) {
+  if (!label.text) return;
+
+  let labelPos: Vec2;
+  const totalLength = computePolylineLength(points);
+  let targetDist: number;
+
+  if (label.align === "start") {
+    targetDist = label.offset;
+  } else if (label.align === "end") {
+    targetDist = totalLength - label.offset;
+  } else {
+    targetDist = totalLength / 2 + label.offset;
+  }
+
+  labelPos = getPointAtDistance(points, targetDist);
+
+  context.save();
+  context.font = "14px sans-serif";
+  context.fillStyle = "#000";
+  context.textAlign = "center";
+  context.textBaseline = "bottom";
+  const metrics = context.measureText(label.text);
+  const padding = 4;
+  const bgWidth = metrics.width + padding * 2;
+  const bgHeight = 18;
+
+  context.fillStyle = "rgba(255, 255, 255, 0.9)";
+  context.fillRect(labelPos.x - bgWidth / 2, labelPos.y - bgHeight - 5, bgWidth, bgHeight);
+  context.strokeStyle = "#ccc";
+  context.lineWidth = 1 / state.camera.zoom;
+  context.strokeRect(labelPos.x - bgWidth / 2, labelPos.y - bgHeight - 5, bgWidth, bgHeight);
+
+  context.fillStyle = "#000";
+  context.fillText(label.text, labelPos.x, labelPos.y - 5);
+  context.restore();
+}
+
+function computePolylineLength(points: Vec2[]): number {
+  let length = 0;
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i].x - points[i - 1].x;
+    const dy = points[i].y - points[i - 1].y;
+    length += Math.sqrt(dx * dx + dy * dy);
+  }
+  return length;
+}
+
+function getPointAtDistance(points: Vec2[], targetDist: number): Vec2 {
+  let accum = 0;
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i].x - points[i - 1].x;
+    const dy = points[i].y - points[i - 1].y;
+    const segLen = Math.sqrt(dx * dx + dy * dy);
+    if (accum + segLen >= targetDist) {
+      const t = (targetDist - accum) / segLen;
+      return { x: points[i - 1].x + dx * t, y: points[i - 1].y + dy * t };
+    }
+    accum += segLen;
+  }
+  return points[points.length - 1];
 }
 
 /**
@@ -560,8 +686,7 @@ function drawSelection(
         context.strokeRect(0, 0, w, h);
         break;
       }
-      case "line":
-      case "arrow": {
+      case "line": {
         const { a, b } = shape.props;
         const minX = Math.min(a.x, b.x);
         const minY = Math.min(a.y, b.y);
@@ -569,6 +694,23 @@ function drawSelection(
         const maxY = Math.max(a.y, b.y);
         const padding = 5;
         context.strokeRect(minX - padding, minY - padding, maxX - minX + padding * 2, maxY - minY + padding * 2);
+        break;
+      }
+      case "arrow": {
+        const bounds = shapeBounds(shape);
+        const localBounds = {
+          minX: bounds.min.x - shape.x,
+          minY: bounds.min.y - shape.y,
+          maxX: bounds.max.x - shape.x,
+          maxY: bounds.max.y - shape.y,
+        };
+        const padding = 5;
+        context.strokeRect(
+          localBounds.minX - padding,
+          localBounds.minY - padding,
+          localBounds.maxX - localBounds.minX + padding * 2,
+          localBounds.maxY - localBounds.minY + padding * 2,
+        );
         break;
       }
       case "text": {

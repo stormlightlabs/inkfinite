@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   BindingRecord,
+  computeEdgeAnchor,
+  computeNormalizedAnchor,
+  computeOrthogonalPath,
   hitTestPoint,
   PageRecord,
   pointInEllipse,
@@ -992,6 +995,135 @@ describe("Geometry", () => {
       const resolved2 = resolveArrowEndpoints(state, arrow.id);
 
       expect(resolved2?.b).toEqual({ x: 350, y: 350 });
+    });
+
+    it("should resolve edge anchors correctly", () => {
+      const store = new Store();
+      const page = PageRecord.create("Test Page", "page:1");
+      const targetRect = ShapeRecord.createRect(
+        page.id,
+        100,
+        100,
+        { w: 100, h: 100, fill: "", stroke: "", radius: 0 },
+        "rect:1",
+      );
+      const arrow = ShapeRecord.createArrow(page.id, 0, 0, {
+        a: { x: 0, y: 0 },
+        b: { x: 100, y: 100 },
+        stroke: "#000",
+        width: 2,
+      }, "arrow:1");
+
+      const binding = BindingRecord.create(arrow.id, targetRect.id, "end", { kind: "edge", nx: 1, ny: 0 });
+
+      store.setState((state) => ({
+        ...state,
+        doc: {
+          pages: { [page.id]: { ...page, shapeIds: [arrow.id, targetRect.id] } },
+          shapes: { [arrow.id]: arrow, [targetRect.id]: targetRect },
+          bindings: { [binding.id]: binding },
+        },
+        ui: { ...state.ui, currentPageId: page.id },
+      }));
+
+      const state = store.getState();
+      const resolved = resolveArrowEndpoints(state, arrow.id);
+
+      expect(resolved?.b).toEqual({ x: 200, y: 150 });
+    });
+  });
+
+  describe("computeEdgeAnchor", () => {
+    it("should compute center anchor correctly", () => {
+      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 100, fill: "", stroke: "", radius: 0 });
+      const anchor = computeEdgeAnchor(rect, 0, 0);
+
+      expect(anchor).toEqual({ x: 150, y: 150 });
+    });
+
+    it("should compute edge anchors correctly", () => {
+      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 100, fill: "", stroke: "", radius: 0 });
+
+      expect(computeEdgeAnchor(rect, -1, -1)).toEqual({ x: 100, y: 100 });
+      expect(computeEdgeAnchor(rect, 1, -1)).toEqual({ x: 200, y: 100 });
+      expect(computeEdgeAnchor(rect, 1, 1)).toEqual({ x: 200, y: 200 });
+      expect(computeEdgeAnchor(rect, -1, 1)).toEqual({ x: 100, y: 200 });
+      expect(computeEdgeAnchor(rect, 1, 0)).toEqual({ x: 200, y: 150 });
+      expect(computeEdgeAnchor(rect, 0, 1)).toEqual({ x: 150, y: 200 });
+    });
+  });
+
+  describe("computeNormalizedAnchor", () => {
+    it("should compute normalized anchor for center point", () => {
+      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 100, fill: "", stroke: "", radius: 0 });
+      const anchor = computeNormalizedAnchor({ x: 150, y: 150 }, rect);
+
+      expect(anchor.nx).toBeCloseTo(0, 5);
+      expect(anchor.ny).toBeCloseTo(0, 5);
+    });
+
+    it("should compute normalized anchor for edge points", () => {
+      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 100, fill: "", stroke: "", radius: 0 });
+
+      const topLeft = computeNormalizedAnchor({ x: 100, y: 100 }, rect);
+      expect(topLeft.nx).toBeCloseTo(-1, 5);
+      expect(topLeft.ny).toBeCloseTo(-1, 5);
+
+      const bottomRight = computeNormalizedAnchor({ x: 200, y: 200 }, rect);
+      expect(bottomRight.nx).toBeCloseTo(1, 5);
+      expect(bottomRight.ny).toBeCloseTo(1, 5);
+
+      const rightCenter = computeNormalizedAnchor({ x: 200, y: 150 }, rect);
+      expect(rightCenter.nx).toBeCloseTo(1, 5);
+      expect(rightCenter.ny).toBeCloseTo(0, 5);
+    });
+
+    it("should clamp normalized anchor values to [-1, 1]", () => {
+      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 100, fill: "", stroke: "", radius: 0 });
+
+      const far = computeNormalizedAnchor({ x: 300, y: 300 }, rect);
+      expect(far.nx).toBe(1);
+      expect(far.ny).toBe(1);
+
+      const farNeg = computeNormalizedAnchor({ x: 0, y: 0 }, rect);
+      expect(farNeg.nx).toBe(-1);
+      expect(farNeg.ny).toBe(-1);
+    });
+  });
+
+  describe("computeOrthogonalPath", () => {
+    it("should create a straight path for horizontal alignment", () => {
+      const path = computeOrthogonalPath({ x: 0, y: 0 }, { x: 100, y: 0 });
+
+      expect(path).toHaveLength(2);
+      expect(path[0]).toEqual({ x: 0, y: 0 });
+      expect(path[1]).toEqual({ x: 100, y: 0 });
+    });
+
+    it("should create a straight path for vertical alignment", () => {
+      const path = computeOrthogonalPath({ x: 0, y: 0 }, { x: 0, y: 100 });
+
+      expect(path).toHaveLength(2);
+      expect(path[0]).toEqual({ x: 0, y: 0 });
+      expect(path[1]).toEqual({ x: 0, y: 100 });
+    });
+
+    it("should create a 4-point path for diagonal movement", () => {
+      const path = computeOrthogonalPath({ x: 0, y: 0 }, { x: 100, y: 100 });
+
+      expect(path).toHaveLength(4);
+      expect(path[0]).toEqual({ x: 0, y: 0 });
+      expect(path[1]).toEqual({ x: 50, y: 0 });
+      expect(path[2]).toEqual({ x: 50, y: 100 });
+      expect(path[3]).toEqual({ x: 100, y: 100 });
+    });
+
+    it("should handle same start and end points", () => {
+      const path = computeOrthogonalPath({ x: 100, y: 100 }, { x: 100, y: 100 });
+
+      expect(path).toHaveLength(2);
+      expect(path[0]).toEqual({ x: 100, y: 100 });
+      expect(path[1]).toEqual({ x: 100, y: 100 });
     });
   });
 });

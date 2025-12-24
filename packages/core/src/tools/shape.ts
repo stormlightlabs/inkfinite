@@ -1,5 +1,5 @@
 import type { Action } from "../actions";
-import { hitTestPoint } from "../geom";
+import { computeNormalizedAnchor, hitTestPoint } from "../geom";
 import { Vec2 } from "../math";
 import { BindingRecord, createId, ShapeRecord } from "../model";
 import type { EditorState, ToolId } from "../reactivity";
@@ -658,14 +658,26 @@ export class ArrowTool implements Tool {
 
     const startHitId = hitTestPoint(stateWithoutArrow, startWorld);
     if (startHitId) {
-      const binding = BindingRecord.create(arrowId, startHitId, "start");
-      newBindings[binding.id] = binding;
+      const targetShape = state.doc.shapes[startHitId];
+      if (targetShape) {
+        const anchor = computeNormalizedAnchor(startWorld, targetShape);
+        const binding = BindingRecord.create(arrowId, startHitId, "start", {
+          kind: "edge",
+          nx: anchor.nx,
+          ny: anchor.ny,
+        });
+        newBindings[binding.id] = binding;
+      }
     }
 
     const endHitId = hitTestPoint(stateWithoutArrow, endWorld);
     if (endHitId) {
-      const binding = BindingRecord.create(arrowId, endHitId, "end");
-      newBindings[binding.id] = binding;
+      const targetShape = state.doc.shapes[endHitId];
+      if (targetShape) {
+        const anchor = computeNormalizedAnchor(endWorld, targetShape);
+        const binding = BindingRecord.create(arrowId, endHitId, "end", { kind: "edge", nx: anchor.nx, ny: anchor.ny });
+        newBindings[binding.id] = binding;
+      }
     }
 
     return { ...state, doc: { ...state.doc, bindings: newBindings } };
