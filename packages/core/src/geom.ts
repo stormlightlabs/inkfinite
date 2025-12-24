@@ -100,14 +100,17 @@ function lineBounds(shape: LineShape): Box2 {
   return Box2Ops.fromPoints(translatedPoints);
 }
 
-/**
- * Get bounds for an arrow shape
- */
 function arrowBounds(shape: ArrowShape): Box2 {
-  const { a, b } = shape.props;
   const { x, y, rot } = shape;
 
-  const points = [a, b];
+  let points: Vec2[];
+  if (shape.props.a && shape.props.b) {
+    points = [shape.props.a, shape.props.b];
+  } else if (shape.props.points && shape.props.points.length >= 2) {
+    points = shape.props.points;
+  } else {
+    return { min: { x, y }, max: { x, y } };
+  }
 
   if (rot === 0) {
     const translatedPoints = points.map((p) => ({ x: p.x + x, y: p.y + y }));
@@ -286,7 +289,23 @@ export function pointNearSegment(p: Vec2, a: Vec2, b: Vec2, tolerance: number): 
  */
 export function pointNearLine(p: Vec2, shape: LineShape | ArrowShape, tolerance = 5): boolean {
   const { x, y, rot } = shape;
-  const { a, b } = shape.props;
+
+  let a: Vec2, b: Vec2;
+  if (shape.type === "line") {
+    a = shape.props.a;
+    b = shape.props.b;
+  } else {
+    if (shape.props.a && shape.props.b) {
+      a = shape.props.a;
+      b = shape.props.b;
+    } else if (shape.props.points && shape.props.points.length >= 2) {
+      a = shape.props.points[0];
+      b = shape.props.points[shape.props.points.length - 1];
+    } else {
+      return false;
+    }
+  }
+
   const localP = worldToLocal(p, x, y, rot);
   return pointNearSegment(localP, a, b, tolerance);
 }
@@ -456,8 +475,18 @@ export function resolveArrowEndpoints(state: EditorState, arrowId: string): { a:
   const arrow = state.doc.shapes[arrowId];
   if (!arrow || arrow.type !== "arrow") return null;
 
-  let a: Vec2 = { x: arrow.x + arrow.props.a.x, y: arrow.y + arrow.props.a.y };
-  let b: Vec2 = { x: arrow.x + arrow.props.b.x, y: arrow.y + arrow.props.b.y };
+  let a: Vec2, b: Vec2;
+  if (arrow.props.a && arrow.props.b) {
+    a = { x: arrow.x + arrow.props.a.x, y: arrow.y + arrow.props.a.y };
+    b = { x: arrow.x + arrow.props.b.x, y: arrow.y + arrow.props.b.y };
+  } else if (arrow.props.points && arrow.props.points.length >= 2) {
+    const firstPoint = arrow.props.points[0];
+    const lastPoint = arrow.props.points[arrow.props.points.length - 1];
+    a = { x: arrow.x + firstPoint.x, y: arrow.y + firstPoint.y };
+    b = { x: arrow.x + lastPoint.x, y: arrow.y + lastPoint.y };
+  } else {
+    return null;
+  }
 
   for (const binding of Object.values(state.doc.bindings)) {
     if (binding.fromShapeId !== arrowId) continue;

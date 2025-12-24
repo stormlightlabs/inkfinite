@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   type ArrowProps,
+  type ArrowStyle,
   BindingRecord,
   createId,
   Document,
@@ -16,7 +17,6 @@ import {
 describe("createId", () => {
   it("should generate a valid UUID without prefix", () => {
     const id = createId();
-
     expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   });
 
@@ -173,13 +173,126 @@ describe("ShapeRecord", () => {
   });
 
   describe("createArrow", () => {
-    it("should create an arrow shape", () => {
+    it("should create an arrow shape with legacy format", () => {
       const props: ArrowProps = { a: { x: 0, y: 0 }, b: { x: 100, y: 50 }, stroke: "#000", width: 2 };
       const shape = ShapeRecord.createArrow(pageId, 10, 20, props);
 
       expect(shape.id).toMatch(/^shape:/);
       expect(shape.type).toBe("arrow");
       expect(shape.props).toEqual(props);
+    });
+
+    it("should create an arrow with modern format (points only)", () => {
+      const props: ArrowProps = {
+        points: [{ x: 0, y: 0 }, { x: 100, y: 50 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "#000", width: 2 },
+      };
+      const shape = ShapeRecord.createArrow(pageId, 10, 20, props);
+
+      expect(shape.id).toMatch(/^shape:/);
+      expect(shape.type).toBe("arrow");
+      expect(shape.props.points).toEqual(props.points);
+      expect(shape.props.start).toEqual({ kind: "free" });
+      expect(shape.props.end).toEqual({ kind: "free" });
+      expect(shape.props.style).toEqual({ stroke: "#000", width: 2 });
+    });
+
+    it("should create an arrow with polyline (3+ points)", () => {
+      const props: ArrowProps = {
+        points: [{ x: 0, y: 0 }, { x: 50, y: 25 }, { x: 100, y: 50 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "#ff0000", width: 3 },
+      };
+      const shape = ShapeRecord.createArrow(pageId, 0, 0, props);
+
+      expect(shape.props.points?.length).toBe(3);
+      expect(shape.props.points).toEqual(props.points);
+    });
+
+    it("should create an arrow with bound endpoints", () => {
+      const props: ArrowProps = {
+        points: [{ x: 0, y: 0 }, { x: 100, y: 50 }],
+        start: { kind: "bound", bindingId: "binding:1" },
+        end: { kind: "bound", bindingId: "binding:2" },
+        style: { stroke: "#000", width: 2 },
+      };
+      const shape = ShapeRecord.createArrow(pageId, 0, 0, props);
+
+      expect(shape.props.start).toEqual({ kind: "bound", bindingId: "binding:1" });
+      expect(shape.props.end).toEqual({ kind: "bound", bindingId: "binding:2" });
+    });
+
+    it("should create an arrow with arrowheads", () => {
+      const style: ArrowStyle = { stroke: "#000", width: 2, headStart: true, headEnd: true };
+      const props: ArrowProps = {
+        points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style,
+      };
+      const shape = ShapeRecord.createArrow(pageId, 0, 0, props);
+
+      expect(shape.props.style?.headStart).toBe(true);
+      expect(shape.props.style?.headEnd).toBe(true);
+    });
+
+    it("should create an arrow with dash pattern", () => {
+      const style: ArrowStyle = { stroke: "#000", width: 2, dash: [5, 3] };
+      const props: ArrowProps = {
+        points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style,
+      };
+      const shape = ShapeRecord.createArrow(pageId, 0, 0, props);
+
+      expect(shape.props.style?.dash).toEqual([5, 3]);
+    });
+
+    it("should create an arrow with orthogonal routing", () => {
+      const props: ArrowProps = {
+        points: [{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 50, y: 50 }, { x: 100, y: 50 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "#000", width: 2 },
+        routing: { kind: "orthogonal", cornerRadius: 5 },
+      };
+      const shape = ShapeRecord.createArrow(pageId, 0, 0, props);
+
+      expect(shape.props.routing).toEqual({ kind: "orthogonal", cornerRadius: 5 });
+    });
+
+    it("should create an arrow with label", () => {
+      const props: ArrowProps = {
+        points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "#000", width: 2 },
+        label: { text: "Connection", align: "center", offset: 0 },
+      };
+      const shape = ShapeRecord.createArrow(pageId, 0, 0, props);
+
+      expect(shape.props.label).toEqual({ text: "Connection", align: "center", offset: 0 });
+    });
+
+    it.each([{ align: "center" as const, offset: 0 }, { align: "start" as const, offset: 10 }, {
+      align: "end" as const,
+      offset: -10,
+    }])("should create arrow with label alignment: $align", ({ align, offset }) => {
+      const props: ArrowProps = {
+        points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "#000", width: 2 },
+        label: { text: "Test", align, offset },
+      };
+      const shape = ShapeRecord.createArrow(pageId, 0, 0, props);
+
+      expect(shape.props.label?.align).toBe(align);
+      expect(shape.props.label?.offset).toBe(offset);
     });
   });
 
@@ -249,6 +362,79 @@ describe("ShapeRecord", () => {
       expect(cloned).toEqual(shape);
       expect(cloned.props).not.toBe(shape.props);
     });
+
+    it("should clone legacy arrow shape", () => {
+      const props: ArrowProps = { a: { x: 0, y: 0 }, b: { x: 100, y: 50 }, stroke: "#000", width: 2 };
+      const shape = ShapeRecord.createArrow(pageId, 0, 0, props);
+
+      const cloned = ShapeRecord.clone(shape);
+
+      expect(cloned).toEqual(shape);
+      expect(cloned.props).not.toBe(shape.props);
+      if (cloned.type === "arrow" && shape.type === "arrow") {
+        expect(cloned.props.a).not.toBe(shape.props.a);
+        expect(cloned.props.b).not.toBe(shape.props.b);
+      }
+    });
+
+    it("should clone modern arrow shape with points", () => {
+      const props: ArrowProps = {
+        points: [{ x: 0, y: 0 }, { x: 50, y: 25 }, { x: 100, y: 50 }],
+        start: { kind: "free" },
+        end: { kind: "bound", bindingId: "binding:1" },
+        style: { stroke: "#000", width: 2, dash: [5, 3] },
+        routing: { kind: "orthogonal", cornerRadius: 5 },
+        label: { text: "Test", align: "center", offset: 0 },
+      };
+      const shape = ShapeRecord.createArrow(pageId, 0, 0, props);
+
+      const cloned = ShapeRecord.clone(shape);
+
+      expect(cloned).toEqual(shape);
+      expect(cloned.props).not.toBe(shape.props);
+      if (cloned.type === "arrow" && shape.type === "arrow") {
+        expect(cloned.props.points).not.toBe(shape.props.points);
+        expect(cloned.props.start).not.toBe(shape.props.start);
+        expect(cloned.props.end).not.toBe(shape.props.end);
+        expect(cloned.props.style).not.toBe(shape.props.style);
+        expect(cloned.props.routing).not.toBe(shape.props.routing);
+        expect(cloned.props.label).not.toBe(shape.props.label);
+      }
+    });
+
+    it("should deep clone arrow points array", () => {
+      const props: ArrowProps = {
+        points: [{ x: 0, y: 0 }, { x: 100, y: 50 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "#000", width: 2 },
+      };
+      const shape = ShapeRecord.createArrow(pageId, 0, 0, props);
+
+      const cloned = ShapeRecord.clone(shape);
+
+      if (cloned.type === "arrow" && shape.type === "arrow" && cloned.props.points && shape.props.points) {
+        cloned.props.points[0].x = 999;
+        expect(shape.props.points[0].x).toBe(0);
+      }
+    });
+
+    it("should deep clone arrow style dash array", () => {
+      const props: ArrowProps = {
+        points: [{ x: 0, y: 0 }, { x: 100, y: 50 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "#000", width: 2, dash: [5, 3] },
+      };
+      const shape = ShapeRecord.createArrow(pageId, 0, 0, props);
+
+      const cloned = ShapeRecord.clone(shape);
+
+      if (cloned.type === "arrow" && shape.type === "arrow" && cloned.props.style?.dash && shape.props.style?.dash) {
+        cloned.props.style.dash[0] = 999;
+        expect(shape.props.style.dash[0]).toBe(5);
+      }
+    });
   });
 
   describe("position and rotation", () => {
@@ -312,7 +498,7 @@ describe("BindingRecord", () => {
   });
 
   describe("clone", () => {
-    it("should create a copy of the binding", () => {
+    it("should create a copy of the binding with center anchor", () => {
       const binding = BindingRecord.create("arrow1", "shape1", "start");
 
       const cloned = BindingRecord.clone(binding);
@@ -322,13 +508,63 @@ describe("BindingRecord", () => {
       expect(cloned.anchor).not.toBe(binding.anchor);
     });
 
-    it("should deep clone anchor", () => {
+    it("should deep clone center anchor", () => {
       const binding = BindingRecord.create("arrow1", "shape1", "start");
 
       const cloned = BindingRecord.clone(binding);
 
       expect(cloned.anchor).toEqual(binding.anchor);
       expect(cloned.anchor).not.toBe(binding.anchor);
+    });
+
+    it("should clone binding with edge anchor", () => {
+      const binding = BindingRecord.create("arrow1", "shape1", "end", { kind: "edge", nx: 0.5, ny: -0.5 });
+
+      const cloned = BindingRecord.clone(binding);
+
+      expect(cloned).toEqual(binding);
+      expect(cloned).not.toBe(binding);
+      expect(cloned.anchor).not.toBe(binding.anchor);
+    });
+
+    it("should deep clone edge anchor", () => {
+      const binding = BindingRecord.create("arrow1", "shape1", "start", { kind: "edge", nx: 1, ny: 0 });
+
+      const cloned = BindingRecord.clone(binding);
+
+      expect(cloned.anchor).toEqual({ kind: "edge", nx: 1, ny: 0 });
+      expect(cloned.anchor).not.toBe(binding.anchor);
+    });
+  });
+
+  describe("edge anchors", () => {
+    it("should create binding with edge anchor at right edge", () => {
+      const anchor = { kind: "edge" as const, nx: 1, ny: 0 };
+      const binding = BindingRecord.create("arrow1", "shape1", "start", anchor);
+
+      expect(binding.anchor).toEqual({ kind: "edge", nx: 1, ny: 0 });
+    });
+
+    it("should create binding with edge anchor at top-left corner", () => {
+      const anchor = { kind: "edge" as const, nx: -1, ny: -1 };
+      const binding = BindingRecord.create("arrow1", "shape1", "end", anchor);
+
+      expect(binding.anchor).toEqual({ kind: "edge", nx: -1, ny: -1 });
+    });
+
+    it.each([
+      { nx: 0, ny: 0, desc: "center" },
+      { nx: 1, ny: 0, desc: "right edge" },
+      { nx: -1, ny: 0, desc: "left edge" },
+      { nx: 0, ny: 1, desc: "bottom edge" },
+      { nx: 0, ny: -1, desc: "top edge" },
+      { nx: 0.5, ny: 0.5, desc: "bottom-right quadrant" },
+      { nx: -0.5, ny: -0.5, desc: "top-left quadrant" },
+    ])("should create binding with edge anchor at $desc", ({ nx, ny }) => {
+      const anchor = { kind: "edge" as const, nx, ny };
+      const binding = BindingRecord.create("arrow1", "shape1", "start", anchor);
+
+      expect(binding.anchor).toEqual({ kind: "edge", nx, ny });
     });
   });
 });
@@ -790,7 +1026,7 @@ describe("validateDoc", () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.errors).toContain("line shape 'shape1' has negative width");
+        expect(result.errors).toContain("Line shape 'shape1' has negative width");
       }
     });
 
@@ -867,6 +1103,224 @@ describe("validateDoc", () => {
       if (!result.ok) {
         expect(result.errors.length).toBeGreaterThan(1);
       }
+    });
+
+    it("should reject arrow with neither legacy nor modern format", () => {
+      const doc = Document.create();
+      const page = PageRecord.create("Page 1", "page1");
+      const shape = ShapeRecord.createArrow("page1", 0, 0, {}, "arrow1");
+
+      page.shapeIds = ["arrow1"];
+      doc.pages = { page1: page };
+      doc.shapes = { arrow1: shape };
+
+      const result = validateDoc(doc);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors).toContain("Arrow shape 'arrow1' missing both legacy (a, b) and modern (points) format");
+      }
+    });
+
+    it("should reject arrow with too few points in modern format", () => {
+      const doc = Document.create();
+      const page = PageRecord.create("Page 1", "page1");
+      const shape = ShapeRecord.createArrow("page1", 0, 0, {
+        points: [{ x: 0, y: 0 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "#000", width: 2 },
+      }, "arrow1");
+
+      page.shapeIds = ["arrow1"];
+      doc.pages = { page1: page };
+      doc.shapes = { arrow1: shape };
+
+      const result = validateDoc(doc);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors).toContain("Arrow shape 'arrow1' points array must have at least 2 points");
+      }
+    });
+
+    it("should reject arrow with negative width in modern format", () => {
+      const doc = Document.create();
+      const page = PageRecord.create("Page 1", "page1");
+      const shape = ShapeRecord.createArrow("page1", 0, 0, {
+        points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "#000", width: -2 },
+      }, "arrow1");
+
+      page.shapeIds = ["arrow1"];
+      doc.pages = { page1: page };
+      doc.shapes = { arrow1: shape };
+
+      const result = validateDoc(doc);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors).toContain("Arrow shape 'arrow1' has negative width in style");
+      }
+    });
+
+    it("should reject arrow with negative cornerRadius", () => {
+      const doc = Document.create();
+      const page = PageRecord.create("Page 1", "page1");
+      const shape = ShapeRecord.createArrow("page1", 0, 0, {
+        points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "#000", width: 2 },
+        routing: { kind: "orthogonal", cornerRadius: -5 },
+      }, "arrow1");
+
+      page.shapeIds = ["arrow1"];
+      doc.pages = { page1: page };
+      doc.shapes = { arrow1: shape };
+
+      const result = validateDoc(doc);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors).toContain("Arrow shape 'arrow1' has negative cornerRadius");
+      }
+    });
+
+    it("should reject arrow with invalid label alignment", () => {
+      const doc = Document.create();
+      const page = PageRecord.create("Page 1", "page1");
+      const shape = ShapeRecord.createArrow("page1", 0, 0, {
+        points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "#000", width: 2 },
+        label: { text: "Test", align: "invalid" as any, offset: 0 },
+      }, "arrow1");
+
+      page.shapeIds = ["arrow1"];
+      doc.pages = { page1: page };
+      doc.shapes = { arrow1: shape };
+
+      const result = validateDoc(doc);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors).toContain("Arrow shape 'arrow1' has invalid label alignment");
+      }
+    });
+
+    it("should reject binding with edge anchor nx out of range", () => {
+      const doc = Document.create();
+      const page = PageRecord.create("Page 1", "page1");
+      const arrow = ShapeRecord.createArrow("page1", 0, 0, {
+        a: { x: 0, y: 0 },
+        b: { x: 100, y: 0 },
+        stroke: "#000",
+        width: 2,
+      }, "arrow1");
+      const rect = ShapeRecord.createRect(
+        "page1",
+        100,
+        0,
+        { w: 50, h: 50, fill: "#fff", stroke: "#000", radius: 0 },
+        "rect1",
+      );
+      const binding = BindingRecord.create("arrow1", "rect1", "end", { kind: "edge", nx: 1.5, ny: 0 }, "binding1");
+
+      page.shapeIds = ["arrow1", "rect1"];
+      doc.pages = { page1: page };
+      doc.shapes = { arrow1: arrow, rect1: rect };
+      doc.bindings = { binding1: binding };
+
+      const result = validateDoc(doc);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors).toContain("Binding 'binding1' has invalid nx '1.5' (must be in [-1, 1])");
+      }
+    });
+
+    it("should reject binding with edge anchor ny out of range", () => {
+      const doc = Document.create();
+      const page = PageRecord.create("Page 1", "page1");
+      const arrow = ShapeRecord.createArrow("page1", 0, 0, {
+        a: { x: 0, y: 0 },
+        b: { x: 100, y: 0 },
+        stroke: "#000",
+        width: 2,
+      }, "arrow1");
+      const rect = ShapeRecord.createRect(
+        "page1",
+        100,
+        0,
+        { w: 50, h: 50, fill: "#fff", stroke: "#000", radius: 0 },
+        "rect1",
+      );
+      const binding = BindingRecord.create("arrow1", "rect1", "start", { kind: "edge", nx: 0, ny: -2 }, "binding1");
+
+      page.shapeIds = ["arrow1", "rect1"];
+      doc.pages = { page1: page };
+      doc.shapes = { arrow1: arrow, rect1: rect };
+      doc.bindings = { binding1: binding };
+
+      const result = validateDoc(doc);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors).toContain("Binding 'binding1' has invalid ny '-2' (must be in [-1, 1])");
+      }
+    });
+
+    it("should accept valid modern arrow format", () => {
+      const doc = Document.create();
+      const page = PageRecord.create("Page 1", "page1");
+      const arrow = ShapeRecord.createArrow("page1", 0, 0, {
+        points: [{ x: 0, y: 0 }, { x: 50, y: 25 }, { x: 100, y: 50 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "#000", width: 2, headStart: false, headEnd: true, dash: [5, 3] },
+        routing: { kind: "orthogonal", cornerRadius: 5 },
+        label: { text: "Connection", align: "center", offset: 0 },
+      }, "arrow1");
+
+      page.shapeIds = ["arrow1"];
+      doc.pages = { page1: page };
+      doc.shapes = { arrow1: arrow };
+
+      const result = validateDoc(doc);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it("should accept binding with valid edge anchor", () => {
+      const doc = Document.create();
+      const page = PageRecord.create("Page 1", "page1");
+      const arrow = ShapeRecord.createArrow("page1", 0, 0, {
+        points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+        start: { kind: "free" },
+        end: { kind: "bound", bindingId: "binding1" },
+        style: { stroke: "#000", width: 2 },
+      }, "arrow1");
+      const rect = ShapeRecord.createRect(
+        "page1",
+        100,
+        0,
+        { w: 50, h: 50, fill: "#fff", stroke: "#000", radius: 0 },
+        "rect1",
+      );
+      const binding = BindingRecord.create("arrow1", "rect1", "end", { kind: "edge", nx: 0.5, ny: -0.5 }, "binding1");
+
+      page.shapeIds = ["arrow1", "rect1"];
+      doc.pages = { page1: page };
+      doc.shapes = { arrow1: arrow, rect1: rect };
+      doc.bindings = { binding1: binding };
+
+      const result = validateDoc(doc);
+
+      expect(result.ok).toBe(true);
     });
   });
 
@@ -1073,6 +1527,97 @@ describe("JSON serialization", () => {
 
     doc.pages = { page1, page2 };
     doc.shapes = { shape1, shape2, shape3, shape4 };
+    doc.bindings = { binding1: binding };
+
+    const json = JSON.stringify(doc);
+    const parsed = JSON.parse(json);
+
+    expect(parsed).toEqual(doc);
+    expect(validateDoc(parsed).ok).toBe(true);
+  });
+
+  it("should round-trip arrow with modern format", () => {
+    const doc = Document.create();
+    const page = PageRecord.create("Page 1", "page1");
+    const arrow = ShapeRecord.createArrow("page1", 0, 0, {
+      points: [{ x: 0, y: 0 }, { x: 50, y: 25 }, { x: 100, y: 50 }],
+      start: { kind: "free" },
+      end: { kind: "free" },
+      style: { stroke: "#ff0000", width: 3, headStart: true, headEnd: true, dash: [5, 3] },
+      routing: { kind: "orthogonal", cornerRadius: 5 },
+      label: { text: "Connection", align: "center", offset: 0 },
+    }, "arrow1");
+
+    page.shapeIds = ["arrow1"];
+    doc.pages = { page1: page };
+    doc.shapes = { arrow1: arrow };
+
+    const json = JSON.stringify(doc);
+    const parsed = JSON.parse(json);
+
+    expect(parsed).toEqual(doc);
+    expect(validateDoc(parsed).ok).toBe(true);
+  });
+
+  it("should round-trip arrow with bound endpoints", () => {
+    const doc = Document.create();
+    const page = PageRecord.create("Page 1", "page1");
+    const arrow = ShapeRecord.createArrow("page1", 0, 0, {
+      points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+      start: { kind: "bound", bindingId: "binding1" },
+      end: { kind: "bound", bindingId: "binding2" },
+      style: { stroke: "#000", width: 2 },
+    }, "arrow1");
+    const rect1 = ShapeRecord.createRect(
+      "page1",
+      -50,
+      -25,
+      { w: 50, h: 50, fill: "#fff", stroke: "#000", radius: 0 },
+      "rect1",
+    );
+    const rect2 = ShapeRecord.createRect(
+      "page1",
+      100,
+      -25,
+      { w: 50, h: 50, fill: "#fff", stroke: "#000", radius: 0 },
+      "rect2",
+    );
+    const binding1 = BindingRecord.create("arrow1", "rect1", "start", { kind: "edge", nx: 1, ny: 0 }, "binding1");
+    const binding2 = BindingRecord.create("arrow1", "rect2", "end", { kind: "edge", nx: -1, ny: 0 }, "binding2");
+
+    page.shapeIds = ["arrow1", "rect1", "rect2"];
+    doc.pages = { page1: page };
+    doc.shapes = { arrow1: arrow, rect1: rect1, rect2: rect2 };
+    doc.bindings = { binding1, binding2 };
+
+    const json = JSON.stringify(doc);
+    const parsed = JSON.parse(json);
+
+    expect(parsed).toEqual(doc);
+    expect(validateDoc(parsed).ok).toBe(true);
+  });
+
+  it("should round-trip binding with edge anchor", () => {
+    const doc = Document.create();
+    const page = PageRecord.create("Page 1", "page1");
+    const arrow = ShapeRecord.createArrow("page1", 0, 0, {
+      a: { x: 0, y: 0 },
+      b: { x: 100, y: 0 },
+      stroke: "#000",
+      width: 2,
+    }, "arrow1");
+    const rect = ShapeRecord.createRect(
+      "page1",
+      100,
+      0,
+      { w: 50, h: 50, fill: "#fff", stroke: "#000", radius: 0 },
+      "rect1",
+    );
+    const binding = BindingRecord.create("arrow1", "rect1", "end", { kind: "edge", nx: -0.5, ny: 0.5 }, "binding1");
+
+    page.shapeIds = ["arrow1", "rect1"];
+    doc.pages = { page1: page };
+    doc.shapes = { arrow1: arrow, rect1: rect };
     doc.bindings = { binding1: binding };
 
     const json = JSON.stringify(doc);

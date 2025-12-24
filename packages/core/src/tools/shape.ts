@@ -605,7 +605,16 @@ export class ArrowTool implements Tool {
 
     let newState = state;
 
-    const arrowLength = Vec2.len(shape.props.b);
+    let endPoint: Vec2;
+    if (shape.props.b) {
+      endPoint = shape.props.b;
+    } else if (shape.props.points && shape.props.points.length >= 2) {
+      endPoint = shape.props.points[shape.props.points.length - 1];
+    } else {
+      endPoint = { x: 0, y: 0 };
+    }
+
+    const arrowLength = Vec2.len(endPoint);
     if (arrowLength < MIN_SHAPE_SIZE) {
       newState = this.cancelShapeCreation(state);
     } else {
@@ -623,8 +632,19 @@ export class ArrowTool implements Tool {
     const arrow = state.doc.shapes[arrowId];
     if (!arrow || arrow.type !== "arrow") return state;
 
-    const startWorld = { x: arrow.x + arrow.props.a.x, y: arrow.y + arrow.props.a.y };
-    const endWorld = { x: arrow.x + arrow.props.b.x, y: arrow.y + arrow.props.b.y };
+    let startPoint: Vec2, endPoint: Vec2;
+    if (arrow.props.a && arrow.props.b) {
+      startPoint = arrow.props.a;
+      endPoint = arrow.props.b;
+    } else if (arrow.props.points && arrow.props.points.length >= 2) {
+      startPoint = arrow.props.points[0];
+      endPoint = arrow.props.points[arrow.props.points.length - 1];
+    } else {
+      return state;
+    }
+
+    const startWorld = { x: arrow.x + startPoint.x, y: arrow.y + startPoint.y };
+    const endWorld = { x: arrow.x + endPoint.x, y: arrow.y + endPoint.y };
 
     const newBindings = { ...state.doc.bindings };
 

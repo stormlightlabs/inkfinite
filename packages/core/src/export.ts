@@ -204,29 +204,43 @@ function lineToSVG(shape: LineShape, transform: string): string {
 }
 
 function arrowToSVG(shape: ArrowShape, transform: string, _state: EditorState): string {
-  const { a, b, stroke, width } = shape.props;
+  let startPoint, endPoint, strokeColor, strokeWidth;
 
-  const angle = Math.atan2(b.y - a.y, b.x - a.x);
+  if (shape.props.a && shape.props.b) {
+    startPoint = shape.props.a;
+    endPoint = shape.props.b;
+    strokeColor = shape.props.stroke || "#000";
+    strokeWidth = shape.props.width || 2;
+  } else if (shape.props.points && shape.props.points.length >= 2) {
+    startPoint = shape.props.points[0];
+    endPoint = shape.props.points[shape.props.points.length - 1];
+    strokeColor = shape.props.style?.stroke || "#000";
+    strokeWidth = shape.props.style?.width || 2;
+  } else {
+    return `<g transform="${transform}"></g>`;
+  }
+
+  const angle = Math.atan2(endPoint.y - startPoint.y, endPoint.x - startPoint.x);
   const arrowLength = 15;
   const arrowAngle = Math.PI / 6;
 
   const arrowPoint1 = {
-    x: b.x - arrowLength * Math.cos(angle - arrowAngle),
-    y: b.y - arrowLength * Math.sin(angle - arrowAngle),
+    x: endPoint.x - arrowLength * Math.cos(angle - arrowAngle),
+    y: endPoint.y - arrowLength * Math.sin(angle - arrowAngle),
   };
 
   const arrowPoint2 = {
-    x: b.x - arrowLength * Math.cos(angle + arrowAngle),
-    y: b.y - arrowLength * Math.sin(angle + arrowAngle),
+    x: endPoint.x - arrowLength * Math.cos(angle + arrowAngle),
+    y: endPoint.y - arrowLength * Math.sin(angle + arrowAngle),
   };
 
-  const strokeAttribute = `stroke="${escapeXML(stroke)}" stroke-width="${width}"`;
+  const strokeAttribute = `stroke="${escapeXML(strokeColor)}" stroke-width="${strokeWidth}"`;
 
   return [
     `<g transform="${transform}">`,
-    `  <line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" ${strokeAttribute}/>`,
-    `  <line x1="${b.x}" y1="${b.y}" x2="${arrowPoint1.x}" y2="${arrowPoint1.y}" ${strokeAttribute}/>`,
-    `  <line x1="${b.x}" y1="${b.y}" x2="${arrowPoint2.x}" y2="${arrowPoint2.y}" ${strokeAttribute}/>`,
+    `  <line x1="${startPoint.x}" y1="${startPoint.y}" x2="${endPoint.x}" y2="${endPoint.y}" ${strokeAttribute}/>`,
+    `  <line x1="${endPoint.x}" y1="${endPoint.y}" x2="${arrowPoint1.x}" y2="${arrowPoint1.y}" ${strokeAttribute}/>`,
+    `  <line x1="${endPoint.x}" y1="${endPoint.y}" x2="${arrowPoint2.x}" y2="${arrowPoint2.y}" ${strokeAttribute}/>`,
     `</g>`,
   ].join("\n");
 }

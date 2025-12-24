@@ -462,10 +462,23 @@ export class SelectTool implements Tool {
         { id: "w", position: { x: minX, y: centerY } },
         { id: "rotate", position: { x: centerX, y: minY - ROTATE_HANDLE_OFFSET } },
       );
-    } else if (shape.type === "line" || shape.type === "arrow") {
+    } else if (shape.type === "line") {
       const start = this.localToWorld(shape, shape.props.a);
       const end = this.localToWorld(shape, shape.props.b);
       handles.push({ id: "line-start", position: start }, { id: "line-end", position: end });
+    } else if (shape.type === "arrow") {
+      // TODO: do away with legacy format
+      if (shape.props.a && shape.props.b) {
+        const start = this.localToWorld(shape, shape.props.a);
+        const end = this.localToWorld(shape, shape.props.b);
+        handles.push({ id: "line-start", position: start }, { id: "line-end", position: end });
+      } else if (shape.props.points && shape.props.points.length >= 2) {
+        const firstPoint = shape.props.points[0];
+        const lastPoint = shape.props.points[shape.props.points.length - 1];
+        const start = this.localToWorld(shape, firstPoint);
+        const end = this.localToWorld(shape, lastPoint);
+        handles.push({ id: "line-start", position: start }, { id: "line-end", position: end });
+      }
     }
     return handles;
   }
@@ -541,12 +554,44 @@ export class SelectTool implements Tool {
     if (initial.type !== "line" && initial.type !== "arrow") {
       return null;
     }
-    const startWorld = this.localToWorld(initial, initial.props.a);
-    const endWorld = this.localToWorld(initial, initial.props.b);
+
+    let startPoint: Vec2, endPoint: Vec2;
+
+    if (initial.type === "line") {
+      startPoint = initial.props.a;
+      endPoint = initial.props.b;
+    } else {
+      if (initial.props.a && initial.props.b) {
+        startPoint = initial.props.a;
+        endPoint = initial.props.b;
+      } else if (initial.props.points && initial.props.points.length >= 2) {
+        startPoint = initial.props.points[0];
+        endPoint = initial.props.points[initial.props.points.length - 1];
+      } else {
+        return null;
+      }
+    }
+
+    const startWorld = this.localToWorld(initial, startPoint);
+    const endWorld = this.localToWorld(initial, endPoint);
     const newStart = handle === "line-start" ? pointer : startWorld;
     const newEnd = handle === "line-end" ? pointer : endWorld;
-    const newProps = { ...initial.props, a: { x: 0, y: 0 }, b: { x: newEnd.x - newStart.x, y: newEnd.y - newStart.y } };
-    return { ...initial, x: newStart.x, y: newStart.y, props: newProps };
+
+    if (initial.type === "line") {
+      const newProps = {
+        ...initial.props,
+        a: { x: 0, y: 0 },
+        b: { x: newEnd.x - newStart.x, y: newEnd.y - newStart.y },
+      };
+      return { ...initial, x: newStart.x, y: newStart.y, props: newProps };
+    } else {
+      const newProps = {
+        ...initial.props,
+        a: { x: 0, y: 0 },
+        b: { x: newEnd.x - newStart.x, y: newEnd.y - newStart.y },
+      };
+      return { ...initial, x: newStart.x, y: newStart.y, props: newProps };
+    }
   }
 
   private rotateShape(initial: ShapeRecord, pointer: Vec2): ShapeRecord | null {

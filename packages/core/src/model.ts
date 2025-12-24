@@ -31,7 +31,47 @@ export const PageRecord = {
 export type RectProps = { w: number; h: number; fill: string; stroke: string; radius: number };
 export type EllipseProps = { w: number; h: number; fill: string; stroke: string };
 export type LineProps = { a: Vec2; b: Vec2; stroke: string; width: number };
-export type ArrowProps = { a: Vec2; b: Vec2; stroke: string; width: number };
+
+/**
+ * Arrow endpoint binding metadata
+ */
+export type ArrowEndpoint = { kind: "free" | "bound"; bindingId?: string };
+
+/**
+ * Arrow style configuration
+ */
+export type ArrowStyle = { stroke: string; width: number; headStart?: boolean; headEnd?: boolean; dash?: number[] };
+
+/**
+ * Arrow routing configuration
+ */
+export type ArrowRouting = { kind: "straight" | "orthogonal"; cornerRadius?: number };
+
+/**
+ * Arrow label configuration
+ */
+export type ArrowLabel = { text: string; align: "center" | "start" | "end"; offset: number };
+
+/**
+ * Arrow properties supporting both legacy (a, b) and modern (points) formats
+ * Legacy format: { a, b, stroke, width }
+ * Modern format: { points, start, end, style, routing?, label? }
+ */
+export type ArrowProps = {
+  // TODO: do away with legacy format (for backward compatibility
+  a?: Vec2;
+  b?: Vec2;
+  stroke?: string;
+  width?: number;
+
+  points?: Vec2[];
+  start?: ArrowEndpoint;
+  end?: ArrowEndpoint;
+  style?: ArrowStyle;
+  routing?: ArrowRouting;
+  label?: ArrowLabel;
+};
+
 export type TextProps = { text: string; fontSize: number; fontFamily: string; color: string; w?: number };
 
 /**
@@ -134,6 +174,26 @@ export const ShapeRecord = {
         },
       };
     }
+    if (shape.type === "arrow") {
+      return {
+        ...shape,
+        props: {
+          ...shape.props,
+
+          a: shape.props.a ? { ...shape.props.a } : undefined,
+          b: shape.props.b ? { ...shape.props.b } : undefined,
+
+          points: shape.props.points ? shape.props.points.map((p) => ({ ...p })) : undefined,
+          start: shape.props.start ? { ...shape.props.start } : undefined,
+          end: shape.props.end ? { ...shape.props.end } : undefined,
+          style: shape.props.style
+            ? { ...shape.props.style, dash: shape.props.style.dash ? [...shape.props.style.dash] : undefined }
+            : undefined,
+          routing: shape.props.routing ? { ...shape.props.routing } : undefined,
+          label: shape.props.label ? { ...shape.props.label } : undefined,
+        },
+      };
+    }
     return { ...shape, props: { ...shape.props } } as ShapeRecord;
   },
 };
@@ -141,8 +201,12 @@ export const ShapeRecord = {
 export type BindingType = "arrow-end";
 export type BindingHandle = "start" | "end";
 
-// TODO: 'edge', 'corner', etc.
-export type BindingAnchor = { kind: "center" };
+/**
+ * Binding anchor configuration
+ * - center: bind to shape center
+ * - edge: bind to shape edge with normalized coordinates (nx, ny in [-1, 1])
+ */
+export type BindingAnchor = { kind: "center" } | { kind: "edge"; nx: number; ny: number };
 
 export type BindingRecord = {
   id: string;
@@ -174,7 +238,7 @@ export const BindingRecord = {
    * Clone a binding record
    */
   clone(binding: BindingRecord): BindingRecord {
-    return { ...binding, anchor: { ...binding.anchor } };
+    return { ...binding, anchor: binding.anchor.kind === "edge" ? { ...binding.anchor } : { kind: "center" } };
   },
 };
 
@@ -248,9 +312,46 @@ export function validateDoc(document: Document): ValidationResult {
 
         break;
       }
-      case "line":
+      case "line": {
+        if (shape.props.width < 0) errors.push(`Line shape '${shapeId}' has negative width`);
+
+        break;
+      }
       case "arrow": {
-        if (shape.props.width < 0) errors.push(`${shape.type} shape '${shapeId}' has negative width`);
+        const props = shape.props;
+        const isLegacy = props.a !== undefined && props.b !== undefined;
+        const isModern = props.points !== undefined;
+
+        if (!isLegacy && !isModern) {
+          errors.push(`Arrow shape '${shapeId}' missing both legacy (a, b) and modern (points) format`);
+        }
+
+        if (isLegacy) {
+          if (props.width !== undefined && props.width < 0) {
+            errors.push(`Arrow shape '${shapeId}' has negative width in legacy format`);
+          }
+        }
+
+        if (isModern) {
+          if (!props.points || props.points.length < 2) {
+            errors.push(`Arrow shape '${shapeId}' points array must have at least 2 points`);
+          }
+          if (props.style) {
+            if (props.style.width < 0) {
+              errors.push(`Arrow shape '${shapeId}' has negative width in style`);
+            }
+          }
+          if (props.routing) {
+            if (props.routing.cornerRadius !== undefined && props.routing.cornerRadius < 0) {
+              errors.push(`Arrow shape '${shapeId}' has negative cornerRadius`);
+            }
+          }
+          if (props.label) {
+            if (!["center", "start", "end"].includes(props.label.align)) {
+              errors.push(`Arrow shape '${shapeId}' has invalid label alignment`);
+            }
+          }
+        }
 
         break;
       }
@@ -313,6 +414,15 @@ export function validateDoc(document: Document): ValidationResult {
 
     if (binding.handle !== "start" && binding.handle !== "end") {
       errors.push(`Binding '${bindingId}' has invalid handle '${binding.handle}'`);
+    }
+
+    if (binding.anchor.kind === "edge") {
+      if (binding.anchor.nx < -1 || binding.anchor.nx > 1) {
+        errors.push(`Binding '${bindingId}' has invalid nx '${binding.anchor.nx}' (must be in [-1, 1])`);
+      }
+      if (binding.anchor.ny < -1 || binding.anchor.ny > 1) {
+        errors.push(`Binding '${bindingId}' has invalid ny '${binding.anchor.ny}' (must be in [-1, 1])`);
+      }
     }
   }
 
