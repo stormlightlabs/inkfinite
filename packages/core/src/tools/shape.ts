@@ -558,10 +558,11 @@ export class ArrowTool implements Tool {
     const shapeId = createId("shape");
 
     const shape = ShapeRecord.createArrow(currentPage.id, action.world.x, action.world.y, {
-      a: { x: 0, y: 0 },
-      b: { x: 0, y: 0 },
-      stroke: "#495057",
-      width: 2,
+      points: [{ x: 0, y: 0 }, { x: 0, y: 0 }],
+      start: { kind: "free" },
+      end: { kind: "free" },
+      style: { stroke: "#495057", width: 2, headEnd: true },
+      routing: { kind: "straight" },
     }, shapeId);
 
     this.toolState.isCreating = true;
@@ -589,7 +590,8 @@ export class ArrowTool implements Tool {
     if (!shape || shape.type !== "arrow") return state;
 
     const b = Vec2.sub(action.world, this.toolState.startWorld);
-    const updatedShape = { ...shape, props: { ...shape.props, b } };
+    const updatedPoints = [{ x: 0, y: 0 }, b];
+    const updatedShape = { ...shape, props: { ...shape.props, points: updatedPoints } };
 
     return {
       ...state,
@@ -605,15 +607,14 @@ export class ArrowTool implements Tool {
 
     let newState = state;
 
-    let endPoint: Vec2;
-    if (shape.props.b) {
-      endPoint = shape.props.b;
-    } else if (shape.props.points && shape.props.points.length >= 2) {
-      endPoint = shape.props.points[shape.props.points.length - 1];
-    } else {
-      endPoint = { x: 0, y: 0 };
+    const points = shape.props.points;
+    if (!points || points.length < 2) {
+      newState = this.cancelShapeCreation(state);
+      this.resetToolState();
+      return newState;
     }
 
+    const endPoint = points[points.length - 1];
     const arrowLength = Vec2.len(endPoint);
     if (arrowLength < MIN_SHAPE_SIZE) {
       newState = this.cancelShapeCreation(state);
@@ -632,21 +633,17 @@ export class ArrowTool implements Tool {
     const arrow = state.doc.shapes[arrowId];
     if (!arrow || arrow.type !== "arrow") return state;
 
-    let startPoint: Vec2, endPoint: Vec2;
-    if (arrow.props.a && arrow.props.b) {
-      startPoint = arrow.props.a;
-      endPoint = arrow.props.b;
-    } else if (arrow.props.points && arrow.props.points.length >= 2) {
-      startPoint = arrow.props.points[0];
-      endPoint = arrow.props.points[arrow.props.points.length - 1];
-    } else {
-      return state;
-    }
+    const points = arrow.props.points;
+    if (!points || points.length < 2) return state;
+
+    const startPoint = points[0];
+    const endPoint = points[points.length - 1];
 
     const startWorld = { x: arrow.x + startPoint.x, y: arrow.y + startPoint.y };
     const endWorld = { x: arrow.x + endPoint.x, y: arrow.y + endPoint.y };
 
     const newBindings = { ...state.doc.bindings };
+    let updatedArrow = arrow;
 
     const stateWithoutArrow = {
       ...state,
@@ -667,6 +664,10 @@ export class ArrowTool implements Tool {
           ny: anchor.ny,
         });
         newBindings[binding.id] = binding;
+        updatedArrow = {
+          ...updatedArrow,
+          props: { ...updatedArrow.props, start: { kind: "bound", bindingId: binding.id } },
+        };
       }
     }
 
@@ -677,10 +678,17 @@ export class ArrowTool implements Tool {
         const anchor = computeNormalizedAnchor(endWorld, targetShape);
         const binding = BindingRecord.create(arrowId, endHitId, "end", { kind: "edge", nx: anchor.nx, ny: anchor.ny });
         newBindings[binding.id] = binding;
+        updatedArrow = {
+          ...updatedArrow,
+          props: { ...updatedArrow.props, end: { kind: "bound", bindingId: binding.id } },
+        };
       }
     }
 
-    return { ...state, doc: { ...state.doc, bindings: newBindings } };
+    return {
+      ...state,
+      doc: { ...state.doc, bindings: newBindings, shapes: { ...state.doc.shapes, [arrowId]: updatedArrow } },
+    };
   }
 
   private handleKeyDown(state: EditorState, action: Action): EditorState {

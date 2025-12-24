@@ -916,7 +916,7 @@ describe("ArrowTool", () => {
     const shape = result.doc.shapes[shapeId];
 
     expect(shape.type).toBe("arrow");
-    expect((shape.props as ArrowProps).b).toEqual({ x: 200, y: 100 });
+    expect((shape.props as ArrowProps).points[1]).toEqual({ x: 200, y: 100 });
   });
 
   it("should remove arrow if too short on pointer up", () => {

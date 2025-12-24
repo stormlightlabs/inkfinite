@@ -173,15 +173,6 @@ describe("ShapeRecord", () => {
   });
 
   describe("createArrow", () => {
-    it("should create an arrow shape with legacy format", () => {
-      const props: ArrowProps = { a: { x: 0, y: 0 }, b: { x: 100, y: 50 }, stroke: "#000", width: 2 };
-      const shape = ShapeRecord.createArrow(pageId, 10, 20, props);
-
-      expect(shape.id).toMatch(/^shape:/);
-      expect(shape.type).toBe("arrow");
-      expect(shape.props).toEqual(props);
-    });
-
     it("should create an arrow with modern format (points only)", () => {
       const props: ArrowProps = {
         points: [{ x: 0, y: 0 }, { x: 100, y: 50 }],
@@ -361,20 +352,6 @@ describe("ShapeRecord", () => {
 
       expect(cloned).toEqual(shape);
       expect(cloned.props).not.toBe(shape.props);
-    });
-
-    it("should clone legacy arrow shape", () => {
-      const props: ArrowProps = { a: { x: 0, y: 0 }, b: { x: 100, y: 50 }, stroke: "#000", width: 2 };
-      const shape = ShapeRecord.createArrow(pageId, 0, 0, props);
-
-      const cloned = ShapeRecord.clone(shape);
-
-      expect(cloned).toEqual(shape);
-      expect(cloned.props).not.toBe(shape.props);
-      if (cloned.type === "arrow" && shape.type === "arrow") {
-        expect(cloned.props.a).not.toBe(shape.props.a);
-        expect(cloned.props.b).not.toBe(shape.props.b);
-      }
     });
 
     it("should clone modern arrow shape with points", () => {
@@ -687,10 +664,10 @@ describe("validateDoc", () => {
       const doc = Document.create();
       const page = PageRecord.create("Page 1", "page1");
       const arrow = ShapeRecord.createArrow("page1", 0, 0, {
-        a: { x: 0, y: 0 },
-        b: { x: 100, y: 0 },
-        stroke: "#000",
-        width: 2,
+        points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "#000", width: 2 },
       }, "arrow1");
       const rect = ShapeRecord.createRect(
         "page1",
@@ -864,10 +841,10 @@ describe("validateDoc", () => {
       const doc = Document.create();
       const page = PageRecord.create("Page 1", "page1");
       const arrow = ShapeRecord.createArrow("page1", 0, 0, {
-        a: { x: 0, y: 0 },
-        b: { x: 100, y: 0 },
-        stroke: "#000",
-        width: 2,
+        points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "#000", width: 2 },
       }, "arrow1");
       const binding = BindingRecord.create("arrow1", "nonexistent", "end", { kind: "center" }, "binding1");
 
@@ -1105,10 +1082,10 @@ describe("validateDoc", () => {
       }
     });
 
-    it("should reject arrow with neither legacy nor modern format", () => {
+    it("should reject arrow with missing required fields", () => {
       const doc = Document.create();
       const page = PageRecord.create("Page 1", "page1");
-      const shape = ShapeRecord.createArrow("page1", 0, 0, {}, "arrow1");
+      const shape = ShapeRecord.createArrow("page1", 0, 0, {} as any, "arrow1");
 
       page.shapeIds = ["arrow1"];
       doc.pages = { page1: page };
@@ -1117,9 +1094,7 @@ describe("validateDoc", () => {
       const result = validateDoc(doc);
 
       expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.errors).toContain("Arrow shape 'arrow1' missing both legacy (a, b) and modern (points) format");
-      }
+      // Arrow is invalid because it has no points or style
     });
 
     it("should reject arrow with too few points in modern format", () => {
@@ -1216,10 +1191,10 @@ describe("validateDoc", () => {
       const doc = Document.create();
       const page = PageRecord.create("Page 1", "page1");
       const arrow = ShapeRecord.createArrow("page1", 0, 0, {
-        a: { x: 0, y: 0 },
-        b: { x: 100, y: 0 },
-        stroke: "#000",
-        width: 2,
+        points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "#000", width: 2 },
       }, "arrow1");
       const rect = ShapeRecord.createRect(
         "page1",
@@ -1247,10 +1222,10 @@ describe("validateDoc", () => {
       const doc = Document.create();
       const page = PageRecord.create("Page 1", "page1");
       const arrow = ShapeRecord.createArrow("page1", 0, 0, {
-        a: { x: 0, y: 0 },
-        b: { x: 100, y: 0 },
-        stroke: "#000",
-        width: 2,
+        points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "#000", width: 2 },
       }, "arrow1");
       const rect = ShapeRecord.createRect(
         "page1",
@@ -1433,10 +1408,10 @@ describe("JSON serialization", () => {
       width: 2,
     }, "shape3");
     const arrow = ShapeRecord.createArrow("page1", 300, 300, {
-      a: { x: 0, y: 0 },
-      b: { x: 100, y: 0 },
-      stroke: "#000",
-      width: 2,
+      points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+      start: { kind: "free" },
+      end: { kind: "free" },
+      style: { stroke: "#000", width: 2 },
     }, "shape4");
     const text = ShapeRecord.createText("page1", 400, 400, {
       text: "Hello World",
@@ -1461,10 +1436,10 @@ describe("JSON serialization", () => {
     const doc = Document.create();
     const page = PageRecord.create("Page 1", "page1");
     const arrow = ShapeRecord.createArrow("page1", 0, 0, {
-      a: { x: 0, y: 0 },
-      b: { x: 100, y: 0 },
-      stroke: "#000",
-      width: 2,
+      points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+      start: { kind: "free" },
+      end: { kind: "free" },
+      style: { stroke: "#000", width: 2 },
     }, "arrow1");
     const rect = ShapeRecord.createRect(
       "page1",
@@ -1507,10 +1482,10 @@ describe("JSON serialization", () => {
       "shape2",
     );
     const shape3 = ShapeRecord.createArrow("page2", 0, 0, {
-      a: { x: 0, y: 0 },
-      b: { x: 100, y: 0 },
-      stroke: "#000",
-      width: 2,
+      points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+      start: { kind: "free" },
+      end: { kind: "free" },
+      style: { stroke: "#000", width: 2 },
     }, "shape3");
     const shape4 = ShapeRecord.createRect(
       "page2",
@@ -1601,10 +1576,10 @@ describe("JSON serialization", () => {
     const doc = Document.create();
     const page = PageRecord.create("Page 1", "page1");
     const arrow = ShapeRecord.createArrow("page1", 0, 0, {
-      a: { x: 0, y: 0 },
-      b: { x: 100, y: 0 },
-      stroke: "#000",
-      width: 2,
+      points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+      start: { kind: "free" },
+      end: { kind: "free" },
+      style: { stroke: "#000", width: 2 },
     }, "arrow1");
     const rect = ShapeRecord.createRect(
       "page1",

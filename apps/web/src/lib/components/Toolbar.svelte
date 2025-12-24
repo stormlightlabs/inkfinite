@@ -92,7 +92,9 @@
 			}
 		}
 		if (strokable.length > 0) {
-			const shared = getSharedColor(strokable, (shape) => shape.props.stroke ?? null);
+			const shared = getSharedColor(strokable, (shape) =>
+				shape.type === 'arrow' ? shape.props.style.stroke : (shape.props.stroke ?? null)
+			);
 			if (shared) {
 				strokeColorValue = shared;
 			}
@@ -356,7 +358,10 @@
 					break;
 				}
 				case 'arrow': {
-					const updated: ArrowShape = { ...shape, props: { ...shape.props, stroke: color } };
+					const updated: ArrowShape = {
+						...shape,
+						props: { ...shape.props, style: { ...shape.props.style, stroke: color } }
+					};
 					newShapes[shape.id] = updated;
 					break;
 				}

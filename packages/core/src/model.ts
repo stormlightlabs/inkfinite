@@ -53,21 +53,14 @@ export type ArrowRouting = { kind: "straight" | "orthogonal"; cornerRadius?: num
 export type ArrowLabel = { text: string; align: "center" | "start" | "end"; offset: number };
 
 /**
- * Arrow properties supporting both legacy (a, b) and modern (points) formats
- * Legacy format: { a, b, stroke, width }
+ * Arrow properties using modern format
  * Modern format: { points, start, end, style, routing?, label? }
  */
 export type ArrowProps = {
-  // TODO: do away with legacy format (for backward compatibility
-  a?: Vec2;
-  b?: Vec2;
-  stroke?: string;
-  width?: number;
-
-  points?: Vec2[];
-  start?: ArrowEndpoint;
-  end?: ArrowEndpoint;
-  style?: ArrowStyle;
+  points: Vec2[];
+  start: ArrowEndpoint;
+  end: ArrowEndpoint;
+  style: ArrowStyle;
   routing?: ArrowRouting;
   label?: ArrowLabel;
 };
@@ -178,17 +171,10 @@ export const ShapeRecord = {
       return {
         ...shape,
         props: {
-          ...shape.props,
-
-          a: shape.props.a ? { ...shape.props.a } : undefined,
-          b: shape.props.b ? { ...shape.props.b } : undefined,
-
-          points: shape.props.points ? shape.props.points.map((p) => ({ ...p })) : undefined,
-          start: shape.props.start ? { ...shape.props.start } : undefined,
-          end: shape.props.end ? { ...shape.props.end } : undefined,
-          style: shape.props.style
-            ? { ...shape.props.style, dash: shape.props.style.dash ? [...shape.props.style.dash] : undefined }
-            : undefined,
+          points: shape.props.points.map((p) => ({ ...p })),
+          start: { ...shape.props.start },
+          end: { ...shape.props.end },
+          style: { ...shape.props.style, dash: shape.props.style.dash ? [...shape.props.style.dash] : undefined },
           routing: shape.props.routing ? { ...shape.props.routing } : undefined,
           label: shape.props.label ? { ...shape.props.label } : undefined,
         },
@@ -319,37 +305,23 @@ export function validateDoc(document: Document): ValidationResult {
       }
       case "arrow": {
         const props = shape.props;
-        const isLegacy = props.a !== undefined && props.b !== undefined;
-        const isModern = props.points !== undefined;
 
-        if (!isLegacy && !isModern) {
-          errors.push(`Arrow shape '${shapeId}' missing both legacy (a, b) and modern (points) format`);
+        if (!props.points || props.points.length < 2) {
+          errors.push(`Arrow shape '${shapeId}' points array must have at least 2 points`);
         }
-
-        if (isLegacy) {
-          if (props.width !== undefined && props.width < 0) {
-            errors.push(`Arrow shape '${shapeId}' has negative width in legacy format`);
+        if (!props.style) {
+          errors.push(`Arrow shape '${shapeId}' missing style`);
+        } else if (props.style.width < 0) {
+          errors.push(`Arrow shape '${shapeId}' has negative width in style`);
+        }
+        if (props.routing) {
+          if (props.routing.cornerRadius !== undefined && props.routing.cornerRadius < 0) {
+            errors.push(`Arrow shape '${shapeId}' has negative cornerRadius`);
           }
         }
-
-        if (isModern) {
-          if (!props.points || props.points.length < 2) {
-            errors.push(`Arrow shape '${shapeId}' points array must have at least 2 points`);
-          }
-          if (props.style) {
-            if (props.style.width < 0) {
-              errors.push(`Arrow shape '${shapeId}' has negative width in style`);
-            }
-          }
-          if (props.routing) {
-            if (props.routing.cornerRadius !== undefined && props.routing.cornerRadius < 0) {
-              errors.push(`Arrow shape '${shapeId}' has negative cornerRadius`);
-            }
-          }
-          if (props.label) {
-            if (!["center", "start", "end"].includes(props.label.align)) {
-              errors.push(`Arrow shape '${shapeId}' has invalid label alignment`);
-            }
+        if (props.label) {
+          if (!["center", "start", "end"].includes(props.label.align)) {
+            errors.push(`Arrow shape '${shapeId}' has invalid label alignment`);
           }
         }
 

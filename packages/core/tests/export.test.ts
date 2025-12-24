@@ -81,10 +81,11 @@ describe("exportToSVG", () => {
     const { state, pageId } = createTestState();
 
     const arrow = ShapeRecord.createArrow(pageId, 0, 0, {
-      a: { x: 0, y: 0 },
-      b: { x: 100, y: 0 },
-      stroke: "black",
-      width: 2,
+      points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+      start: { kind: "free" },
+      end: { kind: "free" },
+      style: { stroke: "black", width: 2, headEnd: true },
+      routing: { kind: "straight" },
     });
 
     state.doc.shapes[arrow.id] = arrow;

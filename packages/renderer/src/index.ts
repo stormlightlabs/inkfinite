@@ -13,7 +13,13 @@ import type {
   Vec2,
   Viewport,
 } from "inkfinite-core";
-import { computeOutline, getShapesOnCurrentPage, resolveArrowEndpoints, shapeBounds } from "inkfinite-core";
+import {
+  computeOrthogonalPath,
+  computeOutline,
+  getShapesOnCurrentPage,
+  resolveArrowEndpoints,
+  shapeBounds,
+} from "inkfinite-core";
 
 export interface Renderer {
   /**
@@ -416,10 +422,7 @@ function drawLine(context: CanvasRenderingContext2D, shape: LineShape) {
  * Draw an arrow shape
  */
 function drawArrow(context: CanvasRenderingContext2D, state: EditorState, shape: ArrowShape) {
-  const legacyStroke = shape.props.stroke;
-  const legacyWidth = shape.props.width;
-  const modernStyle = shape.props.style;
-  const style = modernStyle ?? { stroke: legacyStroke ?? "#000", width: legacyWidth ?? 2 };
+  const style = shape.props.style;
 
   const resolved = resolveArrowEndpoints(state, shape.id);
   if (!resolved) return;
@@ -428,15 +431,16 @@ function drawArrow(context: CanvasRenderingContext2D, state: EditorState, shape:
   const b = { x: resolved.b.x - shape.x, y: resolved.b.y - shape.y };
 
   let points: Vec2[];
-  const modernPoints = shape.props.points;
-  if (modernPoints && modernPoints.length >= 2) {
-    points = modernPoints.map((p: Vec2, index: number) => {
+
+  // Use orthogonal routing if specified
+  if (shape.props.routing?.kind === "orthogonal") {
+    points = computeOrthogonalPath(a, b);
+  } else {
+    points = shape.props.points.map((p: Vec2, index: number) => {
       if (index === 0) return a;
-      if (index === modernPoints.length - 1) return b;
+      if (index === shape.props.points.length - 1) return b;
       return p;
     });
-  } else {
-    points = [a, b];
   }
 
   context.beginPath();
@@ -849,8 +853,18 @@ function getHandlesForShape(state: EditorState, shape: ShapeRecord): HandleVisua
 
   if (shape.type === "arrow") {
     const resolved = resolveArrowEndpoints(state, shape.id);
-    if (resolved) {
-      handles.push({ id: "line-start", position: resolved.a }, { id: "line-end", position: resolved.b });
+    if (resolved && shape.props.points && shape.props.points.length >= 2) {
+      // Show handles for all points
+      handles.push({ id: "line-start", position: resolved.a });
+
+      // Add intermediate point handles
+      for (let i = 1; i < shape.props.points.length - 1; i++) {
+        const point = shape.props.points[i];
+        const worldPos = localToWorld(shape, point);
+        handles.push({ id: `arrow-point-${i}`, position: worldPos });
+      }
+
+      handles.push({ id: "line-end", position: resolved.b });
     }
     return handles;
   }

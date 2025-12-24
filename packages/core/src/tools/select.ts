@@ -35,7 +35,7 @@ type SelectToolState = {
 
 type RectHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
-type HandleKind = RectHandle | "rotate" | "line-start" | "line-end";
+type HandleKind = RectHandle | "rotate" | "line-start" | "line-end" | `arrow-point-${number}`;
 
 const HANDLE_HIT_RADIUS = 10;
 const ROTATE_HANDLE_OFFSET = 40;
@@ -109,6 +109,17 @@ export class SelectTool implements Tool {
    */
   private handlePointerDown(state: EditorState, action: Action): EditorState {
     if (action.type !== "pointer-down") return state;
+
+    if (action.modifiers.alt && state.ui.selectionIds.length === 1) {
+      const shapeId = state.ui.selectionIds[0];
+      const shape = state.doc.shapes[shapeId];
+      if (shape?.type === "arrow") {
+        const result = this.tryAddPointToArrowSegment(state, shape, action.world);
+        if (result) {
+          return result;
+        }
+      }
+    }
 
     const handleHit = this.hitTestHandle(state, action.world);
     if (handleHit) {
@@ -241,7 +252,11 @@ export class SelectTool implements Tool {
     let updated: ShapeRecord | null = null;
     if (this.toolState.activeHandle === "rotate") {
       updated = this.rotateShape(initialShape, action.world);
-    } else if (this.toolState.activeHandle === "line-start" || this.toolState.activeHandle === "line-end") {
+    } else if (
+      this.toolState.activeHandle === "line-start"
+      || this.toolState.activeHandle === "line-end"
+      || this.toolState.activeHandle.startsWith("arrow-point-")
+    ) {
       updated = this.resizeLineShape(initialShape, action.world, this.toolState.activeHandle);
     } else if (this.toolState.handleStartBounds) {
       updated = this.resizeRectLikeShape(
@@ -363,6 +378,15 @@ export class SelectTool implements Tool {
     }
 
     if (action.key === "Delete" || action.key === "Backspace") {
+      if (
+        this.toolState.activeHandle
+        && typeof this.toolState.activeHandle === "string"
+        && this.toolState.activeHandle.startsWith("arrow-point-")
+        && this.toolState.handleShapeId
+      ) {
+        return this.removeArrowPoint(state, this.toolState.handleShapeId, this.toolState.activeHandle);
+      }
+
       return this.deleteSelectedShapes(state);
     }
 
@@ -474,17 +498,19 @@ export class SelectTool implements Tool {
       const end = this.localToWorld(shape, shape.props.b);
       handles.push({ id: "line-start", position: start }, { id: "line-end", position: end });
     } else if (shape.type === "arrow") {
-      // TODO: do away with legacy format
-      if (shape.props.a && shape.props.b) {
-        const start = this.localToWorld(shape, shape.props.a);
-        const end = this.localToWorld(shape, shape.props.b);
-        handles.push({ id: "line-start", position: start }, { id: "line-end", position: end });
-      } else if (shape.props.points && shape.props.points.length >= 2) {
-        const firstPoint = shape.props.points[0];
-        const lastPoint = shape.props.points[shape.props.points.length - 1];
-        const start = this.localToWorld(shape, firstPoint);
-        const end = this.localToWorld(shape, lastPoint);
-        handles.push({ id: "line-start", position: start }, { id: "line-end", position: end });
+      if (shape.props.points && shape.props.points.length >= 2) {
+        for (let i = 0; i < shape.props.points.length; i++) {
+          const point = shape.props.points[i];
+          const worldPos = this.localToWorld(shape, point);
+
+          if (i === 0) {
+            handles.push({ id: "line-start", position: worldPos });
+          } else if (i === shape.props.points.length - 1) {
+            handles.push({ id: "line-end", position: worldPos });
+          } else {
+            handles.push({ id: `arrow-point-${i}` as HandleKind, position: worldPos });
+          }
+        }
       }
     }
     return handles;
@@ -557,8 +583,29 @@ export class SelectTool implements Tool {
     return { ...initial, x: minX, y: minY, props: { ...initial.props, w: width, h: height } };
   }
 
-  private resizeLineShape(initial: ShapeRecord, pointer: Vec2, handle: "line-start" | "line-end"): ShapeRecord | null {
+  private resizeLineShape(initial: ShapeRecord, pointer: Vec2, handle: HandleKind): ShapeRecord | null {
     if (initial.type !== "line" && initial.type !== "arrow") {
+      return null;
+    }
+
+    if (initial.type === "arrow" && typeof handle === "string" && handle.startsWith("arrow-point-")) {
+      const pointIndex = Number.parseInt(handle.replace("arrow-point-", ""), 10);
+      if (!initial.props.points || pointIndex < 1 || pointIndex >= initial.props.points.length - 1) {
+        return null;
+      }
+
+      const newPoints = initial.props.points.map((p, i) => {
+        if (i === pointIndex) {
+          return { x: pointer.x - initial.x, y: pointer.y - initial.y };
+        }
+        return p;
+      });
+
+      const newProps = { ...initial.props, points: newPoints };
+      return { ...initial, props: newProps };
+    }
+
+    if (handle !== "line-start" && handle !== "line-end") {
       return null;
     }
 
@@ -568,15 +615,11 @@ export class SelectTool implements Tool {
       startPoint = initial.props.a;
       endPoint = initial.props.b;
     } else {
-      if (initial.props.a && initial.props.b) {
-        startPoint = initial.props.a;
-        endPoint = initial.props.b;
-      } else if (initial.props.points && initial.props.points.length >= 2) {
-        startPoint = initial.props.points[0];
-        endPoint = initial.props.points[initial.props.points.length - 1];
-      } else {
+      if (!initial.props.points || initial.props.points.length < 2) {
         return null;
       }
+      startPoint = initial.props.points[0];
+      endPoint = initial.props.points[initial.props.points.length - 1];
     }
 
     const startWorld = this.localToWorld(initial, startPoint);
@@ -592,11 +635,18 @@ export class SelectTool implements Tool {
       };
       return { ...initial, x: newStart.x, y: newStart.y, props: newProps };
     } else {
-      const newProps = {
-        ...initial.props,
-        a: { x: 0, y: 0 },
-        b: { x: newEnd.x - newStart.x, y: newEnd.y - newStart.y },
-      };
+      const newPoints = initial.props.points.map((p, i) => {
+        if (i === 0) {
+          return { x: 0, y: 0 };
+        } else if (i === initial.props.points.length - 1) {
+          return { x: newEnd.x - newStart.x, y: newEnd.y - newStart.y };
+        } else {
+          const worldPos = this.localToWorld(initial, p);
+          return { x: worldPos.x - newStart.x, y: worldPos.y - newStart.y };
+        }
+      });
+
+      const newProps = { ...initial.props, points: newPoints };
       return { ...initial, x: newStart.x, y: newStart.y, props: newProps };
     }
   }
@@ -623,6 +673,70 @@ export class SelectTool implements Tool {
     const cos = Math.cos(shape.rot);
     const sin = Math.sin(shape.rot);
     return { x: shape.x + point.x * cos - point.y * sin, y: shape.y + point.x * sin + point.y * cos };
+  }
+
+  /**
+   * Remove an intermediate point from an arrow
+   */
+  private removeArrowPoint(state: EditorState, arrowId: string, handle: HandleKind): EditorState {
+    const arrow = state.doc.shapes[arrowId];
+    if (!arrow || arrow.type !== "arrow" || !arrow.props.points) {
+      return state;
+    }
+
+    const pointIndex = Number.parseInt((handle as string).replace("arrow-point-", ""), 10);
+    if (Number.isNaN(pointIndex) || pointIndex < 1 || pointIndex >= arrow.props.points.length - 1) {
+      return state;
+    }
+
+    const newPoints = arrow.props.points.filter((_, i) => i !== pointIndex);
+
+    if (newPoints.length < 2) {
+      return state;
+    }
+
+    const updatedArrow = { ...arrow, props: { ...arrow.props, points: newPoints } };
+
+    this.resetToolState();
+
+    return { ...state, doc: { ...state.doc, shapes: { ...state.doc.shapes, [arrowId]: updatedArrow } } };
+  }
+
+  /**
+   * Try to add a point to an arrow segment at the clicked location
+   * Returns updated state if successful, null otherwise
+   */
+  private tryAddPointToArrowSegment(state: EditorState, arrow: ShapeRecord, clickWorld: Vec2): EditorState | null {
+    if (arrow.type !== "arrow" || !arrow.props.points || arrow.props.points.length < 2) {
+      return null;
+    }
+
+    const clickLocal = { x: clickWorld.x - arrow.x, y: clickWorld.y - arrow.y };
+    const tolerance = 10;
+
+    for (let i = 0; i < arrow.props.points.length - 1; i++) {
+      const a = arrow.props.points[i];
+      const b = arrow.props.points[i + 1];
+
+      const ab = Vec2Ops.sub(b, a);
+      const ap = Vec2Ops.sub(clickLocal, a);
+      const abLengthSq = Vec2Ops.lenSq(ab);
+
+      if (abLengthSq === 0) continue;
+
+      const t = Math.max(0, Math.min(1, Vec2Ops.dot(ap, ab) / abLengthSq));
+      const projection = Vec2Ops.add(a, Vec2Ops.mulScalar(ab, t));
+      const distance = Vec2Ops.dist(clickLocal, projection);
+
+      if (distance <= tolerance) {
+        const newPoints = [...arrow.props.points.slice(0, i + 1), clickLocal, ...arrow.props.points.slice(i + 1)];
+
+        const updatedArrow = { ...arrow, props: { ...arrow.props, points: newPoints } };
+        return { ...state, doc: { ...state.doc, shapes: { ...state.doc.shapes, [arrow.id]: updatedArrow } } };
+      }
+    }
+
+    return null;
   }
 
   /**

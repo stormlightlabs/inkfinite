@@ -64,10 +64,10 @@ describe("Geometry", () => {
 
     it("should return correct bounds for arrow", () => {
       const arrow = ShapeRecord.createArrow("page:1", 20, 30, {
-        a: { x: 10, y: 10 },
-        b: { x: 50, y: 60 },
-        stroke: "",
-        width: 2,
+        points: [{ x: 10, y: 10 }, { x: 50, y: 60 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "", width: 2 },
       });
 
       const bounds = shapeBounds(arrow);
@@ -582,10 +582,10 @@ describe("Geometry", () => {
       const store = new Store();
       const page = PageRecord.create("Page 1", "page:1");
       const arrow = ShapeRecord.createArrow("page:1", 100, 100, {
-        a: { x: 0, y: 0 },
-        b: { x: 100, y: 0 },
-        stroke: "#000000",
-        width: 2,
+        points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "#000000", width: 2 },
       }, "shape:1");
 
       store.setState((state) => ({
@@ -732,10 +732,10 @@ describe("Geometry", () => {
 
     it("should return center of arrow shape", () => {
       const arrow = ShapeRecord.createArrow("page:1", 50, 50, {
-        a: { x: -50, y: -50 },
-        b: { x: 50, y: 50 },
-        stroke: "",
-        width: 2,
+        points: [{ x: -50, y: -50 }, { x: 50, y: 50 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "", width: 2 },
       });
 
       const center = shapeCenter(arrow);
@@ -758,10 +758,10 @@ describe("Geometry", () => {
       const store = new Store();
       const page = PageRecord.create("Page 1", "page:1");
       const arrow = ShapeRecord.createArrow("page:1", 100, 100, {
-        a: { x: 0, y: 0 },
-        b: { x: 100, y: 50 },
-        stroke: "",
-        width: 2,
+        points: [{ x: 0, y: 0 }, { x: 100, y: 50 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "", width: 2 },
       }, "arrow:1");
 
       store.setState((state) => ({
@@ -787,10 +787,10 @@ describe("Geometry", () => {
         "rect:1",
       );
       const arrow = ShapeRecord.createArrow("page:1", 300, 300, {
-        a: { x: -150, y: -150 },
-        b: { x: 100, y: 100 },
-        stroke: "",
-        width: 2,
+        points: [{ x: -150, y: -150 }, { x: 100, y: 100 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "", width: 2 },
       }, "arrow:1");
 
       const binding = BindingRecord.create(arrow.id, targetRect.id, "start", { kind: "center" }, "binding:1");
@@ -823,10 +823,10 @@ describe("Geometry", () => {
         "rect:1",
       );
       const arrow = ShapeRecord.createArrow("page:1", 50, 50, {
-        a: { x: 0, y: 0 },
-        b: { x: 200, y: 200 },
-        stroke: "",
-        width: 2,
+        points: [{ x: 0, y: 0 }, { x: 200, y: 200 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "", width: 2 },
       }, "arrow:1");
 
       const binding = BindingRecord.create(arrow.id, targetRect.id, "end", { kind: "center" }, "binding:1");
@@ -865,10 +865,10 @@ describe("Geometry", () => {
         "rect:2",
       );
       const arrow = ShapeRecord.createArrow("page:1", 0, 0, {
-        a: { x: 0, y: 0 },
-        b: { x: 100, y: 100 },
-        stroke: "",
-        width: 2,
+        points: [{ x: 0, y: 0 }, { x: 100, y: 100 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "", width: 2 },
       }, "arrow:1");
 
       const binding1 = BindingRecord.create(arrow.id, rect1.id, "start", { kind: "center" }, "binding:1");
@@ -895,10 +895,10 @@ describe("Geometry", () => {
       const store = new Store();
       const page = PageRecord.create("Page 1", "page:1");
       const arrow = ShapeRecord.createArrow("page:1", 100, 100, {
-        a: { x: 0, y: 0 },
-        b: { x: 100, y: 50 },
-        stroke: "",
-        width: 2,
+        points: [{ x: 0, y: 0 }, { x: 100, y: 50 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "", width: 2 },
       }, "arrow:1");
 
       const binding = BindingRecord.create(arrow.id, "nonexistent:1", "start", { kind: "center" }, "binding:1");
@@ -962,10 +962,10 @@ describe("Geometry", () => {
         "rect:1",
       );
       const arrow = ShapeRecord.createArrow("page:1", 50, 50, {
-        a: { x: 0, y: 0 },
-        b: { x: 100, y: 100 },
-        stroke: "",
-        width: 2,
+        points: [{ x: 0, y: 0 }, { x: 100, y: 100 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "", width: 2 },
       }, "arrow:1");
 
       const binding = BindingRecord.create(arrow.id, targetRect.id, "end", { kind: "center" }, "binding:1");
@@ -1008,10 +1008,10 @@ describe("Geometry", () => {
         "rect:1",
       );
       const arrow = ShapeRecord.createArrow(page.id, 0, 0, {
-        a: { x: 0, y: 0 },
-        b: { x: 100, y: 100 },
-        stroke: "#000",
-        width: 2,
+        points: [{ x: 0, y: 0 }, { x: 100, y: 100 }],
+        start: { kind: "free" },
+        end: { kind: "free" },
+        style: { stroke: "#000", width: 2 },
       }, "arrow:1");
 
       const binding = BindingRecord.create(arrow.id, targetRect.id, "end", { kind: "edge", nx: 1, ny: 0 });

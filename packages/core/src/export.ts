@@ -204,21 +204,15 @@ function lineToSVG(shape: LineShape, transform: string): string {
 }
 
 function arrowToSVG(shape: ArrowShape, transform: string, _state: EditorState): string {
-  let startPoint, endPoint, strokeColor, strokeWidth;
-
-  if (shape.props.a && shape.props.b) {
-    startPoint = shape.props.a;
-    endPoint = shape.props.b;
-    strokeColor = shape.props.stroke || "#000";
-    strokeWidth = shape.props.width || 2;
-  } else if (shape.props.points && shape.props.points.length >= 2) {
-    startPoint = shape.props.points[0];
-    endPoint = shape.props.points[shape.props.points.length - 1];
-    strokeColor = shape.props.style?.stroke || "#000";
-    strokeWidth = shape.props.style?.width || 2;
-  } else {
+  const points = shape.props.points;
+  if (!points || points.length < 2) {
     return `<g transform="${transform}"></g>`;
   }
+
+  const startPoint = points[0];
+  const endPoint = points[points.length - 1];
+  const strokeColor = shape.props.style.stroke;
+  const strokeWidth = shape.props.style.width;
 
   const angle = Math.atan2(endPoint.y - startPoint.y, endPoint.x - startPoint.x);
   const arrowLength = 15;

@@ -1,6 +1,5 @@
 ================================================================================
 
-Author intent:
 - Build a Svelte-native editor core (TS) + renderer + UI.
 - Keep the "engine" framework-agnostic so Web + Tauri share it.
 - Defer collaboration until single-player is correct.
@@ -11,129 +10,12 @@ Conventions:
 - Files shown are ideas, not requirements
 
 ================================================================================
-1. Milestone A: Repo skeleton + dev loop                                  *wb-A*
-================================================================================
-
-Created a project monorepo/workspace.
-
-================================================================================
-2. Milestone B: Math + coordinate systems                                 *wb-B*
-================================================================================
-
-Camera math, matrix utilities, and transforms are fully implemented and verified
-so world and screen coordinates map precisely.
-
-================================================================================
-3. Milestone C: Document model (records)                                  *wb-C*
-================================================================================
-
-Document/page/shape/binding records plus validation let the editor serialize and
-reason about drawings safely.
-
-================================================================================
-4. Milestone D: Store + selectors (reactive core)                         *wb-D*
-================================================================================
-
-The reactive store, invariants, and selectors supply deterministic state streams
-for both renderer and UI subscribers.
-
-================================================================================
-5. Milestone E: Canvas renderer (read-only)                               *wb-E*
-================================================================================
-
-The renderer now draws the document via Canvas2D with camera transforms,
-DPI scaling, text sizing, and selection outlines.
-
-================================================================================
-6. Milestone F: Hit testing (picking)                                     *wb-F*
-================================================================================
-
-Geometry helpers compute bounds and intersections so hit testing can always
-return the topmost shape under the cursor.
-
-================================================================================
-7. Milestone G: Input system (pointer + keyboard)                         *wb-G*
-================================================================================
-
-Pointer and keyboard adapters now normalize events, map them into actions, and
-feed the editor consistently across platforms.
-
-================================================================================
-8. Milestone H: Tool state machine (foundation)                           *wb-H*
-================================================================================
-
-Tool interfaces and the router manage lifecycle hooks so each tool is an
-explicit, testable state machine.
-
-
-================================================================================
-9. Milestone I: Select/move tool (MVP interaction)                        *wb-I*
-================================================================================
-
-Selection logic handles hit selection, marquee, dragging, deletion, and escape
-so shapes can be moved reliably.
-
-================================================================================
-10. Milestone J: Create basic shapes via tools                            *wb-J*
-================================================================================
-
-Rect, ellipse, line, arrow, and text tools now create shapes via click-drag
-interactions with proper finalize/cancel behavior.
-
-================================================================================
-11. Milestone K: Bindings for arrows (v0)                                 *wb-K*
-================================================================================
-
-Arrow endpoints bind to target shapes and stay attached by recalculating anchors
-whenever shapes move.
-
-================================================================================
-12. Milestone L: History (undo/redo)                                      *wb-L*
-================================================================================
-
-All document-affecting actions run through undoable commands with history stacks
-and keyboard shortcuts.
-
-================================================================================
-13. Milestone M: Persistence (web) via Dexie + History integration        *wb-M*
-================================================================================
-
-Document changes now persist to IndexedDB via Dexie with migrations, repo API,
-and history-driven syncing.
-
-================================================================================
-14. Milestone N: Status Bar (Editor HUD)                                  *wb-N*
-================================================================================
-
-The HUD is now powered end-to-end via a `StatusBarVM` + cursor store, a web
-persistence/snap manager, and `StatusBar.svelte` with snap/grid toggles backed
-by unit/integration tests for selectors, cursor throttling, persistence
-transitions, and Canvas wiring.
-
-Note: Zoom controls were moved to Toolbar in Milestone O for better UX.
-
-================================================================================
-15. Milestone O: Export (PNG/SVG)                                         *wb-O*
-================================================================================
-
-PNG/SVG export flows now deliver one-click viewport or selection exports from
-the Toolbar across web and desktop builds.
-
-================================================================================
-16. Milestone P: Desktop packaging (Tauri)                                *wb-P*
-================================================================================
-
-The Tauri build now ships the static SvelteKit bundle with native file dialogs
-for open/save/new/rename/delete workflows so the desktop app works end-to-end
-offline.
-
-================================================================================
-17. Milestone Q: Performance + big docs (pragmatic)                       *wb-Q*
+Milestone P: Performance                                                  *wb-P*
 ================================================================================
 
 Goal: the editor stays responsive with many shapes.
 
-[ ] Add spatial index (v0: simple grid buckets):
+[ ] Add spatial index:
     - rebuild index on doc changes
     - query nearby shapes for hit testing
 [ ] Add view culling:
@@ -150,39 +32,293 @@ Goal: the editor stays responsive with many shapes.
 - 10k simple shapes pans/zooms smoothly on a typical machine.
 
 ================================================================================
-18. Milestone R: File Browser (web: Dexie inspector, desktop: FS)         *wb-R*
+Milestone A: Richer arrows / connectors                                   *wb-A*
 ================================================================================
-
-The shared file browser now offers Dexie-backed search + inspector tooling on
-web and full workspace navigation on desktop, all driven by the view model
-contracts.
 
 --------------------------------------------------------------------------------
-R4. Parity behaviors
+A2. Editing UX
 --------------------------------------------------------------------------------
 
-[x] Same shortcuts:
-    - Ctrl/Cmd+O opens file browser
-    - Ctrl/Cmd+N creates board
-[x] Consistent metadata display:
-    - name + updatedAt in both modes
+[ ] Multi-point editing:
+    - Alt/Option+click on segment adds a control point
+    - Backspace/Delete on selected point removes it
+    - Drag point to reshape polyline
+[ ] Orthogonal routing UI toggle:
+    - per-arrow toggle (routing.kind)
+    - UI control to switch between straight and orthogonal
+[ ] Label editing UI:
+    - double-click arrow to edit label text
+    - label drags along the connector (offset along polyline)
 
-(DoD):
-- Web and desktop feel like the same app, with storage differences made explicit
+--------------------------------------------------------------------------------
+A3. Precise anchors + snapping
+--------------------------------------------------------------------------------
+
+[ ] Anchor preview:
+    - show snap indicator when binding will occur
+--------------------------------------------------------------------------------
+A5. Tests
+--------------------------------------------------------------------------------
+
+[ ] Polyline edits preserve endpoints and do not corrupt bindings
+[ ] Label placement stable under zoom/pan
 
 ================================================================================
-19. Milestone S: Quality polish.                                          *wb-S*
+Milestone M: Markdown Blocks                                              *wb-M*
 ================================================================================
 
-Comprehensive UX polish adds BEM CSS, space-drag panning, richer keyboard
-affordances, improved accessibility and styling, refined snapping, and handles.
+Goal:
+Add a "Markdown block" shape with pleasant editing, predictable layout, and
+export. Treat it as a doc-first primitive (not a hacky text element).
+
+--------------------------------------------------------------------------------
+M1. Data model
+--------------------------------------------------------------------------------
+
+/packages/core/src/model:
+[ ] Add ShapeType: 'markdown'
+[ ] MarkdownShape props:
+    - md: string
+    - w: number, h?: number         " fixed width, auto height by layout
+    - style: { fontFamily, fontSize, color, bg?, border? }
+    - mode?: 'view'|'edit'          " not persisted; UI-only
+
+(DoD): Markdown blocks save/load; width preserved; content preserved verbatim.
+
+--------------------------------------------------------------------------------
+M2. Rendering
+--------------------------------------------------------------------------------
+
+/packages/renderer-canvas2d:
+[ ] Render Markdown in canvas using a minimal subset:
+    - headings (#, ##)
+    - bold/italic/code
+    - bullet lists
+    - links (render style only; click later)
+Strategy:
+[ ] Parse md -> tokens -> lines; draw text runs onto canvas
+[ ] Measure to compute auto height; cache layout per (md, w, style)
+
+(DoD): Markdown blocks look consistent and don’t reflow unpredictably during
+pan/zoom.
+
+--------------------------------------------------------------------------------
+M3. Editing UX
+--------------------------------------------------------------------------------
+
+/apps/web:
+[ ] Double-click Markdown block opens an overlay editor (contenteditable)
+[ ] Cmd/Ctrl+Enter toggles edit/view
+[ ] Tab inserts spaces (not focus change) when editing
+
+(DoD): Editing feels fast; no accidental tool switching; commit is one history
+       step.
+
+--------------------------------------------------------------------------------
+M4. Selection + resize
+--------------------------------------------------------------------------------
+
+[ ] Resizing adjusts width; height recomputed from layout
+[ ] Hit-testing uses computed bounds
+
+(DoD): Markdown blocks behave like shapes: move/resize/duplicate/undo.
+
+--------------------------------------------------------------------------------
+M5. Export
+--------------------------------------------------------------------------------
+
+[ ] SVG export:
+    - v0: export as <foreignObject> OR render as text lines
+[ ] PNG export: already covered by canvas export path
+
+(DoD): Export doesn’t lose the Markdown block content.
+
+--------------------------------------------------------------------------------
+M6. Tests
+--------------------------------------------------------------------------------
+
+[ ] Layout cache keying (same md/w/style => stable height)
+[ ] Resize changes width and increases/decreases computed height appropriately
+[ ] Undo/redo persists through refresh (ties into M persistence)
+
+(DoD): Markdown blocks are robust and predictable.
 
 ================================================================================
-20. Milestone T: Sketching / Pen Tool (perfect-freehand)                  *wb-T*
+Milestone L: Layers                                                       *wb-L*
 ================================================================================
 
-Perfect-freehand pen strokes now behave like first-class shapes with frame
-coalesced drafting, geometry/rendering integration, and brush controls.
+Goal:
+Add real layers: reorder, hide/show, lock, and per-layer opacity. This is now a
+baseline expectation even for "simple" editors.
+
+--------------------------------------------------------------------------------
+L1. Data model (doc)
+--------------------------------------------------------------------------------
+
+/packages/core/src/model:
+[ ] Add LayerRecord:
+    - id, boardId/pageId
+    - name
+    - order: number (or layerIds array on page)
+    - visible: boolean
+    - locked: boolean
+    - opacity: number (0..1)
+
+[ ] Attach shapes to layers:
+    - ShapeRecord.layerId: string
+    - Default layer created on new board/page
+
+(DoD): Old docs migrate to "single default layer" automatically
+(Dexie migration).
+
+--------------------------------------------------------------------------------
+L2. Rendering order + behavior
+--------------------------------------------------------------------------------
+
+/packages/renderer-canvas2d:
+[ ] Render layers in order:
+    - skip invisible
+    - apply opacity per layer (ctx.globalAlpha)
+[ ] Selection rendering respects visibility:
+    - do not show selection UI for hidden shapes
+
+(DoD): Hiding a layer truly removes it from view and interaction.
+
+--------------------------------------------------------------------------------
+L3. Interaction rules
+--------------------------------------------------------------------------------
+
+[ ] Locked layer:
+    - shapes cannot be selected or edited
+    - marquee ignores locked shapes
+[ ] Active layer:
+    - new shapes are created into the active layer
+[ ] Reorder layers:
+    - drag to reorder, updates draw order
+
+(DoD): Lock/hide behave exactly as users expect.
+
+--------------------------------------------------------------------------------
+L4. UI panel
+--------------------------------------------------------------------------------
+
+/apps/web:
+[ ] Layers panel:
+    - list layers with eye + lock toggles
+    - rename layer
+    - new/delete layer
+    - drag reorder
+    - set active layer
+    - opacity slider per layer (optional v0, recommended v1)
+
+(DoD): Layers are discoverable and usable without shortcuts.
+
+--------------------------------------------------------------------------------
+L5. Persistence + migrations
+--------------------------------------------------------------------------------
+
+[ ] Dexie migration:
+    - add layers table and layerId field on shapes (if normalized)
+    - backfill existing shapes -> default layer
+    - ensure boards/pages have at least 1 layer
+
+(DoD): Existing boards load unchanged but now sit on a default layer.
+
+--------------------------------------------------------------------------------
+L6. Tests
+--------------------------------------------------------------------------------
+
+[ ] Hidden layer shapes not hit-testable
+[ ] Locked layer shapes not editable
+[ ] New shape inherits active layer
+[ ] Migration backfills correctly
+
+(DoD): No regressions in selection/marquee/editing across layers.
+
+================================================================================
+Milestone S: Stencils (built-in)                                          *wb-S*
+================================================================================
+
+Goal:
+Ship a curated set of built-in stencils (flowchart + UI + dev diagrams) with a
+pleasant insertion workflow. No sharing/community libraries yet—just "your own".
+
+--------------------------------------------------------------------------------
+S1. Stencil definition format (core)
+--------------------------------------------------------------------------------
+
+/packages/core/src/stencils:
+[ ] Define Stencil:
+    - id, name, category, tags[]
+    - preview: { kind: 'svg'|'canvas', data }
+    - spawn: function (atPoint, scale) -> ShapeRecords[] (group)
+      (A stencil can insert 1 shape or a grouped set.)
+
+[ ] Create initial categories (v0):
+    - Flowchart: process, decision, terminator, data, document
+    - Diagrams: server, db, queue, user, browser, mobile
+    - UI: button, input, card, modal
+
+(DoD): Stencils load as data and can spawn shapes deterministically.
+
+--------------------------------------------------------------------------------
+S2. Insert UX
+--------------------------------------------------------------------------------
+
+/apps/web:
+[ ] Stencils drawer/palette:
+    - search (name + tags)
+    - category filter
+    - click inserts at viewport center OR
+      drag ghost preview onto canvas and drop
+
+[ ] Placement rules:
+    - insert into active layer (if layers exist)
+    - snap to grid if enabled
+
+(DoD): Inserting stencils is faster than drawing shapes manually.
+
+--------------------------------------------------------------------------------
+S3. Grouping behavior
+--------------------------------------------------------------------------------
+
+[ ] When a stencil spawns multiple shapes:
+    - create a GroupRecord OR a "groupId" on shapes (your existing grouping
+      model)
+    - allow move as one unit
+    - ungroup command
+
+(DoD): Multi-shape stencils behave like a single object until ungrouped.
+
+--------------------------------------------------------------------------------
+S4. Preview rendering
+--------------------------------------------------------------------------------
+
+[ ] Render stencil previews in the panel:
+    - v0: small SVG thumbnails (best) OR draw to offscreen canvas
+
+(DoD): Users can recognize stencils instantly.
+
+--------------------------------------------------------------------------------
+S5. Persistence + versioning
+--------------------------------------------------------------------------------
+
+[ ] Stencils are "code assets":
+    - version them with the app
+    - inserted shapes are normal shapes (no dependency on stencil after
+      insertion)
+
+(DoD): Old docs do not break if you change stencil definitions later.
+
+--------------------------------------------------------------------------------
+S6. Tests
+--------------------------------------------------------------------------------
+
+[ ] spawn() returns valid records with unique ids and correct initial positions
+[ ] group insert produces expected selection and undo/redo works
+[ ] search indexing returns correct stencils for tag queries
+
+(DoD): Stencils are reliable and don’t corrupt docs.
 
 ================================================================================
 Parking Lot                                                              *wb-pl*
@@ -191,27 +327,3 @@ Parking Lot                                                              *wb-pl*
 - [ ] Opacity for shapes
     - expose fill/stroke opacity controls so translucent layering is possible
       without exporting.
-- [ ] Snapping/binding for arrows
-    - extend the binding system to keep arrow endpoints magnetized to shapes
-    even when snapping/grid options are enabled.
-
-================================================================================
-References (URLs)                                                      *wb-refs*
-================================================================================
-
-tldraw conceptual references (inspiration only):
-- https://tldraw.dev/docs/shapes
-- https://tldraw.dev/docs/editor
-- https://tldraw.dev/reference/editor/Editor
-
-SvelteKit + Tauri packaging:
-- https://v2.tauri.app/start/frontend/sveltekit/
-- https://svelte.dev/docs/kit/adapter-static
-- https://tauri.app/v1/guides/getting-started/setup/sveltekit/
-
-Canvas/infinite-canvas performance ideas:
-- https://antv.vision/infinite-canvas-tutorial/guide/lesson-008
-- https://harrisonmilbradt.com/blog/canvas-panning-and-zooming
-
-Perfect Freehand
-- https://github.com/steveruizok/perfect-freehand
