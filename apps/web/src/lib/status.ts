@@ -180,6 +180,10 @@ function hasPatchChanges(patch: DocPatch): boolean {
   return false;
 }
 
+/**
+ * IMPORTANT: Default gridSize must match DEFAULT_GRID_SIZE renderer
+ * to ensure grid lines and snapping positions align correctly
+ */
 export function createSnapStore(initial?: Partial<SnapSettings>): SnapStore {
   const defaults: SnapSettings = { snapEnabled: false, gridEnabled: true, gridSize: 25 };
   let value: SnapSettings = { ...defaults, ...initial };

@@ -207,6 +207,12 @@ function applyCameraTransform(context: CanvasRenderingContext2D, camera: Camera,
 }
 
 /**
+ * Default grid size in world units
+ * This must match the default in the snap store to ensure grid lines and snapping align
+ */
+const DEFAULT_GRID_SIZE = 25;
+
+/**
  * Draw grid/graph paper background
  *
  * Draws a subtle grid that helps with spatial awareness and alignment.
@@ -216,7 +222,7 @@ function drawGrid(context: CanvasRenderingContext2D, camera: Camera, viewport: V
   if (snapSettings && !snapSettings.gridEnabled) {
     return;
   }
-  const gridSize = snapSettings?.gridSize ?? 50;
+  const gridSize = snapSettings?.gridSize ?? DEFAULT_GRID_SIZE;
   const minorGridColor = "rgba(128, 128, 128, 0.1)";
   const majorGridColor = "rgba(128, 128, 128, 0.2)";
 
@@ -267,11 +273,12 @@ function drawSnapGuides(
     return;
   }
 
-  const gridSize = snapSettings.gridSize || 1;
+  const gridSize = snapSettings?.gridSize ?? DEFAULT_GRID_SIZE;
   const guideWorld = pointerState.snappedWorld ?? cursorState?.cursorWorld;
   if (!guideWorld) {
     return;
   }
+
   const snappedX = pointerState.snappedWorld
     ? pointerState.snappedWorld.x
     : Math.round(guideWorld.x / gridSize) * gridSize;
