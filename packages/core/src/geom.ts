@@ -572,3 +572,34 @@ export function computeOrthogonalPath(start: Vec2, end: Vec2): Vec2[] {
 
   return [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
 }
+
+/**
+ * Compute the total length of a polyline
+ */
+export function computePolylineLength(points: Vec2[]): number {
+  let length = 0;
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i].x - points[i - 1].x;
+    const dy = points[i].y - points[i - 1].y;
+    length += Math.sqrt(dx * dx + dy * dy);
+  }
+  return length;
+}
+
+/**
+ * Get a point at a specific distance along a polyline
+ */
+export function getPointAtDistance(points: Vec2[], targetDist: number): Vec2 {
+  let accum = 0;
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i].x - points[i - 1].x;
+    const dy = points[i].y - points[i - 1].y;
+    const segLen = Math.sqrt(dx * dx + dy * dy);
+    if (accum + segLen >= targetDist) {
+      const t = (targetDist - accum) / segLen;
+      return { x: points[i - 1].x + dx * t, y: points[i - 1].y + dy * t };
+    }
+    accum += segLen;
+  }
+  return points[points.length - 1];
+}

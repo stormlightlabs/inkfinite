@@ -8,6 +8,7 @@
 
 	let canvasEl = $state<HTMLCanvasElement | null>(null);
 	let textEditorEl = $state<HTMLTextAreaElement | null>(null);
+	let arrowLabelEditorEl = $state<HTMLInputElement | null>(null);
 	let historyViewerOpen = $state(false);
 
 	const c = createCanvasController({
@@ -18,6 +19,7 @@
 
 	let platform = $derived(c.platform());
 	let textEditorCurrent = $derived(c.textEditor.current);
+	let arrowLabelEditorCurrent = $derived(c.arrowLabelEditor.current);
 	let persistenceStatusStore = $derived(c.persistenceStatusStore());
 	let marqueeRect = $derived(c.marqueeRect());
 
@@ -29,6 +31,11 @@
 	$effect(() => {
 		c.textEditor.setRef(textEditorEl);
 		return () => c.textEditor.setRef(null);
+	});
+
+	$effect(() => {
+		c.arrowLabelEditor.setRef(arrowLabelEditorEl);
+		return () => c.arrowLabelEditor.setRef(null);
 	});
 </script>
 
@@ -69,6 +76,22 @@
 					onkeydown={c.textEditor.handleKeyDown}
 					onblur={c.textEditor.handleBlur}
 					spellcheck="false"></textarea>
+			{/if}
+		{/if}
+		{#if arrowLabelEditorCurrent}
+			{@const layout = c.arrowLabelEditor.getLayout()}
+			{#if layout}
+				<input
+					bind:this={arrowLabelEditorEl}
+					class="canvas-arrow-label-editor"
+					style={`left:${layout.left}px;top:${layout.top}px;width:${layout.width}px;font-size:${layout.fontSize}px;`}
+					type="text"
+					value={arrowLabelEditorCurrent.value}
+					oninput={c.arrowLabelEditor.handleInput}
+					onkeydown={c.arrowLabelEditor.handleKeyDown}
+					onblur={c.arrowLabelEditor.handleBlur}
+					spellcheck="false"
+					placeholder="Enter arrow label..." />
 			{/if}
 		{/if}
 		{#if marqueeRect}
@@ -133,6 +156,23 @@
 		box-shadow:
 			0 0 0 1px rgba(0, 0, 0, 0.05),
 			0 8px 20px rgba(0, 0, 0, 0.15);
+	}
+
+	.canvas-arrow-label-editor {
+		position: absolute;
+		border: 1px solid var(--accent);
+		background: var(--surface);
+		color: var(--text);
+		padding: 6px 8px;
+		transform-origin: center;
+		outline: none;
+		font-family: sans-serif;
+		text-align: center;
+		z-index: 2;
+		box-shadow:
+			0 0 0 1px rgba(0, 0, 0, 0.05),
+			0 8px 20px rgba(0, 0, 0, 0.15);
+		border-radius: 4px;
 	}
 
 	.canvas-marquee {

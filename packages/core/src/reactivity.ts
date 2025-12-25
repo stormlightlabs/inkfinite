@@ -14,7 +14,14 @@ import { Document as DocumentOps } from "./model";
 
 export type ToolId = "select" | "rect" | "ellipse" | "line" | "arrow" | "text" | "pen";
 
-export type UIState = { currentPageId: string | null; selectionIds: string[]; toolId: ToolId };
+export type BindingPreview = { arrowId: string; targetShapeId: string; handle: "start" | "end" };
+
+export type UIState = {
+  currentPageId: string | null;
+  selectionIds: string[];
+  toolId: ToolId;
+  bindingPreview?: BindingPreview;
+};
 
 export type EditorState = { doc: Document; ui: UIState; camera: Camera };
 
@@ -36,7 +43,12 @@ export const EditorState = {
   clone(state: EditorState): EditorState {
     return {
       doc: DocumentOps.clone(state.doc),
-      ui: { currentPageId: state.ui.currentPageId, selectionIds: [...state.ui.selectionIds], toolId: state.ui.toolId },
+      ui: {
+        currentPageId: state.ui.currentPageId,
+        selectionIds: [...state.ui.selectionIds],
+        toolId: state.ui.toolId,
+        bindingPreview: state.ui.bindingPreview ? { ...state.ui.bindingPreview } : undefined,
+      },
       camera: CameraOps.clone(state.camera),
     };
   },

@@ -31,6 +31,7 @@ import { createRenderer, type Renderer } from "inkfinite-renderer";
 import { onDestroy, onMount } from "svelte";
 import { SvelteSet } from "svelte/reactivity";
 import { computeCursor, describeAction, getCommandKind, statesEqual } from "./canvas-helpers";
+import { ArrowLabelEditorController } from "./controllers/arrowlabel-controller.svelte";
 import { DesktopFileController } from "./controllers/desktop-file-controller.svelte";
 import { FileBrowserController } from "./controllers/filebrowser-controller.svelte";
 import { HistoryController } from "./controllers/history-controller";
@@ -123,7 +124,7 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
       return;
     }
     const cursor = computeCursor(
-      textEditor.isEditing,
+      textEditor.isEditing || arrowLabelEditor.isEditing,
       { isPanning: panState.isPanning, spaceHeld: panState.spaceHeld },
       { hover: handleState.hover, active: handleState.active },
       pointerState.isPointerDown,
@@ -166,6 +167,7 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
   const tools = createToolMap([selectTool, rectTool, ellipseTool, lineTool, arrowTool, textTool, penTool]);
 
   const textEditor = new TextEditorController(store, getViewport, refreshCursor);
+  const arrowLabelEditor = new ArrowLabelEditorController(store, getViewport, refreshCursor);
   const toolController = new ToolController(store, tools);
   const unsubscribeMarqueeCamera = store.subscribe((state) => {
     if (marqueeBounds) {
@@ -466,6 +468,13 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
           return;
         }
       }
+      if (shape.type === "arrow") {
+        const bounds = shapeBounds(shape);
+        if (world.x >= bounds.min.x && world.x <= bounds.max.x && world.y >= bounds.min.y && world.y <= bounds.max.y) {
+          arrowLabelEditor.start(shape.id);
+          return;
+        }
+      }
     }
   }
 
@@ -573,6 +582,7 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     tools: toolController,
     history,
     textEditor,
+    arrowLabelEditor,
     store,
     getViewport,
     handleCanvasDoubleClick,

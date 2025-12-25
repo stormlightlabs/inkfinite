@@ -21,6 +21,7 @@
 		shapeBounds,
 		SnapshotCommand
 	} from 'inkfinite-core';
+	import ArrowPopover from './ArrowPopover.svelte';
 	import BrushPopover from './BrushPopover.svelte';
 
 	type Viewport = { width: number; height: number };
@@ -61,6 +62,9 @@
 	let fillDisabled = $state(true);
 	let strokeDisabled = $state(true);
 	let brush = $derived<BrushSettings>(brushStore.get());
+	let hasArrowSelection = $derived(
+		getSelectedShapes(editorState).some((s) => s.type === 'arrow')
+	);
 
 	$effect(() => {
 		editorState = store.getState();
@@ -433,6 +437,8 @@
 	<div class="toolbar__divider"></div>
 
 	<BrushPopover {brush} onBrushChange={handleBrushChange} disabled={currentTool !== 'pen'} />
+
+	<ArrowPopover {store} disabled={!hasArrowSelection} />
 
 	<div class="toolbar__zoom">
 		<button

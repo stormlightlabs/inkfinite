@@ -32,38 +32,6 @@ Goal: the editor stays responsive with many shapes.
 - 10k simple shapes pans/zooms smoothly on a typical machine.
 
 ================================================================================
-Milestone A: Richer arrows / connectors                                   *wb-A*
-================================================================================
-
---------------------------------------------------------------------------------
-A2. Editing UX
---------------------------------------------------------------------------------
-
-[ ] Multi-point editing:
-    - Alt/Option+click on segment adds a control point
-    - Backspace/Delete on selected point removes it
-    - Drag point to reshape polyline
-[ ] Orthogonal routing UI toggle:
-    - per-arrow toggle (routing.kind)
-    - UI control to switch between straight and orthogonal
-[ ] Label editing UI:
-    - double-click arrow to edit label text
-    - label drags along the connector (offset along polyline)
-
---------------------------------------------------------------------------------
-A3. Precise anchors + snapping
---------------------------------------------------------------------------------
-
-[ ] Anchor preview:
-    - show snap indicator when binding will occur
---------------------------------------------------------------------------------
-A5. Tests
---------------------------------------------------------------------------------
-
-[ ] Polyline edits preserve endpoints and do not corrupt bindings
-[ ] Label placement stable under zoom/pan
-
-================================================================================
 Milestone M: Markdown Blocks                                              *wb-M*
 ================================================================================
 
@@ -89,7 +57,7 @@ M1. Data model
 M2. Rendering
 --------------------------------------------------------------------------------
 
-/packages/renderer-canvas2d:
+/packages/renderer:
 [ ] Render Markdown in canvas using a minimal subset:
     - headings (#, ##)
     - bold/italic/code

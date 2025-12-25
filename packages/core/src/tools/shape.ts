@@ -561,7 +561,7 @@ export class ArrowTool implements Tool {
       points: [{ x: 0, y: 0 }, { x: 0, y: 0 }],
       start: { kind: "free" },
       end: { kind: "free" },
-      style: { stroke: "#495057", width: 2, headEnd: true },
+      style: { stroke: "#2563eb", width: 2, headEnd: true },
       routing: { kind: "straight" },
     }, shapeId);
 
@@ -593,10 +593,36 @@ export class ArrowTool implements Tool {
     const updatedPoints = [{ x: 0, y: 0 }, b];
     const updatedShape = { ...shape, props: { ...shape.props, points: updatedPoints } };
 
-    return {
+    let newState = {
       ...state,
       doc: { ...state.doc, shapes: { ...state.doc.shapes, [this.toolState.creatingShapeId]: updatedShape } },
     };
+
+    const stateWithoutArrow = {
+      ...newState,
+      doc: {
+        ...newState.doc,
+        shapes: Object.fromEntries(
+          Object.entries(newState.doc.shapes).filter(([id]) => id !== this.toolState.creatingShapeId),
+        ),
+      },
+    };
+
+    const hitShapeId = hitTestPoint(stateWithoutArrow, action.world);
+
+    if (hitShapeId) {
+      newState = {
+        ...newState,
+        ui: {
+          ...newState.ui,
+          bindingPreview: { arrowId: this.toolState.creatingShapeId, targetShapeId: hitShapeId, handle: "end" },
+        },
+      };
+    } else {
+      newState = { ...newState, ui: { ...newState.ui, bindingPreview: undefined } };
+    }
+
+    return newState;
   }
 
   private handlePointerUp(state: EditorState, action: Action): EditorState {
@@ -620,6 +646,10 @@ export class ArrowTool implements Tool {
       newState = this.cancelShapeCreation(state);
     } else {
       newState = this.createBindingsForArrow(state, this.toolState.creatingShapeId);
+    }
+
+    if (newState.ui.bindingPreview) {
+      newState = { ...newState, ui: { ...newState.ui, bindingPreview: undefined } };
     }
 
     this.resetToolState();

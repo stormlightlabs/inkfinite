@@ -16,6 +16,8 @@ import type {
 import {
   computeOrthogonalPath,
   computeOutline,
+  computePolylineLength,
+  getPointAtDistance,
   getShapesOnCurrentPage,
   resolveArrowEndpoints,
   shapeBounds,
@@ -182,6 +184,8 @@ function drawScene(
 
   drawSelection(context, state, shapes, handleState);
 
+  drawBindingPreview(context, state);
+
   drawSnapGuides(context, state.camera, viewport, snapSettings, cursorState, pointerState);
 
   context.restore();
@@ -303,6 +307,34 @@ function drawSnapGuides(
   context.arc(snappedX, snappedY, 4 / camera.zoom, 0, Math.PI * 2);
   context.fill();
 
+  context.restore();
+}
+
+/**
+ * Draw binding preview indicator when dragging arrow endpoints
+ */
+function drawBindingPreview(context: CanvasRenderingContext2D, state: EditorState) {
+  if (!state.ui.bindingPreview) return;
+
+  const targetShape = state.doc.shapes[state.ui.bindingPreview.targetShapeId];
+  if (!targetShape) return;
+
+  const bounds = shapeBounds(targetShape);
+
+  context.save();
+  context.strokeStyle = "rgba(59, 130, 246, 0.8)";
+  context.lineWidth = 3 / state.camera.zoom;
+  context.setLineDash([8 / state.camera.zoom, 4 / state.camera.zoom]);
+
+  const padding = 4;
+  context.strokeRect(
+    bounds.min.x - padding,
+    bounds.min.y - padding,
+    bounds.max.x - bounds.min.x + padding * 2,
+    bounds.max.y - bounds.min.y + padding * 2,
+  );
+
+  context.setLineDash([]);
   context.restore();
 }
 
@@ -432,7 +464,6 @@ function drawArrow(context: CanvasRenderingContext2D, state: EditorState, shape:
 
   let points: Vec2[];
 
-  // Use orthogonal routing if specified
   if (shape.props.routing?.kind === "orthogonal") {
     points = computeOrthogonalPath(a, b);
   } else {
@@ -550,31 +581,6 @@ function drawArrowLabel(
   context.fillStyle = "#000";
   context.fillText(label.text, labelPos.x, labelPos.y - 5);
   context.restore();
-}
-
-function computePolylineLength(points: Vec2[]): number {
-  let length = 0;
-  for (let i = 1; i < points.length; i++) {
-    const dx = points[i].x - points[i - 1].x;
-    const dy = points[i].y - points[i - 1].y;
-    length += Math.sqrt(dx * dx + dy * dy);
-  }
-  return length;
-}
-
-function getPointAtDistance(points: Vec2[], targetDist: number): Vec2 {
-  let accum = 0;
-  for (let i = 1; i < points.length; i++) {
-    const dx = points[i].x - points[i - 1].x;
-    const dy = points[i].y - points[i - 1].y;
-    const segLen = Math.sqrt(dx * dx + dy * dy);
-    if (accum + segLen >= targetDist) {
-      const t = (targetDist - accum) / segLen;
-      return { x: points[i - 1].x + dx * t, y: points[i - 1].y + dy * t };
-    }
-    accum += segLen;
-  }
-  return points[points.length - 1];
 }
 
 /**
@@ -854,10 +860,8 @@ function getHandlesForShape(state: EditorState, shape: ShapeRecord): HandleVisua
   if (shape.type === "arrow") {
     const resolved = resolveArrowEndpoints(state, shape.id);
     if (resolved && shape.props.points && shape.props.points.length >= 2) {
-      // Show handles for all points
       handles.push({ id: "line-start", position: resolved.a });
 
-      // Add intermediate point handles
       for (let i = 1; i < shape.props.points.length - 1; i++) {
         const point = shape.props.points[i];
         const worldPos = localToWorld(shape, point);
@@ -865,6 +869,26 @@ function getHandlesForShape(state: EditorState, shape: ShapeRecord): HandleVisua
       }
 
       handles.push({ id: "line-end", position: resolved.b });
+
+      if (shape.props.label) {
+        const polylineLength = computePolylineLength(shape.props.points);
+        const align = shape.props.label.align ?? "center";
+        const offset = shape.props.label.offset ?? 0;
+
+        let distance: number;
+        if (align === "center") {
+          distance = polylineLength / 2 + offset;
+        } else if (align === "start") {
+          distance = offset;
+        } else {
+          distance = polylineLength - offset;
+        }
+
+        distance = Math.max(0, Math.min(distance, polylineLength));
+        const labelPos = getPointAtDistance(shape.props.points, distance);
+        const worldLabelPos = localToWorld(shape, labelPos);
+        handles.push({ id: "arrow-label", position: worldLabelPos });
+      }
     }
     return handles;
   }

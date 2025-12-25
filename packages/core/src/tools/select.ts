@@ -1,5 +1,5 @@
 import type { Action } from "../actions";
-import { computeNormalizedAnchor, hitTestPoint, shapeBounds } from "../geom";
+import { computeNormalizedAnchor, computePolylineLength, getPointAtDistance, hitTestPoint, shapeBounds } from "../geom";
 import { Box2, type Vec2, Vec2 as Vec2Ops } from "../math";
 import { BindingRecord, ShapeRecord } from "../model";
 import { EditorState, getCurrentPage, type ToolId } from "../reactivity";
@@ -35,7 +35,7 @@ type SelectToolState = {
 
 type RectHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
-type HandleKind = RectHandle | "rotate" | "line-start" | "line-end" | `arrow-point-${number}`;
+type HandleKind = RectHandle | "rotate" | "line-start" | "line-end" | `arrow-point-${number}` | "arrow-label";
 
 const HANDLE_HIT_RADIUS = 10;
 const ROTATE_HANDLE_OFFSET = 40;
@@ -252,6 +252,8 @@ export class SelectTool implements Tool {
     let updated: ShapeRecord | null = null;
     if (this.toolState.activeHandle === "rotate") {
       updated = this.rotateShape(initialShape, action.world);
+    } else if (this.toolState.activeHandle === "arrow-label") {
+      updated = this.adjustArrowLabel(initialShape, action.world);
     } else if (
       this.toolState.activeHandle === "line-start"
       || this.toolState.activeHandle === "line-end"
@@ -271,7 +273,35 @@ export class SelectTool implements Tool {
       return state;
     }
 
-    return { ...state, doc: { ...state.doc, shapes: { ...state.doc.shapes, [shapeId]: updated } } };
+    let newState = { ...state, doc: { ...state.doc, shapes: { ...state.doc.shapes, [shapeId]: updated } } };
+
+    if (
+      currentShape.type === "arrow"
+      && (this.toolState.activeHandle === "line-start" || this.toolState.activeHandle === "line-end")
+    ) {
+      const handle = this.toolState.activeHandle === "line-start" ? "start" : "end";
+
+      const stateWithoutArrow = {
+        ...newState,
+        doc: {
+          ...newState.doc,
+          shapes: Object.fromEntries(Object.entries(newState.doc.shapes).filter(([id]) => id !== shapeId)),
+        },
+      };
+
+      const hitShapeId = hitTestPoint(stateWithoutArrow, action.world);
+
+      if (hitShapeId) {
+        newState = {
+          ...newState,
+          ui: { ...newState.ui, bindingPreview: { arrowId: shapeId, targetShapeId: hitShapeId, handle } },
+        };
+      } else {
+        newState = { ...newState, ui: { ...newState.ui, bindingPreview: undefined } };
+      }
+    }
+
+    return newState;
   }
 
   /**
@@ -337,6 +367,10 @@ export class SelectTool implements Tool {
     this.toolState.marqueeStart = null;
     this.toolState.marqueeEnd = null;
     this.notifyMarqueeChange();
+
+    if (newState.ui.bindingPreview) {
+      newState = { ...newState, ui: { ...newState.ui, bindingPreview: undefined } };
+    }
 
     return newState;
   }
@@ -511,6 +545,26 @@ export class SelectTool implements Tool {
             handles.push({ id: `arrow-point-${i}` as HandleKind, position: worldPos });
           }
         }
+
+        if (shape.props.label) {
+          const polylineLength = computePolylineLength(shape.props.points);
+          const align = shape.props.label.align ?? "center";
+          const offset = shape.props.label.offset ?? 0;
+
+          let distance: number;
+          if (align === "center") {
+            distance = polylineLength / 2 + offset;
+          } else if (align === "start") {
+            distance = offset;
+          } else {
+            distance = polylineLength - offset;
+          }
+
+          distance = Math.max(0, Math.min(distance, polylineLength));
+          const labelPos = getPointAtDistance(shape.props.points, distance);
+          const worldLabelPos = this.localToWorld(shape, labelPos);
+          handles.push({ id: "arrow-label", position: worldLabelPos });
+        }
       }
     }
     return handles;
@@ -581,6 +635,53 @@ export class SelectTool implements Tool {
 
     // @ts-expect-error union mismatch
     return { ...initial, x: minX, y: minY, props: { ...initial.props, w: width, h: height } };
+  }
+
+  private adjustArrowLabel(initial: ShapeRecord, pointer: Vec2): ShapeRecord | null {
+    if (initial.type !== "arrow" || !initial.props.points || initial.props.points.length < 2 || !initial.props.label) {
+      return null;
+    }
+
+    const localPointer = this.worldToLocal(initial, pointer);
+    const points = initial.props.points;
+    const polylineLength = computePolylineLength(points);
+
+    let closestDistance = 0;
+    let minDistToLine = Number.POSITIVE_INFINITY;
+
+    for (let i = 0; i < points.length - 1; i++) {
+      const a = points[i];
+      const b = points[i + 1];
+      const segmentLength = Vec2Ops.dist(a, b);
+
+      const ab = Vec2Ops.sub(b, a);
+      const ap = Vec2Ops.sub(localPointer, a);
+      const t = Math.max(0, Math.min(1, Vec2Ops.dot(ap, ab) / Vec2Ops.dot(ab, ab)));
+      const projection = Vec2Ops.add(a, Vec2Ops.mulScalar(ab, t));
+      const distToLine = Vec2Ops.dist(localPointer, projection);
+
+      if (distToLine < minDistToLine) {
+        minDistToLine = distToLine;
+        let distanceToSegmentStart = 0;
+        for (let j = 0; j < i; j++) {
+          distanceToSegmentStart += Vec2Ops.dist(points[j], points[j + 1]);
+        }
+        closestDistance = distanceToSegmentStart + t * segmentLength;
+      }
+    }
+
+    const align = initial.props.label.align ?? "center";
+    let newOffset: number;
+
+    if (align === "center") {
+      newOffset = closestDistance - polylineLength / 2;
+    } else if (align === "start") {
+      newOffset = closestDistance;
+    } else {
+      newOffset = polylineLength - closestDistance;
+    }
+
+    return { ...initial, props: { ...initial.props, label: { ...initial.props.label, offset: newOffset } } };
   }
 
   private resizeLineShape(initial: ShapeRecord, pointer: Vec2, handle: HandleKind): ShapeRecord | null {
@@ -673,6 +774,17 @@ export class SelectTool implements Tool {
     const cos = Math.cos(shape.rot);
     const sin = Math.sin(shape.rot);
     return { x: shape.x + point.x * cos - point.y * sin, y: shape.y + point.x * sin + point.y * cos };
+  }
+
+  private worldToLocal(shape: ShapeRecord, point: Vec2): Vec2 {
+    if (shape.rot === 0) {
+      return { x: point.x - shape.x, y: point.y - shape.y };
+    }
+    const dx = point.x - shape.x;
+    const dy = point.y - shape.y;
+    const cos = Math.cos(-shape.rot);
+    const sin = Math.sin(-shape.rot);
+    return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
   }
 
   /**
