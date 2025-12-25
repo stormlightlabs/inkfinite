@@ -510,16 +510,34 @@ export function shapeCenter(shape: ShapeRecord): Vec2 {
  * @param shape - Target shape
  * @param nx - Normalized x coordinate in [-1, 1] where -1 is left edge, 1 is right edge, 0 is center
  * @param ny - Normalized y coordinate in [-1, 1] where -1 is top edge, 1 is bottom edge, 0 is center
+ * @param offset - Optional offset distance to push the anchor point away from the shape (default: 0)
  * @returns World coordinates of the anchor point
  */
-export function computeEdgeAnchor(shape: ShapeRecord, nx: number, ny: number): Vec2 {
+export function computeEdgeAnchor(shape: ShapeRecord, nx: number, ny: number, offset = 0): Vec2 {
   const bounds = shapeBounds(shape);
   const centerX = (bounds.min.x + bounds.max.x) / 2;
   const centerY = (bounds.min.y + bounds.max.y) / 2;
   const halfWidth = (bounds.max.x - bounds.min.x) / 2;
   const halfHeight = (bounds.max.y - bounds.min.y) / 2;
 
-  return { x: centerX + nx * halfWidth, y: centerY + ny * halfHeight };
+  const baseX = centerX + nx * halfWidth;
+  const baseY = centerY + ny * halfHeight;
+
+  if (offset === 0) {
+    return { x: baseX, y: baseY };
+  }
+
+  const dx = baseX - centerX;
+  const dy = baseY - centerY;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+
+  if (distance < 0.01) {
+    return { x: baseX, y: baseY };
+  }
+
+  const offsetX = (dx / distance) * offset;
+  const offsetY = (dy / distance) * offset;
+  return { x: baseX + offsetX, y: baseY + offsetY };
 }
 
 /**
@@ -565,6 +583,10 @@ export function resolveArrowEndpoints(state: EditorState, arrowId: string): { a:
   let a: Vec2 = { x: arrow.x + firstPoint.x, y: arrow.y + firstPoint.y };
   let b: Vec2 = { x: arrow.x + lastPoint.x, y: arrow.y + lastPoint.y };
 
+  const arrowStrokeWidth = arrow.props.style?.width ?? 2;
+  const targetShapeStrokeWidth = 2;
+  const offset = targetShapeStrokeWidth / 2 + arrowStrokeWidth / 2;
+
   for (const binding of Object.values(state.doc.bindings)) {
     if (binding.fromShapeId !== arrowId) continue;
 
@@ -575,7 +597,7 @@ export function resolveArrowEndpoints(state: EditorState, arrowId: string): { a:
     if (binding.anchor.kind === "center") {
       anchorPoint = shapeCenter(targetShape);
     } else {
-      anchorPoint = computeEdgeAnchor(targetShape, binding.anchor.nx, binding.anchor.ny);
+      anchorPoint = computeEdgeAnchor(targetShape, binding.anchor.nx, binding.anchor.ny, offset);
     }
 
     if (binding.handle === "start") {
