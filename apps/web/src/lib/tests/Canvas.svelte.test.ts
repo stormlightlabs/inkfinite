@@ -128,11 +128,11 @@ describe("Canvas component", () => {
     const { container } = render(Canvas);
     const toolButtons = container.querySelectorAll(".tool-button");
 
-    expect(toolButtons.length).toBe(8);
+    expect(toolButtons.length).toBe(9);
 
     const toolIds = Array.from(toolButtons).map((btn) => btn.getAttribute("data-tool-id"));
     const coreToolIds = toolIds.filter((id) => id && id !== "history");
-    expect(coreToolIds).toEqual(["select", "rect", "ellipse", "line", "arrow", "text", "pen"]);
+    expect(coreToolIds).toEqual(["select", "rect", "ellipse", "line", "arrow", "text", "markdown", "pen"]);
 
     const historyButton = container.querySelector(".tool-button.history-button");
     expect(historyButton).toBeTruthy();

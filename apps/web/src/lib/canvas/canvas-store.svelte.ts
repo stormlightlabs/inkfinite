@@ -16,6 +16,7 @@ import {
   getShapesOnCurrentPage,
   InkfiniteDB,
   LineTool,
+  MarkdownTool,
   PenTool,
   RectTool,
   routeAction,
@@ -35,6 +36,7 @@ import { ArrowLabelEditorController } from "./controllers/arrowlabel-controller.
 import { DesktopFileController } from "./controllers/desktop-file-controller.svelte";
 import { FileBrowserController } from "./controllers/filebrowser-controller.svelte";
 import { HistoryController } from "./controllers/history-controller";
+import { MarkdownEditorController } from "./controllers/markdown-controller.svelte";
 import { TextEditorController } from "./controllers/texteditor-controller.svelte";
 import { ToolController } from "./controllers/tool-controller.svelte";
 import { HandleState } from "./store/handle-state.svelte";
@@ -124,7 +126,7 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
       return;
     }
     const cursor = computeCursor(
-      textEditor.isEditing || arrowLabelEditor.isEditing,
+      textEditor.isEditing || arrowLabelEditor.isEditing || markdownEditor.isEditing,
       { isPanning: panState.isPanning, spaceHeld: panState.spaceHeld },
       { hover: handleState.hover, active: handleState.active },
       pointerState.isPointerDown,
@@ -155,6 +157,7 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
   const lineTool = new LineTool();
   const arrowTool = new ArrowTool();
   const textTool = new TextTool();
+  const markdownTool = new MarkdownTool();
   const getPenBrushConfig = () => {
     const { color: _color, ...config } = brushStore.get();
     return config;
@@ -164,10 +167,20 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     return { color: brush.color, opacity: 1 };
   };
   const penTool = new PenTool(getPenBrushConfig, getPenStrokeStyle);
-  const tools = createToolMap([selectTool, rectTool, ellipseTool, lineTool, arrowTool, textTool, penTool]);
+  const tools = createToolMap([
+    selectTool,
+    rectTool,
+    ellipseTool,
+    lineTool,
+    arrowTool,
+    textTool,
+    markdownTool,
+    penTool,
+  ]);
 
   const textEditor = new TextEditorController(store, getViewport, refreshCursor);
   const arrowLabelEditor = new ArrowLabelEditorController(store, getViewport, refreshCursor);
+  const markdownEditor = new MarkdownEditorController(store, getViewport, refreshCursor);
   const toolController = new ToolController(store, tools);
   const unsubscribeMarqueeCamera = store.subscribe((state) => {
     if (marqueeBounds) {
@@ -370,6 +383,10 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
       textEditor.commit();
     }
 
+    if (markdownEditor.isEditing && (action.type === "pointer-down" || action.type === "pointer-up")) {
+      markdownEditor.commit();
+    }
+
     if (action.type === "pointer-move" && "world" in action && !panState.isPanning && !panState.spaceHeld) {
       const hover = selectTool.getHandleAtPoint(store.getState(), action.world);
       setHandleHover(hover);
@@ -472,6 +489,13 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
         const bounds = shapeBounds(shape);
         if (world.x >= bounds.min.x && world.x <= bounds.max.x && world.y >= bounds.min.y && world.y <= bounds.max.y) {
           arrowLabelEditor.start(shape.id);
+          return;
+        }
+      }
+      if (shape.type === "markdown") {
+        const bounds = shapeBounds(shape);
+        if (world.x >= bounds.min.x && world.x <= bounds.max.x && world.y >= bounds.min.y && world.y <= bounds.max.y) {
+          markdownEditor.start(shape.id);
           return;
         }
       }
@@ -583,6 +607,7 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     history,
     textEditor,
     arrowLabelEditor,
+    markdownEditor,
     store,
     getViewport,
     handleCanvasDoubleClick,

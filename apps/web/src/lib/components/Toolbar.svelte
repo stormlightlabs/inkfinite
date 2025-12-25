@@ -56,15 +56,12 @@
 	let exportMenuOpen = $state(false);
 	let exportMenuEl = $state<HTMLDivElement | null>(null);
 	let exportButtonEl = $state<HTMLButtonElement | null>(null);
-
 	let fillColorValue = $state(DEFAULT_FILL_COLOR);
 	let strokeColorValue = $state(DEFAULT_STROKE_COLOR);
 	let fillDisabled = $state(true);
 	let strokeDisabled = $state(true);
 	let brush = $derived<BrushSettings>(brushStore.get());
-	let hasArrowSelection = $derived(
-		getSelectedShapes(editorState).some((s) => s.type === 'arrow')
-	);
+	let hasArrowSelection = $derived(getSelectedShapes(editorState).some((s) => s.type === 'arrow'));
 
 	$effect(() => {
 		editorState = store.getState();
@@ -150,6 +147,7 @@
 		{ id: 'line', label: 'Line', icon: '╱' },
 		{ id: 'arrow', label: 'Arrow', icon: '→' },
 		{ id: 'text', label: 'Text', icon: 'T' },
+		{ id: 'markdown', label: 'Markdown', icon: 'M↓' },
 		{ id: 'pen', label: 'Pen', icon: '✎' }
 	];
 

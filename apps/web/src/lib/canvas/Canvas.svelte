@@ -9,6 +9,7 @@
 	let canvasEl = $state<HTMLCanvasElement | null>(null);
 	let textEditorEl = $state<HTMLTextAreaElement | null>(null);
 	let arrowLabelEditorEl = $state<HTMLInputElement | null>(null);
+	let markdownEditorEl = $state<HTMLTextAreaElement | null>(null);
 	let historyViewerOpen = $state(false);
 
 	const c = createCanvasController({
@@ -20,6 +21,7 @@
 	let platform = $derived(c.platform());
 	let textEditorCurrent = $derived(c.textEditor.current);
 	let arrowLabelEditorCurrent = $derived(c.arrowLabelEditor.current);
+	let markdownEditorCurrent = $derived(c.markdownEditor.current);
 	let persistenceStatusStore = $derived(c.persistenceStatusStore());
 	let marqueeRect = $derived(c.marqueeRect());
 
@@ -36,6 +38,11 @@
 	$effect(() => {
 		c.arrowLabelEditor.setRef(arrowLabelEditorEl);
 		return () => c.arrowLabelEditor.setRef(null);
+	});
+
+	$effect(() => {
+		c.markdownEditor.setRef(markdownEditorEl);
+		return () => c.markdownEditor.setRef(null);
 	});
 </script>
 
@@ -70,7 +77,14 @@
 				<textarea
 					bind:this={textEditorEl}
 					class="canvas-text-editor"
-					style={`left:${layout.left}px;top:${layout.top}px;width:${layout.width}px;height:${layout.height}px;font-size:${layout.fontSize}px;`}
+					style={[
+						`left:${layout.left}px`,
+						`top:${layout.top}px`,
+						`width:${layout.width}px`,
+						`height:${layout.height}px`,
+						`font-size:${layout.fontSize}px`,
+						''
+					].join('; ')}
 					value={textEditorCurrent.value}
 					oninput={c.textEditor.handleInput}
 					onkeydown={c.textEditor.handleKeyDown}
@@ -84,7 +98,13 @@
 				<input
 					bind:this={arrowLabelEditorEl}
 					class="canvas-arrow-label-editor"
-					style={`left:${layout.left}px;top:${layout.top}px;width:${layout.width}px;font-size:${layout.fontSize}px;`}
+					style={[
+						`left:${layout.left}px`,
+						`top:${layout.top}px`,
+						`width:${layout.width}px`,
+						`font-size:${layout.fontSize}px`,
+						''
+					].join('; ')}
 					type="text"
 					value={arrowLabelEditorCurrent.value}
 					oninput={c.arrowLabelEditor.handleInput}
@@ -94,10 +114,37 @@
 					placeholder="Enter arrow label..." />
 			{/if}
 		{/if}
+		{#if markdownEditorCurrent}
+			{@const layout = c.markdownEditor.getLayout()}
+			{#if layout}
+				<textarea
+					bind:this={markdownEditorEl}
+					class="canvas-markdown-editor"
+					style={[
+						`left:${layout.left}px`,
+						`top:${layout.top}px`,
+						`width:${layout.width}px`,
+						`height:${layout.height}px`,
+						`font-size:${layout.fontSize}px`,
+						''
+					].join('; ')}
+					value={markdownEditorCurrent.value}
+					oninput={c.markdownEditor.handleInput}
+					onkeydown={c.markdownEditor.handleKeyDown}
+					onblur={c.markdownEditor.handleBlur}
+					spellcheck="false"></textarea>
+			{/if}
+		{/if}
 		{#if marqueeRect}
 			<div
 				class="canvas-marquee"
-				style={`left:${marqueeRect.left}px;top:${marqueeRect.top}px;width:${marqueeRect.width}px;height:${marqueeRect.height}px;`}>
+				style={[
+					`left:${marqueeRect.left}px`,
+					`top:${marqueeRect.top}px`,
+					`width:${marqueeRect.width}px`,
+					`height:${marqueeRect.height}px`,
+					''
+				].join('; ')}>
 			</div>
 		{/if}
 	</div>
@@ -173,6 +220,25 @@
 			0 0 0 1px rgba(0, 0, 0, 0.05),
 			0 8px 20px rgba(0, 0, 0, 0.15);
 		border-radius: 4px;
+	}
+
+	.canvas-markdown-editor {
+		position: absolute;
+		border: 1px solid var(--accent);
+		background: var(--surface);
+		color: var(--text);
+		padding: 8px;
+		transform-origin: top left;
+		resize: none;
+		outline: none;
+		line-height: 1.4;
+		font-family: monospace;
+		z-index: 2;
+		box-shadow:
+			0 0 0 1px rgba(0, 0, 0, 0.05),
+			0 8px 20px rgba(0, 0, 0, 0.15);
+		white-space: pre-wrap;
+		overflow: auto;
 	}
 
 	.canvas-marquee {

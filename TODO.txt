@@ -1,5 +1,4 @@
 ================================================================================
-
 - Build a Svelte-native editor core (TS) + renderer + UI.
 - Keep the "engine" framework-agnostic so Web + Tauri share it.
 - Defer collaboration until single-player is correct.
@@ -32,86 +31,6 @@ Goal: the editor stays responsive with many shapes.
 - 10k simple shapes pans/zooms smoothly on a typical machine.
 
 ================================================================================
-Milestone M: Markdown Blocks                                              *wb-M*
-================================================================================
-
-Goal:
-Add a "Markdown block" shape with pleasant editing, predictable layout, and
-export. Treat it as a doc-first primitive (not a hacky text element).
-
---------------------------------------------------------------------------------
-M1. Data model
---------------------------------------------------------------------------------
-
-/packages/core/src/model:
-[ ] Add ShapeType: 'markdown'
-[ ] MarkdownShape props:
-    - md: string
-    - w: number, h?: number         " fixed width, auto height by layout
-    - style: { fontFamily, fontSize, color, bg?, border? }
-    - mode?: 'view'|'edit'          " not persisted; UI-only
-
-(DoD): Markdown blocks save/load; width preserved; content preserved verbatim.
-
---------------------------------------------------------------------------------
-M2. Rendering
---------------------------------------------------------------------------------
-
-/packages/renderer:
-[ ] Render Markdown in canvas using a minimal subset:
-    - headings (#, ##)
-    - bold/italic/code
-    - bullet lists
-    - links (render style only; click later)
-Strategy:
-[ ] Parse md -> tokens -> lines; draw text runs onto canvas
-[ ] Measure to compute auto height; cache layout per (md, w, style)
-
-(DoD): Markdown blocks look consistent and don’t reflow unpredictably during
-pan/zoom.
-
---------------------------------------------------------------------------------
-M3. Editing UX
---------------------------------------------------------------------------------
-
-/apps/web:
-[ ] Double-click Markdown block opens an overlay editor (contenteditable)
-[ ] Cmd/Ctrl+Enter toggles edit/view
-[ ] Tab inserts spaces (not focus change) when editing
-
-(DoD): Editing feels fast; no accidental tool switching; commit is one history
-       step.
-
---------------------------------------------------------------------------------
-M4. Selection + resize
---------------------------------------------------------------------------------
-
-[ ] Resizing adjusts width; height recomputed from layout
-[ ] Hit-testing uses computed bounds
-
-(DoD): Markdown blocks behave like shapes: move/resize/duplicate/undo.
-
---------------------------------------------------------------------------------
-M5. Export
---------------------------------------------------------------------------------
-
-[ ] SVG export:
-    - v0: export as <foreignObject> OR render as text lines
-[ ] PNG export: already covered by canvas export path
-
-(DoD): Export doesn’t lose the Markdown block content.
-
---------------------------------------------------------------------------------
-M6. Tests
---------------------------------------------------------------------------------
-
-[ ] Layout cache keying (same md/w/style => stable height)
-[ ] Resize changes width and increases/decreases computed height appropriately
-[ ] Undo/redo persists through refresh (ties into M persistence)
-
-(DoD): Markdown blocks are robust and predictable.
-
-================================================================================
 Milestone L: Layers                                                       *wb-L*
 ================================================================================
 
@@ -136,8 +55,8 @@ L1. Data model (doc)
     - ShapeRecord.layerId: string
     - Default layer created on new board/page
 
-(DoD): Old docs migrate to "single default layer" automatically
-(Dexie migration).
+(DoD): Old docs migrate to "single default layer" automatically (Dexie
+       migration).
 
 --------------------------------------------------------------------------------
 L2. Rendering order + behavior
@@ -239,7 +158,6 @@ S2. Insert UX
     - category filter
     - click inserts at viewport center OR
       drag ghost preview onto canvas and drop
-
 [ ] Placement rules:
     - insert into active layer (if layers exist)
     - snap to grid if enabled
@@ -295,3 +213,5 @@ Parking Lot                                                              *wb-pl*
 - [ ] Opacity for shapes
     - expose fill/stroke opacity controls so translucent layering is possible
       without exporting.
+- [ ] Markdown layout caching
+    - cache layout per (md, w, style) to avoid re-parsing on every render

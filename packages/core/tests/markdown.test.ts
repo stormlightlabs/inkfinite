@@ -106,7 +106,12 @@ describe("MarkdownShape", () => {
       });
 
       it("should compute bounds for markdown shape with auto height", () => {
-        const shape = ShapeRecord.createMarkdown(pageId, 0, 0, createProps({ md: "# Test", color: "#000" }));
+        const shape = ShapeRecord.createMarkdown(
+          pageId,
+          0,
+          0,
+          createProps({ md: "# Test", h: undefined, color: "#000" }),
+        );
         const bounds = shapeBounds(shape);
         expect(bounds.min.x).toBe(0);
         expect(bounds.min.y).toBe(0);

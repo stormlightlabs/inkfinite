@@ -21,10 +21,10 @@ describe("Toolbar component", () => {
     const { container } = render(Toolbar, { currentTool: "select", onToolChange, store, getViewport, brushStore });
 
     const buttons = container.querySelectorAll(".tool-button");
-    expect(buttons.length).toBe(7);
+    expect(buttons.length).toBe(8);
 
     const toolIds = Array.from(buttons).map((btn) => btn.getAttribute("data-tool-id"));
-    expect(toolIds).toEqual(["select", "rect", "ellipse", "line", "arrow", "text", "pen"]);
+    expect(toolIds).toEqual(["select", "rect", "ellipse", "line", "arrow", "text", "markdown", "pen"]);
   });
 
   it("should mark the current tool as active", () => {
