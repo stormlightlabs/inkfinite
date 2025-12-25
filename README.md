@@ -1,15 +1,10 @@
-# INKFINITE
+# Inkfinite
 
-An infinite canvas whiteboard application for creative visual thinking and collaboration.
-
-## Overview
-
-Inkfinite is a web-based infinite canvas application.
+A web-based infinite canvas application for creative visual thinking.
 
 ## Architecture
 
-Inkfinite is built with a reactive architecture and optimized canvas rendering.
-There are pan, zoom, and shape manipulation tools.
+Inkfinite is built with reactivity, vector math, and optimized canvas rendering.
 
 The project is organized as a pnpm monorepo with the following structure:
 
@@ -119,23 +114,7 @@ Tauri desktop wrapper that loads the web app with native file system access.
 
 ### Development
 
-```bash
-cd apps/desktop
-
-# Development mode (with hot reload)
-pnpm tauri dev
-
-# Build production app
-pnpm tauri build
-```
-
-**Note:** The web app automatically detects when running in Tauri and switches from IndexedDB to file-based persistence.
-
-</details>
-
-## Development
-
-### Prerequisites
+#### Prerequisites
 
 **Standard Setup:**
 
@@ -147,119 +126,16 @@ pnpm tauri build
 - Nix with flakes enabled
 - For desktop app: Rust via [rustup](https://rustup.rs) (not Nix)
 
-### Setup
-
-<details>
-<summary>
-Standard
-</summary>
-
 ```bash
-# Install dependencies
-pnpm install
-
-# Run tests
-pnpm test
-
-# Build all packages
-pnpm build
-
-# Start web app in development
-cd apps/web
-pnpm dev
-```
-
-</details>
-
-<details>
-<summary>
-Nix Shell
-</summary>
-
-```bash
-# Enter Nix development shell (provides Node.js & pnpm)
-nix-shell
-
-# Install dependencies
-pnpm install
-
-# For desktop app development, ensure Rust is installed via rustup:
-# curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh --no-modify-path -y
-
-# Run web app
-cd apps/web
-pnpm dev
-
-# Run desktop app (Tauri)
 cd apps/desktop
+
+# Development mode (with hot reload)
 pnpm tauri dev
+
+# Build production app
+pnpm tauri build
 ```
 
-- Node.js and pnpm are provided by Nix for consistency
-- Rust must be installed via rustup to avoid macOS framework linking issues
-- The shell automatically configures paths and SDK for Tauri development
-
-</details>
-
-### Project
-
-<details>
-<summary>
-Structure
-</summary>
-
-```sh
-.
-├── packages/
-│   ├── core/
-│   │   ├── src/
-│   │   │   ├── math.ts        # Vector and matrix math
-│   │   │   ├── camera.ts      # Camera transforms
-│   │   │   ├── geom.ts        # Geometry utilities
-│   │   │   ├── model.ts       # Data structures
-│   │   │   ├── reactivity.ts  # State management
-│   │   │   └── actions.ts     # Input system
-│   │   └── package.json
-│   └── renderer/
-│       ├── src/
-│       │   └── index.ts       # Canvas renderer
-│       └── package.json
-└── apps/
-    └── web/
-        ├── src/
-        │   ├── routes/        # SvelteKit routes
-        │   └── lib/           # Svelte components
-        └── package.json
-```
-
-</details>
-
-<details>
-<summary>
-Design Principles
-</summary>
-
-### Code Organization
-
-- **Namespace pattern** - Types and operations co-located (e.g., `Vec2` type + `Vec2.add()` function)
-- **Pure functions** - Immutable operations, no side effects
-- **Type safety** - Full TypeScript coverage with strict mode
-
-### Coordinate Systems
-
-- **World space** - Infinite 2D plane for shape coordinates
-- **Screen space** - Viewport pixels, origin at top-left
-- **Camera** - Mediates between world and screen coordinates
-
-</details>
-
-<details>
-<summary>
-Theme
-</summary>
-
-- **Light:** Nord color palette
-- **Dark:** Iceberg.vim color palette
-- **Font:** Open Sans
+**Note:** The web app automatically detects when running in Tauri and switches from IndexedDB to file-based persistence.
 
 </details>

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import HistoryViewer from '$lib/components/HistoryViewer.svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
-	import TitleBar from '$lib/components/TitleBar.svelte';
 	import Toolbar from '$lib/components/Toolbar.svelte';
 	import FileBrowser from '$lib/filebrowser/FileBrowser.svelte';
 	import { createCanvasController } from './canvas-store.svelte.ts';
@@ -47,7 +46,7 @@
 </script>
 
 <div class="editor">
-	<TitleBar
+	<Toolbar
 		{platform}
 		desktop={{
 			fileName: c.desktop.fileName,
@@ -57,8 +56,7 @@
 			onSaveAs: () => c.desktop.handleSaveAs(null),
 			onSelectBoard: c.desktop.handleRecentSelect
 		}}
-		onOpenBrowser={c.fileBrowser.handleOpen} />
-	<Toolbar
+		onOpenBrowser={c.fileBrowser.handleOpen}
 		currentTool={c.tools.currentToolId}
 		onToolChange={c.tools.handleChange}
 		onHistoryClick={c.history.handleClick}
@@ -193,7 +191,7 @@
 		border: 1px solid var(--accent);
 		background: var(--surface);
 		color: var(--text);
-		padding: 4px;
+		padding: 0.25rem;
 		transform-origin: top left;
 		resize: none;
 		outline: none;
@@ -219,7 +217,7 @@
 		box-shadow:
 			0 0 0 1px rgba(0, 0, 0, 0.05),
 			0 8px 20px rgba(0, 0, 0, 0.15);
-		border-radius: 4px;
+		border-radius: 0.25rem;
 	}
 
 	.canvas-markdown-editor {

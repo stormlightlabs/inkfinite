@@ -1,7 +1,18 @@
 <script lang="ts">
+	import Icon from '$lib/components/Icon.svelte';
+	import {
+		DEFAULT_FILL_COLOR,
+		DEFAULT_STROKE_COLOR,
+		HELP_LINKS,
+		KEYBOARD_TIPS,
+		TOOLS,
+		ZOOM_PRESETS
+	} from '$lib/constants';
+	import type { Platform } from '$lib/platform';
 	import type { BrushSettings, BrushStore } from '$lib/status';
 	import type {
 		ArrowShape,
+		BoardMeta,
 		Box2,
 		EditorState as EditorStateType,
 		EllipseShape,
@@ -21,10 +32,21 @@
 		shapeBounds,
 		SnapshotCommand
 	} from 'inkfinite-core';
+	import icon from '../assets/favicon.svg';
 	import ArrowPopover from './ArrowPopover.svelte';
 	import BrushPopover from './BrushPopover.svelte';
+	import Dialog from './Dialog.svelte';
 
 	type Viewport = { width: number; height: number };
+
+	type DesktopControls = {
+		fileName: string | null;
+		recentBoards: BoardMeta[];
+		onOpen?: () => void | Promise<void>;
+		onNew?: () => void | Promise<void>;
+		onSaveAs?: () => void | Promise<void>;
+		onSelectBoard?: (boardId: string) => void | Promise<void>;
+	};
 
 	type Props = {
 		currentTool: ToolId;
@@ -34,6 +56,9 @@
 		getViewport: () => Viewport;
 		canvas?: HTMLCanvasElement;
 		brushStore: BrushStore;
+		platform?: Platform;
+		desktop?: DesktopControls;
+		onOpenBrowser?: () => void;
 	};
 
 	let {
@@ -43,11 +68,11 @@
 		store,
 		getViewport,
 		canvas,
-		brushStore
+		brushStore,
+		platform = 'web',
+		desktop,
+		onOpenBrowser
 	}: Props = $props();
-
-	const DEFAULT_FILL_COLOR = '#4a90e2';
-	const DEFAULT_STROKE_COLOR = '#2e5c8a';
 
 	let editorState = $derived<EditorStateType>(store.getState());
 	let zoomMenuOpen = $state(false);
@@ -62,6 +87,7 @@
 	let strokeDisabled = $state(true);
 	let brush = $derived<BrushSettings>(brushStore.get());
 	let hasArrowSelection = $derived(getSelectedShapes(editorState).some((s) => s.type === 'arrow'));
+	let infoOpen = $state(false);
 
 	$effect(() => {
 		editorState = store.getState();
@@ -140,22 +166,13 @@
 		return () => document.removeEventListener('pointerdown', handlePointerDown);
 	});
 
-	const tools: Array<{ id: ToolId; label: string; icon: string }> = [
-		{ id: 'select', label: 'Select', icon: '⌖' },
-		{ id: 'rect', label: 'Rectangle', icon: '▭' },
-		{ id: 'ellipse', label: 'Ellipse', icon: '○' },
-		{ id: 'line', label: 'Line', icon: '╱' },
-		{ id: 'arrow', label: 'Arrow', icon: '→' },
-		{ id: 'text', label: 'Text', icon: 'T' },
-		{ id: 'markdown', label: 'Markdown', icon: 'M↓' },
-		{ id: 'pen', label: 'Pen', icon: '✎' }
-	];
+	function openInfo() {
+		infoOpen = true;
+	}
 
-	const zoomPresets = [
-		{ label: '50%', value: 50 },
-		{ label: '100%', value: 100 },
-		{ label: '200%', value: 200 }
-	];
+	function closeInfo() {
+		infoOpen = false;
+	}
 
 	function handleToolClick(toolId: ToolId) {
 		onToolChange(toolId);
@@ -394,10 +411,81 @@
 	function handleBrushChange(newBrush: BrushSettings) {
 		brushStore.set(newBrush);
 	}
+
+	function invokeDesktopAction(action?: () => void | Promise<void>) {
+		if (action) {
+			void action();
+		}
+	}
+
+	function handleRecentSelect(event: Event) {
+		if (!desktop?.onSelectBoard) {
+			return;
+		}
+		const select = event.currentTarget as HTMLSelectElement;
+		const boardId = select.value;
+		if (boardId) {
+			void desktop.onSelectBoard(boardId);
+		}
+		select.value = '';
+	}
+
+	function desktopFileLabel() {
+		return desktop?.fileName ?? 'Unsaved board';
+	}
 </script>
 
 <div class="toolbar" role="toolbar" aria-label="Drawing tools">
-	{#each tools as tool (`${tool.id}:${tool.label}`)}
+	<div class="toolbar__brand">
+		<div class="toolbar__logo">
+			<img src={icon} alt="Inkfinite Icon" />
+		</div>
+		<div style="display: flex; gap: 0.125rem; flex-direction:column;">
+			<div class="toolbar__name">Inkfinite</div>
+			<div class="toolbar__tagline">Stormlight Labs</div>
+		</div>
+	</div>
+	{#if platform === 'desktop' && desktop}
+		<div class="toolbar__desktop">
+			<div class="toolbar__file" aria-live="polite">{desktopFileLabel()}</div>
+			<div class="toolbar__desktop-actions">
+				<button
+					class="toolbar__desktop-button"
+					type="button"
+					onclick={() => invokeDesktopAction(desktop.onNew)}
+					aria-label="Create new board">
+					New…
+				</button>
+				<button
+					class="toolbar__desktop-button"
+					type="button"
+					onclick={() => invokeDesktopAction(desktop.onOpen)}
+					aria-label="Open board from disk">
+					Open…
+				</button>
+				<button
+					class="toolbar__desktop-button"
+					type="button"
+					onclick={() => invokeDesktopAction(desktop.onSaveAs)}
+					aria-label="Save board as new file">
+					Save As…
+				</button>
+				{#if desktop.recentBoards.length > 0}
+					<label class="toolbar__recent">
+						<span>Recent</span>
+						<select onchange={handleRecentSelect} aria-label="Switch to recent board">
+							<option value="">Select…</option>
+							{#each desktop.recentBoards as board (`${board.id}:${board.name}`)}
+								<option value={board.id}>{board.name}</option>
+							{/each}
+						</select>
+					</label>
+				{/if}
+			</div>
+		</div>
+	{/if}
+	<div class="toolbar__divider"></div>
+	{#each TOOLS as tool (`${tool.id}:${tool.label}`)}
 		<button
 			class="toolbar__tool-button tool-button"
 			class:toolbar__tool-button--active={currentTool === tool.id}
@@ -435,9 +523,7 @@
 	<div class="toolbar__divider"></div>
 
 	<BrushPopover {brush} onBrushChange={handleBrushChange} disabled={currentTool !== 'pen'} />
-
 	<ArrowPopover {store} disabled={!hasArrowSelection} />
-
 	<div class="toolbar__zoom">
 		<button
 			class="toolbar__zoom-button"
@@ -451,7 +537,7 @@
 
 		{#if zoomMenuOpen}
 			<div class="toolbar__zoom-menu" bind:this={zoomMenuEl} role="menu" aria-label="Zoom options">
-				{#each zoomPresets as preset (`${preset.label}:${preset.value}`)}
+				{#each ZOOM_PRESETS as preset (`${preset.label}:${preset.value}`)}
 					<button
 						class="toolbar__menu-item"
 						role="menuitem"
@@ -479,7 +565,6 @@
 		{/if}
 	</div>
 
-	<!-- Export controls -->
 	<div class="toolbar__export">
 		<button
 			class="toolbar__export-button"
@@ -522,6 +607,19 @@
 		{/if}
 	</div>
 
+	<div class="toolbar__info-actions">
+		{#if platform === 'web' && onOpenBrowser}
+			<button class="toolbar__info" onclick={onOpenBrowser} aria-label="Browse boards">
+				<Icon name="folder" size={16} />
+				<span class="toolbar__info-label">Boards</span>
+			</button>
+		{/if}
+		<button class="toolbar__info" onclick={openInfo} aria-label="About Inkfinite">
+			<Icon name="info-circle" size={16} />
+			<span class="toolbar__info-label">Info</span>
+		</button>
+	</div>
+
 	{#if onHistoryClick}
 		<div class="toolbar__divider"></div>
 		<button
@@ -536,11 +634,44 @@
 	{/if}
 </div>
 
+<Dialog bind:open={infoOpen} onClose={closeInfo} title="About Inkfinite">
+	<section class="about">
+		<h1>About Inkfinite</h1>
+		<p>
+			Inkfinite is an infinite canvas prototype. The goal is to build a cross-platform editor with
+			a framework-agnostic core so the same engine powers both the web and desktop apps.
+		</p>
+
+		<div class="about__section">
+			<h2>Quick Tips</h2>
+			<ul>
+				{#each KEYBOARD_TIPS as tip (tip)}
+					<li>{tip}</li>
+				{/each}
+			</ul>
+		</div>
+
+		<div class="about__section">
+			<h2>Need help?</h2>
+			<ul>
+				{#each HELP_LINKS as link (link.href)}
+					<li>
+						<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+						<a href={link.href} target={link.external ? '_blank' : undefined} rel="noreferrer">
+							{link.label}
+						</a>
+					</li>
+				{/each}
+			</ul>
+		</div>
+	</section>
+</Dialog>
+
 <style>
 	.toolbar {
 		display: flex;
-		gap: 8px;
-		padding: 12px;
+		gap: 0.5rem;
+		padding: 0.75rem;
 		background: var(--surface-elevated);
 		border-bottom: 1px solid var(--border);
 		align-items: center;
@@ -550,10 +681,10 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 4px;
-		padding: 8px 12px;
+		gap: 0.25rem;
+		padding: 0.5rem 0.75rem;
 		border: 1px solid var(--border);
-		border-radius: 4px;
+		border-radius: 0.25rem;
 		background: var(--surface);
 		color: var(--text);
 		cursor: pointer;
@@ -579,12 +710,12 @@
 	}
 
 	.toolbar__tool-icon {
-		font-size: 20px;
+		font-size: 1.5rem;
 		line-height: 1;
 	}
 
 	.toolbar__tool-label {
-		font-size: 11px;
+		font-size: 0.75rem;
 		line-height: 1;
 		white-space: nowrap;
 	}
@@ -598,15 +729,15 @@
 
 	.toolbar__colors {
 		display: flex;
-		gap: 12px;
+		gap: 0.75rem;
 		align-items: center;
 	}
 
 	.toolbar__color-control {
 		display: flex;
 		flex-direction: column;
-		gap: 4px;
-		font-size: 11px;
+		gap: 0.25rem;
+		font-size: 0.75rem;
 		color: var(--text-muted);
 	}
 
@@ -635,8 +766,8 @@
 		border: 1px solid var(--border);
 		background: var(--surface);
 		color: var(--text);
-		padding: 8px 12px;
-		border-radius: 4px;
+		padding: 0.5rem 0.75rem;
+		border-radius: 0.25rem;
 		cursor: pointer;
 		font-size: 13px;
 		min-width: 60px;
@@ -666,7 +797,7 @@
 		padding: 8px;
 		display: flex;
 		flex-direction: column;
-		gap: 4px;
+		gap: 0.25rem;
 		z-index: 10;
 		min-width: 150px;
 	}
@@ -676,7 +807,7 @@
 		background: transparent;
 		color: var(--text);
 		padding: 4px 8px;
-		border-radius: 4px;
+		border-radius: 0.25rem;
 		text-align: left;
 		cursor: pointer;
 		font-size: 13px;
@@ -699,5 +830,149 @@
 
 	.toolbar__tool-button--history {
 		margin-left: auto;
+	}
+
+	.toolbar__brand {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.toolbar__desktop {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.toolbar__file {
+		font-size: 13px;
+		color: var(--text-secondary);
+	}
+
+	.toolbar__desktop-actions {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-wrap: wrap;
+	}
+
+	.toolbar__desktop-button {
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--text);
+		border-radius: 6px;
+		padding: 4px 10px;
+		font-size: 13px;
+		cursor: pointer;
+	}
+
+	.toolbar__desktop-button:hover {
+		background: var(--surface-elevated);
+	}
+
+	.toolbar__recent {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 0.75rem;
+		color: var(--text-secondary);
+	}
+
+	.toolbar__recent select {
+		font-size: 0.75rem;
+		padding: 4px 6px;
+		border-radius: 0.25rem;
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--text);
+	}
+
+	.toolbar__logo {
+		width: 36px;
+		height: 36px;
+		border-radius: 8px;
+		background: var(--accent);
+		color: var(--surface);
+		font-weight: 600;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 18px;
+	}
+
+	.toolbar__name {
+		font-weight: 600;
+		color: var(--text);
+	}
+
+	.toolbar__tagline {
+		font-size: 0.75rem;
+		color: var(--text-muted);
+	}
+
+	.toolbar__info {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--text);
+		border-radius: 999px;
+		padding: 4px 10px;
+		cursor: pointer;
+		font-size: 14px;
+	}
+
+	.toolbar__info:hover {
+		background: var(--surface-elevated);
+	}
+
+	.toolbar__info-label {
+		font-size: 0.75rem;
+		color: var(--text-secondary);
+	}
+
+	.about {
+		padding: 24px;
+		max-width: 480px;
+	}
+
+	.about h1 {
+		margin-top: 0;
+		font-size: 22px;
+	}
+
+	.about__section {
+		margin-top: 20px;
+	}
+
+	.about__section h2 {
+		margin-bottom: 8px;
+		font-size: 16px;
+		color: var(--text-secondary);
+	}
+
+	.about__section ul {
+		margin: 0;
+		padding-left: 20px;
+	}
+
+	.about__section li + li {
+		margin-top: 0.25rem;
+	}
+
+	.about__section a {
+		color: var(--accent);
+		text-decoration: none;
+	}
+
+	.about__section a:hover {
+		text-decoration: underline;
+	}
+
+	.toolbar__info-actions {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
 	}
 </style>

@@ -488,8 +488,8 @@
 		color: var(--text-secondary, #666);
 		font-size: 1.5rem;
 		cursor: pointer;
-		padding: 4px;
-		border-radius: 4px;
+		padding: 0.25rem;
+		border-radius: 0.25rem;
 		display: flex;
 		align-items: center;
 	}
@@ -506,7 +506,7 @@
 		background-color: var(--primary, #007bff);
 		color: white;
 		border: none;
-		border-radius: 4px;
+		border-radius: 0.25rem;
 		cursor: pointer;
 		font-size: 0.875rem;
 		font-weight: 500;
@@ -543,7 +543,7 @@
 		padding: 0.25rem 0.5rem;
 		background-color: transparent;
 		border: 1px solid var(--border, #e0e0e0);
-		border-radius: 4px;
+		border-radius: 0.25rem;
 		cursor: pointer;
 		font-size: 0.75rem;
 		color: var(--text);
@@ -563,7 +563,7 @@
 		background-color: var(--primary, #007bff);
 		color: white;
 		border: none;
-		border-radius: 4px;
+		border-radius: 0.25rem;
 		cursor: pointer;
 		font-size: 0.875rem;
 	}
@@ -588,7 +588,7 @@
 		width: 100%;
 		padding: 0.5rem;
 		border: 1px solid var(--border, #e0e0e0);
-		border-radius: 4px;
+		border-radius: 0.25rem;
 		font-size: 0.875rem;
 		background-color: var(--input-bg, white);
 		color: var(--text);
@@ -610,7 +610,7 @@
 		width: 100%;
 		padding: 0.5rem;
 		border: 1px solid var(--border, #e0e0e0);
-		border-radius: 4px;
+		border-radius: 0.25rem;
 		font-size: 0.875rem;
 		margin-bottom: 0.5rem;
 		background-color: var(--input-bg, white);
@@ -631,7 +631,7 @@
 	.filebrowser__btn {
 		padding: 0.375rem 0.75rem;
 		border: none;
-		border-radius: 4px;
+		border-radius: 0.25rem;
 		cursor: pointer;
 		font-size: 0.875rem;
 	}
@@ -746,7 +746,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		border-radius: 4px;
+		border-radius: 0.25rem;
 		transition: background-color 0.15s;
 	}
 
@@ -765,7 +765,7 @@
 		margin: 1rem;
 		background-color: var(--error-bg, #f8d7da);
 		color: var(--error-text, #721c24);
-		border-radius: 4px;
+		border-radius: 0.25rem;
 		border: 1px solid var(--error-border, #f5c6cb);
 	}
 
@@ -821,7 +821,7 @@
 		justify-content: space-between;
 		padding: 0.5rem;
 		background-color: var(--surface-hover, #f5f5f5);
-		border-radius: 4px;
+		border-radius: 0.25rem;
 	}
 
 	.inspector__migration-id {
@@ -839,7 +839,7 @@
 		padding: 0.75rem;
 		background-color: var(--warning-bg, #fff3cd);
 		border: 1px solid var(--warning-border, #ffeaa7);
-		border-radius: 4px;
+		border-radius: 0.25rem;
 	}
 
 	.inspector__pending-title {

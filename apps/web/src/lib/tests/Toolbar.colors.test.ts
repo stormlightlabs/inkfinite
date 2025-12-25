@@ -4,7 +4,7 @@ import { cleanup, render } from "vitest-browser-svelte";
 import Toolbar from "../components/Toolbar.svelte";
 import { createBrushStore } from "../status";
 
-function createStoreWithRect() {
+export function createStoreWithRect() {
   const store = new Store();
   const base = EditorState.create();
   const pageId = "page:rect";

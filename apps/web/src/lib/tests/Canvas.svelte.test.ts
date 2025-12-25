@@ -119,9 +119,9 @@ describe("Canvas component", () => {
 
   it("should render the header with info button", () => {
     const { container } = render(Canvas);
-    const titleBar = container.querySelector(".titlebar");
+    const titleBar = container.querySelector(".toolbar");
     expect(titleBar).toBeTruthy();
-    expect(titleBar?.querySelector(".titlebar__info")).toBeTruthy();
+    expect(titleBar?.querySelector(".toolbar__info")).toBeTruthy();
   });
 
   it("should render all tool buttons in toolbar", () => {

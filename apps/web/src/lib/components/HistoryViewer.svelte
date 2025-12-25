@@ -116,9 +116,9 @@
 	}
 
 	.history-actions button {
-		padding: 6px 12px;
+		padding: 6px 0.75rem;
 		border: 1px solid #ccc;
-		border-radius: 4px;
+		border-radius: 0.25rem;
 		background-color: white;
 		cursor: pointer;
 		font-size: 14px;
@@ -149,7 +149,7 @@
 
 	.empty-state {
 		margin: 0;
-		padding: 12px;
+		padding: 0.75rem;
 		text-align: center;
 		color: #999;
 		font-size: 14px;
@@ -166,9 +166,9 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 8px 12px;
-		margin-bottom: 4px;
-		border-radius: 4px;
+		padding: 0.5rem 0.75rem;
+		margin-bottom: 0.25rem;
+		border-radius: 0.25rem;
 		background-color: #f9f9f9;
 		border-left: 3px solid #4dabf7;
 	}
@@ -190,12 +190,12 @@
 	}
 
 	.entry-time {
-		font-size: 12px;
+		font-size: 0.75rem;
 		color: #666;
 	}
 
 	.entry-index {
-		font-size: 12px;
+		font-size: 0.75rem;
 		color: #999;
 		font-weight: 500;
 	}

@@ -141,24 +141,23 @@
 		<span class="status-bar__value">{formatSelection()}</span>
 	</div>
 
-	<div class="status-bar__section status-bar__section--snap">
-		<span class="status-bar__label">Snap</span>
+	<div class="status-bar__section">
 		<div class="status-bar__toggle-row">
 			<label class="status-bar__toggle">
+				<span>Snap</span>
 				<input
 					type="checkbox"
 					checked={snapSnapshot.snapEnabled}
 					onchange={handleSnapToggle}
 					aria-label="Enable main snapping" />
-				<span>Main</span>
 			</label>
 			<label class="status-bar__toggle">
+				<span>Show Grid</span>
 				<input
 					type="checkbox"
 					checked={snapSnapshot.gridEnabled}
 					onchange={handleGridToggle}
 					aria-label="Enable grid snapping" />
-				<span>Grid</span>
 			</label>
 		</div>
 	</div>
@@ -177,36 +176,33 @@
 	.status-bar {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-		gap: 12px;
-		padding: 8px 16px;
+		gap: 1rem;
+		padding: 0.5rem 1rem;
 		background: var(--surface-elevated);
 		border-top: 1px solid var(--border);
-		font-size: 13px;
+		font-size: 0.75rem;
 		align-items: center;
-		min-height: 48px;
+		min-height: 40px;
 	}
 
 	.status-bar__section {
 		display: flex;
-		flex-direction: column;
-		gap: 2px;
+		flex-direction: row;
+		align-items: center;
+		gap: 0.5rem;
 		position: relative;
-	}
-
-	.status-bar__section--snap {
-		align-items: flex-start;
 	}
 
 	.status-bar__toggle-row {
 		display: flex;
-		gap: 8px;
+		gap: 1rem;
 	}
 
 	.status-bar__toggle {
 		display: flex;
 		align-items: center;
-		gap: 4px;
-		font-size: 12px;
+		gap: 0.25rem;
+		font-size: 0.75rem;
 		color: var(--text);
 	}
 
@@ -221,7 +217,7 @@
 	}
 
 	.status-bar__label {
-		font-size: 11px;
+		font-size: 0.75rem;
 		color: var(--text-muted);
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
@@ -237,7 +233,7 @@
 	}
 
 	.status-bar__mode {
-		font-size: 12px;
+		font-size: 0.75rem;
 		color: var(--text-muted);
 	}
 </style>

@@ -198,8 +198,8 @@
 		border: 1px solid var(--border);
 		background: var(--surface);
 		color: var(--text);
-		padding: 8px 12px;
-		border-radius: 4px;
+		padding: 0.5rem 0.75rem;
+		border-radius: 0.25rem;
 		cursor: pointer;
 		font-size: 13px;
 		min-width: 60px;
@@ -228,10 +228,10 @@
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-		padding: 12px;
+		padding: 0.75rem;
 		display: flex;
 		flex-direction: column;
-		gap: 12px;
+		gap: 0.75rem;
 		z-index: 10;
 		min-width: 200px;
 	}
@@ -243,7 +243,7 @@
 	}
 
 	.arrow-popover__label {
-		font-size: 12px;
+		font-size: 0.75rem;
 		font-weight: 500;
 		color: var(--text);
 	}
@@ -258,10 +258,10 @@
 		border: 1px solid var(--border);
 		background: var(--surface);
 		color: var(--text);
-		padding: 6px 12px;
-		border-radius: 4px;
+		padding: 6px 0.75rem;
+		border-radius: 0.25rem;
 		cursor: pointer;
-		font-size: 12px;
+		font-size: 0.75rem;
 		transition: all 0.15s;
 	}
 
@@ -286,7 +286,7 @@
 		background: var(--surface);
 		color: var(--text);
 		padding: 6px 8px;
-		border-radius: 4px;
+		border-radius: 0.25rem;
 		font-size: 13px;
 	}
 

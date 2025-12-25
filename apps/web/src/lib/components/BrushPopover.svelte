@@ -230,8 +230,8 @@
 		border: 1px solid var(--border);
 		background: var(--surface);
 		color: var(--text);
-		padding: 8px 12px;
-		border-radius: 4px;
+		padding: 0.5rem 0.75rem;
+		border-radius: 0.25rem;
 		cursor: pointer;
 		font-size: 13px;
 		min-width: 60px;
@@ -260,10 +260,10 @@
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-		padding: 12px;
+		padding: 0.75rem;
 		display: flex;
 		flex-direction: column;
-		gap: 12px;
+		gap: 0.75rem;
 		z-index: 10;
 		min-width: 200px;
 	}
@@ -278,7 +278,7 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		font-size: 12px;
+		font-size: 0.75rem;
 		color: var(--text);
 	}
 
@@ -293,7 +293,7 @@
 
 	.brush-popover__control input[type='range'] {
 		width: 100%;
-		height: 4px;
+		height: 0.25rem;
 		border-radius: 2px;
 		background: var(--border);
 		outline: none;
@@ -338,7 +338,7 @@
 	.brush-popover__control--color input[type='color'] {
 		width: 100%;
 		border: 1px solid var(--border);
-		border-radius: 4px;
+		border-radius: 0.25rem;
 		height: 32px;
 		background: var(--surface);
 		cursor: pointer;
