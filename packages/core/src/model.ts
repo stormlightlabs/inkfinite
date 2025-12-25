@@ -68,6 +68,24 @@ export type ArrowProps = {
 export type TextProps = { text: string; fontSize: number; fontFamily: string; color: string; w?: number };
 
 /**
+ * Markdown block properties
+ * - md: markdown source text
+ * - w: fixed width (required for layout)
+ * - h: auto-computed height from layout (optional override)
+ * - style: font and color settings
+ */
+export type MarkdownProps = {
+  md: string;
+  w: number;
+  h?: number;
+  fontSize: number;
+  fontFamily: string;
+  color: string;
+  bg?: string;
+  border?: string;
+};
+
+/**
  * Point with optional pressure value (0-1)
  * Format: [x, y, pressure?]
  */
@@ -97,8 +115,7 @@ export type StrokeStyle = { color: string; opacity: number };
  */
 export type StrokeProps = { points: StrokePoint[]; style: StrokeStyle; brush: BrushConfig };
 
-export type ShapeType = "rect" | "ellipse" | "line" | "arrow" | "text" | "stroke";
-
+export type ShapeType = "rect" | "ellipse" | "line" | "arrow" | "text" | "stroke" | "markdown";
 export type BaseShape = { id: string; type: ShapeType; pageId: string; x: number; y: number; rot: number };
 export type RectShape = BaseShape & { type: "rect"; props: RectProps };
 export type EllipseShape = BaseShape & { type: "ellipse"; props: EllipseProps };
@@ -106,8 +123,9 @@ export type LineShape = BaseShape & { type: "line"; props: LineProps };
 export type ArrowShape = BaseShape & { type: "arrow"; props: ArrowProps };
 export type TextShape = BaseShape & { type: "text"; props: TextProps };
 export type StrokeShape = BaseShape & { type: "stroke"; props: StrokeProps };
+export type MarkdownShape = BaseShape & { type: "markdown"; props: MarkdownProps };
 
-export type ShapeRecord = RectShape | EllipseShape | LineShape | ArrowShape | TextShape | StrokeShape;
+export type ShapeRecord = RectShape | EllipseShape | LineShape | ArrowShape | TextShape | StrokeShape | MarkdownShape;
 
 export const ShapeRecord = {
   /**
@@ -153,6 +171,13 @@ export const ShapeRecord = {
   },
 
   /**
+   * Create a markdown block shape
+   */
+  createMarkdown(pageId: string, x: number, y: number, properties: MarkdownProps, id?: string): MarkdownShape {
+    return { id: id ?? createId("shape"), type: "markdown", pageId, x, y, rot: 0, props: properties };
+  },
+
+  /**
    * Clone a shape record
    */
   clone(shape: ShapeRecord): ShapeRecord {
@@ -179,6 +204,9 @@ export const ShapeRecord = {
           label: shape.props.label ? { ...shape.props.label } : undefined,
         },
       };
+    }
+    if (shape.type === "markdown") {
+      return { ...shape, props: { ...shape.props } };
     }
     return { ...shape, props: { ...shape.props } } as ShapeRecord;
   },
@@ -344,6 +372,19 @@ export function validateDoc(document: Document): ValidationResult {
         }
         if (shape.props.style.opacity < 0 || shape.props.style.opacity > 1) {
           errors.push(`Stroke shape '${shapeId}' has invalid opacity`);
+        }
+
+        break;
+      }
+      case "markdown": {
+        if (shape.props.fontSize <= 0) {
+          errors.push(`Markdown shape '${shapeId}' has invalid fontSize`);
+        }
+        if (shape.props.w <= 0) {
+          errors.push(`Markdown shape '${shapeId}' has invalid width`);
+        }
+        if (shape.props.h !== undefined && shape.props.h <= 0) {
+          errors.push(`Markdown shape '${shapeId}' has invalid height`);
         }
 
         break;

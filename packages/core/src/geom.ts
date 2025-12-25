@@ -6,6 +6,7 @@ import type {
   BrushConfig,
   EllipseShape,
   LineShape,
+  MarkdownShape,
   RectShape,
   ShapeRecord,
   StrokePoint,
@@ -43,6 +44,9 @@ export function shapeBounds(shape: ShapeRecord): Box2 {
     }
     case "stroke": {
       return strokeBounds(shape);
+    }
+    case "markdown": {
+      return markdownBounds(shape);
     }
   }
 }
@@ -134,6 +138,26 @@ function textBounds(shape: TextShape): Box2 {
 
   const corners = [{ x: 0, y: 0 }, { x: width, y: 0 }, { x: width, y: height }, { x: 0, y: height }];
 
+  const rotatedCorners = corners.map((corner) => rotatePoint(corner, rot));
+  const translatedCorners = rotatedCorners.map((corner) => ({ x: corner.x + x, y: corner.y + y }));
+  return Box2Ops.fromPoints(translatedCorners);
+}
+
+/**
+ * Get bounds for a markdown block shape
+ */
+function markdownBounds(shape: MarkdownShape): Box2 {
+  const { w, h, fontSize } = shape.props;
+  const { x, y, rot } = shape;
+
+  const width = w;
+  const height = h ?? fontSize * 10;
+
+  if (rot === 0) {
+    return Box2Ops.create(x, y, x + width, y + height);
+  }
+
+  const corners = [{ x: 0, y: 0 }, { x: width, y: 0 }, { x: width, y: height }, { x: 0, y: height }];
   const rotatedCorners = corners.map((corner) => rotatePoint(corner, rot));
   const translatedCorners = rotatedCorners.map((corner) => ({ x: corner.x + x, y: corner.y + y }));
   return Box2Ops.fromPoints(translatedCorners);
@@ -324,6 +348,22 @@ export function pointInText(p: Vec2, shape: TextShape): boolean {
 }
 
 /**
+ * Check if a point is inside a markdown block shape
+ *
+ * @param p - Point in world coordinates
+ * @param shape - Markdown block shape
+ * @returns True if point is inside the markdown block bounds
+ */
+export function pointInMarkdown(p: Vec2, shape: MarkdownShape): boolean {
+  const { x, y, rot } = shape;
+  const { w, h, fontSize } = shape.props;
+  const localP = worldToLocal(p, x, y, rot);
+  const width = w;
+  const height = h ?? fontSize * 10;
+  return localP.x >= 0 && localP.x <= width && localP.y >= 0 && localP.y <= height;
+}
+
+/**
  * Check if a point is inside a polygon using ray casting algorithm
  *
  * @param p - Point to test
@@ -431,6 +471,12 @@ export function hitTestPoint(state: EditorState, worldPoint: Vec2, tolerance = 5
       }
       case "text": {
         if (pointInText(worldPoint, shape)) {
+          return shape.id;
+        }
+        break;
+      }
+      case "markdown": {
+        if (pointInMarkdown(worldPoint, shape)) {
           return shape.id;
         }
         break;

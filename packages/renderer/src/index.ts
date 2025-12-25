@@ -5,6 +5,7 @@ import type {
   EditorState,
   EllipseShape,
   LineShape,
+  MarkdownShape,
   RectShape,
   ShapeRecord,
   Store,
@@ -370,6 +371,10 @@ function drawShape(context: CanvasRenderingContext2D, state: EditorState, shape:
       drawText(context, shape);
       break;
     }
+    case "markdown": {
+      drawMarkdown(context, shape);
+      break;
+    }
     case "stroke": {
       drawStroke(context, shape);
       break;
@@ -604,6 +609,215 @@ function drawText(context: CanvasRenderingContext2D, shape: TextShape) {
 }
 
 /**
+ * Parse and render markdown to canvas
+ *
+ * Renders markdown with basic formatting:
+ * - Headings (h1-h6) with appropriate sizes
+ * - Bold (**text** or __text__)
+ * - Italic (*text* or _text_)
+ * - Code (`code`)
+ * - Paragraphs with line wrapping
+ * - Lists (ordered and unordered)
+ * - Code blocks (```)
+ */
+function drawMarkdown(context: CanvasRenderingContext2D, shape: MarkdownShape) {
+  const { md, w, h, fontSize, fontFamily, color, bg, border } = shape.props;
+
+  const width = w;
+  const height = h ?? fontSize * 10;
+
+  context.fillStyle = bg ?? "#ffffff";
+  context.fillRect(0, 0, width, height);
+
+  if (border) {
+    context.strokeStyle = border;
+    context.lineWidth = 1;
+    context.strokeRect(0, 0, width, height);
+  }
+
+  context.fillStyle = color;
+  context.textBaseline = "top";
+
+  const padding = 8;
+  let yOffset = padding;
+  const lineHeight = fontSize * 1.4;
+
+  const lines = md.split("\n");
+
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    let line = lines[lineIndex];
+
+    if (yOffset + lineHeight > height - padding) break;
+
+    let currentFontSize = fontSize;
+    let currentStyle = "normal";
+    let currentWeight = "normal";
+    let prefix = "";
+
+    if (line.startsWith("```")) {
+      context.fillStyle = "#f4f4f4";
+      const codeBlockLines = [];
+      lineIndex++;
+      while (lineIndex < lines.length && !lines[lineIndex].startsWith("```")) {
+        codeBlockLines.push(lines[lineIndex]);
+        lineIndex++;
+      }
+
+      const codeBlockHeight = codeBlockLines.length * lineHeight + padding * 2;
+      if (yOffset + codeBlockHeight <= height - padding) {
+        context.fillRect(padding, yOffset, width - padding * 2, codeBlockHeight);
+
+        context.fillStyle = "#333";
+        context.font = `normal normal ${fontSize}px monospace`;
+
+        for (const [index, codeLine] of codeBlockLines.entries()) {
+          context.fillText(codeLine, padding + 4, yOffset + padding + index * lineHeight);
+        }
+
+        yOffset += codeBlockHeight + padding;
+      }
+
+      context.fillStyle = color;
+      context.font = `${currentWeight} ${currentStyle} ${currentFontSize}px ${fontFamily}`;
+      continue;
+    }
+
+    if (line.match(/^#{1,6}\s/)) {
+      const match = line.match(/^(#{1,6})\s(.*)$/);
+      if (match) {
+        const level = match[1].length;
+        line = match[2];
+        currentFontSize = fontSize * (2 - level * 0.15);
+        currentWeight = "bold";
+      }
+    } else if (line.match(/^[-*+]\s/)) {
+      prefix = "• ";
+      line = line.replace(/^[-*+]\s/, "");
+    } else if (line.match(/^\d+\.\s/)) {
+      const match = line.match(/^(\d+)\.\s(.*)$/);
+      if (match) {
+        prefix = `${match[1]}. `;
+        line = match[2];
+      }
+    }
+
+    line = prefix + line;
+
+    line = line.replace(/`([^`]+)`/g, "$1");
+
+    context.font = `${currentWeight} ${currentStyle} ${currentFontSize}px ${fontFamily}`;
+
+    const wrappedLines = wrapText(context, line, width - padding * 2);
+
+    for (const wrappedLine of wrappedLines) {
+      if (yOffset + currentFontSize * 1.4 > height - padding) break;
+
+      const styledLine = wrappedLine;
+      let xOffset = padding;
+
+      const segments = parseInlineStyles(styledLine);
+
+      for (const segment of segments) {
+        const { text: segmentText, bold, italic, code } = segment;
+
+        if (code) {
+          context.fillStyle = "#f4f4f4";
+          const metrics = context.measureText(segmentText);
+          context.fillRect(xOffset, yOffset, metrics.width + 4, currentFontSize * 1.2);
+          context.fillStyle = "#333";
+          context.font = `normal normal ${currentFontSize * 0.9}px monospace`;
+          context.fillText(segmentText, xOffset + 2, yOffset);
+          xOffset += metrics.width + 4;
+          context.fillStyle = color;
+          context.font = `${currentWeight} ${currentStyle} ${currentFontSize}px ${fontFamily}`;
+        } else {
+          const weight = bold ? "bold" : currentWeight;
+          const style = italic ? "italic" : currentStyle;
+          context.font = `${weight} ${style} ${currentFontSize}px ${fontFamily}`;
+          context.fillText(segmentText, xOffset, yOffset);
+          const metrics = context.measureText(segmentText);
+          xOffset += metrics.width;
+          context.font = `${currentWeight} ${currentStyle} ${currentFontSize}px ${fontFamily}`;
+        }
+      }
+
+      yOffset += currentFontSize * 1.4;
+    }
+  }
+}
+
+/**
+ * Parse inline markdown styles (bold, italic, code) into segments
+ */
+function parseInlineStyles(text: string): Array<{ text: string; bold: boolean; italic: boolean; code: boolean }> {
+  const segments: Array<{ text: string; bold: boolean; italic: boolean; code: boolean }> = [];
+
+  const codeRegex = /`([^`]+)`/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = codeRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ text: text.slice(lastIndex, match.index), code: false });
+    }
+    parts.push({ text: match[1], code: true });
+    lastIndex = codeRegex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push({ text: text.slice(lastIndex), code: false });
+  }
+
+  for (const part of parts) {
+    if (part.code) {
+      segments.push({ text: part.text, bold: false, italic: false, code: true });
+    } else {
+      const boldItalicRegex = /(\*\*\*|___)([^*_]+)(\*\*\*|___)|(\*\*|__)([^*_]+)(\*\*|__)|(\*|_)([^*_]+)(\*|_)/g;
+      let lastPartIndex = 0;
+      let partMatch;
+
+      while ((partMatch = boldItalicRegex.exec(part.text)) !== null) {
+        if (partMatch.index > lastPartIndex) {
+          segments.push({
+            text: part.text.slice(lastPartIndex, partMatch.index),
+            bold: false,
+            italic: false,
+            code: false,
+          });
+        }
+
+        if (partMatch[1]) {
+          segments.push({ text: partMatch[2], bold: true, italic: true, code: false });
+        } else if (partMatch[4]) {
+          segments.push({ text: partMatch[5], bold: true, italic: false, code: false });
+        } else if (partMatch[7]) {
+          segments.push({ text: partMatch[8], bold: false, italic: true, code: false });
+        }
+
+        lastPartIndex = boldItalicRegex.lastIndex;
+      }
+
+      if (lastPartIndex < part.text.length) {
+        segments.push({ text: part.text.slice(lastPartIndex), bold: false, italic: false, code: false });
+      }
+
+      if (segments.length === 0 || lastPartIndex === 0) {
+        if (segments.length === 0) {
+          segments.push({ text: part.text, bold: false, italic: false, code: false });
+        }
+      }
+    }
+  }
+
+  if (segments.length === 0) {
+    segments.push({ text, bold: false, italic: false, code: false });
+  }
+
+  return segments;
+}
+
+/**
  * Draw a stroke shape (freehand drawing)
  */
 function drawStroke(context: CanvasRenderingContext2D, shape: StrokeShape) {
@@ -732,6 +946,13 @@ function drawSelection(
         context.strokeRect(0, 0, width, height);
         break;
       }
+      case "markdown": {
+        const { w, h, fontSize } = shape.props;
+        const width = w;
+        const height = h ?? fontSize * 10;
+        context.strokeRect(0, 0, width, height);
+        break;
+      }
       case "stroke": {
         const { points, brush } = shape.props;
         if (points.length >= 2) {
@@ -824,7 +1045,7 @@ function drawHandles(
 
 function getHandlesForShape(state: EditorState, shape: ShapeRecord): HandleVisual[] {
   const handles: HandleVisual[] = [];
-  if (shape.type === "rect" || shape.type === "ellipse" || shape.type === "text") {
+  if (shape.type === "rect" || shape.type === "ellipse" || shape.type === "text" || shape.type === "markdown") {
     const bounds = shapeBounds(shape);
     const minX = bounds.min.x;
     const maxX = bounds.max.x;

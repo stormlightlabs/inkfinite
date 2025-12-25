@@ -576,7 +576,9 @@ export class SelectTool implements Tool {
     pointer: Vec2,
     handle: HandleKind,
   ): ShapeRecord | null {
-    if (initial.type !== "rect" && initial.type !== "ellipse" && initial.type !== "text") {
+    if (
+      initial.type !== "rect" && initial.type !== "ellipse" && initial.type !== "text" && initial.type !== "markdown"
+    ) {
       return null;
     }
     let minX = bounds.min.x;
@@ -631,6 +633,10 @@ export class SelectTool implements Tool {
 
     if (initial.type === "text") {
       return { ...initial, x: minX, y: minY, props: { ...initial.props, w: width } };
+    }
+
+    if (initial.type === "markdown") {
+      return { ...initial, x: minX, y: minY, props: { ...initial.props, w: width, h: height } };
     }
 
     // @ts-expect-error union mismatch
@@ -756,7 +762,9 @@ export class SelectTool implements Tool {
     if (!this.toolState.rotationCenter || this.toolState.rotationStartAngle === null) {
       return null;
     }
-    if (initial.type !== "rect" && initial.type !== "ellipse" && initial.type !== "text") {
+    if (
+      initial.type !== "rect" && initial.type !== "ellipse" && initial.type !== "text" && initial.type !== "markdown"
+    ) {
       return null;
     }
     const currentAngle = Math.atan2(

@@ -1,7 +1,7 @@
 import { shapeBounds } from "./geom";
 import type { Box2 } from "./math";
 import { Box2 as Box2Ops } from "./math";
-import type { ArrowShape, EllipseShape, LineShape, RectShape, ShapeRecord, TextShape } from "./model";
+import type { ArrowShape, EllipseShape, LineShape, MarkdownShape, RectShape, ShapeRecord, TextShape } from "./model";
 import type { EditorState } from "./reactivity";
 import { getSelectedShapes, getShapesOnCurrentPage } from "./reactivity";
 
@@ -168,6 +168,9 @@ function shapeToSVG(shape: ShapeRecord, state: EditorState): string | null {
     case "text": {
       return textToSVG(shape, transform);
     }
+    case "markdown": {
+      return markdownToSVG(shape, transform);
+    }
     default: {
       return null;
     }
@@ -245,6 +248,36 @@ function textToSVG(shape: TextShape, transform: string): string {
   return `<text transform="${transform}" font-size="${fontSize}" font-family="${escapeXML(fontFamily)}" fill="${
     escapeXML(color)
   }">${escapeXML(text)}</text>`;
+}
+
+/**
+ * Export markdown shape as SVG foreignObject
+ *
+ * Uses foreignObject to embed HTML for markdown rendering.
+ *
+ * For better compatibility, the markdown is exported as plain text with basic formatting preserved.
+ */
+function markdownToSVG(shape: MarkdownShape, transform: string): string {
+  const { md, w, h, fontSize, fontFamily, color, bg, border } = shape.props;
+  const width = w;
+  const height = h ?? fontSize * 10;
+
+  const bgStyle = bg ? `background: ${escapeXML(bg)};` : "background: white;";
+  const borderStyle = border ? `border: 1px solid ${escapeXML(border)};` : "";
+
+  const escapedMarkdown = escapeXML(md);
+
+  return [
+    `<foreignObject transform="${transform}" width="${width}" height="${height}">`,
+    `  <div xmlns="http://www.w3.org/1999/xhtml" style="${bgStyle}${borderStyle} padding: 8px; font-size: ${fontSize}px; font-family: ${
+      escapeXML(fontFamily)
+    }; color: ${
+      escapeXML(color)
+    }; width: 100%; height: 100%; overflow: auto; white-space: pre-wrap; box-sizing: border-box;">`,
+    `    ${escapedMarkdown}`,
+    `  </div>`,
+    `</foreignObject>`,
+  ].join("\n");
 }
 
 /**

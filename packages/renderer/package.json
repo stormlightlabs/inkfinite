@@ -33,5 +33,12 @@
     "typescript-eslint": "^8.50.1",
     "vitest": "^4.0.16"
   },
-  "dependencies": { "inkfinite-core": "workspace:*" }
+  "dependencies": {
+    "inkfinite-core": "workspace:*",
+    "rehype-stringify": "^10.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.2",
+    "unified": "^11.0.5"
+  }
 }

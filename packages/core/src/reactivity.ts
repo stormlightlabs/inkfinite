@@ -12,7 +12,7 @@ import {
 import type { Document, PageRecord, ShapeRecord } from "./model";
 import { Document as DocumentOps } from "./model";
 
-export type ToolId = "select" | "rect" | "ellipse" | "line" | "arrow" | "text" | "pen";
+export type ToolId = "select" | "rect" | "ellipse" | "line" | "arrow" | "text" | "pen" | "markdown";
 
 export type BindingPreview = { arrowId: string; targetShapeId: string; handle: "start" | "end" };
 
