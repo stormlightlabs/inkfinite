@@ -4,6 +4,7 @@ import type { DesktopDocRepo } from "$lib/persistence/desktop";
 import { createPlatformRepo, detectPlatform } from "$lib/platform";
 import { createBrushStore, createPersistenceManager, createSnapStore, createStatusStore } from "$lib/status";
 import type { BrushStore, SnapStore, StatusStore } from "$lib/status";
+import { themeStore } from "$lib/theme.svelte";
 import {
   ArrowTool,
   Camera,
@@ -526,10 +527,16 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
         get: () => ({ isPointerDown: pointerState.isPointerDown, snappedWorld: pointerState.snappedWorld }),
       },
       handleProvider: { get: () => handleState.getSnapshot() },
+      themeProvider: { get: () => themeStore.current },
     });
 
     const unsubStore = store.subscribe(() => renderer?.markDirty());
     const unsubSnap = snapStore.subscribe(() => renderer?.markDirty());
+
+    $effect(() => {
+      themeStore.current;
+      renderer?.markDirty();
+    });
 
     inputAdapter = createInputAdapter({
       canvas,

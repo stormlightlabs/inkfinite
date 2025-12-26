@@ -145,6 +145,7 @@ S1. Stencil definition format (core)
     - Flowchart: process, decision, terminator, data, document
     - Diagrams: server, db, queue, user, browser, mobile
     - UI: button, input, card, modal
+    - Etc: Post-It style/sticky notes, index cards, speech bubble
 
 (DoD): Stencils load as data and can spawn shapes deterministically.
 
@@ -215,3 +216,5 @@ Parking Lot                                                              *wb-pl*
       without exporting.
 - [ ] Markdown layout caching
     - cache layout per (md, w, style) to avoid re-parsing on every render
+- [ ] Bug Fix: Cursor Mapping
+    - Investigate cursor position getting stuck or offsetting after window resize.

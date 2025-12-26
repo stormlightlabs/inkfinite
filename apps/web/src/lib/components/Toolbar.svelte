@@ -33,6 +33,7 @@
 		shapeBounds,
 		SnapshotCommand
 	} from 'inkfinite-core';
+    import { fade } from 'svelte/transition';
 	import icon from '../assets/favicon.svg';
 	import ArrowPopover from './ArrowPopover.svelte';
 	import BrushPopover from './BrushPopover.svelte';
@@ -129,6 +130,17 @@
 		}
 	});
 
+    let showColorControls = $derived(
+        toolSupportsStyles(currentTool) || 
+        toolSupportsFill(currentTool) || 
+        getSelectedShapes(editorState).some(s => shapeSupportsFill(s) || shapeSupportsStroke(s))
+    );
+
+	let position = $state({ x: 20, y: 20 });
+	let isDragging = $state(false);
+	let dragOffset = $state({ x: 0, y: 0 });
+	let toolbarEl = $state<HTMLElement | null>(null);
+
 	$effect(() => {
 		if (!zoomMenuOpen || typeof document === 'undefined') {
 			return;
@@ -166,6 +178,33 @@
 		document.addEventListener('pointerdown', handlePointerDown);
 		return () => document.removeEventListener('pointerdown', handlePointerDown);
 	});
+
+	function handleDragStart(event: PointerEvent) {
+		isDragging = true;
+		dragOffset = {
+			x: event.clientX - position.x,
+			y: event.clientY - position.y
+		};
+
+		if(typeof document !== 'undefined') document.body.style.userSelect = 'none';
+        
+
+        (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+	}
+
+	function handleDragMove(event: PointerEvent) {
+		if (!isDragging) return;
+		position = {
+			x: event.clientX - dragOffset.x,
+			y: event.clientY - dragOffset.y
+		};
+	}
+
+	function handleDragEnd(event: PointerEvent) {
+		isDragging = false;
+		if(typeof document !== 'undefined') document.body.style.userSelect = '';
+        (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+	}
 
 	function openInfo() {
 		infoOpen = true;
@@ -308,6 +347,19 @@
 		);
 	}
 
+    function toolSupportsStyles(tool: ToolId): boolean {
+        return (
+            tool === 'rect' ||
+            tool === 'ellipse' ||
+            tool === 'line' ||
+            tool === 'arrow'
+        );
+    }
+
+    function toolSupportsFill(tool: ToolId): boolean {
+        return tool === 'rect' || tool === 'ellipse' || tool === 'text';
+    }
+
 	function getSharedColor<T extends ShapeRecord>(
 		shapes: T[],
 		extract: (shape: T) => string | null | undefined
@@ -436,7 +488,27 @@
 	}
 </script>
 
-<div class="toolbar" role="toolbar" aria-label="Drawing tools">
+<div 
+    class="toolbar" 
+    role="toolbar" 
+    aria-label="Drawing tools"
+    bind:this={toolbarEl}
+    style="position: fixed; left: {position.x}px; top: {position.y}px;"
+    data-dragging={isDragging}
+>
+    <!-- Drag Handle -->
+    <div 
+        class="toolbar__drag-handle"
+        onpointerdown={handleDragStart}
+        onpointermove={handleDragMove}
+        onpointerup={handleDragEnd}
+        aria-label="Drag toolbar"
+        role="button"
+        tabindex="0"
+    >
+        <Icon name="grip-vertical" size={16} />
+    </div>
+
 	<div class="toolbar__brand">
 		<div class="toolbar__logo">
 			<img src={icon} alt="Inkfinite Icon" />
@@ -500,26 +572,32 @@
 		</button>
 	{/each}
 
-	<div class="toolbar__colors" aria-label="Color controls">
+    {#if showColorControls}
+	<div class="toolbar__colors" aria-label="Color controls" transition:fade={{ duration: 150 }}>
+        {#if toolSupportsFill(currentTool) || getSelectedShapes(editorState).some(shapeSupportsFill)}
 		<label class="toolbar__color-control">
 			<span>Fill</span>
 			<input
 				type="color"
 				value={fillColorValue}
 				onchange={handleFillChange}
-				disabled={fillDisabled}
+				disabled={fillDisabled && !toolSupportsFill(currentTool)}
 				aria-label="Fill color" />
 		</label>
+        {/if}
+        {#if toolSupportsStyles(currentTool) || getSelectedShapes(editorState).some(shapeSupportsStroke)}
 		<label class="toolbar__color-control">
 			<span>Stroke</span>
 			<input
 				type="color"
 				value={strokeColorValue}
 				onchange={handleStrokeChange}
-				disabled={strokeDisabled}
+				disabled={strokeDisabled && !toolSupportsStyles(currentTool)}
 				aria-label="Stroke color" />
 		</label>
+        {/if}
 	</div>
+    {/if}
 
 	<div class="toolbar__divider"></div>
 
@@ -680,14 +758,46 @@
 	.toolbar {
 		display: flex;
 		gap: 0.75rem;
-		padding: 0.75rem 1rem;
+		padding: 0.75rem 1rem 0.75rem 0.25rem; /* Adjusted padding for handle */
 		background: var(--surface-elevated);
 		border-bottom: 1px solid var(--border);
+        border: 1px solid var(--border);
+        border-radius: 0.75rem;
 		align-items: center;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        z-index: 10;
-        position: relative;
+        z-index: 100;
+        transition: transform 0.1s;
+        touch-action: none;
 	}
+    
+    .toolbar[data-dragging="true"] {
+        transform: scale(1.02);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    .toolbar__drag-handle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 100%;
+        cursor: grab;
+        color: var(--text-muted);
+        opacity: 0.5;
+        transition: opacity 0.2s;
+        touch-action: none;
+    }
+    
+    .toolbar__drag-handle:hover {
+        opacity: 1;
+        color: var(--text);
+    }
+    
+    .toolbar[data-dragging="true"] .toolbar__drag-handle {
+        cursor: grabbing;
+        opacity: 1;
+        color: var(--accent);
+    }
 
     .toolbar__brand {
         display: flex;
@@ -720,18 +830,21 @@
 		align-items: center;
 		gap: 0.375rem;
 		padding: 0.625rem 0.875rem;
-		border: 1px solid transparent;
+		border: 1px solid var(--border);
 		border-radius: 0.5rem;
 		background: transparent;
-		color: var(--text-muted);
+		color: var(--text);
 		cursor: pointer;
 		transition: all 0.2s ease;
 		min-width: 68px;
+        opacity: 0.8;
 	}
 
 	.toolbar__tool-button:hover {
 		background: var(--bg-tertiary);
 		color: var(--text);
+        opacity: 1;
+        border-color: var(--text-muted);
 	}
 
 	.toolbar__tool-button:focus {
@@ -743,7 +856,9 @@
 	.tool-button.active {
 		background: var(--accent);
 		color: var(--surface);
+        border-color: var(--accent);
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        opacity: 1;
 	}
 
 	.toolbar__tool-icon {
@@ -759,10 +874,11 @@
 	}
 
 	.toolbar__divider {
-		width: 1px;
+		width: 2px;
 		background-color: var(--border);
-		margin: 0 1rem;
-		height: 48px;
+		margin: 0 1.25rem;
+		height: 32px;
+        opacity: 0.5;
 	}
 
     .toolbar__info {

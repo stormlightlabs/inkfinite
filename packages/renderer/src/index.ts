@@ -47,6 +47,7 @@ export type RendererOptions = {
   cursorProvider?: { get(): CursorState };
   pointerStateProvider?: { get(): PointerVisualState };
   handleProvider?: { get(): HandleRenderState };
+  themeProvider?: { get(): "light" | "dark" };
 };
 
 /**
@@ -111,7 +112,8 @@ export function createRenderer(canvas: HTMLCanvasElement, store: Store, options?
     const cursorState = options?.cursorProvider?.get();
     const pointerState = options?.pointerStateProvider?.get();
     const handleState = options?.handleProvider?.get();
-    drawScene(context, state, viewport, snapSettings, cursorState, pointerState, handleState);
+    const theme = options?.themeProvider?.get() ?? "light";
+    drawScene(context, state, viewport, snapSettings, cursorState, pointerState, handleState, theme);
   }
 
   /**
@@ -169,6 +171,7 @@ function drawScene(
   cursorState?: CursorState,
   pointerState?: PointerVisualState,
   handleState?: HandleRenderState,
+  theme: "light" | "dark" = "light",
 ) {
   context.clearRect(0, 0, viewport.width, viewport.height);
 
@@ -180,7 +183,7 @@ function drawScene(
 
   const shapes = getShapesOnCurrentPage(state);
   for (const shape of shapes) {
-    drawShape(context, state, shape);
+    drawShape(context, state, shape, theme);
   }
 
   drawSelection(context, state, shapes, handleState);
@@ -349,7 +352,12 @@ function drawBindingPreview(context: CanvasRenderingContext2D, state: EditorStat
 /**
  * Draw a single shape
  */
-function drawShape(context: CanvasRenderingContext2D, state: EditorState, shape: ShapeRecord) {
+function drawShape(
+  context: CanvasRenderingContext2D,
+  state: EditorState,
+  shape: ShapeRecord,
+  theme: "light" | "dark" = "light",
+) {
   context.save();
 
   context.translate(shape.x, shape.y);
@@ -379,7 +387,7 @@ function drawShape(context: CanvasRenderingContext2D, state: EditorState, shape:
       break;
     }
     case "markdown": {
-      drawMarkdown(context, shape);
+      drawMarkdown(context, shape, theme);
       break;
     }
     case "stroke": {
@@ -627,7 +635,7 @@ function drawText(context: CanvasRenderingContext2D, shape: TextShape) {
  * - Lists (ordered and unordered)
  * - Code blocks (```)
  */
-function drawMarkdown(context: CanvasRenderingContext2D, shape: MarkdownShape) {
+function drawMarkdown(context: CanvasRenderingContext2D, shape: MarkdownShape, theme: "light" | "dark" = "light") {
   const { md, w, h, fontSize, fontFamily, color, bg, border } = shape.props;
 
   const width = w;
@@ -662,7 +670,7 @@ function drawMarkdown(context: CanvasRenderingContext2D, shape: MarkdownShape) {
     let prefix = "";
 
     if (line.startsWith("```")) {
-      context.fillStyle = "#f4f4f4";
+      context.fillStyle = theme === "dark" ? "#2e3440" : "#f4f4f4";
       const codeBlockLines = [];
       lineIndex++;
       while (lineIndex < lines.length && !lines[lineIndex].startsWith("```")) {
@@ -674,7 +682,7 @@ function drawMarkdown(context: CanvasRenderingContext2D, shape: MarkdownShape) {
       if (yOffset + codeBlockHeight <= height - padding) {
         context.fillRect(padding, yOffset, width - padding * 2, codeBlockHeight);
 
-        context.fillStyle = "#333";
+        context.fillStyle = theme === "dark" ? "#e5e9f0" : "#333";
         context.font = `normal normal ${fontSize}px monospace`;
 
         for (const [index, codeLine] of codeBlockLines.entries()) {
@@ -728,10 +736,11 @@ function drawMarkdown(context: CanvasRenderingContext2D, shape: MarkdownShape) {
         const { text: segmentText, bold, italic, code } = segment;
 
         if (code) {
-          context.fillStyle = "#f4f4f4";
+          context.fillStyle = theme === "dark" ? "#2e3440" : "#f4f4f4";
           const metrics = context.measureText(segmentText);
           context.fillRect(xOffset, yOffset, metrics.width + 4, currentFontSize * 1.2);
-          context.fillStyle = "#333";
+
+          context.fillStyle = theme === "dark" ? "#e5e9f0" : "#333";
           context.font = `normal normal ${currentFontSize * 0.9}px monospace`;
           context.fillText(segmentText, xOffset + 2, yOffset);
           xOffset += metrics.width + 4;

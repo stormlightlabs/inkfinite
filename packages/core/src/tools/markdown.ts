@@ -4,14 +4,6 @@ import type { EditorState, ToolId } from "../reactivity";
 import { getCurrentPage } from "../reactivity";
 import type { Tool } from "./base";
 
-/**
- * Markdown tool creates markdown block shapes on click
- *
- * Features:
- * - Click to create a markdown block at the pointer position
- * - Block is created with default content and dimensions
- * - Shape is immediately selected after creation
- */
 export class MarkdownTool implements Tool {
   readonly id: ToolId = "markdown";
 
@@ -47,7 +39,7 @@ export class MarkdownTool implements Tool {
       w: 300,
       h: 200,
       fontSize: 16,
-      fontFamily: "sans-serif",
+      fontFamily: "Inter",
       color: "#1f2933",
     }, shapeId);
 
