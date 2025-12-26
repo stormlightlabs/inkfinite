@@ -568,12 +568,17 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
       persistenceStatusStore = persistenceManager.status;
 
       const boards = await repo.listBoards();
+      let boardId: string;
+
       if (boards.length > 0) {
-        const boardId = boards[0].id;
-        const doc = await repo.loadDoc(boardId);
-        setActiveBoardId(boardId);
-        applyLoadedDoc(doc);
+        boardId = boards[0].id;
+      } else {
+        boardId = await repo.createBoard("Untitled Board");
       }
+
+      const doc = await repo.loadDoc(boardId);
+      setActiveBoardId(boardId);
+      applyLoadedDoc(doc);
 
       removeBeforeUnload = () => {
         window.removeEventListener("beforeunload", handleBeforeUnload);
