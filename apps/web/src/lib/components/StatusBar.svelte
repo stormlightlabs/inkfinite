@@ -176,32 +176,32 @@
 	.status-bar {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-		gap: 1rem;
-		padding: 0.5rem 1rem;
+		gap: 1.5rem;
+		padding: 0.75rem 1.5rem;
 		background: var(--surface-elevated);
 		border-top: 1px solid var(--border);
 		font-size: 0.75rem;
 		align-items: center;
-		min-height: 40px;
+		min-height: 48px;
 	}
 
 	.status-bar__section {
 		display: flex;
 		flex-direction: row;
 		align-items: center;
-		gap: 0.5rem;
+		gap: 0.75rem;
 		position: relative;
 	}
 
 	.status-bar__toggle-row {
 		display: flex;
-		gap: 1rem;
+		gap: 1.25rem;
 	}
 
 	.status-bar__toggle {
 		display: flex;
 		align-items: center;
-		gap: 0.25rem;
+		gap: 0.375rem;
 		font-size: 0.75rem;
 		color: var(--text);
 	}
@@ -209,7 +209,12 @@
 	.status-bar__toggle input {
 		margin: 0;
 		cursor: pointer;
+        opacity: 0.8;
 	}
+
+    .status-bar__toggle:hover input {
+        opacity: 1;
+    }
 
 	.status-bar__toggle input:focus {
 		outline: 2px solid var(--accent);
@@ -217,15 +222,17 @@
 	}
 
 	.status-bar__label {
-		font-size: 0.75rem;
+		font-size: 0.6875rem;
 		color: var(--text-muted);
 		text-transform: uppercase;
-		letter-spacing: 0.05em;
+		letter-spacing: 0.075em;
+        font-weight: 600;
 	}
 
 	.status-bar__value {
 		font-weight: 500;
 		color: var(--text);
+        font-variant-numeric: tabular-nums;
 	}
 
 	.status-bar__value--error {

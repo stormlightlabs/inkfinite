@@ -10,6 +10,7 @@
 	} from '$lib/constants';
 	import type { Platform } from '$lib/platform';
 	import type { BrushSettings, BrushStore } from '$lib/status';
+    import { themeStore } from '$lib/theme.svelte';
 	import type {
 		ArrowShape,
 		BoardMeta,
@@ -608,6 +609,14 @@
 	</div>
 
 	<div class="toolbar__info-actions">
+        <button 
+            class="toolbar__info" 
+            onclick={() => themeStore.toggle()} 
+            aria-label="Toggle Dark Mode"
+            title="Toggle Dark Mode">
+            <Icon name={themeStore.current === 'dark' ? 'sun' : 'moon'} size={16} />
+			<span class="toolbar__info-label">{themeStore.current === 'dark' ? 'Light' : 'Dark'}</span>
+        </button>
 		{#if platform === 'web' && onOpenBrowser}
 			<button class="toolbar__info" onclick={onOpenBrowser} aria-label="Browse boards">
 				<Icon name="folder" size={16} />
@@ -670,31 +679,59 @@
 <style>
 	.toolbar {
 		display: flex;
-		gap: 0.5rem;
-		padding: 0.75rem;
+		gap: 0.75rem;
+		padding: 0.75rem 1rem;
 		background: var(--surface-elevated);
 		border-bottom: 1px solid var(--border);
 		align-items: center;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        z-index: 10;
+        position: relative;
 	}
+
+    .toolbar__brand {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-right: 1.5rem;
+    }
+
+    .toolbar__logo img {
+        width: 32px;
+        height: 32px;
+    }
+
+    .toolbar__name {
+        font-weight: 600;
+        font-size: 1.125rem;
+        letter-spacing: -0.025em;
+        color: var(--text);
+    }
+
+    .toolbar__tagline {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        font-weight: 500;
+    }
 
 	.toolbar__tool-button {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 0.25rem;
-		padding: 0.5rem 0.75rem;
-		border: 1px solid var(--border);
-		border-radius: 0.25rem;
-		background: var(--surface);
-		color: var(--text);
+		gap: 0.375rem;
+		padding: 0.625rem 0.875rem;
+		border: 1px solid transparent;
+		border-radius: 0.5rem;
+		background: transparent;
+		color: var(--text-muted);
 		cursor: pointer;
-		transition: all 0.2s;
-		min-width: 60px;
+		transition: all 0.2s ease;
+		min-width: 68px;
 	}
 
 	.toolbar__tool-button:hover {
-		background: var(--surface-elevated);
-		border-color: var(--text-muted);
+		background: var(--bg-tertiary);
+		color: var(--text);
 	}
 
 	.toolbar__tool-button:focus {
@@ -706,16 +743,17 @@
 	.tool-button.active {
 		background: var(--accent);
 		color: var(--surface);
-		border-color: var(--accent-hover);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 	}
 
 	.toolbar__tool-icon {
-		font-size: 1.5rem;
+		font-size: 1.25rem;
 		line-height: 1;
 	}
 
 	.toolbar__tool-label {
 		font-size: 0.75rem;
+        font-weight: 500;
 		line-height: 1;
 		white-space: nowrap;
 	}
@@ -723,38 +761,28 @@
 	.toolbar__divider {
 		width: 1px;
 		background-color: var(--border);
-		margin: 0 8px;
-		height: 40px;
+		margin: 0 1rem;
+		height: 48px;
 	}
 
-	.toolbar__colors {
-		display: flex;
-		gap: 0.75rem;
-		align-items: center;
-	}
-
-	.toolbar__color-control {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-		font-size: 0.75rem;
-		color: var(--text-muted);
-	}
-
-	.toolbar__color-control input[type='color'] {
-		width: 40px;
-		height: 30px;
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 0;
-		background: transparent;
-		cursor: pointer;
-	}
-
-	.toolbar__color-control input[type='color']:disabled {
-		opacity: 0.4;
-		cursor: not-allowed;
-	}
+    .toolbar__info {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.375rem;
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: color 0.2s;
+        font-size: 0.875rem;
+    }
+    
+    .toolbar__info:hover {
+        background: var(--bg-tertiary);
+        color: var(--text);
+    }
 
 	.toolbar__zoom,
 	.toolbar__export {
@@ -766,38 +794,37 @@
 		border: 1px solid var(--border);
 		background: var(--surface);
 		color: var(--text);
-		padding: 0.5rem 0.75rem;
-		border-radius: 0.25rem;
+		padding: 0.5rem 1rem;
+		border-radius: 0.375rem;
 		cursor: pointer;
-		font-size: 13px;
-		min-width: 60px;
+		font-size: 0.875rem;
+        font-weight: 500;
+		min-width: 72px;
+        transition: all 0.2s;
 	}
 
 	.toolbar__zoom-button:hover,
 	.toolbar__export-button:hover {
-		background: var(--surface-elevated);
-	}
-
-	.toolbar__zoom-button:focus,
-	.toolbar__export-button:focus {
-		outline: 2px solid var(--accent);
-		outline-offset: 2px;
+		background: var(--bg-tertiary);
+        border-color: var(--text-muted);
 	}
 
 	.toolbar__zoom-menu,
 	.toolbar__export-menu {
 		position: absolute;
-		top: calc(100% + 4px);
+		top: calc(100% + 8px);
 		left: 0;
-		background: var(--surface);
+		background: var(--surface-elevated);
 		color: var(--text);
 		border: 1px solid var(--border);
-		border-radius: 6px;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-		padding: 8px;
+		border-radius: 0.5rem;
+		box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+		padding: 0.5rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.25rem;
+        min-width: 160px;
+        z-index: 20;
 		z-index: 10;
 		min-width: 150px;
 	}
