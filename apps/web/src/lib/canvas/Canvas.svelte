@@ -54,7 +54,17 @@
 			dataTransferTypes: e.dataTransfer?.types
 		});
 		e.preventDefault();
-		const stencil = draggingStencil.current;
+
+		let stencil = draggingStencil.current;
+
+		if (!stencil && e.dataTransfer) {
+			const stencilId = e.dataTransfer.getData('application/x-inkfinite-stencil');
+			if (stencilId) {
+				console.log('[Canvas] Recovering stencil from dataTransfer:', stencilId);
+				stencil = stencils.registry.get(stencilId) ?? null;
+			}
+		}
+
 		console.log('[Canvas] Dragging stencil state:', stencil);
 
 		if (!stencil || !canvasEl) {

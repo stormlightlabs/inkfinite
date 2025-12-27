@@ -112,8 +112,14 @@ const cardStencil: Stencil = {
       w: 300,
       h: 200,
       fill: "#ffffff",
-      stroke: "#dddddd",
+      stroke: "#333333",
       radius: 8,
+    }),
+    ShapeRecord.createLine("placeholder_page", at.x, at.y + 50, {
+      a: { x: 0, y: 0 },
+      b: { x: 300, y: 0 },
+      stroke: "#333333",
+      width: 1,
     }),
   ],
 };

@@ -306,6 +306,44 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     return { ...state, doc: { ...state.doc, pages: { ...state.doc.pages, [pageId]: { ...page, shapeIds } } } };
   }
 
+  function ungroupSelection(state: EditorState): EditorState | null {
+    const selectionIds = state.ui.selectionIds;
+    if (selectionIds.length === 0) {
+      return null;
+    }
+
+    const groupsToDissolve = new Set<string>();
+    const shapes = state.doc.shapes;
+
+    for (const id of selectionIds) {
+      const shape = shapes[id];
+      if (shape && shape.groupId) {
+        groupsToDissolve.add(shape.groupId);
+      }
+    }
+
+    if (groupsToDissolve.size === 0) {
+      return null;
+    }
+
+    const newShapes = { ...shapes };
+    let changed = false;
+
+    for (const id in newShapes) {
+      const shape = newShapes[id];
+      if (shape.groupId && groupsToDissolve.has(shape.groupId)) {
+        const newShape = { ...shape };
+        delete newShape.groupId;
+        newShapes[id] = newShape;
+        changed = true;
+      }
+    }
+
+    if (!changed) return null;
+
+    return { ...state, doc: { ...state.doc, shapes: newShapes } };
+  }
+
   function handleKeyboardShortcuts(state: EditorState, action: Action): EditorState | null {
     if (action.type !== "key-down") {
       return null;
@@ -370,6 +408,10 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     }
     if (primaryModifier && action.key === "[") {
       return reorderSelection(state, "backward");
+    }
+
+    if (primaryModifier && action.modifiers.shift && (action.key === "g" || action.key === "G")) {
+      return ungroupSelection(state);
     }
 
     return null;
@@ -644,11 +686,18 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
   };
 
   function insertStencil(stencil: Stencil, worldPos: { x: number; y: number }) {
+    const snap = snapStore.get();
+    let pos = { ...worldPos };
+    if (snap.snapEnabled && snap.gridEnabled) {
+      const gridSize = snap.gridSize;
+      pos = { x: Math.round(pos.x / gridSize) * gridSize, y: Math.round(pos.y / gridSize) * gridSize };
+    }
+
     const state = store.getState();
     const pageId = state.ui.currentPageId;
     if (!pageId) return;
 
-    const shapes = stencil.spawn(worldPos);
+    const shapes = stencil.spawn(pos);
     const groupId = shapes.length > 1 ? createId("group") : undefined;
 
     const newShapes = { ...state.doc.shapes };

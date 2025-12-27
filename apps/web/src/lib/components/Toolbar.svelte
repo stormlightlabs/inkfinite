@@ -1125,4 +1125,17 @@
 		flex-direction: column;
 		gap: 0.25rem;
 	}
+
+	.toolbar__colors {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.toolbar__color-control {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 4px;
+		text-align: right;
+	}
 </style>

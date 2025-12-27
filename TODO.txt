@@ -131,85 +131,15 @@ Ship a curated set of built-in stencils (flowchart + UI + dev diagrams) with a
 pleasant insertion workflow. No sharing/community libraries yet—just "your own".
 
 --------------------------------------------------------------------------------
-S1. Stencil definition format (core)
---------------------------------------------------------------------------------
-
-/packages/core/src/stencils:
-[x] Define Stencil:
-    - id, name, category, tags[]
-    - preview: { kind: 'svg'|'canvas', data }
-    - spawn: function (atPoint, scale) -> ShapeRecords[] (group)
-      (A stencil can insert 1 shape or a grouped set.)
-
-[x] Create initial categories:
-    - Flowchart: process, decision, terminator, data, document
-    - Diagrams: server, db, queue, user, browser, mobile
-    - UI: button, input, card, modal
-    - Etc: Post-It style/sticky notes, index cards, speech bubble
-
-(DoD): Stencils load as data and can spawn shapes deterministically.
-
---------------------------------------------------------------------------------
 S2. Insert UX
 --------------------------------------------------------------------------------
 
 /apps/web:
-[x] Stencils drawer/palette:
-    - search (name + tags)
-    - category filter
-    - click inserts at viewport center OR
-      drag ghost preview onto canvas and drop
 [ ] Placement rules:
-    - insert into active layer (if layers exist)
-    - snap to grid if enabled
-[x] Toolbar
-    - Open menu to insert stencils with button to open drawer
-[x] Drawer
-    - Stencil selection with search, category filter, and thumbnail previews
+    - insert into active layer (when layers are added)
+    - [x] snap to grid if enabled
 
 (DoD): Inserting stencils is faster than drawing shapes manually.
-
---------------------------------------------------------------------------------
-S3. Grouping behavior
---------------------------------------------------------------------------------
-
-[ ] When a stencil spawns multiple shapes:
-    - create a GroupRecord OR a "groupId" on shapes (your existing grouping
-      model)
-    - allow move as one unit
-    - ungroup command
-
-(DoD): Multi-shape stencils behave like a single object until ungrouped.
-
---------------------------------------------------------------------------------
-S4. Preview rendering
---------------------------------------------------------------------------------
-
-[x] Render stencil previews in the panel:
-    - small SVG thumbnails (best) & draw to offscreen canvas
-
-(DoD): Users can recognize stencils instantly.
-
---------------------------------------------------------------------------------
-S5. Persistence + versioning
---------------------------------------------------------------------------------
-
-[ ] Stencils are "code assets":
-    - version them with the app
-    - inserted shapes are normal shapes (no dependency on stencil after
-      insertion)
-
-(DoD): Old docs do not break if you change stencil definitions later.
-
---------------------------------------------------------------------------------
-S6. Tests
---------------------------------------------------------------------------------
-
-[ ] spawn() returns valid records with unique ids and correct initial positions
-[ ] group insert produces expected selection and undo/redo works
-[ ] search indexing returns correct stencils for tag queries
-
-(DoD): Stencils are reliable and don’t corrupt docs.
 
 ================================================================================
 Parking Lot                                                              *wb-pl*
