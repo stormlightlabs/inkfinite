@@ -141,7 +141,7 @@ S1. Stencil definition format (core)
     - spawn: function (atPoint, scale) -> ShapeRecords[] (group)
       (A stencil can insert 1 shape or a grouped set.)
 
-[ ] Create initial categories (v0):
+[ ] Create initial categories:
     - Flowchart: process, decision, terminator, data, document
     - Diagrams: server, db, queue, user, browser, mobile
     - UI: button, input, card, modal
@@ -162,6 +162,10 @@ S2. Insert UX
 [ ] Placement rules:
     - insert into active layer (if layers exist)
     - snap to grid if enabled
+[ ] Toolbar
+    - Open menu to insert stencils with button to open drawer
+[ ] Drawer
+    - Stencil selection with search, category filter, and thumbnail previews
 
 (DoD): Inserting stencils is faster than drawing shapes manually.
 
@@ -182,7 +186,7 @@ S4. Preview rendering
 --------------------------------------------------------------------------------
 
 [ ] Render stencil previews in the panel:
-    - v0: small SVG thumbnails (best) OR draw to offscreen canvas
+    - small SVG thumbnails (best) & draw to offscreen canvas
 
 (DoD): Users can recognize stencils instantly.
 

@@ -12,6 +12,7 @@
 		closeOnBackdrop?: boolean;
 		closeOnEscape?: boolean;
 		class?: string;
+		backdropClass?: string;
 		children?: Snippet;
 	};
 
@@ -23,7 +24,8 @@
 		side = 'right',
 		closeOnBackdrop = true,
 		closeOnEscape = true,
-		class: className = ''
+		class: className = '',
+		backdropClass = ''
 	}: Props = $props();
 
 	let sheetElement = $state<HTMLDivElement>();
@@ -61,7 +63,7 @@
 
 {#if open}
 	<div
-		class="sheet__backdrop"
+		class="sheet__backdrop {backdropClass}"
 		role="presentation"
 		onclick={handleBackdropClick}
 		onkeydown={handleKeyDown}>

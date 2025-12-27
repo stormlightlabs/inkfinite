@@ -180,17 +180,49 @@ export class SelectTool implements Tool {
   private handleShapeClick(state: EditorState, shapeId: string, action: Action): EditorState {
     if (action.type !== "pointer-down") return state;
 
+    const clickedShape = state.doc.shapes[shapeId];
+    if (!clickedShape) return state;
+
     const isShiftHeld = action.modifiers.shift;
-    const isAlreadySelected = state.ui.selectionIds.includes(shapeId);
+
+    let idsToInteractWith: string[] = [shapeId];
+    if (clickedShape.groupId) {
+      idsToInteractWith = Object.values(state.doc.shapes).filter((s) => s.groupId === clickedShape.groupId).map((s) =>
+        s.id
+      );
+    }
+
+    const isAnySelected = idsToInteractWith.some(id => state.ui.selectionIds.includes(id));
 
     let newSelectionIds: string[];
 
     if (isShiftHeld) {
-      newSelectionIds = isAlreadySelected
-        ? state.ui.selectionIds.filter((id) => id !== shapeId)
-        : [...state.ui.selectionIds, shapeId];
+      if (isAnySelected) {
+        newSelectionIds = state.ui.selectionIds.filter((id) => !idsToInteractWith.includes(id));
+      } else {
+        newSelectionIds = [...state.ui.selectionIds, ...idsToInteractWith];
+      }
     } else {
-      newSelectionIds = isAlreadySelected ? state.ui.selectionIds : [shapeId];
+      if (isAnySelected && !isShiftHeld) {
+        newSelectionIds = state.ui.selectionIds;
+      } else {
+        newSelectionIds = idsToInteractWith;
+      }
+    }
+
+    if (isShiftHeld) {
+      const shouldSelect = !isAnySelected;
+      if (shouldSelect) {
+        newSelectionIds = [...new Set([...state.ui.selectionIds, ...idsToInteractWith])];
+      } else {
+        newSelectionIds = state.ui.selectionIds.filter(id => !idsToInteractWith.includes(id));
+      }
+    } else {
+      if (isAnySelected) {
+        newSelectionIds = state.ui.selectionIds;
+      } else {
+        newSelectionIds = idsToInteractWith;
+      }
     }
 
     this.toolState.isDragging = true;

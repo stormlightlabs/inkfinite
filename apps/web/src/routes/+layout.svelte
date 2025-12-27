@@ -4,8 +4,8 @@
 	import '../app.css';
 
 	let { children } = $props();
-	
-	const _ = themeStore; 
+
+	const _ = themeStore;
 </script>
 
 <svelte:head>

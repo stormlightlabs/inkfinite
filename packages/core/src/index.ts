@@ -12,6 +12,7 @@ export * from "./persistence/repo";
 export * from "./persistence/stats";
 export * from "./persistence/web";
 export * from "./reactivity";
+export * as stencils from "./stencils";
 export * from "./tools";
 export * from "./ui/filebrowser";
 export * from "./ui/statusbar";

@@ -3,7 +3,10 @@
 	import StatusBar from '$lib/components/StatusBar.svelte';
 	import Toolbar from '$lib/components/Toolbar.svelte';
 	import FileBrowser from '$lib/filebrowser/FileBrowser.svelte';
+	import StencilPalette from '$lib/components/StencilPalette.svelte';
 	import { createCanvasController } from './canvas-store.svelte.ts';
+	import { draggingStencil, endDrag } from '$lib/dnd.svelte';
+	import { Camera } from 'inkfinite-core';
 
 	let canvasEl = $state<HTMLCanvasElement | null>(null);
 	let textEditorEl = $state<HTMLTextAreaElement | null>(null);
@@ -43,6 +46,24 @@
 		c.markdownEditor.setRef(markdownEditorEl);
 		return () => c.markdownEditor.setRef(null);
 	});
+
+	function handleDrop(e: DragEvent) {
+		e.preventDefault();
+		const stencil = draggingStencil.current;
+		if (!stencil || !canvasEl) return;
+
+		const rect = canvasEl.getBoundingClientRect();
+		const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+		const viewport = c.getViewport();
+		const world = Camera.screenToWorld(c.store.getState().camera, screen, viewport);
+
+		c.insertStencil(stencil, world);
+		endDrag();
+	}
+
+	function handleStencilsClick() {
+		c.stencilPaletteOpen = !c.stencilPaletteOpen;
+	}
 </script>
 
 <div class="editor">
@@ -60,11 +81,19 @@
 		currentTool={c.tools.currentToolId}
 		onToolChange={c.tools.handleChange}
 		onHistoryClick={c.history.handleClick}
+		onStencilsClick={handleStencilsClick}
 		store={c.store}
 		getViewport={c.getViewport}
 		canvas={canvasEl ?? undefined}
 		brushStore={c.brushStore} />
-	<div class="canvas-container">
+	<div
+		class="canvas-container"
+		ondragover={(e) => {
+			e.preventDefault();
+			if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+		}}
+		ondrop={handleDrop}
+		role="application">
 		<canvas
 			bind:this={canvasEl}
 			ondblclick={c.handleCanvasDoubleClick}
@@ -157,10 +186,12 @@
 			bind:vm={c.fileBrowser.vm}
 			bind:open={c.fileBrowser.open}
 			onUpdate={c.fileBrowser.handleUpdate}
-			fetchInspectorData={c.fileBrowser.fetchInspectorData}
 			onClose={c.fileBrowser.handleClose}
 			desktopRepo={c.desktop.repo} />
 	{/if}
+	<StencilPalette
+		bind:open={c.stencilPaletteOpen}
+		onClose={() => (c.stencilPaletteOpen = false)} />
 </div>
 
 <style>

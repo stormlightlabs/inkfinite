@@ -10,7 +10,7 @@
 	} from '$lib/constants';
 	import type { Platform } from '$lib/platform';
 	import type { BrushSettings, BrushStore } from '$lib/status';
-    import { themeStore } from '$lib/theme.svelte';
+	import { themeStore } from '$lib/theme.svelte';
 	import type {
 		ArrowShape,
 		BoardMeta,
@@ -33,7 +33,7 @@
 		shapeBounds,
 		SnapshotCommand
 	} from 'inkfinite-core';
-    import { fade } from 'svelte/transition';
+	import { fade } from 'svelte/transition';
 	import icon from '../assets/favicon.svg';
 	import ArrowPopover from './ArrowPopover.svelte';
 	import BrushPopover from './BrushPopover.svelte';
@@ -61,6 +61,7 @@
 		platform?: Platform;
 		desktop?: DesktopControls;
 		onOpenBrowser?: () => void;
+		onStencilsClick?: () => void;
 	};
 
 	let {
@@ -73,7 +74,8 @@
 		brushStore,
 		platform = 'web',
 		desktop,
-		onOpenBrowser
+		onOpenBrowser,
+		onStencilsClick
 	}: Props = $props();
 
 	let editorState = $derived<EditorStateType>(store.getState());
@@ -130,11 +132,11 @@
 		}
 	});
 
-    let showColorControls = $derived(
-        toolSupportsStyles(currentTool) || 
-        toolSupportsFill(currentTool) || 
-        getSelectedShapes(editorState).some(s => shapeSupportsFill(s) || shapeSupportsStroke(s))
-    );
+	let showColorControls = $derived(
+		toolSupportsStyles(currentTool) ||
+			toolSupportsFill(currentTool) ||
+			getSelectedShapes(editorState).some((s) => shapeSupportsFill(s) || shapeSupportsStroke(s))
+	);
 
 	let position = $state({ x: 20, y: 20 });
 	let isDragging = $state(false);
@@ -181,29 +183,22 @@
 
 	function handleDragStart(event: PointerEvent) {
 		isDragging = true;
-		dragOffset = {
-			x: event.clientX - position.x,
-			y: event.clientY - position.y
-		};
+		dragOffset = { x: event.clientX - position.x, y: event.clientY - position.y };
 
-		if(typeof document !== 'undefined') document.body.style.userSelect = 'none';
-        
+		if (typeof document !== 'undefined') document.body.style.userSelect = 'none';
 
-        (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
 	}
 
 	function handleDragMove(event: PointerEvent) {
 		if (!isDragging) return;
-		position = {
-			x: event.clientX - dragOffset.x,
-			y: event.clientY - dragOffset.y
-		};
+		position = { x: event.clientX - dragOffset.x, y: event.clientY - dragOffset.y };
 	}
 
 	function handleDragEnd(event: PointerEvent) {
 		isDragging = false;
-		if(typeof document !== 'undefined') document.body.style.userSelect = '';
-        (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+		if (typeof document !== 'undefined') document.body.style.userSelect = '';
+		(event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
 	}
 
 	function openInfo() {
@@ -347,18 +342,13 @@
 		);
 	}
 
-    function toolSupportsStyles(tool: ToolId): boolean {
-        return (
-            tool === 'rect' ||
-            tool === 'ellipse' ||
-            tool === 'line' ||
-            tool === 'arrow'
-        );
-    }
+	function toolSupportsStyles(tool: ToolId): boolean {
+		return tool === 'rect' || tool === 'ellipse' || tool === 'line' || tool === 'arrow';
+	}
 
-    function toolSupportsFill(tool: ToolId): boolean {
-        return tool === 'rect' || tool === 'ellipse' || tool === 'text';
-    }
+	function toolSupportsFill(tool: ToolId): boolean {
+		return tool === 'rect' || tool === 'ellipse' || tool === 'text';
+	}
 
 	function getSharedColor<T extends ShapeRecord>(
 		shapes: T[],
@@ -488,26 +478,24 @@
 	}
 </script>
 
-<div 
-    class="toolbar" 
-    role="toolbar" 
-    aria-label="Drawing tools"
-    bind:this={toolbarEl}
-    style="position: fixed; left: {position.x}px; top: {position.y}px;"
-    data-dragging={isDragging}
->
-    <!-- Drag Handle -->
-    <div 
-        class="toolbar__drag-handle"
-        onpointerdown={handleDragStart}
-        onpointermove={handleDragMove}
-        onpointerup={handleDragEnd}
-        aria-label="Drag toolbar"
-        role="button"
-        tabindex="0"
-    >
-        <Icon name="grip-vertical" size={16} />
-    </div>
+<div
+	class="toolbar"
+	role="toolbar"
+	aria-label="Drawing tools"
+	bind:this={toolbarEl}
+	style="position: fixed; left: {position.x}px; top: {position.y}px;"
+	data-dragging={isDragging}>
+	<!-- Drag Handle -->
+	<div
+		class="toolbar__drag-handle"
+		onpointerdown={handleDragStart}
+		onpointermove={handleDragMove}
+		onpointerup={handleDragEnd}
+		aria-label="Drag toolbar"
+		role="button"
+		tabindex="0">
+		<Icon name="grip-vertical" size={16} />
+	</div>
 
 	<div class="toolbar__brand">
 		<div class="toolbar__logo">
@@ -572,32 +560,32 @@
 		</button>
 	{/each}
 
-    {#if showColorControls}
-	<div class="toolbar__colors" aria-label="Color controls" transition:fade={{ duration: 150 }}>
-        {#if toolSupportsFill(currentTool) || getSelectedShapes(editorState).some(shapeSupportsFill)}
-		<label class="toolbar__color-control">
-			<span>Fill</span>
-			<input
-				type="color"
-				value={fillColorValue}
-				onchange={handleFillChange}
-				disabled={fillDisabled && !toolSupportsFill(currentTool)}
-				aria-label="Fill color" />
-		</label>
-        {/if}
-        {#if toolSupportsStyles(currentTool) || getSelectedShapes(editorState).some(shapeSupportsStroke)}
-		<label class="toolbar__color-control">
-			<span>Stroke</span>
-			<input
-				type="color"
-				value={strokeColorValue}
-				onchange={handleStrokeChange}
-				disabled={strokeDisabled && !toolSupportsStyles(currentTool)}
-				aria-label="Stroke color" />
-		</label>
-        {/if}
-	</div>
-    {/if}
+	{#if showColorControls}
+		<div class="toolbar__colors" aria-label="Color controls" transition:fade={{ duration: 150 }}>
+			{#if toolSupportsFill(currentTool) || getSelectedShapes(editorState).some(shapeSupportsFill)}
+				<label class="toolbar__color-control">
+					<span>Fill</span>
+					<input
+						type="color"
+						value={fillColorValue}
+						onchange={handleFillChange}
+						disabled={fillDisabled && !toolSupportsFill(currentTool)}
+						aria-label="Fill color" />
+				</label>
+			{/if}
+			{#if toolSupportsStyles(currentTool) || getSelectedShapes(editorState).some(shapeSupportsStroke)}
+				<label class="toolbar__color-control">
+					<span>Stroke</span>
+					<input
+						type="color"
+						value={strokeColorValue}
+						onchange={handleStrokeChange}
+						disabled={strokeDisabled && !toolSupportsStyles(currentTool)}
+						aria-label="Stroke color" />
+				</label>
+			{/if}
+		</div>
+	{/if}
 
 	<div class="toolbar__divider"></div>
 
@@ -687,14 +675,14 @@
 	</div>
 
 	<div class="toolbar__info-actions">
-        <button 
-            class="toolbar__info" 
-            onclick={() => themeStore.toggle()} 
-            aria-label="Toggle Dark Mode"
-            title="Toggle Dark Mode">
-            <Icon name={themeStore.current === 'dark' ? 'sun' : 'moon'} size={16} />
+		<button
+			class="toolbar__info"
+			onclick={() => themeStore.toggle()}
+			aria-label="Toggle Dark Mode"
+			title="Toggle Dark Mode">
+			<Icon name={themeStore.current === 'dark' ? 'sun' : 'moon'} size={16} />
 			<span class="toolbar__info-label">{themeStore.current === 'dark' ? 'Light' : 'Dark'}</span>
-        </button>
+		</button>
 		{#if platform === 'web' && onOpenBrowser}
 			<button class="toolbar__info" onclick={onOpenBrowser} aria-label="Browse boards">
 				<Icon name="folder" size={16} />
@@ -717,6 +705,18 @@
 			aria-pressed="false">
 			<span class="toolbar__tool-icon">⏱</span>
 			<span class="toolbar__tool-label">History</span>
+		</button>
+	{/if}
+	{#if onStencilsClick}
+		<button
+			class="toolbar__tool-button tool-button"
+			onclick={onStencilsClick}
+			aria-label="Stencils"
+			title="Stencils">
+			<span class="toolbar__tool-icon">
+				<Icon name="grid-dots" size={18} />
+			</span>
+			<span class="toolbar__tool-label">Stencils</span>
 		</button>
 	{/if}
 </div>
@@ -761,68 +761,72 @@
 		padding: 0.75rem 1rem 0.75rem 0.25rem; /* Adjusted padding for handle */
 		background: var(--surface-elevated);
 		border-bottom: 1px solid var(--border);
-        border: 1px solid var(--border);
-        border-radius: 0.75rem;
+		border: 1px solid var(--border);
+		border-radius: 0.75rem;
 		align-items: center;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        z-index: 100;
-        transition: transform 0.1s;
-        touch-action: none;
+		box-shadow:
+			0 4px 6px -1px rgba(0, 0, 0, 0.1),
+			0 2px 4px -1px rgba(0, 0, 0, 0.06);
+		z-index: 100;
+		transition: transform 0.1s;
+		touch-action: none;
 	}
-    
-    .toolbar[data-dragging="true"] {
-        transform: scale(1.02);
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    }
 
-    .toolbar__drag-handle {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 24px;
-        height: 100%;
-        cursor: grab;
-        color: var(--text-muted);
-        opacity: 0.5;
-        transition: opacity 0.2s;
-        touch-action: none;
-    }
-    
-    .toolbar__drag-handle:hover {
-        opacity: 1;
-        color: var(--text);
-    }
-    
-    .toolbar[data-dragging="true"] .toolbar__drag-handle {
-        cursor: grabbing;
-        opacity: 1;
-        color: var(--accent);
-    }
+	.toolbar[data-dragging='true'] {
+		transform: scale(1.02);
+		box-shadow:
+			0 20px 25px -5px rgba(0, 0, 0, 0.1),
+			0 10px 10px -5px rgba(0, 0, 0, 0.04);
+	}
 
-    .toolbar__brand {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        margin-right: 1.5rem;
-    }
+	.toolbar__drag-handle {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 24px;
+		height: 100%;
+		cursor: grab;
+		color: var(--text-muted);
+		opacity: 0.5;
+		transition: opacity 0.2s;
+		touch-action: none;
+	}
 
-    .toolbar__logo img {
-        width: 32px;
-        height: 32px;
-    }
+	.toolbar__drag-handle:hover {
+		opacity: 1;
+		color: var(--text);
+	}
 
-    .toolbar__name {
-        font-weight: 600;
-        font-size: 1.125rem;
-        letter-spacing: -0.025em;
-        color: var(--text);
-    }
+	.toolbar[data-dragging='true'] .toolbar__drag-handle {
+		cursor: grabbing;
+		opacity: 1;
+		color: var(--accent);
+	}
 
-    .toolbar__tagline {
-        font-size: 0.75rem;
-        color: var(--text-muted);
-        font-weight: 500;
-    }
+	.toolbar__brand {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		margin-right: 1.5rem;
+	}
+
+	.toolbar__logo img {
+		width: 32px;
+		height: 32px;
+	}
+
+	.toolbar__name {
+		font-weight: 600;
+		font-size: 1.125rem;
+		letter-spacing: -0.025em;
+		color: var(--text);
+	}
+
+	.toolbar__tagline {
+		font-size: 0.75rem;
+		color: var(--text-muted);
+		font-weight: 500;
+	}
 
 	.toolbar__tool-button {
 		display: flex;
@@ -837,14 +841,14 @@
 		cursor: pointer;
 		transition: all 0.2s ease;
 		min-width: 68px;
-        opacity: 0.8;
+		opacity: 0.8;
 	}
 
 	.toolbar__tool-button:hover {
 		background: var(--bg-tertiary);
 		color: var(--text);
-        opacity: 1;
-        border-color: var(--text-muted);
+		opacity: 1;
+		border-color: var(--text-muted);
 	}
 
 	.toolbar__tool-button:focus {
@@ -856,9 +860,9 @@
 	.tool-button.active {
 		background: var(--accent);
 		color: var(--surface);
-        border-color: var(--accent);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        opacity: 1;
+		border-color: var(--accent);
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+		opacity: 1;
 	}
 
 	.toolbar__tool-icon {
@@ -868,7 +872,7 @@
 
 	.toolbar__tool-label {
 		font-size: 0.75rem;
-        font-weight: 500;
+		font-weight: 500;
 		line-height: 1;
 		white-space: nowrap;
 	}
@@ -878,27 +882,27 @@
 		background-color: var(--border);
 		margin: 0 1.25rem;
 		height: 32px;
-        opacity: 0.5;
+		opacity: 0.5;
 	}
 
-    .toolbar__info {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.5rem 0.75rem;
-        border-radius: 0.375rem;
-        background: transparent;
-        border: none;
-        color: var(--text-muted);
-        cursor: pointer;
-        transition: color 0.2s;
-        font-size: 0.875rem;
-    }
-    
-    .toolbar__info:hover {
-        background: var(--bg-tertiary);
-        color: var(--text);
-    }
+	.toolbar__info {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 0.75rem;
+		border-radius: 0.375rem;
+		background: transparent;
+		border: none;
+		color: var(--text-muted);
+		cursor: pointer;
+		transition: color 0.2s;
+		font-size: 0.875rem;
+	}
+
+	.toolbar__info:hover {
+		background: var(--bg-tertiary);
+		color: var(--text);
+	}
 
 	.toolbar__zoom,
 	.toolbar__export {
@@ -914,15 +918,15 @@
 		border-radius: 0.375rem;
 		cursor: pointer;
 		font-size: 0.875rem;
-        font-weight: 500;
+		font-weight: 500;
 		min-width: 72px;
-        transition: all 0.2s;
+		transition: all 0.2s;
 	}
 
 	.toolbar__zoom-button:hover,
 	.toolbar__export-button:hover {
 		background: var(--bg-tertiary);
-        border-color: var(--text-muted);
+		border-color: var(--text-muted);
 	}
 
 	.toolbar__zoom-menu,
@@ -934,13 +938,15 @@
 		color: var(--text);
 		border: 1px solid var(--border);
 		border-radius: 0.5rem;
-		box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+		box-shadow:
+			0 10px 15px -3px rgba(0, 0, 0, 0.1),
+			0 4px 6px -2px rgba(0, 0, 0, 0.05);
 		padding: 0.5rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.25rem;
-        min-width: 160px;
-        z-index: 20;
+		min-width: 160px;
+		z-index: 20;
 		z-index: 10;
 		min-width: 150px;
 	}

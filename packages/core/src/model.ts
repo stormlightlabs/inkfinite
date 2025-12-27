@@ -116,7 +116,15 @@ export type StrokeStyle = { color: string; opacity: number };
 export type StrokeProps = { points: StrokePoint[]; style: StrokeStyle; brush: BrushConfig };
 
 export type ShapeType = "rect" | "ellipse" | "line" | "arrow" | "text" | "stroke" | "markdown";
-export type BaseShape = { id: string; type: ShapeType; pageId: string; x: number; y: number; rot: number };
+export type BaseShape = {
+  id: string;
+  type: ShapeType;
+  pageId: string;
+  x: number;
+  y: number;
+  rot: number;
+  groupId?: string;
+};
 export type RectShape = BaseShape & { type: "rect"; props: RectProps };
 export type EllipseShape = BaseShape & { type: "ellipse"; props: EllipseProps };
 export type LineShape = BaseShape & { type: "line"; props: LineProps };

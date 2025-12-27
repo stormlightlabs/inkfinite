@@ -29,7 +29,10 @@ import {
   TextTool,
 } from "inkfinite-core";
 import type { Action, Box2, LoadedDoc, PersistenceSink, PersistentDocRepo, Viewport } from "inkfinite-core";
+import { stencils } from "inkfinite-core";
 import { createRenderer, type Renderer } from "inkfinite-renderer";
+
+type Stencil = stencils.Stencil;
 import { onDestroy, onMount } from "svelte";
 import { SvelteSet } from "svelte/reactivity";
 import { computeCursor, describeAction, getCommandKind, statesEqual } from "./canvas-helpers";
@@ -62,6 +65,7 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
   let activeBoardId: string | null = null;
   let desktopRepo: DesktopDocRepo | null = null;
   let removeBeforeUnload: (() => void) | null = null;
+  let stencilPaletteOpen = $state(false);
   const handleResize = () => {
     if (marqueeBounds) {
       updateMarquee(marqueeBounds);
@@ -630,5 +634,51 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     brushStore,
     setCanvasRef,
     marqueeRect: () => marqueeRect,
+    insertStencil,
+    get stencilPaletteOpen() {
+      return stencilPaletteOpen;
+    },
+    set stencilPaletteOpen(val: boolean) {
+      stencilPaletteOpen = val;
+    },
   };
+
+  function insertStencil(stencil: Stencil, worldPos: { x: number; y: number }) {
+    const state = store.getState();
+    const pageId = state.ui.currentPageId;
+    if (!pageId) return;
+
+    const shapes = stencil.spawn(worldPos);
+    const groupId = shapes.length > 1 ? createId("group") : undefined;
+
+    const newShapes = { ...state.doc.shapes };
+    const page = state.doc.pages[pageId];
+    if (!page) return;
+
+    const newPageShapeIds = [...page.shapeIds];
+    const newSelection: string[] = [];
+
+    for (const shape of shapes) {
+      shape.pageId = pageId;
+      if (groupId) {
+        shape.groupId = groupId;
+      }
+      newShapes[shape.id] = shape;
+      newPageShapeIds.push(shape.id);
+      newSelection.push(shape.id);
+    }
+
+    const nextState = {
+      ...state,
+      doc: {
+        ...state.doc,
+        shapes: newShapes,
+        pages: { ...state.doc.pages, [pageId]: { ...page, shapeIds: newPageShapeIds } },
+      },
+      ui: { ...state.ui, selectionIds: newSelection },
+    };
+
+    const command = new SnapshotCommand("Insert Stencil", "doc", state, nextState);
+    store.executeCommand(command);
+  }
 }

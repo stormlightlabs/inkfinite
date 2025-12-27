@@ -61,7 +61,11 @@
 </script>
 
 {#if open}
-	<div class="dialog__backdrop" role="presentation" onclick={handleBackdropClick} onkeydown={handleKeyDown}>
+	<div
+		class="dialog__backdrop"
+		role="presentation"
+		onclick={handleBackdropClick}
+		onkeydown={handleKeyDown}>
 		<div
 			bind:this={dialogElement}
 			class="dialog__content {className}"

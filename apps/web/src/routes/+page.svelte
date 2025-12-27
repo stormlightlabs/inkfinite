@@ -3,16 +3,20 @@
 </script>
 
 <div class="editor">
-	<Canvas />
+	<div class="canvas-wrapper">
+		<Canvas />
+	</div>
 </div>
 
 <style>
-	.editor {
-		position: fixed;
-		top: 0;
-		left: 0;
+	:global(body),
+	:global(html) {
+		margin: 0;
+		padding: 0;
 		width: 100vw;
 		height: 100vh;
 		overflow: hidden;
+		position: relative;
+		min-width: 0;
 	}
 </style>

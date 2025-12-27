@@ -129,7 +129,7 @@
 	--border: var(--line-numbers);
 	--accent: var(--accent-blue);
 	--accent-hover: var(--accent-cyan);
-    color-scheme: dark;
+	color-scheme: dark;
 }
 
 * {
@@ -143,8 +143,8 @@ body {
 	background-color: var(--surface);
 	color: var(--text);
 	line-height: 1.5;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
 }
 
 button {
@@ -158,9 +158,9 @@ button {
 
 /* Markdown Styling */
 .markdown-body {
-    color: var(--text);
-    font-size: 1rem;
-    line-height: 1.6;
+	color: var(--text);
+	font-size: 1rem;
+	line-height: 1.6;
 }
 
 .markdown-body h1,
@@ -169,73 +169,92 @@ button {
 .markdown-body h4,
 .markdown-body h5,
 .markdown-body h6 {
-    margin-top: 1.5em;
-    margin-bottom: 0.5em;
-    font-weight: 600;
-    line-height: 1.25;
+	margin-top: 1.5em;
+	margin-bottom: 0.5em;
+	font-weight: 600;
+	line-height: 1.25;
 }
 
-.markdown-body h1 { font-size: 2em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
-.markdown-body h2 { font-size: 1.5em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
-.markdown-body h3 { font-size: 1.25em; }
-.markdown-body h4 { font-size: 1em; }
+.markdown-body h1 {
+	font-size: 2em;
+	border-bottom: 1px solid var(--border);
+	padding-bottom: 0.3em;
+}
+.markdown-body h2 {
+	font-size: 1.5em;
+	border-bottom: 1px solid var(--border);
+	padding-bottom: 0.3em;
+}
+.markdown-body h3 {
+	font-size: 1.25em;
+}
+.markdown-body h4 {
+	font-size: 1em;
+}
 
 .markdown-body p {
-    margin-bottom: 1em;
+	margin-bottom: 1em;
 }
 
 .markdown-body ul,
 .markdown-body ol {
-    padding-left: 2em;
-    margin-bottom: 1em;
+	padding-left: 2em;
+	margin-bottom: 1em;
 }
 
 .markdown-body blockquote {
-    padding: 0 1em;
-    color: var(--text-muted);
-    border-left: 0.25em solid var(--border);
-    margin-bottom: 1em;
+	padding: 0 1em;
+	color: var(--text-muted);
+	border-left: 0.25em solid var(--border);
+	margin-bottom: 1em;
 }
 
 .markdown-body code {
-    padding: 0.2em 0.4em;
-    margin: 0;
-    font-size: 85%;
-    background-color: var(--bg-secondary);
-    border-radius: 6px;
-    font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+	padding: 0.2em 0.4em;
+	margin: 0;
+	font-size: 85%;
+	background-color: var(--bg-secondary);
+	border-radius: 6px;
+	font-family:
+		ui-monospace,
+		SFMono-Regular,
+		SF Mono,
+		Menlo,
+		Consolas,
+		Liberation Mono,
+		monospace;
 }
 
 .markdown-body pre {
-    padding: 16px;
-    overflow: auto;
-    font-size: 85%;
-    line-height: 1.45;
-    background-color: var(--bg-secondary);
-    border-radius: 6px;
-    margin-bottom: 1em;
+	padding: 16px;
+	overflow: auto;
+	font-size: 85%;
+	line-height: 1.45;
+	background-color: var(--bg-secondary);
+	border-radius: 6px;
+	margin-bottom: 1em;
 }
 
 .markdown-body pre code {
-    background-color: transparent;
-    padding: 0;
+	background-color: transparent;
+	padding: 0;
 }
 
 .markdown-body a {
-    color: var(--accent);
-    text-decoration: none;
+	color: var(--accent);
+	text-decoration: none;
 }
 
 .markdown-body a:hover {
-    text-decoration: underline;
+	text-decoration: underline;
 }
 
 .markdown-body hr {
-    height: 0.25em;
-    padding: 0;
-    margin: 24px 0;
-    background-color: var(--border);
-    border: 0;
+	height: 0.25em;
+	padding: 0;
+	margin: 24px 0;
+	background-color: var(--border);
+	border: 0;
 }
 
 * {

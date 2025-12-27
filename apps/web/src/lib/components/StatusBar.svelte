@@ -209,12 +209,12 @@
 	.status-bar__toggle input {
 		margin: 0;
 		cursor: pointer;
-        opacity: 0.8;
+		opacity: 0.8;
 	}
 
-    .status-bar__toggle:hover input {
-        opacity: 1;
-    }
+	.status-bar__toggle:hover input {
+		opacity: 1;
+	}
 
 	.status-bar__toggle input:focus {
 		outline: 2px solid var(--accent);
@@ -226,13 +226,13 @@
 		color: var(--text-muted);
 		text-transform: uppercase;
 		letter-spacing: 0.075em;
-        font-weight: 600;
+		font-weight: 600;
 	}
 
 	.status-bar__value {
 		font-weight: 500;
 		color: var(--text);
-        font-variant-numeric: tabular-nums;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.status-bar__value--error {
