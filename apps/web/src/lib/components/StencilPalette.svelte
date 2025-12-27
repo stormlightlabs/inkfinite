@@ -8,7 +8,15 @@
 	type Stencil = stencils.Stencil;
 	const { registry, registerBuiltinStencils } = stencils;
 
-	let { open = $bindable(false), onClose }: { open: boolean; onClose: () => void } = $props();
+	let {
+		open = $bindable(false),
+		onClose,
+		onStencilClick
+	}: {
+		open: boolean;
+		onClose: () => void;
+		onStencilClick?: (stencil: Stencil) => void;
+	} = $props();
 
 	let categories = $state([] as string[]);
 	let stencilsByCategory = $state({} as Record<string, Stencil[]>);
@@ -42,8 +50,10 @@
 	}
 
 	function onDragStart(e: DragEvent, stencil: Stencil) {
+		console.log('[StencilPalette] Drag started for stencil:', stencil.id);
 		if (e.dataTransfer) {
 			e.dataTransfer.effectAllowed = 'copy';
+			e.dataTransfer.setData('application/x-inkfinite-stencil', stencil.id);
 		}
 		startDrag(stencil);
 	}
@@ -108,6 +118,13 @@
 									draggable="true"
 									ondragstart={(e) => onDragStart(e, stencil)}
 									ondragend={endDrag}
+									onclick={() => onStencilClick?.(stencil)}
+									onkeydown={(e) => {
+										if (e.key === 'Enter' || e.key === ' ') {
+											e.preventDefault();
+											onStencilClick?.(stencil);
+										}
+									}}
 									class="palette__item"
 									title={stencil.name}>
 									<div class="palette__item-preview">
@@ -318,17 +335,17 @@
 		transform-origin: center;
 		pointer-events: none;
 		color: var(--text, #333);
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+		width: 100%;
+		height: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 
-    .palette__item-preview-content :global(svg) {
-        width: 100%;
-        height: 100%;
-    }
+	.palette__item-preview-content :global(svg) {
+		width: 100%;
+		height: 100%;
+	}
 
 	.palette__item-name {
 		font-size: 0.75rem;

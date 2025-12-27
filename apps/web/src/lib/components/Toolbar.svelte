@@ -558,6 +558,19 @@
 			<span class="toolbar__tool-icon">{tool.icon}</span>
 			<span class="toolbar__tool-label">{tool.label}</span>
 		</button>
+		{#if tool.id === 'select' && onStencilsClick}
+			<button
+				class="toolbar__tool-button tool-button"
+				onclick={onStencilsClick}
+				aria-label="Stencils"
+				title="Stencils">
+				<span class="toolbar__tool-icon">
+					<Icon name="grid-dots" size={18} />
+				</span>
+				<span class="toolbar__tool-label">Stencils</span>
+			</button>
+			<div class="toolbar__divider"></div>
+		{/if}
 	{/each}
 
 	{#if showColorControls}
@@ -705,18 +718,6 @@
 			aria-pressed="false">
 			<span class="toolbar__tool-icon">⏱</span>
 			<span class="toolbar__tool-label">History</span>
-		</button>
-	{/if}
-	{#if onStencilsClick}
-		<button
-			class="toolbar__tool-button tool-button"
-			onclick={onStencilsClick}
-			aria-label="Stencils"
-			title="Stencils">
-			<span class="toolbar__tool-icon">
-				<Icon name="grid-dots" size={18} />
-			</span>
-			<span class="toolbar__tool-label">Stencils</span>
 		</button>
 	{/if}
 </div>

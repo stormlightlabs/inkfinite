@@ -6,7 +6,7 @@
 	import StencilPalette from '$lib/components/StencilPalette.svelte';
 	import { createCanvasController } from './canvas-store.svelte.ts';
 	import { draggingStencil, endDrag } from '$lib/dnd.svelte';
-	import { Camera } from 'inkfinite-core';
+	import { Camera, stencils } from 'inkfinite-core';
 
 	let canvasEl = $state<HTMLCanvasElement | null>(null);
 	let textEditorEl = $state<HTMLTextAreaElement | null>(null);
@@ -48,21 +48,41 @@
 	});
 
 	function handleDrop(e: DragEvent) {
+		console.log('[Canvas] Drop event detected', {
+			clientX: e.clientX,
+			clientY: e.clientY,
+			dataTransferTypes: e.dataTransfer?.types
+		});
 		e.preventDefault();
 		const stencil = draggingStencil.current;
-		if (!stencil || !canvasEl) return;
+		console.log('[Canvas] Dragging stencil state:', stencil);
+
+		if (!stencil || !canvasEl) {
+			console.warn('[Canvas] Drop ignored - missing stencil or canvas ref');
+			return;
+		}
 
 		const rect = canvasEl.getBoundingClientRect();
 		const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
 		const viewport = c.getViewport();
 		const world = Camera.screenToWorld(c.store.getState().camera, screen, viewport);
 
+		console.log('[Canvas] Inserting stencil at:', world);
 		c.insertStencil(stencil, world);
 		endDrag();
 	}
 
 	function handleStencilsClick() {
 		c.stencilPaletteOpen = !c.stencilPaletteOpen;
+	}
+
+	// TODO: close palette on click? Users might want to add multiple.
+	function handleInsertStencilAtCenter(stencil: stencils.Stencil) {
+		console.log('[Canvas] Click insert stencil:', stencil.id);
+		const viewport = c.getViewport();
+		const screen = { x: viewport.width / 2, y: viewport.height / 2 };
+		const world = Camera.screenToWorld(c.store.getState().camera, screen, viewport);
+		c.insertStencil(stencil, world);
 	}
 </script>
 
@@ -191,7 +211,8 @@
 	{/if}
 	<StencilPalette
 		bind:open={c.stencilPaletteOpen}
-		onClose={() => (c.stencilPaletteOpen = false)} />
+		onClose={() => (c.stencilPaletteOpen = false)}
+		onStencilClick={handleInsertStencilAtCenter} />
 </div>
 
 <style>

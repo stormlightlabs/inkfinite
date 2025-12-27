@@ -135,13 +135,13 @@ S1. Stencil definition format (core)
 --------------------------------------------------------------------------------
 
 /packages/core/src/stencils:
-[ ] Define Stencil:
+[x] Define Stencil:
     - id, name, category, tags[]
     - preview: { kind: 'svg'|'canvas', data }
     - spawn: function (atPoint, scale) -> ShapeRecords[] (group)
       (A stencil can insert 1 shape or a grouped set.)
 
-[ ] Create initial categories:
+[x] Create initial categories:
     - Flowchart: process, decision, terminator, data, document
     - Diagrams: server, db, queue, user, browser, mobile
     - UI: button, input, card, modal
@@ -154,7 +154,7 @@ S2. Insert UX
 --------------------------------------------------------------------------------
 
 /apps/web:
-[ ] Stencils drawer/palette:
+[x] Stencils drawer/palette:
     - search (name + tags)
     - category filter
     - click inserts at viewport center OR
@@ -162,9 +162,9 @@ S2. Insert UX
 [ ] Placement rules:
     - insert into active layer (if layers exist)
     - snap to grid if enabled
-[ ] Toolbar
+[x] Toolbar
     - Open menu to insert stencils with button to open drawer
-[ ] Drawer
+[x] Drawer
     - Stencil selection with search, category filter, and thumbnail previews
 
 (DoD): Inserting stencils is faster than drawing shapes manually.
@@ -185,7 +185,7 @@ S3. Grouping behavior
 S4. Preview rendering
 --------------------------------------------------------------------------------
 
-[ ] Render stencil previews in the panel:
+[x] Render stencil previews in the panel:
     - small SVG thumbnails (best) & draw to offscreen canvas
 
 (DoD): Users can recognize stencils instantly.
