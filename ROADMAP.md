@@ -131,6 +131,32 @@ merge-time invariant handling, and acceptable time and memory use with 10,000
 shapes. Record the benchmark hardware and dependency versions before locking the
 v2 format.
 
+V2-02 completed this gate on July 17, 2026. The proof exchanged compact files
+between Rust and JavaScript, converged offline edits independent of merge order,
+and validated deterministic hierarchy repair before adoption. Automerge passed,
+so Yjs/Yrs was not evaluated. The measured evidence and reproduction commands
+live in [`spikes/crdt-automerge`](spikes/crdt-automerge/README.md).
+
+On the V2-01 Apple M1 reference machine, the 3.98 MB, 10,000-shape JSON fixture
+produced a 211 KB compact Rust document. Rust import, load, and save took 1.76 s,
+1.82 s, and 495 ms, with a 98 MB resident-memory increase. The JavaScript proof
+used 651 KB of storage and added 422 MB of resident memory. These costs confirm
+the planned ownership boundary: Rust holds the CRDT, while TypeScript holds a
+materialized mirror. The V1 baseline's 9.69 ms open and 12.09 ms save parse plain
+JSON and are not equivalent to first-time CRDT import.
+
+The proof pins Automerge Rust 0.6.1 and `@automerge/automerge` 3.2.6. Automerge
+Rust 0.7 through 0.10 require Rust 1.89, newer than the V2-01 Rust 1.88
+toolchain. V2-03 must upgrade the workspace toolchain and rerun the proof against
+the current crate before production CRDT code lands. Inkfinite-owned contracts
+remain mandatory because the Rust API is low-level and its release requirements
+can move independently of the document engine.
+
+The V2-11 reference budgets are an 8 ms median Canvas frame and a 1 ms median
+hit test for the frozen 10,000-shape board. The V1 medians are 0.61 ms and
+0.22 ms. V2-11 may add a spatial index only if its linear query path misses the
+1 ms budget.
+
 One Inkfinite transaction maps to one Automerge change. Causal heads, rather
 than a scalar revision, are the concurrency token. A local sequence number may
 be displayed, but callers use inspected heads and operation preconditions.

@@ -1,0 +1,15 @@
+{
+  "bindings": { "binding:1": { "fromShapeId": "shape:root", "toShapeId": "shape:child" } },
+  "pages": { "page:1": { "layers": ["layer:1"], "name": "Proof page" } },
+  "layers": { "layer:1": { "children": ["shape:root"], "pageId": "page:1" } },
+  "shapes": {
+    "shape:child": { "children": [], "content": "Collaborative text 🌩️", "parentId": "shape:root", "x": 24, "y": 48 },
+    "shape:root": {
+      "children": ["shape:child"],
+      "parentId": "layer:1",
+      "style": { "fill": "#ffffff", "stroke": "#0f172a" },
+      "x": 8,
+      "y": 16
+    }
+  }
+}

@@ -3,21 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "workspaces": [
-    "packages/*",
-    "apps/*"
-  ],
+  "workspaces": ["packages/*", "apps/*", "spikes/*/js"],
   "scripts": {
     "fixtures:v1": "node scripts/generate-v1-fixtures.mjs",
-    "baseline:v1": "node scripts/capture-v1-performance.mjs --output fixtures/v1/performance/baseline.json"
+    "baseline:v1": "node scripts/capture-v1-performance.mjs --output fixtures/v1/performance/baseline.json",
+    "proof:v2-02": "pnpm --filter inkfinite-crdt-proof-js test",
+    "proof:v2-02:benchmark": "pnpm --filter inkfinite-crdt-proof-js benchmark",
+    "proof:v2-02:twice": "pnpm --filter inkfinite-crdt-proof-js test:twice"
   },
-  "devDependencies": {
-    "dprint": "^0.50.2",
-    "typescript": "^5.9.3"
-  },
-  "engines": {
-    "node": ">=18.0.0",
-    "pnpm": ">=8.0.0"
-  },
+  "devDependencies": { "dprint": "^0.50.2", "typescript": "^5.9.3" },
+  "engines": { "node": ">=18.0.0", "pnpm": ">=8.0.0" },
   "packageManager": "pnpm@11.13.1"
 }

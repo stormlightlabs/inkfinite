@@ -49,17 +49,17 @@ Blocked by: V2-01
 
 Acceptance criteria:
 
-- [ ] Rust and JavaScript round-trip the same nested maps, ordered child lists,
+- [x] Rust and JavaScript round-trip the same nested maps, ordered child lists,
       text, and 10,000-shape document without semantic drift.
-- [ ] Two offline replicas merge concurrent property, list, text, delete, and
+- [x] Two offline replicas merge concurrent property, list, text, delete, and
       reparent edits and converge byte-independently to the same materialized
       snapshot.
-- [ ] Incremental patches, change heads, actor IDs, actor-scoped undo, sync,
+- [x] Incremental patches, change heads, actor IDs, actor-scoped undo, sync,
       save/load, and compaction are demonstrated.
-- [ ] A merge is applied on a fork and adopted only after deterministic repair
+- [x] A merge is applied on a fork and adopted only after deterministic repair
       and validation; duplicate children, missing parents, dangling bindings,
       and zero-layer pages have convergence tests.
-- [ ] Results compare time, memory, storage growth, API risk, and dependency
+- [x] Results compare time, memory, storage growth, API risk, and dependency
       versions with the V2-01 baseline and record the final Automerge or Yjs/Yrs
       decision in `ROADMAP.md`.
 
@@ -142,6 +142,12 @@ Acceptance criteria:
       checks run on a fork before an atomic commit.
 - [ ] Undo and redo emit actor-scoped compensating changes and preserve
       intervening edits from other actors.
+- [ ] Production `inkfinite-crdt` tests absorb the reusable V2-02 cases for
+      nested data, patches, heads, actor IDs, undo, fork repair, convergence,
+      transport-independent sync, save/load, compaction, and 10,000 shapes.
+      Preserve the measured benchmark result, then remove
+      `spikes/crdt-automerge`, its workspace entry, dependency, and root proof
+      commands. Keep the V1 compatibility fixtures and baselines.
 - [ ] Queries support IDs, names, roles, tags, kinds, parents, layers, bounds,
       and affected regions; alignment and distribution use the same engine.
 - [ ] Property-based tests cover apply/invert, merge order, deterministic repair,
@@ -151,6 +157,7 @@ Verification:
 
 ```sh
 cargo test -p inkfinite-engine -p inkfinite-crdt
+test ! -d spikes/crdt-automerge
 ```
 
 ### V2-06: Generate schemas and TypeScript bindings
@@ -589,5 +596,5 @@ pnpm --filter inkfinite-web lint
 
 ## Frontier
 
-V2-01 is the only ticket that can start immediately. V2-02 follows once the
-fixtures and baselines are reproducible.
+V2-03 is the current frontier. Work it in a fresh implementation context before
+starting tickets that depend on the production vNext workspace.

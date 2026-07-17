@@ -1,6 +1,7 @@
 packages:
   - packages/*
   - apps/*
+  - spikes/*/js
 
 allowBuilds:
   dprint: true
