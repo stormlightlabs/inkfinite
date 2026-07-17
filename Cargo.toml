@@ -19,6 +19,7 @@ rust-version = "1.89"
 version = "0.0.0"
 
 [workspace.dependencies]
+automerge = "=0.10.0"
 inkfinite-crdt = { path = "crates/inkfinite-crdt" }
 inkfinite-engine = { path = "crates/inkfinite-engine" }
 inkfinite-file = { path = "crates/inkfinite-file" }
@@ -28,6 +29,7 @@ inkfinite-protocol = { path = "crates/inkfinite-protocol" }
 inkfinite-render-svg = { path = "crates/inkfinite-render-svg" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+thiserror = "2.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -35,4 +37,3 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 all = "warn"
 pedantic = "warn"
-

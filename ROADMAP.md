@@ -134,8 +134,9 @@ v2 format.
 V2-02 completed this gate on July 17, 2026. The proof exchanged compact files
 between Rust and JavaScript, converged offline edits independent of merge order,
 and validated deterministic hierarchy repair before adoption. Automerge passed,
-so Yjs/Yrs was not evaluated. The measured evidence and reproduction commands
-live in [`spikes/crdt-automerge`](spikes/crdt-automerge/README.md).
+so Yjs/Yrs was not evaluated. V2-05 moved the reusable Rust coverage into
+`inkfinite-crdt` and `inkfinite-engine`, then removed the disposable proof. The
+measurements below preserve the architecture-gate evidence.
 
 On the V2-01 Apple M1 reference machine, the 3.98 MB, 10,000-shape JSON fixture
 produced a 211 KB compact Rust document. Rust import, load, and save took 1.76 s,

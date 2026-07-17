@@ -136,21 +136,21 @@ Blocked by: V2-04
 
 Acceptance criteria:
 
-- [ ] Operations cover page, layer, shape, hierarchy, binding, asset, and layout
+- [x] Operations cover page, layer, shape, hierarchy, binding, asset, and layout
       changes with head and record-version preconditions.
-- [ ] Schema, precondition, permission, invariant, repair, and final snapshot
+- [x] Schema, precondition, permission, invariant, repair, and final snapshot
       checks run on a fork before an atomic commit.
-- [ ] Undo and redo emit actor-scoped compensating changes and preserve
+- [x] Undo and redo emit actor-scoped compensating changes and preserve
       intervening edits from other actors.
-- [ ] Production `inkfinite-crdt` tests absorb the reusable V2-02 cases for
+- [x] Production `inkfinite-crdt` tests absorb the reusable V2-02 cases for
       nested data, patches, heads, actor IDs, undo, fork repair, convergence,
       transport-independent sync, save/load, compaction, and 10,000 shapes.
       Preserve the measured benchmark result, then remove
       `spikes/crdt-automerge`, its workspace entry, dependency, and root proof
       commands. Keep the V1 compatibility fixtures and baselines.
-- [ ] Queries support IDs, names, roles, tags, kinds, parents, layers, bounds,
+- [x] Queries support IDs, names, roles, tags, kinds, parents, layers, bounds,
       and affected regions; alignment and distribution use the same engine.
-- [ ] Property-based tests cover apply/invert, merge order, deterministic repair,
+- [x] Property-based tests cover apply/invert, merge order, deterministic repair,
       and convergence.
 
 Verification:

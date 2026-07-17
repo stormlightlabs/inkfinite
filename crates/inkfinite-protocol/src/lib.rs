@@ -1,5 +1,7 @@
 //! Serializable contracts shared by desktop commands, IPC, and the CLI.
 
+use std::collections::BTreeMap;
+
 use inkfinite_model::{
     ActorId, AssetId, AssetRecord, BindingId, BindingRecord, ChangeHash, ContainerLayout,
     DocumentId, DocumentSnapshot, LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord,
@@ -102,6 +104,34 @@ pub struct AssetPatch {
     pub name: Option<String>,
     /// Replacement attribution source label.
     pub provenance_source: Option<Option<String>>,
+}
+
+/// Axis used by alignment and distribution operations.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LayoutAxis {
+    /// Horizontal document axis.
+    Horizontal,
+    /// Vertical document axis.
+    Vertical,
+}
+
+/// Edge or center line used to align a group of shapes.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ShapeAlignment {
+    /// Align left bounds.
+    Left,
+    /// Align horizontal centers.
+    Center,
+    /// Align right bounds.
+    Right,
+    /// Align top bounds.
+    Top,
+    /// Align vertical centers.
+    Middle,
+    /// Align bottom bounds.
+    Bottom,
 }
 
 /// Durable document operation. Ordered insertions use sibling anchors only.
@@ -232,6 +262,24 @@ pub enum Operation {
         /// Optional optimistic record version.
         expected_version: Option<RecordVersion>,
     },
+    /// Align two or more shapes using their materialized bounds.
+    AlignShapes {
+        /// Shapes to align.
+        shape_ids: Vec<ShapeId>,
+        /// Alignment line shared by the shapes.
+        alignment: ShapeAlignment,
+        /// Optional optimistic versions keyed by shape ID.
+        expected_versions: BTreeMap<ShapeId, RecordVersion>,
+    },
+    /// Distribute three or more shapes with equal gaps between their bounds.
+    DistributeShapes {
+        /// Shapes to distribute.
+        shape_ids: Vec<ShapeId>,
+        /// Axis on which to distribute the shapes.
+        axis: LayoutAxis,
+        /// Optional optimistic versions keyed by shape ID.
+        expected_versions: BTreeMap<ShapeId, RecordVersion>,
+    },
 }
 
 /// Identifies a record touched by a commit or proposal.
@@ -261,6 +309,37 @@ pub struct DocumentPatch {
     pub deleted: Vec<RecordId>,
 }
 
+/// Axis-aligned bounds in document coordinates.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Bounds {
+    /// Left edge.
+    pub x: f64,
+    /// Top edge.
+    pub y: f64,
+    /// Non-negative width.
+    pub width: f64,
+    /// Non-negative height.
+    pub height: f64,
+}
+
+/// Region that a renderer should consider dirty after a transaction.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AffectedRegion {
+    /// Page containing the changed visual content.
+    pub page_id: PageId,
+    /// Union of the record's bounds before and after the change.
+    pub bounds: Bounds,
+}
+
+/// Operations needed to compensate a committed transaction.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct InverseMetadata {
+    /// Actor whose history owns this inverse.
+    pub actor_id: ActorId,
+    /// Field-scoped compensating operations.
+    pub operations: Vec<Operation>,
+}
+
 /// Non-fatal repair or normalization performed during a commit or merge.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Warning {
@@ -283,13 +362,21 @@ pub struct CommitResult {
     pub patch: DocumentPatch,
     /// All records affected directly or through repairs.
     pub affected_ids: Vec<RecordId>,
+    /// Visual regions invalidated by the commit.
+    pub affected_regions: Vec<AffectedRegion>,
+    /// Metadata retained for actor-scoped undo.
+    pub inverse: InverseMetadata,
     /// Non-fatal repairs and normalization notes.
     pub warnings: Vec<Warning>,
 }
 
 /// Optional semantic filters for a document query.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Query {
+    /// Match one exact record ID, regardless of record kind.
+    pub id: Option<String>,
+    /// Match a page, layer, shape, or asset display name.
+    pub name: Option<String>,
     /// Match one exact semantic role.
     pub role: Option<String>,
     /// Match one exact tag.
@@ -300,6 +387,10 @@ pub struct Query {
     pub page_id: Option<PageId>,
     /// Restrict the query to one layer.
     pub layer_id: Option<LayerId>,
+    /// Restrict shapes to one direct parent.
+    pub parent_id: Option<String>,
+    /// Restrict shapes to those intersecting these document bounds.
+    pub bounds: Option<Bounds>,
 }
 
 /// Materialized query result suitable for machine clients.
@@ -309,6 +400,8 @@ pub struct QueryResult {
     pub heads: Vec<ChangeHash>,
     /// Matching records in deterministic order.
     pub records: Vec<RecordId>,
+    /// Bounds for matching shapes, in the same order as their shape records.
+    pub bounds: BTreeMap<ShapeId, Bounds>,
 }
 
 /// Result of saving an open document session.

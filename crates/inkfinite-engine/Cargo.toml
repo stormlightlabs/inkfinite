@@ -10,7 +10,11 @@ version.workspace = true
 inkfinite-crdt.workspace = true
 inkfinite-model.workspace = true
 inkfinite-protocol.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest = "1.7"
 
 [lints]
 workspace = true
-
