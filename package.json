@@ -3,9 +3,18 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {},
-  "devDependencies": { "dprint": "^0.50.2", "typescript": "^5.9.3" },
-  "engines": { "node": ">=18.0.0", "pnpm": ">=8.0.0" },
-  "packageManager": "pnpm@10.26.1"
+  "devDependencies": {
+    "dprint": "^0.50.2",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@11.13.1"
 }
