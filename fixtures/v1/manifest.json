@@ -1,0 +1,36 @@
+{
+  "format": "inkfinite-v1-compatibility-fixtures",
+  "generatedAt": "2026-07-17T00:00:00.000Z",
+  "generator": "scripts/generate-v1-fixtures.mjs",
+  "performanceSeed": 439041101,
+  "coverage": {
+    "shapeTypes": [
+      "rect",
+      "ellipse",
+      "line",
+      "arrow",
+      "text",
+      "stroke",
+      "markdown"
+    ],
+    "stencilIds": [
+      "flowchart:process",
+      "flowchart:decision",
+      "flowchart:terminator",
+      "etc:stickynote",
+      "ui:card"
+    ],
+    "groupIds": [
+      "group:card",
+      "group:content"
+    ],
+    "bindingIds": [
+      "binding:arrow-start",
+      "binding:arrow-end"
+    ],
+    "pageIds": [
+      "page:fixtures",
+      "page:ordering"
+    ]
+  }
+}

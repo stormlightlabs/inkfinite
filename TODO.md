@@ -18,13 +18,13 @@ Blocked by: None - can start immediately
 
 Acceptance criteria:
 
-- [ ] Fixtures cover every current shape, bindings, groups, pages, Markdown,
+- [x] Fixtures cover every current shape, bindings, groups, pages, Markdown,
       stencils, history-relevant edits, and persisted ordering.
-- [ ] Import, render, hit-test, open/save, and cursor-after-resize behavior have
+- [x] Import, render, hit-test, open/save, and cursor-after-resize behavior have
       baseline tests; known failures are marked as such rather than normalized.
-- [ ] The performance harness records hardware, runtime versions, fixture seed,
+- [x] The performance harness records hardware, runtime versions, fixture seed,
       visible-shape count, frame time, hit-test time, memory, open, and save time.
-- [ ] Current package tests, type checks, web checks, lint, and desktop Rust tests
+- [x] Current package tests, type checks, web checks, lint, and desktop Rust tests
       run from documented commands.
 
 Verification:

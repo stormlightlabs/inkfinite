@@ -1,6 +1,6 @@
-import { Action, type Action as ActionType, Camera, Modifiers, PointerButtons } from "inkfinite-core";
+import { type Action as ActionType, Camera } from "inkfinite-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createInputAdapter, InputAdapter, type PointerState } from "../input";
+import { createInputAdapter, InputAdapter } from "../input";
 
 /**
  * Create a mock canvas element with getBoundingClientRect
@@ -366,6 +366,51 @@ describe("InputAdapter", () => {
   });
 
   describe("coordinate transformation", () => {
+    it("uses current canvas bounds and viewport after a resize", () => {
+      const resizedCanvas = document.createElement("canvas");
+      let bounds = {
+        left: 0,
+        top: 0,
+        right: 800,
+        bottom: 600,
+        width: 800,
+        height: 600,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      };
+      let viewport = { width: 800, height: 600 };
+      vi.spyOn(resizedCanvas, "getBoundingClientRect").mockImplementation(() => bounds);
+      const resizedActions: ActionType[] = [];
+      const resizedAdapter = new InputAdapter({
+        canvas: resizedCanvas,
+        getCamera: () => Camera.create(0, 0, 1),
+        getViewport: () => viewport,
+        onAction: (action) => resizedActions.push(action),
+        captureKeyboard: false,
+      });
+
+      resizedCanvas.dispatchEvent(createPointerEvent("pointermove", { clientX: 400, clientY: 300 }));
+      expect(resizedActions.at(-1)).toMatchObject({ screen: { x: 400, y: 300 }, world: { x: 0, y: 0 } });
+
+      bounds = {
+        left: 100,
+        top: 50,
+        right: 500,
+        bottom: 350,
+        width: 400,
+        height: 300,
+        x: 100,
+        y: 50,
+        toJSON: () => ({}),
+      };
+      viewport = { width: 400, height: 300 };
+      resizedCanvas.dispatchEvent(createPointerEvent("pointermove", { clientX: 300, clientY: 200 }));
+
+      expect(resizedActions.at(-1)).toMatchObject({ screen: { x: 200, y: 150 }, world: { x: 0, y: 0 } });
+      resizedAdapter.dispose();
+    });
+
     it("should handle camera panning", () => {
       camera = Camera.create(100, 50, 1);
 

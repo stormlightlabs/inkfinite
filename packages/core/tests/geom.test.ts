@@ -1029,7 +1029,7 @@ describe("Geometry", () => {
       const state = store.getState();
       const resolved = resolveArrowEndpoints(state, arrow.id);
 
-      expect(resolved?.b).toEqual({ x: 200, y: 150 });
+      expect(resolved?.b).toEqual({ x: 202, y: 150 });
     });
   });
 

@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tauri::AppHandle;
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -14,23 +14,23 @@ pub struct FileEntry {
 fn read_directory(directory: String, pattern: Option<String>) -> Result<Vec<FileEntry>, String> {
     let path = Path::new(&directory);
     if !path.exists() {
-        return Err(format!("Directory does not exist: {}", directory));
+        return Err(format!("Directory does not exist: {directory}"));
     }
     if !path.is_dir() {
-        return Err(format!("Path is not a directory: {}", directory));
+        return Err(format!("Path is not a directory: {directory}"));
     }
 
-    let entries = fs::read_dir(path).map_err(|e| format!("Failed to read directory: {}", e))?;
+    let entries = fs::read_dir(path).map_err(|e| format!("Failed to read directory: {e}"))?;
 
     let mut results = Vec::new();
     let pattern = pattern.unwrap_or_else(|| "*.inkfinite.json".to_string());
 
     for entry in entries {
-        let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+        let entry = entry.map_err(|e| format!("Failed to read entry: {e}"))?;
         let entry_path = entry.path();
         let metadata = entry
             .metadata()
-            .map_err(|e| format!("Failed to read metadata: {}", e))?;
+            .map_err(|e| format!("Failed to read metadata: {e}"))?;
 
         let name = entry.file_name().to_string_lossy().to_string();
 
@@ -73,10 +73,10 @@ fn rename_file(old_path: String, new_path: String) -> Result<(), String> {
     let new = Path::new(&new_path);
 
     if !old.exists() {
-        return Err(format!("Source file does not exist: {}", old_path));
+        return Err(format!("Source file does not exist: {old_path}"));
     }
 
-    fs::rename(old, new).map_err(|e| format!("Failed to rename file: {}", e))?;
+    fs::rename(old, new).map_err(|e| format!("Failed to rename file: {e}"))?;
 
     Ok(())
 }
@@ -87,14 +87,14 @@ fn delete_file(file_path: String) -> Result<(), String> {
     let path = Path::new(&file_path);
 
     if !path.exists() {
-        return Err(format!("File does not exist: {}", file_path));
+        return Err(format!("File does not exist: {file_path}"));
     }
 
     if path.is_dir() {
-        return Err(format!("Path is a directory, not a file: {}", file_path));
+        return Err(format!("Path is a directory, not a file: {file_path}"));
     }
 
-    fs::remove_file(path).map_err(|e| format!("Failed to delete file: {}", e))?;
+    fs::remove_file(path).map_err(|e| format!("Failed to delete file: {e}"))?;
 
     Ok(())
 }
@@ -102,12 +102,15 @@ fn delete_file(file_path: String) -> Result<(), String> {
 /// Pick a workspace directory using the system folder picker
 #[tauri::command]
 async fn pick_workspace_directory(app: AppHandle) -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+    use tauri_plugin_dialog::DialogExt;
 
     let result = app.dialog().file().blocking_pick_folder();
 
     match result {
-        Some(path) => Ok(Some(path.to_string_lossy().to_string())),
+        Some(path) => path
+            .into_path()
+            .map(|path| Some(path.to_string_lossy().into_owned()))
+            .map_err(|error| format!("Failed to resolve selected directory: {error}")),
         None => Ok(None),
     }
 }

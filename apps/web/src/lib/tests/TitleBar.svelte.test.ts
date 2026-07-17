@@ -41,12 +41,12 @@ describe("TitleBar (merged into Toolbar)", () => {
 
   it("opens info dialog when button clicked", async () => {
     const { container } = renderToolbar();
-    const button = container.querySelector(".toolbar__info") as HTMLButtonElement;
+    const button = container.querySelector('button[aria-label="About Inkfinite"]') as HTMLButtonElement;
     expect(button).toBeTruthy();
 
     button.click();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(container.querySelector(".about")).toBeTruthy();
+    await tick();
+    expect(container.querySelector('[role="dialog"][aria-label="About Inkfinite"]')).toBeTruthy();
   });
 
   it("shows desktop controls when running on desktop", async () => {

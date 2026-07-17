@@ -312,7 +312,7 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
       return null;
     }
 
-    const groupsToDissolve = new Set<string>();
+    const groupsToDissolve = new SvelteSet<string>();
     const shapes = state.doc.shapes;
 
     for (const id of selectionIds) {
@@ -580,8 +580,9 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     const unsubSnap = snapStore.subscribe(() => renderer?.markDirty());
 
     $effect(() => {
-      themeStore.current;
-      renderer?.markDirty();
+      if (themeStore.current) {
+        renderer?.markDirty();
+      }
     });
 
     inputAdapter = createInputAdapter({

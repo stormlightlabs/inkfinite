@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import { stencils } from 'inkfinite-core';
 	import { startDrag, endDrag, draggingStencil } from '../dnd.svelte';
 	import Sheet from '$lib/components/Sheet.svelte';
@@ -30,7 +31,7 @@
 	function refreshStencils() {
 		const allStencils = registry.search(searchQuery);
 		const grouped: Record<string, Stencil[]> = {};
-		const cats = new Set<string>();
+		const cats = new SvelteSet<string>();
 
 		for (const stencil of allStencils) {
 			if (!grouped[stencil.category]) {
@@ -104,14 +105,14 @@
 
 		<div class="palette__content custom-scrollbar">
 			<div class="palette__list">
-				{#each categories as category}
+				{#each categories as category (category)}
 					<div class="palette__category">
 						<h3 class="palette__category-title">
 							<span class="palette__category-dot"></span>
 							{category}
 						</h3>
 						<div class="palette__grid">
-							{#each stencilsByCategory[category] as stencil}
+							{#each stencilsByCategory[category] as stencil (stencil.id)}
 								<div
 									role="button"
 									tabindex="0"
@@ -129,6 +130,8 @@
 									title={stencil.name}>
 									<div class="palette__item-preview">
 										<div class="palette__item-preview-content">
+											<!-- Built-in previews are source-controlled SVG strings. -->
+											<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 											{@html stencil.preview.data}
 										</div>
 									</div>

@@ -128,7 +128,7 @@ describe("Canvas component", () => {
     const { container } = render(Canvas);
     const toolButtons = container.querySelectorAll(".tool-button");
 
-    expect(toolButtons.length).toBe(9);
+    expect(toolButtons.length).toBe(10);
 
     const toolIds = Array.from(toolButtons).map((btn) => btn.getAttribute("data-tool-id"));
     const coreToolIds = toolIds.filter((id) => id && id !== "history");

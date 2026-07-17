@@ -3,17 +3,15 @@ import { browser } from "$app/environment";
 export type Theme = "light" | "dark";
 
 export function createThemeStore() {
-  let theme = $state<Theme>("dark");
+  const stored = browser ? localStorage.getItem("theme") : null;
+  const initialTheme: Theme = stored === "light" || stored === "dark" ? stored : "dark";
+  let theme = $state<Theme>(initialTheme);
 
   if (browser) {
-    const stored = localStorage.getItem("theme") as Theme | null;
-    if (stored === "light" || stored === "dark") {
-      theme = stored;
-    } else {
-      theme = "dark";
+    if (stored !== "light" && stored !== "dark") {
       localStorage.setItem("theme", "dark");
     }
-    document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.setAttribute("data-theme", initialTheme);
   }
 
   function toggle() {

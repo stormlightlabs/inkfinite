@@ -7,6 +7,7 @@ import {
   serializeDesktopFile,
 } from "inkfinite-core";
 import { beforeEach, describe, expect, it } from "vitest";
+import desktopFixture from "../../../../../fixtures/v1/desktop/all-features.inkfinite.json";
 import { createDesktopDocRepo } from "../persistence/desktop";
 
 function createFakeFileOps() {
@@ -137,6 +138,23 @@ describe("createDesktopDocRepo", () => {
 
     const boards = await repo.listBoards();
     expect(boards.some((entry: BoardMeta) => entry.id === "board-dialog")).toBe(true);
+  });
+
+  it("opens and saves the frozen v1 desktop fixture without order drift", async () => {
+    const repo = createDesktopDocRepo(fake.ops);
+    const path = "/tmp/v1-all-features.inkfinite.json";
+    fake.files.set(path, JSON.stringify(desktopFixture, null, 2));
+    fake.setNextOpen(path);
+
+    const opened = await repo.openFromDialog();
+    await repo.applyDocPatch(opened.boardId, {
+      upserts: { pages: [opened.doc.pages["page:fixtures"]] },
+      order: opened.doc.order,
+    });
+
+    const saved = JSON.parse(fake.files.get(path) ?? "null");
+    expect(saved.doc).toEqual(desktopFixture.doc);
+    expect(saved.order).toEqual(desktopFixture.order);
   });
 
   it("renames the current board and updates the file", async () => {

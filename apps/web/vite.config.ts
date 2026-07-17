@@ -5,6 +5,12 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [sveltekit(), devtoolsJson()],
+  resolve: {
+    alias: {
+      "inkfinite-core": new URL("../../packages/core/src/index.ts", import.meta.url).pathname,
+      "inkfinite-renderer": new URL("../../packages/renderer/src/index.ts", import.meta.url).pathname,
+    },
+  },
   test: {
     ui: false,
     watch: false,
@@ -16,7 +22,7 @@ export default defineConfig({
         browser: {
           headless: true,
           enabled: true,
-          provider: playwright(),
+          provider: playwright({ launchOptions: { channel: "chrome" } }),
           instances: [{ browser: "chromium", headless: true }],
         },
         include: ["src/**/*.svelte.{test,spec}.{js,ts}", "src/lib/tests/**/*.{test,spec}.{js,ts}"],

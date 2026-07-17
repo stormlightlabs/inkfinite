@@ -106,17 +106,16 @@ describe("Toolbar color controls", () => {
     expect(updated.props.stroke).toBe("#222299");
   });
 
-  it("disables fill control when selection has no fillable shapes", () => {
+  it("hides fill control when selection has no fillable shapes", () => {
     const store = createStoreWithLine();
     const { container } = renderToolbar(store);
 
     const fillInput = container.querySelector("input[aria-label=\"Fill color\"]") as HTMLInputElement | null;
     const strokeInput = container.querySelector("input[aria-label=\"Stroke color\"]") as HTMLInputElement | null;
-    expect(fillInput).toBeTruthy();
+    expect(fillInput).toBeNull();
     expect(strokeInput).toBeTruthy();
-    if (!fillInput || !strokeInput) return;
+    if (!strokeInput) return;
 
-    expect(fillInput.disabled).toBe(true);
     expect(strokeInput.disabled).toBe(false);
   });
 });

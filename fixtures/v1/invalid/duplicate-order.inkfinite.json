@@ -1,0 +1,49 @@
+{
+  "board": {
+    "id": "board:invalid-order",
+    "name": "V1 compatibility fixtures",
+    "createdAt": 1784246400000,
+    "updatedAt": 1784246400000
+  },
+  "doc": {
+    "pages": {
+      "page:invalid": {
+        "id": "page:invalid",
+        "name": "Invalid",
+        "shapeIds": [
+          "shape:one",
+          "shape:one"
+        ]
+      }
+    },
+    "shapes": {
+      "shape:one": {
+        "id": "shape:one",
+        "type": "rect",
+        "pageId": "page:invalid",
+        "x": 0,
+        "y": 0,
+        "rot": 0,
+        "props": {
+          "w": 10,
+          "h": 10,
+          "fill": "#fff",
+          "stroke": "#000",
+          "radius": 0
+        }
+      }
+    },
+    "bindings": {}
+  },
+  "order": {
+    "pageIds": [
+      "page:invalid"
+    ],
+    "shapeOrder": {
+      "page:invalid": [
+        "shape:one",
+        "shape:one"
+      ]
+    }
+  }
+}
