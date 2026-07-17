@@ -1,0 +1,14 @@
+[package]
+name = "inkfinite-render-svg"
+description = "Deterministic SVG rendering boundary for Inkfinite"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+inkfinite-model.workspace = true
+
+[lints]
+workspace = true
+

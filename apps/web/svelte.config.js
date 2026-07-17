@@ -6,7 +6,7 @@ const config = {
   preprocess: vitePreprocess(),
   kit: {
     adapter: adapter({ fallback: "index.html" }),
-    prerender: { entries: [] },
+    prerender: { entries: ["/"] },
     alias: { "$assets": "./src/lib/assets", "$components": "./src/lib/components" },
   },
 };

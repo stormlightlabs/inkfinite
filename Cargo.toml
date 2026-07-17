@@ -1,0 +1,38 @@
+[workspace]
+members = [
+  "apps/desktop/src-tauri",
+  "crates/inkfinite-cli",
+  "crates/inkfinite-crdt",
+  "crates/inkfinite-engine",
+  "crates/inkfinite-file",
+  "crates/inkfinite-ipc",
+  "crates/inkfinite-model",
+  "crates/inkfinite-protocol",
+  "crates/inkfinite-render-svg",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
+license = "AGPL-3.0-only"
+rust-version = "1.89"
+version = "0.0.0"
+
+[workspace.dependencies]
+inkfinite-crdt = { path = "crates/inkfinite-crdt" }
+inkfinite-engine = { path = "crates/inkfinite-engine" }
+inkfinite-file = { path = "crates/inkfinite-file" }
+inkfinite-ipc = { path = "crates/inkfinite-ipc" }
+inkfinite-model = { path = "crates/inkfinite-model" }
+inkfinite-protocol = { path = "crates/inkfinite-protocol" }
+inkfinite-render-svg = { path = "crates/inkfinite-render-svg" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = "warn"
+pedantic = "warn"
+

@@ -82,14 +82,14 @@ Blocked by: V2-02
 
 Acceptance criteria:
 
-- [ ] A root Cargo workspace contains the model, CRDT, engine, file, protocol,
+- [x] A root Cargo workspace contains the model, CRDT, engine, file, protocol,
       SVG, IPC, and CLI crates named in the roadmap.
-- [ ] The pnpm workspace contains `editor-runtime`, `renderer-canvas`,
+- [x] The pnpm workspace contains `editor-runtime`, `renderer-canvas`,
       `input-dom`, and `generated-bindings`; the existing apps and packages keep
       working in place during the scaffold step.
-- [ ] New crates and packages contain only minimal compileable entry points,
+- [x] New crates and packages contain only minimal compileable entry points,
       manifests, and dependency edges. This ticket moves no product behavior.
-- [ ] Workspace commands can discover, build, test, type-check, and lint the new
+- [x] Workspace commands can discover, build, test, type-check, and lint the new
       members from the repository root.
 
 Verification:
@@ -111,13 +111,13 @@ Blocked by: V2-03
 
 Acceptance criteria:
 
-- [ ] The model covers pages, layers, scene hierarchy, built-in shape kinds,
+- [x] The model covers pages, layers, scene hierarchy, built-in shape kinds,
       bindings, assets, semantic metadata, provenance, opacity, and format IDs.
-- [ ] Ordered child lists have one source of truth and public operations use
+- [x] Ordered child lists have one source of truth and public operations use
       sibling anchors rather than numeric indexes.
-- [ ] CRDT, engine, file, rendering, IPC, and CLI code depend on the contracts in
+- [x] CRDT, engine, file, rendering, IPC, and CLI code depend on the contracts in
       one direction; model and protocol crates do not import those consumers.
-- [ ] `cargo test --workspace` and strict Clippy run from the repository root.
+- [x] `cargo test --workspace` and strict Clippy run from the repository root.
 
 Verification:
 

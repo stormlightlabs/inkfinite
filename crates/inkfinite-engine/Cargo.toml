@@ -1,0 +1,16 @@
+[package]
+name = "inkfinite-engine"
+description = "Validated transaction engine for Inkfinite documents"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+inkfinite-crdt.workspace = true
+inkfinite-model.workspace = true
+inkfinite-protocol.workspace = true
+
+[lints]
+workspace = true
+

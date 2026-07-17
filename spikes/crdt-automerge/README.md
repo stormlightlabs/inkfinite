@@ -53,9 +53,7 @@ The production architecture will use the Rust Automerge crate behind Inkfinite
 contracts; JavaScript will consume materialized snapshots and patches instead of
 holding the authoritative CRDT.
 
-The reference toolchain affects the version choice. Automerge Rust 0.7 through
-0.10 require Rust 1.89, while V2-01 recorded Rust 1.88. This proof therefore pins
-Automerge Rust 0.6.1 and confirms that its files interoperate with
-`@automerge/automerge` 3.2.6. Before production CRDT work starts, V2-03 must move
-the workspace to Rust 1.89 or newer and re-run this proof against the current
-Rust crate. Inkfinite contracts must continue to hide its lower-level API.
+V2-03 upgraded the workspace from the V2-01 Rust 1.88 baseline to Rust 1.89 and
+moved this proof from Automerge Rust 0.6.1 to 0.10.0. The full fixed-seed proof
+passed twice with `@automerge/automerge` 3.2.6 and produced identical snapshots.
+Production crates continue to hide Automerge behind Inkfinite-owned contracts.

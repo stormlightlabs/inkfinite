@@ -145,12 +145,12 @@ the planned ownership boundary: Rust holds the CRDT, while TypeScript holds a
 materialized mirror. The V1 baseline's 9.69 ms open and 12.09 ms save parse plain
 JSON and are not equivalent to first-time CRDT import.
 
-The proof pins Automerge Rust 0.6.1 and `@automerge/automerge` 3.2.6. Automerge
-Rust 0.7 through 0.10 require Rust 1.89, newer than the V2-01 Rust 1.88
-toolchain. V2-03 must upgrade the workspace toolchain and rerun the proof against
-the current crate before production CRDT code lands. Inkfinite-owned contracts
-remain mandatory because the Rust API is low-level and its release requirements
-can move independently of the document engine.
+V2-03 upgraded the workspace to Rust 1.89 and reran the fixed-seed proof twice
+with Automerge Rust 0.10.0 and `@automerge/automerge` 3.2.6. Both runs converged
+to identical snapshots, and the original semantic, repair, sync, and
+cross-language tests passed without changing the Inkfinite proof boundary.
+Production code depends on the Inkfinite-owned CRDT contracts rather than
+Automerge types, so changes to Automerge's low-level API remain isolated.
 
 The V2-11 reference budgets are an 8 ms median Canvas frame and a 1 ms median
 hit test for the frozen 10,000-shape board. The V1 medians are 0.61 ms and

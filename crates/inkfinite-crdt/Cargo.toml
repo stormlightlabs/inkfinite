@@ -1,0 +1,15 @@
+[package]
+name = "inkfinite-crdt"
+description = "Project-owned CRDT contracts for Inkfinite documents"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+inkfinite-model.workspace = true
+serde.workspace = true
+
+[lints]
+workspace = true
+

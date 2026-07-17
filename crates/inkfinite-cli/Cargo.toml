@@ -1,0 +1,23 @@
+[package]
+name = "inkfinite-cli"
+description = "Command-line entry point for Inkfinite"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[[bin]]
+name = "inkfinite"
+path = "src/main.rs"
+
+[dependencies]
+inkfinite-engine.workspace = true
+inkfinite-file.workspace = true
+inkfinite-ipc.workspace = true
+inkfinite-model.workspace = true
+inkfinite-protocol.workspace = true
+inkfinite-render-svg.workspace = true
+
+[lints]
+workspace = true
+

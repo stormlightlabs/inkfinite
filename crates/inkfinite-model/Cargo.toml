@@ -1,0 +1,15 @@
+[package]
+name = "inkfinite-model"
+description = "Durable document records and identifiers for Inkfinite"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
+

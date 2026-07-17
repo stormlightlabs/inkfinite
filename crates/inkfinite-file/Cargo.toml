@@ -1,0 +1,16 @@
+[package]
+name = "inkfinite-file"
+description = "Import, migration, and persistence boundary for Inkfinite"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+inkfinite-crdt.workspace = true
+inkfinite-engine.workspace = true
+inkfinite-model.workspace = true
+
+[lints]
+workspace = true
+

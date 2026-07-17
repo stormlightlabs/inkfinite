@@ -1,0 +1,16 @@
+[package]
+name = "inkfinite-protocol"
+description = "Transport-independent requests and responses for Inkfinite"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+inkfinite-model.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
+

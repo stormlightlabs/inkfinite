@@ -161,6 +161,20 @@ importers:
         specifier: ^4.0.16
         version: 4.0.16(@types/node@25.0.3)(@vitest/browser-playwright@4.0.16)(jiti@2.6.1)(jsdom@27.3.0)(yaml@2.8.2)
 
+  packages/editor-runtime:
+    dependencies:
+      generated-bindings:
+        specifier: workspace:*
+        version: link:../generated-bindings
+
+  packages/generated-bindings: {}
+
+  packages/input-dom:
+    dependencies:
+      editor-runtime:
+        specifier: workspace:*
+        version: link:../editor-runtime
+
   packages/renderer:
     dependencies:
       inkfinite-core:
@@ -215,6 +229,15 @@ importers:
       vitest:
         specifier: ^4.0.16
         version: 4.0.16(@types/node@25.0.3)(@vitest/browser-playwright@4.0.16)(jiti@2.6.1)(jsdom@27.3.0)(yaml@2.8.2)
+
+  packages/renderer-canvas:
+    dependencies:
+      editor-runtime:
+        specifier: workspace:*
+        version: link:../editor-runtime
+      generated-bindings:
+        specifier: workspace:*
+        version: link:../generated-bindings
 
   spikes/crdt-automerge/js:
     dependencies:
