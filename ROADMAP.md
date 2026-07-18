@@ -1,6 +1,6 @@
 # Inkfinite vNext / Version 2
 
-Status: implementation in progress; V2-01 through V2-14 are complete
+Status: implementation in progress; V2-01 through V2-15 are complete
 
 This is the product and architecture contract for vNext. [TODO.md](TODO.md) is
 the implementation queue.
@@ -54,11 +54,16 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
 - Rust produces deterministic headless SVG for built-in shapes, layers,
   bindings, nested transforms, text, Markdown, and filtered views. Missing
   fonts and assets use stable fallbacks with explicit warnings.
-- [TODO.md](TODO.md) starts the remaining work at V2-15: CLI commands, followed
-  by live control, sync, agent packaging, release verification, and v1
-  compatibility removal.
+- The file-mode CLI creates, inspects, queries, and validates closed documents.
+  It also exposes generated schemas, global `--json` and `--non-interactive`
+  options, task-oriented help, and a machine-readable capability contract.
+- [TODO.md](TODO.md) starts the remaining work at V2-16: mutating CLI commands
+  and CLI access to the SVG renderer, followed by live control, sync, agent
+  packaging, release verification, and v1 compatibility removal.
 
 ## Architecture
+
+The target architecture is:
 
 ```text
 Static web root ── Dexie adapter ──┐
@@ -88,7 +93,7 @@ TypeScript editor runtime
 | Local-first state        | Automerge, isolated behind Inkfinite interfaces            |
 | CLI                      | Rust and `clap`                                            |
 | Schemas and bindings     | Serde, Schemars, and `ts-rs`                               |
-| Desktop control          | `interprocess` local sockets and length-prefixed messages  |
+| Desktop control          | Planned local sockets and length-prefixed messages         |
 | Async I/O                | Tokio where needed                                         |
 | Agent integration        | CLI and bundled `SKILL.md`                                 |
 
@@ -147,8 +152,9 @@ format. Through V2-21, the development build also accepts the frozen v1 envelope
 as an import source so the architecture and release baselines remain
 reproducible. V2-22 removes that unreleased compatibility surface before vNext
 ships. [docs/v2-file-format.md](docs/v2-file-format.md) defines the current file
-behavior. The CLI supplies JSON inspection and SVG rendering for repositories
-and CI.
+behavior. The CLI supplies JSON inspection for repositories and CI. The Rust
+core already produces deterministic SVG; V2-16 exposes that renderer through
+the CLI.
 
 ## Document contract
 
@@ -266,26 +272,46 @@ spatial index; WebGL and OffscreenCanvas remain deferred pending evidence.
 ## CLI and agent workflow
 
 The CLI binary is `inkfinite`; the desktop application is `Inkfinite`. File mode
-works without the app:
+works without the app. The shipped commands are:
 
 ```sh
 inkfinite new architecture.inkfinite
 inkfinite inspect architecture.inkfinite --json
 inkfinite query architecture.inkfinite --role architecture.service --json
-inkfinite apply architecture.inkfinite --transaction transaction.json --dry-run
 inkfinite validate architecture.inkfinite
+inkfinite schema document
+inkfinite capabilities --json
+```
+
+V2-16 adds mutating and rendering commands:
+
+```sh
+inkfinite apply architecture.inkfinite --transaction transaction.json --dry-run
 inkfinite render architecture.inkfinite --output architecture.svg
 ```
 
-Structured `shape create/patch/delete`, `connect`, and `layout` commands build
-ordinary transactions. They never bypass the engine. `schema document`, `schema
-transaction`, `schema protocol`, and `capabilities --json` expose the contracts.
+Structured `shape create/patch/delete`, `connect`, and `layout` commands will
+build ordinary transactions and never bypass the engine. `schema document`,
+`schema transaction`, `schema protocol`, and `capabilities --json` expose the
+contracts.
 
-Every command supports deterministic JSON where applicable, reads standard input
-where useful, writes machine output to stdout and diagnostics to stderr, never
-prompts under `--json` or `--non-interactive`, and uses stable exit codes.
+`--json` and `--non-interactive` are global and may appear before or after a
+subcommand. Every command supports deterministic JSON where applicable, reads
+standard input where useful, writes machine output to stdout and diagnostics to
+stderr, never prompts under either global option, and uses stable exit codes.
 Mutations support `--dry-run`, report heads and affected IDs, write atomically,
 and refuse failed preconditions or invalid documents.
+
+File-mode commands return 0 for success, 2 for invalid usage, 3 for file or
+input errors, 4 for invalid documents or data, and 5 for file, lock, or state
+conflicts. `inkfinite --help` and `inkfinite capabilities --json` expose the
+same contract.
+
+CLI design follows the [Command Line Interface Guidelines](https://clig.dev/).
+Top-level help shows common examples and links to documentation and issue
+reporting. Each subcommand has realistic examples and clear value names. New
+commands must keep help, capabilities, README.md, TODO.md, ROADMAP.md, and
+integration tests synchronized.
 
 The bundled skill teaches agents to inspect heads, query narrowly, create the
 smallest transaction, dry-run, resolve conflicts, apply or propose, validate,
@@ -345,12 +371,20 @@ pointer normalization, patch reconciliation, Canvas hit testing, and SVG output.
 Current verification commands:
 
 ```sh
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
+cargo fmt --all -- --check
+cargo test --workspace --all-features
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+pnpm format:check
+pnpm bindings:check
+pnpm bindings:test
 pnpm --filter @inkfinite/core test --run
 pnpm --filter @inkfinite/renderer test --run
+pnpm --filter @inkfinite/runtime typecheck
+pnpm --filter @inkfinite/input-dom typecheck
+pnpm --filter @inkfinite/ui test
 pnpm --filter @inkfinite/web test
 pnpm --filter @inkfinite/desktop test
+pnpm --filter @inkfinite/bindings typecheck
 pnpm --filter @inkfinite/core typecheck
 pnpm --filter @inkfinite/renderer typecheck
 pnpm --filter @inkfinite/ui check
@@ -365,15 +399,15 @@ stencils, render parity, proposal UX, recovery prompts, and permission failures.
 
 ## Milestones
 
-Milestones 1 through 4 are complete: the architecture gate, Rust authority,
-desktop vertical slice, and editor scale work all passed. V2-12 also completed
-the layer foundation in milestone 5. [TODO.md](TODO.md) owns ticket-level status
-and acceptance criteria.
+Milestones 1 through 5 are complete: the architecture gate, Rust authority,
+desktop vertical slice, editor scale work, layers, opacity, and stencils all
+passed. Milestone 6 has deterministic SVG in the Rust core and the initial
+file-mode CLI; V2-16 is the remaining mutating and render-command work.
+[TODO.md](TODO.md) owns ticket-level status and acceptance criteria.
 
-- **Milestone 5, layers and styles:** finish shape opacity and active-layer
-  stencil insertion.
-- **Milestone 6, CLI and SVG:** ship deterministic SVG plus read-only and mutating
-  file-mode commands.
+- **Milestone 5, layers and styles:** complete.
+- **Milestone 6, CLI and SVG:** expose the existing SVG renderer and ship
+  mutating file-mode commands.
 - **Milestone 7, live control and sync:** add authenticated local IPC, reviewable
   proposals, explicit apply, and two-replica offline convergence.
 - **Milestone 8, agent and release readiness:** bundle the agent skill, record

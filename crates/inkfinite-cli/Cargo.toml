@@ -15,8 +15,11 @@ name = "generate-bindings"
 path = "src/bin/generate-bindings.rs"
 
 [dependencies]
+anyhow.workspace = true
+clap.workspace = true
 inkfinite-core.workspace = true
 schemars.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 ts-rs.workspace = true
 

@@ -13,9 +13,7 @@ use thiserror::Error;
 use crate::engine::{EngineError, validate_document};
 use crate::file::{DocumentFile, FileError};
 use crate::proto::{CommitResult, DocumentPath, Query, QueryResult, SaveResult, SessionId, TransactionDraft};
-use crate::{
-    ActorId, Document, DocumentId, DocumentSnapshot, LayerId, LayerRecord, Opacity, PageId, PageRecord, RecordVersion,
-};
+use crate::{ActorId, DocumentId, DocumentSnapshot, blank_document};
 
 /// State of the session's future synchronization boundary.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -144,7 +142,7 @@ impl SessionService {
     pub fn create(
         &mut self, path: impl AsRef<Path>, document_id: DocumentId, actor_id: ActorId, page_name: Option<&str>,
     ) -> Result<SessionOpened, SessionError> {
-        let document = new_document(&document_id, page_name);
+        let document = blank_document(&document_id, page_name);
         let file = DocumentFile::create(path, document_id, actor_id, document)?;
         self.insert(file)
     }
@@ -378,38 +376,6 @@ fn canonical_import_path(path: &Path) -> PathBuf {
     destination
 }
 
-fn new_document(document_id: &DocumentId, page_name: Option<&str>) -> Document {
-    let page_id = PageId::from(format!("page:{}:1", document_id.as_str()));
-    let layer_id = LayerId::from(format!("layer:{}:1", document_id.as_str()));
-    let page = PageRecord {
-        id: page_id.clone(),
-        name: page_name
-            .filter(|name| !name.trim().is_empty())
-            .unwrap_or("Page 1")
-            .to_owned(),
-        layer_ids: vec![layer_id.clone()],
-        version: RecordVersion(1),
-    };
-    let layer = LayerRecord {
-        id: layer_id.clone(),
-        page_id: page_id.clone(),
-        name: "Default".into(),
-        shape_ids: Vec::new(),
-        visible: true,
-        locked: false,
-        opacity: Opacity::OPAQUE,
-        version: RecordVersion(1),
-    };
-    Document {
-        pages: BTreeMap::from([(page_id.clone(), page)]),
-        page_ids: vec![page_id],
-        layers: BTreeMap::from([(layer_id, layer)]),
-        shapes: BTreeMap::new(),
-        bindings: BTreeMap::new(),
-        assets: BTreeMap::new(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -419,7 +385,7 @@ mod tests {
     use super::*;
     use crate::engine::TransactionDraft;
     use crate::proto::{Operation, TransactionId};
-    use crate::{Origin, RecordVersion, Timestamp};
+    use crate::{Origin, PageId, RecordVersion, Timestamp};
 
     static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
 

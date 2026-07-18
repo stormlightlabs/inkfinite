@@ -637,6 +637,44 @@ pub struct DocumentSnapshot {
     pub document: Document,
 }
 
+/// Creates the normalized blank document used by desktop and file-mode clients.
+///
+/// The first page uses `page_name` when it contains non-whitespace text. Its
+/// page and layer IDs are derived from `document_id`, keeping initial records
+/// stable across every adapter.
+#[must_use]
+pub fn blank_document(document_id: &DocumentId, page_name: Option<&str>) -> Document {
+    let page_id = PageId::from(format!("page:{}:1", document_id.as_str()));
+    let layer_id = LayerId::from(format!("layer:{}:1", document_id.as_str()));
+    let page = PageRecord {
+        id: page_id.clone(),
+        name: page_name
+            .filter(|name| !name.trim().is_empty())
+            .unwrap_or("Page 1")
+            .to_owned(),
+        layer_ids: vec![layer_id.clone()],
+        version: RecordVersion(1),
+    };
+    let layer = LayerRecord {
+        id: layer_id.clone(),
+        page_id: page_id.clone(),
+        name: "Default".into(),
+        shape_ids: Vec::new(),
+        visible: true,
+        locked: false,
+        opacity: Opacity::OPAQUE,
+        version: RecordVersion(1),
+    };
+    Document {
+        pages: BTreeMap::from([(page_id.clone(), page)]),
+        page_ids: vec![page_id],
+        layers: BTreeMap::from([(layer_id, layer)]),
+        shapes: BTreeMap::new(),
+        bindings: BTreeMap::new(),
+        assets: BTreeMap::new(),
+    }
+}
+
 /// Validates the property rules shared by the Rust and TypeScript registries.
 ///
 /// Unknown properties remain available for shape-specific extensions. The

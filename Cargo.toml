@@ -13,7 +13,9 @@ rust-version = "1.89"
 version = "0.0.0"
 
 [workspace.dependencies]
+anyhow = "1.0.103"
 automerge = "=0.10.0"
+clap = { version = "4.6.1", features = ["derive"] }
 inkfinite-core = { path = "crates/inkfinite-core" }
 perfect_freehand = "=0.1.1"
 schemars = "1.2.1"

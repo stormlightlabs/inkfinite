@@ -168,21 +168,30 @@ cargo test -p inkfinite-core render::
 
 ### V2-15: Ship read-only and schema CLI commands
 
-What to build: Implement `new`, `inspect`, `query`, `validate`, `schema`, and
-`capabilities` in file mode with stable human and machine output.
+Implemented `new`, `inspect`, `query`, `validate`, `schema`, and `capabilities`
+in file mode with stable human and machine output, global output controls, and
+task-oriented help.
 
 Blocked by: V2-06, V2-07
 
 Acceptance criteria:
 
-- [ ] Commands work while the desktop app is closed and contain no business
+- [x] Commands work while the desktop app is closed and contain no business
       logic outside shared crates.
-- [ ] `--json` never prompts, writes only machine data to stdout, sends
-      diagnostics to stderr, and returns documented stable exit codes.
-- [ ] Inspect/query report document heads and support semantic, hierarchy, layer,
+- [x] `--json` never prompts, writes only machine data to stdout, sends
+      diagnostics to stderr, and returns documented stable exit codes. It works
+      before or after a subcommand.
+- [x] Inspect/query report document heads and support semantic, hierarchy, layer,
       kind, and bounds filters.
-- [ ] Schema and capability output matches generated artifacts and is snapshot
+- [x] Schema and capability output matches generated artifacts and is snapshot
       tested on Unix and Windows path conventions.
+- [x] Top-level help includes common examples, version discovery, documentation
+      and issue links, and typo suggestions. Each subcommand has realistic
+      examples and clear value names. Running without a subcommand prints
+      concise help and returns the usage exit code.
+- [x] `capabilities --json` reports the global `--json` and
+      `--non-interactive` options alongside commands, schemas, filters, format,
+      protocol, and exit codes.
 
 Verification:
 
@@ -208,11 +217,18 @@ Acceptance criteria:
 - [ ] Results report previous/current heads, transaction ID, created/updated/
       deleted IDs, repairs, and warnings.
 - [ ] `render` writes deterministic SVG without opening the desktop app.
+- [ ] New subcommands preserve the global `--json` and `--non-interactive`
+      options, stdout/stderr separation, stable exit codes, unambiguous names,
+      descriptive long flags, built-in examples, and project support links.
+- [ ] Help, `capabilities --json`, README.md, TODO.md, ROADMAP.md, and CLI
+      integration tests describe the same shipped interface.
 
 Verification:
 
-- Run CLI workflow tests: inspect → dry-run → apply → validate → reopen → render,
-  including every failure path.
+- Run CLI workflow tests for inspect → dry-run → apply → validate → reopen →
+  render, including every failure path. Cover top-level and subcommand help,
+  both placements of global options, version output, and the capability
+  contract.
 
 ## Milestone 7: Live control and CRDT sync
 
@@ -347,15 +363,26 @@ Acceptance criteria:
 Verification:
 
 ```sh
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
+cargo fmt --all -- --check
+cargo test --workspace --all-features
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+pnpm format:check
+pnpm bindings:check
+pnpm bindings:test
 pnpm --filter @inkfinite/core test --run
 pnpm --filter @inkfinite/renderer test --run
+pnpm --filter @inkfinite/runtime typecheck
+pnpm --filter @inkfinite/input-dom typecheck
+pnpm --filter @inkfinite/ui test
 pnpm --filter @inkfinite/web test
+pnpm --filter @inkfinite/desktop test
+pnpm --filter @inkfinite/bindings typecheck
 pnpm --filter @inkfinite/core typecheck
 pnpm --filter @inkfinite/renderer typecheck
+pnpm --filter @inkfinite/ui check
 pnpm --filter @inkfinite/web check
 pnpm --filter @inkfinite/web lint
+pnpm --filter @inkfinite/desktop check
 ```
 
 ### V2-22: Collapse to one native Inkfinite model
@@ -404,4 +431,5 @@ Verification:
 
 ## Frontier
 
-V2-15 is the current frontier. Add read-only and schema CLI commands.
+V2-16 is the current frontier. Add mutating CLI commands and expose the existing
+SVG renderer through the CLI.
