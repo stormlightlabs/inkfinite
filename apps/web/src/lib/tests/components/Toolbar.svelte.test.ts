@@ -2,8 +2,8 @@ import type { ToolId } from "@inkfinite/core";
 import { Store } from "@inkfinite/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render } from "vitest-browser-svelte";
-import Toolbar from "../../components/Toolbar.svelte";
-import { createBrushStore } from "../../status";
+import Toolbar from "$editor/components/Toolbar.svelte";
+import { createBrushStore } from "$editor/status";
 
 const createMockStore = () => new Store();
 const createMockGetViewport = () => () => ({ width: 1024, height: 768 });

@@ -1,8 +1,5 @@
 import {
   FileBrowserVM,
-  getBoardInspectorData,
-  InkfiniteDB,
-  KNOWN_MIGRATION_IDS,
   type BoardInspectorData,
   type FileBrowserViewModel,
   type PersistentDocRepo,
@@ -16,6 +13,7 @@ export class FileBrowserController {
   constructor(
     private getRepo: () => PersistentDocRepo | null,
     private onLoadDoc?: (boardId: string, doc: LoadedDoc) => void,
+    private getInspector?: () => ((boardId: string) => Promise<BoardInspectorData>) | undefined,
   ) {}
 
   handleOpen = () => {
@@ -49,11 +47,10 @@ export class FileBrowserController {
     }
   };
 
-  fetchInspectorData = async (boardId: string, webDb: InkfiniteDB | null): Promise<BoardInspectorData> => {
-    if (!webDb) {
-      throw new Error("Database not available");
-    }
-    return getBoardInspectorData(webDb, boardId, KNOWN_MIGRATION_IDS);
+  fetchInspectorData = async (boardId: string): Promise<BoardInspectorData> => {
+    const inspect = this.getInspector?.();
+    if (!inspect) throw new Error("Board inspection is not available on this platform");
+    return inspect(boardId);
   };
 
   private createBrowserRepo(repo: PersistentDocRepo): PersistentDocRepo {

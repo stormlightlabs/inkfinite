@@ -4,38 +4,7 @@ import { cleanup, render } from "vitest-browser-svelte";
 
 const actionHandlers: Array<(action: any) => void> = [];
 const coreMocks = vi.hoisted(() => ({ sinkEnqueueSpy: vi.fn(), storeInstances: [] as any[] }));
-const persistenceMocks = vi.hoisted(() => {
-  const state = {
-    instance: null as null | {
-      sink: { enqueueDocPatch: ReturnType<typeof vi.fn>; flush: ReturnType<typeof vi.fn> };
-      status: {
-        get: () => { backend: string; state: string; pendingWrites: number };
-        subscribe: () => () => void;
-        update: () => void;
-      };
-      setActiveBoard: ReturnType<typeof vi.fn>;
-      dispose: ReturnType<typeof vi.fn>;
-    },
-  };
-  return {
-    state,
-    createPersistenceManager: vi.fn(() => {
-      state.instance = {
-        sink: { enqueueDocPatch: vi.fn(), flush: vi.fn() },
-        status: {
-          get: () => ({ backend: "indexeddb", state: "saved", pendingWrites: 0 }),
-          subscribe: () => () => {},
-          update: () => {},
-        },
-        setActiveBoard: vi.fn(),
-        dispose: vi.fn(),
-      };
-      return state.instance;
-    }),
-  };
-});
-
-vi.mock("$lib/input", () => {
+vi.mock("$editor/input", () => {
   return {
     createInputAdapter: vi.fn((config) => {
       actionHandlers.push(config.onAction);
@@ -45,9 +14,8 @@ vi.mock("$lib/input", () => {
 });
 
 vi.mock(
-  "$lib/status",
+  "$editor/status",
   () => ({
-    createPersistenceManager: persistenceMocks.createPersistenceManager,
     createStatusStore: () => ({
       get: () => ({ backend: "indexeddb", state: "saved", pendingWrites: 0 }),
       subscribe: () => () => {},
@@ -85,6 +53,30 @@ const createDoc = () => ({
   bindings: {},
   order: { pageIds: ["page:1"], shapeOrder: { "page:1": [] } },
 });
+
+vi.mock("$lib/persistence/database", () => ({ InkfiniteDB: class {} }));
+
+vi.mock("$lib/persistence/repository", () => ({
+  createDexieDocRepo: vi.fn(() => ({
+    listBoards: vi.fn(async () => [{ id: "board:1", name: "Board 1", createdAt: 0, updatedAt: 0 }]),
+    createBoard: vi.fn(async () => "board:new"),
+    openBoard: vi.fn(async () => {}),
+    renameBoard: vi.fn(),
+    deleteBoard: vi.fn(),
+    loadDoc: vi.fn(async () => createDoc()),
+    applyDocPatch: vi.fn(),
+    exportBoard: vi.fn(async () => ({
+      board: { id: "board:1", name: "", createdAt: 0, updatedAt: 0 },
+      doc: createDoc(),
+      order: { pageIds: [], shapeOrder: {} },
+    })),
+    importBoard: vi.fn(async () => "board:new"),
+  })),
+  createPersistenceSink: vi.fn(() => ({
+    enqueueDocPatch: coreMocks.sinkEnqueueSpy,
+    flush: vi.fn(),
+  })),
+}));
 
 vi.mock("@inkfinite/core", async () => {
   const actual = await vi.importActual<typeof import("@inkfinite/core")>("@inkfinite/core");
@@ -187,22 +179,6 @@ vi.mock("@inkfinite/core", async () => {
       return this.historyState.redoStack.length > 0;
     }
   }
-
-  const createWebDocRepo = vi.fn(() => ({
-    listBoards: vi.fn(async () => [{ id: "board:1", name: "Board 1", createdAt: 0, updatedAt: 0 }]),
-    createBoard: vi.fn(async () => "board:new"),
-    openBoard: vi.fn(async () => {}),
-    renameBoard: vi.fn(),
-    deleteBoard: vi.fn(),
-    loadDoc: vi.fn(async () => createDoc()),
-    applyDocPatch: vi.fn(),
-    exportBoard: vi.fn(async () => ({
-      board: { id: "board:1", name: "", createdAt: 0, updatedAt: 0 },
-      doc: createDoc(),
-      order: { pageIds: [], shapeOrder: {} },
-    })),
-    importBoard: vi.fn(async () => "board:new"),
-  }));
 
   const routeAction = vi.fn((state: any, action: any) => {
     if (action.type === "pointer-down") {
@@ -308,8 +284,6 @@ vi.mock("@inkfinite/core", async () => {
         return { cursorWorld: { x: 0, y: 0 }, lastMoveAt: Date.now() };
       }
     },
-    createWebDocRepo,
-    createPersistenceSink: vi.fn(() => ({ enqueueDocPatch: sinkEnqueueSpy, flush: vi.fn() })),
     buildStatusBarVM: () => ({
       cursorWorld: { x: 0, y: 0 },
       toolId: "select",
@@ -322,7 +296,6 @@ vi.mock("@inkfinite/core", async () => {
     getShapesOnCurrentPage: () => [],
     shapeBounds: () => ({ min: { x: 0, y: 0 }, max: { x: 0, y: 0 } }),
     diffDoc: vi.fn(() => ({})),
-    InkfiniteDB: class {},
     exportToSVG: vi.fn(() => "<svg></svg>"),
     exportViewportToPNG: vi.fn(() => Promise.resolve(new Blob())),
     exportSelectionToPNG: vi.fn(() => Promise.resolve(new Blob())),
@@ -332,7 +305,8 @@ vi.mock("@inkfinite/core", async () => {
 });
 
 import * as InkfiniteCore from "@inkfinite/core";
-import Canvas from "../canvas/Canvas.svelte";
+import Canvas from "$editor/canvas/Canvas.svelte";
+import { createTestPlatformAdapter } from "./test-platform";
 const { sinkEnqueueSpy, storeInstances } = coreMocks;
 
 describe("Canvas history integration", () => {
@@ -344,13 +318,13 @@ describe("Canvas history integration", () => {
   });
 
   it("wraps pointer actions in SnapshotCommands and enqueues persistence", async () => {
-    render(Canvas);
+    render(Canvas, { platform: createTestPlatformAdapter() });
 
     await vi.waitFor(() => {
       expect(actionHandlers.length).toBeGreaterThan(0);
     });
     await vi.waitFor(() => {
-      expect(persistenceMocks.createPersistenceManager).toHaveBeenCalled();
+      expect(storeInstances.at(-1)?.getState().ui.currentPageId).toBe("page:1");
     });
     const handler = actionHandlers.at(-1);
     expect(handler).toBeTypeOf("function");

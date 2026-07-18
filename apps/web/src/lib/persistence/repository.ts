@@ -1,60 +1,48 @@
-import Dexie from "dexie";
 import {
   type BindingRecord,
   BindingRecord as BindingOps,
+  type BoardExport,
+  type BoardInspectorData,
+  type BoardMeta,
+  type BoardStats,
+  BoardStatsOps,
   createId,
+  type DocOrder,
+  type DocPatch,
   type Document,
+  getPendingMigrations,
+  type LoadedDoc,
+  type MigrationInfo,
   type PageRecord,
   PageRecord as PageOps,
+  type PersistenceSink,
+  type PersistentDocRepo,
+  type SchemaInfo,
   type ShapeRecord,
   ShapeRecord as ShapeOps,
-} from "../model";
-import type { BoardMeta, DocRepo, Timestamp } from "./repo";
-import type { BoardInspectorData, BoardStats, MigrationInfo, SchemaInfo } from "./stats";
-import { BoardStatsOps, getPendingMigrations } from "./stats";
+  type Timestamp,
+} from "@inkfinite/core";
+import Dexie from "dexie";
 
+/** IndexedDB row for a page scoped to its board. */
 export type PageRow = PageRecord & { boardId: string; updatedAt: Timestamp };
 
+/** IndexedDB row for a shape scoped to its board. */
 export type ShapeRow = ShapeRecord & { boardId: string; updatedAt: Timestamp };
 
+/** IndexedDB row for a binding scoped to its board. */
 export type BindingRow = BindingRecord & { boardId: string; updatedAt: Timestamp };
 
+/** Key-value metadata stored alongside document rows. */
 export type MetaRow = { key: string; value: unknown };
 
+/** Record of a completed IndexedDB data migration. */
 export type MigrationRow = { id: string; appliedAt: Timestamp };
 
-export type DocOrder = {
-  pageIds: string[];
-  /** Optional per-page shape order overrides */
-  shapeOrder?: Record<string, string[]>;
-};
-
-export type DocPatch = {
-  upserts?: { pages?: PageRecord[]; shapes?: ShapeRecord[]; bindings?: BindingRecord[] };
-  deletes?: { pageIds?: string[]; shapeIds?: string[]; bindingIds?: string[] };
-  order?: Partial<DocOrder>;
-};
-
-export type LoadedDoc = {
-  pages: Record<string, PageRecord>;
-  shapes: Record<string, ShapeRecord>;
-  bindings: Record<string, BindingRecord>;
-  order: DocOrder;
-};
-
-export type BoardExport = { board: BoardMeta; doc: Document; order: DocOrder };
-
-export type PersistenceSink = { enqueueDocPatch(boardId: string, patch: DocPatch): void; flush(): Promise<void> };
-
+/** Debounce configuration for the web persistence sink. */
 export type PersistenceSinkOptions = { debounceMs?: number };
 
-export interface PersistentDocRepo extends DocRepo {
-  loadDoc(boardId: string): Promise<LoadedDoc>;
-  applyDocPatch(boardId: string, patch: DocPatch): Promise<void>;
-  exportBoard(boardId: string): Promise<BoardExport>;
-  importBoard(snapshot: BoardExport): Promise<string>;
-}
-
+/** Clock override used by deterministic repository tests. */
 export type WebRepoOptions = { now?: () => Timestamp };
 
 type DexieLike = Pick<Dexie, "table" | "transaction">;
@@ -70,7 +58,7 @@ const shapeOrderKey = (boardId: string) => `${SHAPE_ORDER_META_PREFIX}${boardId}
 /**
  * Create a Dexie-backed persistent DocRepo used by the web app.
  */
-export function createWebDocRepo(database: DexieLike, options?: WebRepoOptions): PersistentDocRepo {
+export function createDexieDocRepo(database: DexieLike, options?: WebRepoOptions): PersistentDocRepo {
   const now = () => options?.now?.() ?? Date.now();
 
   const boards = () => database.table<BoardMeta>("boards");
@@ -271,39 +259,6 @@ export function createWebDocRepo(database: DexieLike, options?: WebRepoOptions):
 }
 
 /**
- * Compute a patch between two documents. Current implementation sends the full snapshot (upsert all rows).
- */
-export function diffDoc(before: Document, after: Document): DocPatch {
-  const patch: DocPatch = {};
-
-  const deletedPages = difference(Object.keys(before.pages), Object.keys(after.pages));
-  const deletedShapes = difference(Object.keys(before.shapes), Object.keys(after.shapes));
-  const deletedBindings = difference(Object.keys(before.bindings), Object.keys(after.bindings));
-
-  if (deletedPages.length > 0 || deletedShapes.length > 0 || deletedBindings.length > 0) {
-    patch.deletes = {};
-    if (deletedPages.length > 0) patch.deletes.pageIds = deletedPages;
-    if (deletedShapes.length > 0) patch.deletes.shapeIds = deletedShapes;
-    if (deletedBindings.length > 0) patch.deletes.bindingIds = deletedBindings;
-  }
-
-  const pageUpserts = Object.values(after.pages).map((page) => PageOps.clone(page));
-  const shapeUpserts = Object.values(after.shapes).map((shape) => ShapeOps.clone(shape));
-  const bindingUpserts = Object.values(after.bindings).map((binding) => BindingOps.clone(binding));
-
-  if (pageUpserts.length > 0 || shapeUpserts.length > 0 || bindingUpserts.length > 0) {
-    patch.upserts = {};
-    if (pageUpserts.length > 0) patch.upserts.pages = pageUpserts;
-    if (shapeUpserts.length > 0) patch.upserts.shapes = shapeUpserts;
-    if (bindingUpserts.length > 0) patch.upserts.bindings = bindingUpserts;
-  }
-
-  patch.order = deriveDocOrderFromDocument(after);
-
-  return patch;
-}
-
-/**
  * Batch doc patches and flush them with a debounce to cut down on Dexie writes.
  */
 export function createPersistenceSink(repo: PersistentDocRepo, options?: PersistenceSinkOptions): PersistenceSink {
@@ -386,11 +341,6 @@ function cloneShapeRow(row: ShapeRow): ShapeRecord {
 function cloneBindingRow(row: BindingRow): BindingRecord {
   const { boardId: _boardId, updatedAt: _updatedAt, ...rest } = row;
   return BindingOps.clone(rest);
-}
-
-function difference(before: string[], after: string[]): string[] {
-  const afterSet = new Set(after);
-  return before.filter((id) => !afterSet.has(id));
 }
 
 function deriveDocOrderFromDocument(doc: Document): DocOrder {
@@ -534,5 +484,5 @@ export async function getBoardInspectorData(
 
   const pendingMigrations = getPendingMigrations(knownMigrationIds, migrations);
 
-  return { stats, schema, migrations, pendingMigrations };
+  return { storageType: "IndexedDB (Dexie)", stats, schema, migrations, pendingMigrations };
 }

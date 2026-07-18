@@ -1,22 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render } from "vitest-browser-svelte";
-import Canvas from "../canvas/Canvas.svelte";
+import Canvas from "$editor/canvas/Canvas.svelte";
+import { createTestPlatformAdapter } from "./test-platform";
 
-vi.mock("$lib/status", () => {
+const renderCanvas = () => render(Canvas, { platform: createTestPlatformAdapter() });
+
+vi.mock("$editor/status", () => {
   return {
-    createPersistenceManager: () => ({
-      sink: {
-        enqueueDocPatch: () => {},
-        flush: () => Promise.resolve(),
-      },
-      status: {
-        get: () => ({ backend: "indexeddb", state: "saved", pendingWrites: 0 }),
-        subscribe: () => () => {},
-        update: () => {},
-      },
-      setActiveBoard: () => {},
-      dispose: () => {},
-    }),
     createStatusStore: () => ({
       get: () => ({ backend: "indexeddb", state: "saved", pendingWrites: 0 }),
       subscribe: () => () => {},
@@ -50,7 +40,7 @@ describe("Canvas component", () => {
   });
 
   it("should render a canvas element", () => {
-    const { container } = render(Canvas);
+    const { container } = renderCanvas();
     const canvas = container.querySelector("canvas");
 
     expect(canvas).toBeTruthy();
@@ -58,7 +48,7 @@ describe("Canvas component", () => {
   });
 
   it("should create canvas with full dimensions", () => {
-    const { container } = render(Canvas);
+    const { container } = renderCanvas();
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
 
     const style = window.getComputedStyle(canvas);
@@ -68,7 +58,7 @@ describe("Canvas component", () => {
   });
 
   it("should have touch-action: none for pointer events", () => {
-    const { container } = render(Canvas);
+    const { container } = renderCanvas();
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
 
     const style = window.getComputedStyle(canvas);
@@ -76,7 +66,7 @@ describe("Canvas component", () => {
   });
 
   it("should get 2D rendering context", () => {
-    const { container } = render(Canvas);
+    const { container } = renderCanvas();
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
 
     const context = canvas.getContext("2d");
@@ -85,7 +75,7 @@ describe("Canvas component", () => {
   });
 
   it("should initialize with test shapes", async () => {
-    const { component } = render(Canvas);
+    const { component } = renderCanvas();
 
     // Canvas component initializes store with test shapes
     // FIXME: We can't directly access the store
@@ -93,7 +83,7 @@ describe("Canvas component", () => {
   });
 
   it("should render the Toolbar component", () => {
-    const { container } = render(Canvas);
+    const { container } = renderCanvas();
     const toolbar = container.querySelector(".toolbar");
 
     expect(toolbar).toBeTruthy();
@@ -101,7 +91,7 @@ describe("Canvas component", () => {
   });
 
   it("should render editor wrapper with correct layout", () => {
-    const { container } = render(Canvas);
+    const { container } = renderCanvas();
     const editor = container.querySelector(".editor");
 
     expect(editor).toBeTruthy();
@@ -111,21 +101,21 @@ describe("Canvas component", () => {
   });
 
   it("should render the status bar", () => {
-    const { container } = render(Canvas);
+    const { container } = renderCanvas();
     const statusBar = container.querySelector(".status-bar");
 
     expect(statusBar).toBeTruthy();
   });
 
   it("should render the header with info button", () => {
-    const { container } = render(Canvas);
+    const { container } = renderCanvas();
     const titleBar = container.querySelector(".toolbar");
     expect(titleBar).toBeTruthy();
     expect(titleBar?.querySelector(".toolbar__info")).toBeTruthy();
   });
 
   it("should render all tool buttons in toolbar", () => {
-    const { container } = render(Canvas);
+    const { container } = renderCanvas();
     const toolButtons = container.querySelectorAll(".tool-button");
 
     expect(toolButtons.length).toBe(10);
@@ -139,14 +129,14 @@ describe("Canvas component", () => {
   });
 
   it("should have select tool active by default", () => {
-    const { container } = render(Canvas);
+    const { container } = renderCanvas();
     const selectButton = container.querySelector(".tool-button[data-tool-id=\"select\"]");
 
     expect(selectButton?.classList.contains("active")).toBe(true);
   });
 
   it("should change active tool when toolbar button is clicked", async () => {
-    const { container } = render(Canvas);
+    const { container } = renderCanvas();
 
     const selectButton = container.querySelector(".tool-button[data-tool-id=\"select\"]");
     const rectButton = container.querySelector(".tool-button[data-tool-id=\"rect\"]") as HTMLButtonElement;

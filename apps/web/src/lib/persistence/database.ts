@@ -1,8 +1,8 @@
+import { type BoardMeta, PageRecord as PageOps, type Timestamp } from "@inkfinite/core";
 import Dexie, { type Transaction } from "dexie";
-import { PageRecord as PageOps } from "../model";
-import type { BoardMeta, Timestamp } from "./repo";
-import type { BindingRow, MetaRow, MigrationRow, PageRow, ShapeRow } from "./web";
+import type { BindingRow, MetaRow, MigrationRow, PageRow, ShapeRow } from "./repository";
 
+/** Default IndexedDB database name for the static web application. */
 export const DB_NAME = "inkfinite";
 
 type Migration = { id: string; apply(tx: Transaction): Promise<void> };
@@ -14,7 +14,7 @@ const pageOrderKey = (boardId: string) => `${PAGE_ORDER_META_PREFIX}${boardId}`;
 const shapeOrderKey = (boardId: string) => `${SHAPE_ORDER_META_PREFIX}${boardId}`;
 
 /**
- * Dexie wrapper for Inkfinite persistence
+ * Dexie database owned by the static web application's persistence adapter.
  */
 export class InkfiniteDB extends Dexie {
   boards!: Dexie.Table<BoardMeta, string>;

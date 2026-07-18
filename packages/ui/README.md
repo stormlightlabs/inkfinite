@@ -1,11 +1,12 @@
 # Inkfinite UI
 
-Shared Svelte 5 components and design tokens for Inkfinite's web app and Tauri desktop shell.
+Shared Svelte 5 components, design tokens, and the composed Inkfinite editor.
 
-The package exports buttons, icon buttons, semantic icons, panels, toolbars,
-dialogs, sheets, and brush settings. Application components should compose these
-controls while keeping document, runtime, persistence, and Tauri dependencies in
-the consuming app.
+The package root exports buttons, icon buttons, semantic icons, panels, toolbars,
+dialogs, sheets, and brush settings. The `@inkfinite/ui/editor` subpath exports
+the product editor and its platform contract. Web and desktop persistence remain
+in their application composition roots, so this package does not import Dexie or
+Tauri.
 
 The light theme uses Eldritch Dusk. The dark theme uses the restrained Eldritch Abyss palette. IBM Plex Sans Variable is the body face; Playpen Sans Variable is reserved for display text and handwritten accents. UnoCSS generates a small, fixed Iconify bundle from Phosphor, Tabler, and Bootstrap Icons.
 
@@ -15,11 +16,23 @@ Add `@inkfinite/ui` as a workspace dependency, then import the global theme once
 
 ```svelte
 <script lang="ts">
-  import "@inkfinite/ui/styles.css";
-  import { Button } from "@inkfinite/ui";
+	import '@inkfinite/ui/styles.css';
+	import { Button } from '@inkfinite/ui';
 </script>
 
 <Button icon="save" label="Save drawing" variant="primary" />
+```
+
+Application roots render the shared editor with their own adapter:
+
+```svelte
+<script lang="ts">
+	import { Editor } from '@inkfinite/ui/editor';
+
+	let { platform } = $props();
+</script>
+
+<Editor {platform} />
 ```
 
 Set `data-ink-theme="light"` or `data-ink-theme="dark"` on the document root or any themed subtree. Leave the attribute unset to follow `prefers-color-scheme`.

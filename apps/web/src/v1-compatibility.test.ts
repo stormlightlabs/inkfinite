@@ -1,24 +1,24 @@
 import "fake-indexeddb/auto";
+import { InkfiniteDB } from "$lib/persistence/database";
+import { createDexieDocRepo } from "$lib/persistence/repository";
+import {
+  type BoardExport,
+  DeleteShapesCommand,
+  type DesktopFileData,
+  type EditorState,
+  hitTestPoint,
+  parseDesktopFile,
+  type ShapeRecord as Shape,
+  stencils,
+  Store,
+  UpdateShapeCommand,
+  validateDoc,
+} from "@inkfinite/core";
+import Dexie from "dexie";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import Dexie from "dexie";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  createWebDocRepo,
-  DeleteShapesCommand,
-  hitTestPoint,
-  InkfiniteDB,
-  parseDesktopFile,
-  Store,
-  stencils,
-  UpdateShapeCommand,
-  validateDoc,
-  type BoardExport,
-  type DesktopFileData,
-  type EditorState,
-  type ShapeRecord as Shape,
-} from "../src";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const openDatabases: Dexie[] = [];
@@ -35,9 +35,9 @@ afterEach(async () => {
 describe("frozen v1 compatibility fixtures", () => {
   it("covers every shape kind, pages, bindings, groups, Markdown, stencils, and persisted order", () => {
     const fixture = readFixture<DesktopFileData>("desktop/all-features.inkfinite.json");
-    const manifest = readFixture<{
-      coverage: { shapeTypes: string[]; stencilIds: string[]; groupIds: string[]; bindingIds: string[] };
-    }>("manifest.json");
+    const manifest = readFixture<
+      { coverage: { shapeTypes: string[]; stencilIds: string[]; groupIds: string[]; bindingIds: string[] } }
+    >("manifest.json");
 
     expect(validateDoc(fixture.doc)).toEqual({ ok: true });
     expect([...new Set(Object.values(fixture.doc.shapes).map((shape) => shape.type))].sort()).toEqual(
@@ -71,7 +71,7 @@ describe("frozen v1 compatibility fixtures", () => {
     const fixture = readFixture<BoardExport>("web/all-features.web.json");
     const database = new InkfiniteDB(`v1-fixture-${crypto.randomUUID()}`);
     openDatabases.push(database);
-    const repo = createWebDocRepo(database);
+    const repo = createDexieDocRepo(database);
 
     const boardId = await repo.importBoard(fixture);
     await repo.openBoard(boardId);
@@ -94,10 +94,16 @@ describe("frozen v1 compatibility fixtures", () => {
   });
 
   it("keeps invalid fixtures invalid instead of repairing them into the baseline", () => {
-    const malformed = readFileSync(resolve(repositoryRoot, "fixtures/v1/invalid/malformed-json.inkfinite.json"), "utf8");
+    const malformed = readFileSync(
+      resolve(repositoryRoot, "fixtures/v1/invalid/malformed-json.inkfinite.json"),
+      "utf8",
+    );
     expect(() => parseDesktopFile(malformed)).toThrow(SyntaxError);
 
-    const missingFields = readFileSync(resolve(repositoryRoot, "fixtures/v1/invalid/missing-envelope-fields.json"), "utf8");
+    const missingFields = readFileSync(
+      resolve(repositoryRoot, "fixtures/v1/invalid/missing-envelope-fields.json"),
+      "utf8",
+    );
     expect(() => parseDesktopFile(missingFields)).toThrow("missing required fields");
 
     for (const fixtureName of ["dangling-references.inkfinite.json", "duplicate-order.inkfinite.json"]) {
@@ -123,11 +129,13 @@ describe("frozen v1 compatibility fixtures", () => {
   });
 
   it("replays and undoes the frozen history-relevant edits", () => {
-    const fixture = readFixture<{
-      initialState: EditorState;
-      edits: Array<{ kind: string; shapeId: string; patch?: Partial<Shape> & { props?: Record<string, unknown> } }>;
-      expectedAfterUndoAll: { shapeId: string; x: number; y: number; fill: string };
-    }>("history/history-edits.json");
+    const fixture = readFixture<
+      {
+        initialState: EditorState;
+        edits: Array<{ kind: string; shapeId: string; patch?: Partial<Shape> & { props?: Record<string, unknown> } }>;
+        expectedAfterUndoAll: { shapeId: string; x: number; y: number; fill: string };
+      }
+    >("history/history-edits.json");
     const store = new Store(fixture.initialState);
 
     for (const edit of fixture.edits) {
@@ -138,11 +146,7 @@ describe("frozen v1 compatibility fixtures", () => {
         continue;
       }
       const patch = edit.patch ?? {};
-      const next = {
-        ...current,
-        ...patch,
-        props: { ...current.props, ...(patch.props ?? {}) },
-      } as Shape;
+      const next = { ...current, ...patch, props: { ...current.props, ...(patch.props ?? {}) } } as Shape;
       store.executeCommand(new UpdateShapeCommand(current.id, current, next));
     }
 

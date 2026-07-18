@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { SnapSettings, SnapStore, StatusStore } from '$lib/status';
+	import type { SnapSettings, SnapStore, StatusStore } from '../status';
 	import {
 		type CursorState,
 		type CursorStore,
@@ -21,7 +21,11 @@
 		state: 'saved',
 		pendingWrites: 0
 	};
-	let snapSnapshot = $state<SnapSettings>({ snapEnabled: false, gridEnabled: true, gridSize: 25 });
+	let snapSnapshot = $state<SnapSettings>({
+		snapEnabled: false,
+		gridEnabled: true,
+		gridSize: 25
+	});
 	let statusVm = $state(buildStatusBarVM(editorSnapshot, cursorSnapshot, persistenceSnapshot));
 
 	function updateVm() {
@@ -132,7 +136,9 @@
 	<div class="status-bar__section">
 		<span class="status-bar__label">Cursor</span>
 		<span class="status-bar__value">
-			{formatCursorCoord(statusVm.cursorWorld.x)}, {formatCursorCoord(statusVm.cursorWorld.y)}
+			{formatCursorCoord(statusVm.cursorWorld.x)}, {formatCursorCoord(
+				statusVm.cursorWorld.y
+			)}
 		</span>
 	</div>
 

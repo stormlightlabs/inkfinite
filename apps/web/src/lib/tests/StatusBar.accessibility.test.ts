@@ -1,7 +1,7 @@
 import { CursorStore, Store } from "@inkfinite/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { cleanup, render } from "vitest-browser-svelte";
-import StatusBar from "../components/StatusBar.svelte";
+import StatusBar from "$editor/components/StatusBar.svelte";
 
 const createMockStatusStore = () => ({
   get: () => ({ backend: "indexeddb" as const, state: "saved" as const, pendingWrites: 0 }),

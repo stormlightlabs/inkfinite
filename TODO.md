@@ -51,9 +51,10 @@ files, export stable JSON snapshots, and recover from interrupted writes.
 ## Milestone 3: Desktop vertical slice
 
 Exit when a desktop gesture commits through Rust, redraws from a returned patch,
-survives reopen, and can be undone. The implementation must update `apps/web` to
-consume `@inkfinite/ui`, because `apps/desktop` packages that SvelteKit build. Do
-not create a separate desktop component tree or theme.
+survives reopen, and can be undone. The web and desktop composition roots must
+render the same `@inkfinite/ui/editor` module while keeping Dexie and Tauri in
+their respective application adapters. Do not create a second editor component
+tree or theme.
 
 ### V2-08: Make Tauri own document sessions
 
@@ -423,5 +424,5 @@ pnpm --filter @inkfinite/web lint
 
 ## Frontier
 
-V2-08 is the current frontier. Work it in a fresh implementation context before
-starting tickets that depend on Rust-owned document sessions.
+V2-10 is the current frontier. Fix cursor mapping across viewport changes before
+starting the 10,000-shape rendering work in V2-11.

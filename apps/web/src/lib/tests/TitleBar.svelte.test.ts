@@ -1,8 +1,8 @@
-import { createBrushStore } from "$lib/status";
+import { createBrushStore } from "$editor/status";
 import { type ComponentProps, tick } from "svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render } from "vitest-browser-svelte";
-import Toolbar from "../components/Toolbar.svelte";
+import Toolbar from "$editor/components/Toolbar.svelte";
 import { createStoreWithRect } from "./Toolbar.colors.test";
 
 const renderToolbar = (overrides: Partial<ComponentProps<typeof Toolbar>> = {}) => {

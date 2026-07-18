@@ -45,7 +45,7 @@ async function waitForDocumentReady() {
   });
 }
 
-vi.mock("$lib/input", () => {
+vi.mock("$editor/input", () => {
   return {
     createInputAdapter: vi.fn((config) => {
       actionHandlers.push(config.onAction);
@@ -55,18 +55,8 @@ vi.mock("$lib/input", () => {
 });
 
 vi.mock(
-  "$lib/status",
+  "$editor/status",
   () => ({
-    createPersistenceManager: () => ({
-      sink: { enqueueDocPatch: vi.fn(), flush: vi.fn() },
-      status: {
-        get: () => ({ backend: "indexeddb", state: "saved", pendingWrites: 0 }),
-        subscribe: () => () => {},
-        update: () => {},
-      },
-      setActiveBoard: vi.fn(),
-      dispose: vi.fn(),
-    }),
     createStatusStore: () => ({
       get: () => ({ backend: "indexeddb", state: "saved", pendingWrites: 0 }),
       subscribe: () => () => {},
@@ -98,6 +88,51 @@ vi.mock("@inkfinite/renderer", () => {
   return { createRenderer: vi.fn(() => ({ dispose: vi.fn(), markDirty: vi.fn() })) };
 });
 
+vi.mock("$lib/persistence/database", () => ({ InkfiniteDB: class {} }));
+
+vi.mock("$lib/persistence/repository", () => ({
+  createDexieDocRepo: vi.fn(() => ({
+    listBoards: async () => [{ id: "board-1", name: "Test Board", createdAt: 0, updatedAt: 0 }],
+    createBoard: async () => "board-1",
+    openBoard: async () => {},
+    renameBoard: async () => {},
+    deleteBoard: async () => {},
+    loadDoc: async () => ({
+      pages: { "page:1": { id: "page:1", name: "Page 1", shapeIds: ["shape:1", "shape:2"] } },
+      shapes: {
+        "shape:1": {
+          id: "shape:1",
+          type: "rect",
+          pageId: "page:1",
+          x: 100,
+          y: 100,
+          rot: 0,
+          props: { w: 50, h: 50, fill: "#ff0000", stroke: "#000000", radius: 0 },
+        },
+        "shape:2": {
+          id: "shape:2",
+          type: "ellipse",
+          pageId: "page:1",
+          x: 200,
+          y: 200,
+          rot: 0,
+          props: { w: 40, h: 40, fill: "#00ff00", stroke: "#000000" },
+        },
+      },
+      bindings: {},
+      order: { pageIds: ["page:1"] },
+    }),
+    applyDocPatch: async () => {},
+    exportBoard: async () => ({
+      board: { id: "board-1", name: "Test Board", createdAt: 0, updatedAt: 0 },
+      doc: { pages: {}, shapes: {}, bindings: {} },
+      order: { pageIds: [], shapeOrder: {} },
+    }),
+    importBoard: async () => "board-1",
+  })),
+  createPersistenceSink: vi.fn(() => ({ enqueueDocPatch: vi.fn(), flush: vi.fn() })),
+}));
+
 vi.mock("@inkfinite/core", async () => {
   const actual = await vi.importActual<typeof import("@inkfinite/core")>("@inkfinite/core");
   const { executeCommandSpy } = coreMocks;
@@ -114,58 +149,16 @@ vi.mock("@inkfinite/core", async () => {
     }
   }
 
-  class MockInkfiniteDB {
-    boards = { toArray: async () => [], add: async () => "board-1" };
-    boardDocuments = { get: async () => null, put: async () => {} };
-  }
-
   return {
     ...actual,
     Store: MockStore,
-    InkfiniteDB: MockInkfiniteDB,
-    createWebDocRepo: vi.fn(() => ({
-      listBoards: async () => [{ id: "board-1", name: "Test Board", createdAt: 0, updatedAt: 0 }],
-      createBoard: async () => "board-1",
-      openBoard: async () => {},
-      renameBoard: async () => {},
-      deleteBoard: async () => {},
-      loadDoc: async () => ({
-        pages: { "page:1": { id: "page:1", name: "Page 1", shapeIds: ["shape:1", "shape:2"] } },
-        shapes: {
-          "shape:1": {
-            id: "shape:1",
-            type: "rect",
-            pageId: "page:1",
-            x: 100,
-            y: 100,
-            rot: 0,
-            props: { w: 50, h: 50, fill: "#ff0000", stroke: "#000000", radius: 0 },
-          },
-          "shape:2": {
-            id: "shape:2",
-            type: "ellipse",
-            pageId: "page:1",
-            x: 200,
-            y: 200,
-            rot: 0,
-            props: { w: 40, h: 40, fill: "#00ff00", stroke: "#000000" },
-          },
-        },
-        bindings: {},
-        order: { pageIds: ["page:1"] },
-      }),
-      applyDocPatch: async () => {},
-      exportBoard: async () => ({
-        board: { id: "board-1", name: "Test Board", createdAt: 0, updatedAt: 0 },
-        doc: { pages: {}, shapes: {}, bindings: {} },
-        order: { pageIds: [], shapeOrder: {} },
-      }),
-      importBoard: async () => "board-1",
-    })),
   };
 });
 
-import Canvas from "../canvas/Canvas.svelte";
+import Canvas from "$editor/canvas/Canvas.svelte";
+import { createTestPlatformAdapter } from "./test-platform";
+
+const renderCanvas = () => render(Canvas, { platform: createTestPlatformAdapter() });
 
 describe("Canvas keyboard shortcuts", () => {
   beforeEach(() => {
@@ -175,7 +168,7 @@ describe("Canvas keyboard shortcuts", () => {
   });
 
   it("should handle space key for panning mode", async () => {
-    render(Canvas);
+    renderCanvas();
     await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
     coreMocks.executeCommandSpy.mockClear();
 
@@ -204,7 +197,7 @@ describe("Canvas keyboard shortcuts", () => {
   });
 
   it("should nudge selected shapes with arrow keys", async () => {
-    render(Canvas);
+    renderCanvas();
     await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
     await waitForDocumentReady();
 
@@ -230,7 +223,7 @@ describe("Canvas keyboard shortcuts", () => {
   });
 
   it("should nudge by 10px with shift modifier", async () => {
-    render(Canvas);
+    renderCanvas();
     await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
     await waitForDocumentReady();
 
@@ -255,7 +248,7 @@ describe("Canvas keyboard shortcuts", () => {
   });
 
   it("should duplicate selected shapes with Cmd/Ctrl+D", async () => {
-    render(Canvas);
+    renderCanvas();
     await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
     await waitForDocumentReady();
 
@@ -281,7 +274,7 @@ describe("Canvas keyboard shortcuts", () => {
   });
 
   it("should bring shapes forward with Cmd/Ctrl+]", async () => {
-    render(Canvas);
+    renderCanvas();
     await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
     await waitForDocumentReady();
 
@@ -307,7 +300,7 @@ describe("Canvas keyboard shortcuts", () => {
   });
 
   it("should send shapes backward with Cmd/Ctrl+[", async () => {
-    render(Canvas);
+    renderCanvas();
     await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
     await waitForDocumentReady();
 
@@ -333,7 +326,7 @@ describe("Canvas keyboard shortcuts", () => {
   });
 
   it("should not process tool actions while space is held", async () => {
-    render(Canvas);
+    renderCanvas();
     await vi.waitFor(() => expect(actionHandlers.length).toBeGreaterThan(0));
     await waitForDocumentReady();
 

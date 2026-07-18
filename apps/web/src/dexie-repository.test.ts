@@ -1,16 +1,17 @@
 import "fake-indexeddb/auto";
+import { InkfiniteDB, runMigrations } from "$lib/persistence/database";
+import { createDexieDocRepo, createPersistenceSink } from "$lib/persistence/repository";
+import {
+  CreateShapeCommand,
+  diffDoc,
+  Document as DocumentOps,
+  PageRecord,
+  SetSelectionCommand,
+  ShapeRecord,
+  Store,
+} from "@inkfinite/core";
 import Dexie from "dexie";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { InkfiniteDB, runMigrations } from "../../src";
-import {
-  createPersistenceSink,
-  CreateShapeCommand,
-  createWebDocRepo,
-  diffDoc,
-  SetSelectionCommand,
-  Store,
-} from "../../src";
-import { Document as DocumentOps, PageRecord, ShapeRecord } from "../../src/model";
 
 const openDbs: Dexie[] = [];
 
@@ -35,7 +36,7 @@ afterEach(async () => {
 describe("DocRepo (Dexie)", () => {
   it("createBoard seeds default page + order and rename persists", async () => {
     const db = createTestDb();
-    const repo = createWebDocRepo(db);
+    const repo = createDexieDocRepo(db);
     const boardId = await repo.createBoard("Seeded");
     const loaded = await repo.loadDoc(boardId);
 
@@ -50,7 +51,7 @@ describe("DocRepo (Dexie)", () => {
 
   it("round-trips docs via applyDocPatch + loadDoc", async () => {
     const database = createTestDb();
-    const repo = createWebDocRepo(database);
+    const repo = createDexieDocRepo(database);
     const boardId = await repo.createBoard("Round trip");
 
     const page = PageRecord.create("Canvas");
@@ -71,7 +72,7 @@ describe("DocRepo (Dexie)", () => {
 
   it("applyDocPatch performs a single Dexie transaction", async () => {
     const database = createTestDb();
-    const repo = createWebDocRepo(database);
+    const repo = createDexieDocRepo(database);
     const boardId = await repo.createBoard("Tx board");
 
     const page = PageRecord.create("Tx Page");
@@ -89,7 +90,7 @@ describe("DocRepo (Dexie)", () => {
 
   it("deleteBoard removes rows across all tables", async () => {
     const database = createTestDb();
-    const repo = createWebDocRepo(database);
+    const repo = createDexieDocRepo(database);
     const boardId = await repo.createBoard("Delete board");
 
     const page = PageRecord.create("Delete Page");
@@ -111,7 +112,7 @@ describe("DocRepo (Dexie)", () => {
 
   it("exportBoard + importBoard round-trip doc + metadata", async () => {
     const db = createTestDb();
-    const repo = createWebDocRepo(db);
+    const repo = createDexieDocRepo(db);
     const boardId = await repo.createBoard("Source");
 
     const page = PageRecord.create("Canvas");
@@ -137,12 +138,12 @@ describe("DocRepo (Dexie)", () => {
 });
 
 describe("History persistence sink", () => {
-  let repo: ReturnType<typeof createWebDocRepo>;
+  let repo: ReturnType<typeof createDexieDocRepo>;
   let boardId: string;
 
   beforeEach(async () => {
     const database = createTestDb();
-    repo = createWebDocRepo(database);
+    repo = createDexieDocRepo(database);
     boardId = await repo.createBoard("Persisted");
   });
 
@@ -284,7 +285,7 @@ describe("runMigrations", () => {
   });
 });
 
-async function createStoreWithSink(repo: ReturnType<typeof createWebDocRepo>, boardId: string) {
+async function createStoreWithSink(repo: ReturnType<typeof createDexieDocRepo>, boardId: string) {
   const sink = createPersistenceSink(repo, { debounceMs: 10 });
   const applySpy = vi.spyOn(repo, "applyDocPatch");
   const store = new Store(undefined, {
@@ -301,7 +302,7 @@ async function createStoreWithSink(repo: ReturnType<typeof createWebDocRepo>, bo
   return { store, sink, applySpy, pageId };
 }
 
-async function hydrateStoreFromRepo(store: Store, repo: ReturnType<typeof createWebDocRepo>, boardId: string) {
+async function hydrateStoreFromRepo(store: Store, repo: ReturnType<typeof createDexieDocRepo>, boardId: string) {
   const loaded = await repo.loadDoc(boardId);
   const firstPageId = loaded.order.pageIds[0] ?? Object.keys(loaded.pages)[0];
 

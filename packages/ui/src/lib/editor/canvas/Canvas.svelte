@@ -1,12 +1,15 @@
 <script lang="ts">
-	import HistoryViewer from '$lib/components/HistoryViewer.svelte';
-	import StatusBar from '$lib/components/StatusBar.svelte';
-	import Toolbar from '$lib/components/Toolbar.svelte';
-	import FileBrowser from '$lib/filebrowser/FileBrowser.svelte';
-	import StencilPalette from '$lib/components/StencilPalette.svelte';
-	import { createCanvasController } from './canvas-store.svelte.ts';
-	import { draggingStencil, endDrag } from '$lib/dnd.svelte';
+	import HistoryViewer from '../components/HistoryViewer.svelte';
+	import StatusBar from '../components/StatusBar.svelte';
+	import Toolbar from '../components/Toolbar.svelte';
+	import FileBrowser from '../filebrowser/FileBrowser.svelte';
+	import StencilPalette from '../components/StencilPalette.svelte';
+	import { createCanvasController } from './canvas-store.svelte';
+	import { draggingStencil, endDrag } from '../dnd.svelte';
+	import type { EditorPlatformAdapter } from '../platform';
 	import { Camera, stencils } from '@inkfinite/core';
+
+	let { platform: platformAdapter }: { platform: EditorPlatformAdapter } = $props();
 
 	let canvasEl = $state<HTMLCanvasElement | null>(null);
 	let textEditorEl = $state<HTMLTextAreaElement | null>(null);
@@ -14,13 +17,15 @@
 	let markdownEditorEl = $state<HTMLTextAreaElement | null>(null);
 	let historyViewerOpen = $state(false);
 
-	const c = createCanvasController({
+	// The composition root fixes the platform adapter for this component's lifetime.
+	// svelte-ignore state_referenced_locally
+	const c = createCanvasController(platformAdapter, {
 		setHistoryViewerOpen(value: boolean) {
 			historyViewerOpen = value;
 		}
 	});
 
-	let platform = $derived(c.platform());
+	let platformKind = $derived(c.platform());
 	let textEditorCurrent = $derived(c.textEditor.current);
 	let arrowLabelEditorCurrent = $derived(c.arrowLabelEditor.current);
 	let markdownEditorCurrent = $derived(c.markdownEditor.current);
@@ -98,7 +103,7 @@
 
 <div class="editor">
 	<Toolbar
-		{platform}
+		platform={platformKind}
 		desktop={{
 			fileName: c.desktop.fileName,
 			recentBoards: c.desktop.boards,
@@ -217,6 +222,9 @@
 			bind:open={c.fileBrowser.open}
 			onUpdate={c.fileBrowser.handleUpdate}
 			onClose={c.fileBrowser.handleClose}
+			fetchInspectorData={platformKind === 'web'
+				? c.fileBrowser.fetchInspectorData
+				: undefined}
 			desktopRepo={c.desktop.repo} />
 	{/if}
 	<StencilPalette

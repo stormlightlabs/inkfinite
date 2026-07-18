@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { BrushPopover, Dialog, Icon } from '@inkfinite/ui';
+	import { BrushPopover, Dialog, Icon } from '../../index';
 	import {
 		DEFAULT_FILL_COLOR,
 		DEFAULT_STROKE_COLOR,
@@ -7,10 +7,10 @@
 		KEYBOARD_TIPS,
 		TOOLS,
 		ZOOM_PRESETS
-	} from '$lib/constants';
-	import type { Platform } from '$lib/platform';
-	import type { BrushSettings, BrushStore } from '$lib/status';
-	import { themeStore } from '$lib/theme.svelte';
+	} from '../constants';
+	import type { EditorPlatform } from '../platform';
+	import type { BrushSettings, BrushStore } from '../status';
+	import { themeStore } from '../theme.svelte';
 	import type {
 		ArrowShape,
 		BoardMeta,
@@ -56,7 +56,7 @@
 		getViewport: () => Viewport;
 		canvas?: HTMLCanvasElement;
 		brushStore: BrushStore;
-		platform?: Platform;
+		platform?: EditorPlatform;
 		desktop?: DesktopControls;
 		onOpenBrowser?: () => void;
 		onStencilsClick?: () => void;

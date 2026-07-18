@@ -1,8 +1,8 @@
 import { Store } from "@inkfinite/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { cleanup, render } from "vitest-browser-svelte";
-import Toolbar from "../components/Toolbar.svelte";
-import { createBrushStore } from "../status";
+import Toolbar from "$editor/components/Toolbar.svelte";
+import { createBrushStore } from "$editor/status";
 
 // TODO: reuse this pattern
 function renderToolbar(store: Store) {

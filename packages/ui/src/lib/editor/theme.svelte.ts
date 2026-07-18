@@ -1,5 +1,3 @@
-import { browser } from '$app/environment';
-
 /** Explicit color themes supported by the web editor. */
 export type Theme = 'light' | 'dark';
 
@@ -10,7 +8,7 @@ export class ThemeStore {
 	readonly current = $derived(this.#theme);
 
 	constructor() {
-		const stored = browser ? localStorage.getItem('theme') : null;
+		const stored = typeof window !== 'undefined' ? localStorage.getItem('theme') : null;
 		this.#theme = stored === 'light' || stored === 'dark' ? stored : 'dark';
 		this.#syncTheme();
 	}
@@ -27,7 +25,7 @@ export class ThemeStore {
 	}
 
 	#syncTheme() {
-		if (!browser) return;
+		if (typeof window === 'undefined') return;
 
 		localStorage.setItem('theme', this.#theme);
 		document.documentElement.setAttribute('data-theme', this.#theme);

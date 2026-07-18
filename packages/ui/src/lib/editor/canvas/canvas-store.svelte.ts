@@ -1,10 +1,8 @@
-import { createInputAdapter } from "$lib/input";
-import type { InputAdapter } from "$lib/input";
-import { createDesktopPersistenceSink, type DesktopSessionRepo } from "$lib/persistence/desktop-session";
-import { createPlatformRepo, detectPlatform } from "$lib/platform";
-import { createBrushStore, createPersistenceManager, createSnapStore, createStatusStore } from "$lib/status";
-import type { BrushStore, SnapStore, StatusStore } from "$lib/status";
-import { themeStore } from "$lib/theme.svelte";
+import { createInputAdapter, type InputAdapter } from "../input";
+import { initialPersistenceStatus, type DesktopDocumentRepo, type EditorPlatformAdapter, type EditorPlatformSession } from "../platform";
+import { createBrushStore, createSnapStore, createStatusStore } from "../status";
+import type { BrushStore, SnapStore, StatusStore } from "../status";
+import { themeStore } from "../theme.svelte";
 import {
   ArrowTool,
   Camera,
@@ -14,7 +12,6 @@ import {
   diffDoc,
   EllipseTool,
   getShapesOnCurrentPage,
-  InkfiniteDB,
   LineTool,
   MarkdownTool,
   PenTool,
@@ -47,19 +44,15 @@ export type CanvasControllerBindings = { setHistoryViewerOpen(value: boolean): v
 
 export type CanvasController = ReturnType<typeof createCanvasController>;
 
-export function createCanvasController(bindings: CanvasControllerBindings) {
+export function createCanvasController(platformAdapter: EditorPlatformAdapter, bindings: CanvasControllerBindings) {
   let repo: PersistentDocRepo | null = null;
   let sink: PersistenceSink | null = null;
-  let persistenceManager: ReturnType<typeof createPersistenceManager> | null = null;
-  const platform = detectPlatform();
-  const fallbackStatusStore = createStatusStore({
-    backend: platform === "desktop" ? "filesystem" : "indexeddb",
-    state: "saved",
-    pendingWrites: 0,
-  });
+  let platformSession: EditorPlatformSession | null = null;
+  const platform = platformAdapter.kind;
+  const fallbackStatusStore = createStatusStore(initialPersistenceStatus(platform));
   let persistenceStatusStore = $state<StatusStore>(fallbackStatusStore);
   let activeBoardId: string | null = null;
-  let desktopRepo: DesktopSessionRepo | null = null;
+  let desktopRepo: DesktopDocumentRepo | null = null;
   let removeBeforeUnload: (() => void) | null = null;
   let stencilPaletteOpen = $state(false);
   const handleResize = () => {
@@ -70,7 +63,6 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
   if (typeof window !== "undefined") {
     window.addEventListener("resize", handleResize);
   }
-  let webDb: InkfiniteDB | null = null;
   let canvas = $state<HTMLCanvasElement | null>(null);
 
   const pointerState = new PointerState();
@@ -139,7 +131,7 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
 
   function setActiveBoardId(boardId: string) {
     activeBoardId = boardId;
-    persistenceManager?.setActiveBoard(boardId);
+    platformSession?.setActiveBoard?.(boardId);
   }
 
   function applyLoadedDoc(doc: LoadedDoc) {
@@ -195,10 +187,14 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     setActiveBoardId(boardId);
     applyLoadedDoc(doc);
   });
-  const fileBrowser = new FileBrowserController(() => repo, (boardId, doc) => {
-    setActiveBoardId(boardId);
-    applyLoadedDoc(doc);
-  });
+  const fileBrowser = new FileBrowserController(
+    () => repo,
+    (boardId, doc) => {
+      setActiveBoardId(boardId);
+      applyLoadedDoc(doc);
+    },
+    () => platformSession?.inspectBoard,
+  );
   const runtime = new EditorRuntime({
     store,
     tools,
@@ -339,14 +335,14 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
   });
 
   onMount(async () => {
-    if (platform === "desktop") {
-      const desktopPlatformRepo = await createPlatformRepo();
-      if (desktopPlatformRepo.desktop) {
-        desktopRepo = desktopPlatformRepo.desktop;
-        repo = desktopRepo;
-        sink = createDesktopPersistenceSink(desktopRepo);
-        persistenceStatusStore = fallbackStatusStore;
+    platformSession = await platformAdapter.connect();
+    repo = platformSession.repo;
+    sink = platformSession.sink;
+    persistenceStatusStore = platformSession.status;
+    desktopRepo = platformSession.desktop ?? null;
 
+    if (platform === "desktop") {
+      if (desktopRepo) {
         const boards = await desktop.refreshBoards();
         if (boards.length > 0) {
           const boardId = boards[0].id;
@@ -356,14 +352,6 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
         }
       }
     } else {
-      webDb = new InkfiniteDB();
-      const { createWebDocRepo, createPersistenceSink } = await import("@inkfinite/core");
-      const { liveQuery } = await import("dexie");
-      repo = createWebDocRepo(webDb);
-      sink = createPersistenceSink(repo);
-      persistenceManager = createPersistenceManager(webDb, repo, { liveQueryFn: liveQuery });
-      persistenceStatusStore = persistenceManager.status;
-
       const boards = await repo.listBoards();
       let boardId: string;
 
@@ -391,7 +379,7 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
   onDestroy(() => {
     renderer?.dispose();
     inputAdapter?.dispose();
-    persistenceManager?.dispose();
+    platformSession?.dispose?.();
     if (platform === "desktop") {
       void sink?.flush()
         .then(() => desktopRepo?.closeSession())
@@ -402,11 +390,7 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     if (typeof window !== "undefined") {
       window.removeEventListener("resize", handleResize);
     }
-    fallbackStatusStore.update(() => ({
-      backend: platform === "desktop" ? "filesystem" : "indexeddb",
-      state: "saved",
-      pendingWrites: 0,
-    }));
+    fallbackStatusStore.update(() => initialPersistenceStatus(platform));
     persistenceStatusStore = fallbackStatusStore;
   });
 

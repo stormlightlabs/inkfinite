@@ -1,6 +1,6 @@
 import { EditorState, PageRecord, ShapeRecord, Store } from "@inkfinite/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MarkdownEditorController } from "../canvas/controllers/markdown-controller.svelte";
+import { MarkdownEditorController } from "$editor/canvas/controllers/markdown-controller.svelte";
 
 describe("MarkdownEditorController", () => {
   let store: Store;

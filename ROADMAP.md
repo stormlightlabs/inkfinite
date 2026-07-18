@@ -37,9 +37,10 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
 - The pnpm monorepo contains a TypeScript core, Canvas 2D renderer, SvelteKit web
   UI, and Tauri 2 wrapper.
 - `@inkfinite/ui` provides shared Svelte components, theme tokens, fonts, and
-  icons for the browser and the Tauri-hosted frontend. Shared buttons, icons,
-  panels, toolbars, dialogs, sheets, and brush controls have package-owned tests
-  and Storybook stories. `apps/web` keeps document-aware panels and adapters.
+  icons. Its `@inkfinite/ui/editor` subpath composes the Canvas, document-aware
+  panels, controllers, and platform contract used by both application roots.
+  `apps/web` owns the Dexie adapter. `apps/desktop` owns the Tauri adapter and
+  builds its own copy of the shared editor.
 - TypeScript currently owns a flat page/shape model, snapshot undo/redo, tools,
   and browser persistence. Web documents use Dexie; desktop documents use a
   thin adapter over Rust-owned sessions and typed Tauri commands.
@@ -56,7 +57,9 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
 ## Architecture
 
 ```text
-Svelte UI + DOM editors
+Static web root ── Dexie adapter ──┐
+                                   ├── @inkfinite/ui/editor
+Desktop root ── Tauri adapter ─────┘            │
         │ Tauri commands, patches, notifications
         ▼
 Tauri document service ───── local socket ───── Rust CLI
@@ -99,15 +102,16 @@ patch for the frontend's read-only document mirror.
 
 ### Crate and package boundaries
 
-| Unit                    | Responsibility                                                          |
-| ----------------------- | ----------------------------------------------------------------------- |
-| `inkfinite-core`        | Document model and engine plus CRDT, file, protocol, rendering, and IPC |
-| `inkfinite-cli`         | `clap`, formatting, exit codes, and calls into shared Rust code         |
-| `@inkfinite/runtime`    | Framework-neutral tools, camera, selection, and previews                |
-| `@inkfinite/renderer`   | Svelte-independent Canvas 2D renderer                                   |
-| `@inkfinite/input-dom`  | Browser input normalization                                             |
-| `@inkfinite/bindings`   | Generated TypeScript records; never hand-edited                         |
-| `@inkfinite/ui`         | Shared Svelte components, themes, fonts, icons, stories, and UI tests   |
+| Unit                   | Responsibility                                                          |
+| ---------------------- | ----------------------------------------------------------------------- |
+| `inkfinite-core`       | Document model and engine plus CRDT, file, protocol, rendering, and IPC |
+| `inkfinite-cli`        | `clap`, formatting, exit codes, and calls into shared Rust code         |
+| `@inkfinite/runtime`   | Framework-neutral tools, camera, selection, and previews                |
+| `@inkfinite/renderer`  | Svelte-independent Canvas 2D renderer                                   |
+| `@inkfinite/input-dom` | Browser input normalization                                             |
+| `@inkfinite/bindings`  | Generated TypeScript records; never hand-edited                         |
+| `@inkfinite/ui`        | Shared Svelte components, themes, fonts, icons, stories, and UI tests   |
+| `@inkfinite/ui/editor` | Shared product editor, document-aware panels, and platform contract     |
 
 Business logic must not depend on Tauri, Svelte, CLI parsing, or a transport.
 
@@ -192,10 +196,12 @@ that boundary into one history command, and the desktop session adapter builds
 one Rust transaction before replacing its mirror from the returned snapshot.
 `@inkfinite/input-dom` owns browser listener and coordinate normalization. A
 browser integration test covers drag, simulated Rust commit, patch-driven
-redraw, and undo back to the original document. The final UI boundary moved the
-dependency-free dialog, sheet, brush popover, and remaining semantic icons into
-`@inkfinite/ui`, along with their tests and Storybook stories. Document-aware
-panels remain in `apps/web` and compose those shared controls.
+redraw, and undo back to the original document. The final UI boundary first
+moved the dependency-free dialog, sheet, brush popover, and remaining semantic
+icons into `@inkfinite/ui`, along with their tests and Storybook stories. The
+product editor and its document-aware panels now live in the
+`@inkfinite/ui/editor` module. The application roots supply its web or desktop
+platform adapter.
 
 One Inkfinite transaction maps to one Automerge change. Causal heads, rather
 than a scalar revision, are the concurrency token. A local sequence number may
@@ -308,10 +314,11 @@ Keep Canvas 2D. The renderer receives a snapshot, camera, session state, and an
 optional transaction preview. DOM overlays remain limited to active text and
 Markdown editing, menus, tooltips, accessibility controls, and proposal review.
 
-`apps/desktop` packages the `apps/web` SvelteKit build. Milestone 3 must update
-that shared frontend to consume `@inkfinite/ui`; it must not introduce a second
-desktop component tree or duplicate theme. Desktop-only behavior belongs in
-Tauri commands and thin frontend adapters around shared components.
+`apps/web` and `apps/desktop` are separate SvelteKit composition roots. Each
+builds and deploys independently, while both render `@inkfinite/ui/editor`.
+The web root supplies the Dexie adapter; the desktop root supplies typed Tauri
+commands and desktop-only file capabilities. Neither root owns a second editor
+component tree or theme.
 
 Performance work is evidence-driven:
 
@@ -408,15 +415,18 @@ undo, precondition conflicts, locked/hidden layers, active-layer insertion,
 atomic-write failures, IPC framing/authentication, CLI JSON, tool state machines,
 pointer normalization, patch reconciliation, Canvas hit testing, and SVG output.
 
-Current commands, before the Cargo workspace exists:
+Current verification commands:
 
 ```sh
 pnpm --filter @inkfinite/core test --run
 pnpm --filter @inkfinite/renderer test --run
 pnpm --filter @inkfinite/web test
+pnpm --filter @inkfinite/desktop test
 pnpm --filter @inkfinite/core typecheck
 pnpm --filter @inkfinite/renderer typecheck
+pnpm --filter @inkfinite/ui check
 pnpm --filter @inkfinite/web check
+pnpm --filter @inkfinite/desktop check
 pnpm --filter @inkfinite/web lint
 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 ```
@@ -435,9 +445,9 @@ recovery prompts, and release migrations.
    transactions, validation, migrations, schemas, and generated bindings. Exit
    with convergent Rust tests and lossless v1 imports.
 3. **Desktop vertical slice:** make Rust own open, edit, undo, save, recovery, and
-   the frontend mirror. Update `apps/web` to use `@inkfinite/ui`, and package that
-   same frontend through `apps/desktop`. Exit with an end-to-end drag, reopen,
-   and undo test against the shared UI.
+   the frontend mirror. Keep independent web and desktop composition roots over
+   the same `@inkfinite/ui/editor` module. Exit with an end-to-end drag, reopen,
+   and undo test against the shared editor.
 4. **Editor structure and scale:** extract the editor runtime, fix resize cursor
    mapping, add culling/caches/benchmarks, and add a spatial index only if needed.
    Exit with the recorded 10,000-shape budget passing.
@@ -456,10 +466,10 @@ recovery prompts, and release migrations.
 
 ## Deferred milestones
 
-- Adapt the standalone browser runtime and Dexie persistence to the v2 Rust/CRDT
-  authority after the desktop contracts and file format stabilize. Its migration
-  must backfill every existing board with a default layer and preserve shape
-  order. Keep the shared browser build green while desktop behavior changes.
+- Adapt the standalone browser's Dexie adapter to the v2 Rust/CRDT authority
+  after the desktop contracts and file format stabilize. Its migration must
+  backfill every existing board with a default layer and preserve shape order.
+  Keep the static web build green while desktop behavior changes.
 - Add hosted sync relay, identity, invitations, permissions, and ephemeral
   presence after local peer sync is correct and threat-modeled.
 - Consider WebGL, OffscreenCanvas, third-party shape plugins, Figma import,

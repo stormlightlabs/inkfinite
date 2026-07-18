@@ -7,7 +7,7 @@
 	 */
 
 	import type { Store } from '@inkfinite/core';
-	import { Sheet } from '@inkfinite/ui';
+	import { Sheet } from '../../index';
 
 	type Props = { store: Store; open: boolean; onClose: () => void };
 

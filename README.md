@@ -6,19 +6,27 @@ A web-based infinite canvas application for creative visual thinking.
 
 Inkfinite is built with reactivity, vector math, and optimized canvas rendering.
 
-The project is organized as a pnpm monorepo with the following structure:
+The project is organized as a pnpm and Cargo monorepo:
 
 ```sh
 .
 ├── packages/
 │   ├── core/          # Core logic and state management
-│   └── renderer/      # Canvas rendering engine
+│   ├── renderer/      # Canvas rendering engine
+│   ├── runtime/       # Framework-neutral editor interaction
+│   └── ui/            # UI primitives and shared editor module
+├── crates/
+│   ├── inkfinite-core/ # Rust document engine and file format
+│   └── inkfinite-cli/  # File-mode and live desktop CLI
 └── apps/
-    ├── web/           # SvelteKit web application
-    └── desktop/       # Tauri desktop wrapper
+    ├── web/           # Static SvelteKit app with a Dexie adapter
+    └── desktop/       # Tauri app with its own SvelteKit root
 ```
 
-**Desktop App:** The desktop app shares the same codebase as the web app. The web app detects if it's running inside Tauri and uses file-based persistence instead of IndexedDB.
+The web and desktop apps build independently. Both render the editor exported by
+`@inkfinite/ui/editor`. The web composition root supplies Dexie persistence; the
+desktop composition root supplies typed Tauri commands backed by Rust-owned
+document sessions.
 
 ## Packages
 
@@ -77,12 +85,13 @@ High-performance canvas renderer with:
 <details>
 <summary><code>apps/web</code></summary>
 
-SvelteKit-based web application providing the user interface.
+Static SvelteKit application for browser use. It stores local boards in
+IndexedDB through its Dexie adapter and contains no Tauri dependencies.
 
 ### Tech Stack
 
 - **Testing:** Vitest with Playwright (browser tests) and Node (unit tests)
-- **Persistence:** IndexedDB (Dexie) for web, filesystem for desktop
+- **Persistence:** IndexedDB through the app-owned Dexie adapter
 
 ### Development
 
@@ -97,19 +106,20 @@ pnpm test     # Run tests
 <details>
 <summary><code>apps/desktop</code></summary>
 
-Tauri desktop wrapper that loads the web app with native file system access.
+Tauri desktop application with its own thin SvelteKit composition root. It uses
+the same editor module as the web app while keeping native persistence in Rust.
 
 ### Features
 
 - Native file dialogs (Open/Save)
-- File-based document persistence (`.inkfinite.json`)
+- Rust-owned `.inkfinite` document sessions
 - Recent files tracking
-- Same UI as web app with platform-specific persistence
+- Shared editor UI with a desktop-owned adapter
 
 ### Tech Stack
 
 - **Framework:** Tauri v2
-- **Frontend:** Shared with web app (SvelteKit)
+- **Frontend:** SvelteKit composition root using `@inkfinite/ui/editor`
 - **Backend:** Rust with Tauri plugins (dialog, fs, store)
 
 ### Development
@@ -136,6 +146,7 @@ pnpm tauri dev
 pnpm tauri build
 ```
 
-**Note:** The web app automatically detects when running in Tauri and switches from IndexedDB to file-based persistence.
+The Rust CLI will use `inkfinite-core` directly for closed files and connect to
+the running desktop app through authenticated local IPC for live control.
 
 </details>

@@ -1,10 +1,8 @@
 import { sveltekit } from "@sveltejs/kit/vite";
-import { playwright } from "@vitest/browser-playwright";
-import devtoolsJson from "vite-plugin-devtools-json";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  plugins: [sveltekit(), devtoolsJson()],
+  plugins: [sveltekit()],
   resolve: {
     alias: {
       "@inkfinite/bindings": new URL("../../packages/bindings/src/index.ts", import.meta.url).pathname,
@@ -18,31 +16,5 @@ export default defineConfig({
       "$editor": new URL("../../packages/ui/src/lib/editor", import.meta.url).pathname,
     },
   },
-  test: {
-    ui: false,
-    watch: false,
-    expect: { requireAssertions: true },
-    projects: [{
-      extends: "./vite.config.ts",
-      test: {
-        name: "client",
-        browser: {
-          headless: true,
-          enabled: true,
-          provider: playwright({ launchOptions: { channel: "chrome" } }),
-          instances: [{ browser: "chromium", headless: true }],
-        },
-        include: ["src/**/*.svelte.{test,spec}.{js,ts}", "src/lib/tests/**/*.{test,spec}.{js,ts}"],
-        exclude: ["src/lib/server/**"],
-      },
-    }, {
-      extends: "./vite.config.ts",
-      test: {
-        name: "server",
-        environment: "node",
-        include: ["src/**/*.{test,spec}.{js,ts}"],
-        exclude: ["src/**/*.svelte.{test,spec}.{js,ts}", "src/lib/tests/**/*.{test,spec}.{js,ts}"],
-      },
-    }],
-  },
+  test: { environment: "node", include: ["src/**/*.test.ts"] },
 });

@@ -32,7 +32,9 @@
 			if (selectedArrows.length === 0) return '';
 			if (selectedArrows.length === 1) return selectedArrows[0].props.label?.text ?? '';
 			const first = selectedArrows[0].props.label?.text ?? '';
-			const allSame = selectedArrows.every((arrow) => (arrow.props.label?.text ?? '') === first);
+			const allSame = selectedArrows.every(
+				(arrow) => (arrow.props.label?.text ?? '') === first
+			);
 			return allSame ? first : '';
 		})()
 	);

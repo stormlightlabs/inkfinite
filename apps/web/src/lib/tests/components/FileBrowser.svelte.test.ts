@@ -1,4 +1,4 @@
-import FileBrowser from "$lib/filebrowser/FileBrowser.svelte";
+import FileBrowser from "$editor/filebrowser/FileBrowser.svelte";
 import type { BoardMeta, FileBrowserViewModel } from "@inkfinite/core";
 import { FileBrowserVM } from "@inkfinite/core";
 import { describe, expect, it, vi } from "vitest";
@@ -147,6 +147,7 @@ describe("FileBrowser", () => {
       const boards = createMockBoards();
       const vm = createMockVM(boards);
       const fetchInspectorData = vi.fn().mockResolvedValue({
+        storageType: "IndexedDB (Dexie)",
         stats: { pageCount: 2, shapeCount: 10, bindingCount: 3, docSizeBytes: 2048, lastUpdated: 3000 },
         schema: { declaredVersion: 1, installedVersion: 1 },
         migrations: [{ id: "MIG-0001", appliedAt: 1000 }, { id: "MIG-0002", appliedAt: 2000 }],
@@ -167,6 +168,7 @@ describe("FileBrowser", () => {
       const boards = createMockBoards();
       const vm = createMockVM(boards);
       const fetchInspectorData = vi.fn().mockResolvedValue({
+        storageType: "IndexedDB (Dexie)",
         stats: { pageCount: 2, shapeCount: 10, bindingCount: 3, docSizeBytes: 2048, lastUpdated: 3000 },
         schema: { declaredVersion: 1, installedVersion: 1 },
         migrations: [],
@@ -191,6 +193,7 @@ describe("FileBrowser", () => {
       const boards = createMockBoards();
       const vm = createMockVM(boards);
       const fetchInspectorData = vi.fn().mockResolvedValue({
+        storageType: "IndexedDB (Dexie)",
         stats: { pageCount: 2, shapeCount: 10, bindingCount: 3, docSizeBytes: 2048, lastUpdated: 3000 },
         schema: { declaredVersion: 1, installedVersion: 1 },
         migrations: [],
@@ -213,6 +216,7 @@ describe("FileBrowser", () => {
       const boards = createMockBoards();
       const vm = createMockVM(boards);
       const fetchInspectorData = vi.fn().mockResolvedValue({
+        storageType: "IndexedDB (Dexie)",
         stats: { pageCount: 2, shapeCount: 10, bindingCount: 3, docSizeBytes: 2048, lastUpdated: 3000 },
         schema: { declaredVersion: 1, installedVersion: 1 },
         migrations: [{ id: "MIG-0001", appliedAt: 1000 }, { id: "MIG-0002", appliedAt: 2000 }],
@@ -235,6 +239,7 @@ describe("FileBrowser", () => {
       const boards = createMockBoards();
       const vm = createMockVM(boards);
       const fetchInspectorData = vi.fn().mockResolvedValue({
+        storageType: "IndexedDB (Dexie)",
         stats: { pageCount: 2, shapeCount: 10, bindingCount: 3, docSizeBytes: 2048, lastUpdated: 3000 },
         schema: { declaredVersion: 1, installedVersion: 1 },
         migrations: [{ id: "MIG-0001", appliedAt: 1000 }],

@@ -13,6 +13,8 @@ export type SchemaInfo = { declaredVersion: number; installedVersion: number };
 export type MigrationInfo = { id: string; appliedAt: Timestamp };
 
 export type BoardInspectorData = {
+  /** Human-readable storage backend supplied by the application adapter. */
+  storageType: string;
   stats: BoardStats;
   schema: SchemaInfo;
   migrations: MigrationInfo[];

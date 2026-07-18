@@ -1,18 +1,29 @@
 {
   "name": "@inkfinite/core",
   "type": "module",
+  "sideEffects": false,
   "version": "0.0.0",
   "description": "A starter for creating a TypeScript package.",
   "author": "Owais J. <desertthunder.dev@gmail.com>",
   "license": "AGPL-3.0-only",
   "homepage": "https://github.com/stormlightlabs/inkfinite#readme",
-  "repository": { "type": "git", "url": "git+https://github.com/stormlightlabs/inkfinite.git" },
-  "bugs": { "url": "https://github.com/stormlightlabs/inkfinite/issues" },
-  "exports": { ".": "./dist/index.mjs", "./package.json": "./package.json" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stormlightlabs/inkfinite.git"
+  },
+  "bugs": {
+    "url": "https://github.com/stormlightlabs/inkfinite/issues"
+  },
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
@@ -27,11 +38,14 @@
     "bumpp": "^10.3.2",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
-    "fake-indexeddb": "^6.0.0",
     "tsdown": "^0.18.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.50.1",
     "vitest": "^4.0.16"
   },
-  "dependencies": { "dexie": "^4.2.1", "perfect-freehand": "^1.2.2", "rxjs": "^7.8.2", "uuid": "^13.0.0" }
+  "dependencies": {
+    "perfect-freehand": "^1.2.2",
+    "rxjs": "^7.8.2",
+    "uuid": "^13.0.0"
+  }
 }

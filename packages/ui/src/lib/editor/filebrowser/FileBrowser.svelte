@@ -1,26 +1,18 @@
 <script lang="ts">
-	import { Button, Icon, Sheet } from '@inkfinite/ui';
-	import type { DesktopDocRepo } from '$lib/persistence/desktop';
-	import type {
-		BoardInspectorData,
-		BoardMeta,
-		FileBrowserViewModel,
-		InkfiniteDB
-	} from '@inkfinite/core';
+	import { Button, Icon, Sheet } from '../../index';
+	import type { DesktopDocumentRepo } from '../platform';
+	import type { BoardInspectorData, BoardMeta, FileBrowserViewModel } from '@inkfinite/core';
 	import { BoardStatsOps, FileBrowserVM } from '@inkfinite/core';
 	import type { Snippet } from 'svelte';
 
 	type Props = {
 		vm: FileBrowserViewModel;
 		onUpdate?: (vm: FileBrowserViewModel) => void;
-		fetchInspectorData?: (
-			boardId: string,
-			webDb: InkfiniteDB | null
-		) => Promise<BoardInspectorData>;
+		fetchInspectorData?: (boardId: string) => Promise<BoardInspectorData>;
 		open?: boolean;
 		onClose?: () => void;
 		children?: Snippet;
-		desktopRepo?: DesktopDocRepo | null;
+		desktopRepo?: DesktopDocumentRepo | null;
 	};
 
 	let {
@@ -138,7 +130,7 @@
 		inspectorError = null;
 
 		try {
-			inspectorData = await fetchInspectorData(board.id, null);
+			inspectorData = await fetchInspectorData(board.id);
 		} catch (error) {
 			inspectorError =
 				error instanceof Error ? error.message : 'Failed to load inspector data';
@@ -384,8 +376,7 @@
 					<h4 class="inspector__section-title">Storage</h4>
 					<div class="inspector__item">
 						<span class="inspector__label">Storage Type:</span>
-						<!-- TODO: local? browser? -->
-						<span class="inspector__value">IndexedDB (Dexie)</span>
+						<span class="inspector__value">{inspectorData.storageType}</span>
 					</div>
 				</section>
 

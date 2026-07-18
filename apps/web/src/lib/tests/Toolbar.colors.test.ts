@@ -1,8 +1,8 @@
 import { EditorState, ShapeRecord, Store } from "@inkfinite/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { cleanup, render } from "vitest-browser-svelte";
-import Toolbar from "../components/Toolbar.svelte";
-import { createBrushStore } from "../status";
+import Toolbar from "$editor/components/Toolbar.svelte";
+import { createBrushStore } from "$editor/status";
 
 export function createStoreWithRect() {
   const store = new Store();

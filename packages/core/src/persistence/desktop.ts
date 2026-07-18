@@ -1,6 +1,6 @@
 import type { BindingRecord, Document, PageRecord, ShapeRecord } from "../model";
+import type { DocOrder, LoadedDoc } from "./document";
 import type { BoardMeta } from "./repo";
-import type { DocOrder, LoadedDoc } from "./web";
 
 /**
  * Desktop file representation - combines board metadata with document content

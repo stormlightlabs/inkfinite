@@ -1,14 +1,12 @@
 <script lang="ts">
 	import { Editor } from '@inkfinite/ui/editor';
-	import { createDexiePlatformAdapter } from '$lib/persistence/dexie';
+	import { createDesktopPlatformAdapter } from '$lib/platform';
 
-	const platform = createDexiePlatformAdapter();
+	const platform = createDesktopPlatformAdapter();
 </script>
 
-<div class="editor">
-	<div class="canvas-wrapper">
-		<Editor {platform} />
-	</div>
+<div class="editor-root">
+	<Editor {platform} />
 </div>
 
 <style>
@@ -21,5 +19,10 @@
 		overflow: hidden;
 		position: relative;
 		min-width: 0;
+	}
+
+	.editor-root {
+		width: 100%;
+		height: 100%;
 	}
 </style>

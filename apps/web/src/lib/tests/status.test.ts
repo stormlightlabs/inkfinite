@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Observable, Observer, Subscription } from "dexie";
-import type { DocPatch, InkfiniteDB, PageRecord, PersistentDocRepo } from "@inkfinite/core";
+import type { DocPatch, PageRecord, PersistentDocRepo } from "@inkfinite/core";
 import { describe, expect, it, vi } from "vitest";
-import { createPersistenceManager, type PersistenceManagerOptions } from "../status";
+import type { InkfiniteDB } from "$lib/persistence/database";
+import { createDexieSession, type DexieAdapterOptions } from "$lib/persistence/dexie";
 
 function createMockRepo(): PersistentDocRepo {
   return {
@@ -26,7 +27,7 @@ type ObserverLike = { next: (value: any) => void; error?: (err: unknown) => void
 
 function createMockLiveQuery() {
   const observers = new Set<ObserverLike>();
-  const factory: PersistenceManagerOptions["liveQueryFn"] = () => {
+  const factory: NonNullable<DexieAdapterOptions["liveQueryFn"]> = () => {
     const observable: Observable<any> = {
       subscribe(observer?: Observer<any> | ((value: any) => void) | null) {
         const normalized: ObserverLike = typeof observer === "function"
@@ -73,13 +74,17 @@ function createMockLiveQuery() {
 }
 
 function createStatusTracker(
-  overrides?: { repo?: PersistentDocRepo; options?: PersistenceManagerOptions; db?: Partial<InkfiniteDB> },
+  overrides?: {
+    repo?: PersistentDocRepo;
+    options?: Omit<DexieAdapterOptions, "database">;
+    db?: Partial<InkfiniteDB>;
+  },
 ) {
   const repo = overrides?.repo ?? createMockRepo();
   const live = overrides?.options?.liveQueryFn ? null : createMockLiveQuery();
-  const options: PersistenceManagerOptions = overrides?.options ?? { liveQueryFn: live?.factory };
+  const options: Omit<DexieAdapterOptions, "database"> = overrides?.options ?? { liveQueryFn: live?.factory };
   const db = (overrides?.db ?? { boards: { get: vi.fn(async () => undefined) } }) as InkfiniteDB;
-  const manager = createPersistenceManager(db, repo, options);
+  const manager = createDexieSession(db, repo, options);
   const mock = { repo, live, manager };
   return mock;
 }
@@ -88,11 +93,11 @@ function buildPatch(): DocPatch {
   return { upserts: { pages: [{ id: "page:1", name: "Page 1", shapeIds: [] } as PageRecord] } };
 }
 
-describe("createPersistenceManager", () => {
+describe("Dexie editor adapter", () => {
   it("tracks pending writes and resets when liveQuery emits", () => {
     const { live, manager } = createStatusTracker();
     expect(manager.status.get().pendingWrites).toBe(0);
-    manager.setActiveBoard("board:1");
+    manager.setActiveBoard?.("board:1");
 
     manager.sink.enqueueDocPatch("board:1", buildPatch());
     let status = manager.status.get();
@@ -110,7 +115,7 @@ describe("createPersistenceManager", () => {
     const repo = createMockRepo();
     (repo.applyDocPatch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("failed"));
     const { manager } = createStatusTracker({ repo });
-    manager.setActiveBoard("board:1");
+    manager.setActiveBoard?.("board:1");
     manager.sink.enqueueDocPatch("board:1", buildPatch());
 
     await expect(manager.sink.flush()).rejects.toThrow("failed");
@@ -121,9 +126,9 @@ describe("createPersistenceManager", () => {
   it("stops liveQuery when disposed", () => {
     const live = createMockLiveQuery();
     const { manager } = createStatusTracker({ options: { liveQueryFn: live.factory } });
-    manager.setActiveBoard("board:1");
+    manager.setActiveBoard?.("board:1");
     expect(live.observerCount()).toBe(1);
-    manager.dispose();
+    manager.dispose?.();
     expect(live.observerCount()).toBe(0);
   });
 });

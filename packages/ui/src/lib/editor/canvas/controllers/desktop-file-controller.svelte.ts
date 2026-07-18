@@ -1,5 +1,5 @@
-import type { DesktopDocRepo } from "$lib/persistence/desktop";
 import type { BoardMeta, LoadedDoc, PersistentDocRepo } from "@inkfinite/core";
+import type { DesktopDocumentRepo } from "../../platform";
 
 function isUserCancelled(error: unknown) {
   return error instanceof Error && /cancel/i.test(error.message);
@@ -11,11 +11,11 @@ export class DesktopFileController {
 
   constructor(
     private getRepo: () => PersistentDocRepo | null,
-    private getDesktopRepo: () => DesktopDocRepo | null,
+    private getDesktopRepo: () => DesktopDocumentRepo | null,
     private onLoadDoc: (boardId: string, doc: LoadedDoc) => void,
   ) {}
 
-  get repo(): DesktopDocRepo | null {
+  get repo(): DesktopDocumentRepo | null {
     return this.getDesktopRepo();
   }
 
