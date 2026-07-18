@@ -46,13 +46,15 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
   thin adapter over Rust-owned sessions and typed Tauri commands.
 - `@inkfinite/runtime` owns framework-neutral camera, tool, selection, snapping,
   shortcut, and gesture-preview state. `@inkfinite/input-dom` normalizes browser
-  events, while the Svelte canvas controller wires DOM overlays, rendering, and
-  session persistence around those packages. The renderer still walks every
-  shape on the page and resizes its backing canvas on each draw.
+  events from current canvas bounds, owns pointer capture and release cleanup,
+  and keeps gesture coordinates independent of device-pixel ratio. The Svelte
+  canvas controller wires DOM overlays, rendering, and session persistence
+  around those packages. The renderer still walks every shape on the page and
+  resizes its backing canvas on each draw.
 - Built-in stencils, grid snapping, a dirty-frame loop, Markdown shapes, and
   cursor coordinate mapping already exist. vNext must preserve them while adding
   active-layer placement, measured rendering improvements, Markdown layout
-  caching, and a resize regression test for cursor mapping.
+  caching, and headless SVG coverage.
 
 ## Architecture
 
@@ -202,6 +204,13 @@ icons into `@inkfinite/ui`, along with their tests and Storybook stories. The
 product editor and its document-aware panels now live in the
 `@inkfinite/ui/editor` module. The application roots supply its web or desktop
 platform adapter.
+
+V2-10 completed on July 18, 2026. Pointer, wheel, hit-test, and drag coordinates
+now use the canvas's current CSS bounds and viewport for every event. Canvas
+resize invalidation recomputes marquee and positioned editor overlays. Pointer
+capture plus window-level release, cancellation, and lost-capture handling ends
+gestures outside the canvas without leaving a stuck drag or cursor. Browser
+regressions cover resized and scrolled bounds at device-pixel ratios 1 and 2.
 
 One Inkfinite transaction maps to one Automerge change. Causal heads, rather
 than a scalar revision, are the concurrency token. A local sequence number may

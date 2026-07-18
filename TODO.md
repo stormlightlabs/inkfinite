@@ -100,19 +100,20 @@ budget passes with measured optimizations.
 
 ### V2-10: Fix cursor mapping across viewport changes
 
-What to build: Keep pointer screen/world coordinates and overlays correct after
-resize, scrolling, device-pixel-ratio changes, and pointer capture.
+Implemented current-bound coordinate mapping, reactive viewport invalidation,
+and pointer-capture cleanup across resize, scrolling, and device-pixel-ratio
+changes.
 
 Blocked by: V2-09
 
 Acceptance criteria:
 
-- [ ] Coordinate conversion reads current canvas bounds and viewport dimensions
+- [x] Coordinate conversion reads current canvas bounds and viewport dimensions
       for each relevant event; no cached rect survives a layout change.
-- [ ] Cursor status, hit testing, marquee, handles, text/Markdown overlays, wheel
+- [x] Cursor status, hit testing, marquee, handles, text/Markdown overlays, wheel
       zoom, and drag previews agree after resize and scroll.
-- [ ] Pointer-up outside the canvas cannot leave a stuck drag or cursor state.
-- [ ] Browser tests reproduce the previous offset/stuck failure and pass at two
+- [x] Pointer-up outside the canvas cannot leave a stuck drag or cursor state.
+- [x] Browser tests reproduce the previous offset/stuck failure and pass at two
       DPR values.
 
 Verification:
@@ -424,5 +425,5 @@ pnpm --filter @inkfinite/web lint
 
 ## Frontier
 
-V2-10 is the current frontier. Fix cursor mapping across viewport changes before
-starting the 10,000-shape rendering work in V2-11.
+V2-11 is the current frontier. Meet the recorded 10,000-shape rendering and hit
+testing budgets before starting layers in V2-12.
