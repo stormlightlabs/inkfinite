@@ -12,7 +12,6 @@ import {
   createToolMap,
   CursorStore,
   diffDoc,
-  EditorState,
   EllipseTool,
   getShapesOnCurrentPage,
   InkfiniteDB,
@@ -20,22 +19,20 @@ import {
   MarkdownTool,
   PenTool,
   RectTool,
-  routeAction,
   SelectTool,
   shapeBounds,
-  ShapeRecord,
   SnapshotCommand,
   Store,
   TextTool,
 } from "@inkfinite/core";
-import type { Action, Box2, LoadedDoc, PersistenceSink, PersistentDocRepo, Viewport } from "@inkfinite/core";
+import type { Box2, LoadedDoc, PersistenceSink, PersistentDocRepo, Viewport } from "@inkfinite/core";
 import { stencils } from "@inkfinite/core";
+import { Action, EditorRuntime } from "@inkfinite/runtime";
 import { createRenderer, type Renderer } from "@inkfinite/renderer";
 
 type Stencil = stencils.Stencil;
 import { onDestroy, onMount } from "svelte";
-import { SvelteSet } from "svelte/reactivity";
-import { computeCursor, describeAction, getCommandKind, statesEqual } from "./canvas-helpers";
+import { computeCursor } from "./canvas-helpers";
 import { ArrowLabelEditorController } from "./controllers/arrowlabel-controller.svelte";
 import { DesktopFileController } from "./controllers/desktop-file-controller.svelte";
 import { FileBrowserController } from "./controllers/filebrowser-controller.svelte";
@@ -44,7 +41,6 @@ import { MarkdownEditorController } from "./controllers/markdown-controller.svel
 import { TextEditorController } from "./controllers/texteditor-controller.svelte";
 import { ToolController } from "./controllers/tool-controller.svelte";
 import { HandleState } from "./store/handle-state.svelte";
-import { PanState } from "./store/pan-state.svelte";
 import { PointerState } from "./store/pointer-state.svelte";
 
 export type CanvasControllerBindings = { setHistoryViewerOpen(value: boolean): void };
@@ -79,7 +75,6 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
 
   const pointerState = new PointerState();
   const handleState = new HandleState();
-  const panState = new PanState();
 
   const store = new Store(undefined, {
     onHistoryEvent: (event) => {
@@ -132,9 +127,12 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     }
     const cursor = computeCursor(
       textEditor.isEditing || arrowLabelEditor.isEditing || markdownEditor.isEditing,
-      { isPanning: panState.isPanning, spaceHeld: panState.spaceHeld },
+      {
+        isPanning: runtime.getInteractionState().panning,
+        spaceHeld: runtime.getInteractionState().spaceHeld,
+      },
       { hover: handleState.hover, active: handleState.active },
-      pointerState.isPointerDown,
+      runtime.getInteractionState().pointerDown,
     );
     canvas.style.cursor = cursor;
   }
@@ -201,6 +199,26 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     setActiveBoardId(boardId);
     applyLoadedDoc(doc);
   });
+  const runtime = new EditorRuntime({
+    store,
+    tools,
+    selectionTool: selectTool,
+    getSnapSettings: () => snapStore.get(),
+    onTransactionDraft: ({ name, kind, before, after }) => {
+      // Tool movement renders `after` as a local preview. Restore the durable
+      // mirror before executing the command so history and persistence receive
+      // the real before/after pair exactly once.
+      store.setState(() => before);
+      store.executeCommand(new SnapshotCommand(name, kind, before, after));
+      syncHandleState();
+    },
+    onOpenRequested: () => fileBrowser.handleOpen(),
+    onHandleHover: setHandleHover,
+    onInteractionChanged: syncHandleState,
+    onSnappedWorldChanged: (world) => {
+      pointerState.snappedWorld = world;
+    },
+  });
 
   function setHandleHover(handle: string | null) {
     if (handleState.hover === handle) {
@@ -215,220 +233,7 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     refreshCursor();
   }
 
-  function applySnapping(action: Action): Action {
-    if (!("world" in action) || !action.world) {
-      return action;
-    }
-    const snap = snapStore.get();
-    if (!snap.snapEnabled || !snap.gridEnabled) {
-      return action;
-    }
-    const gridSize = snap.gridSize;
-    const snappedX = Math.round(action.world.x / gridSize) * gridSize;
-    const snappedY = Math.round(action.world.y / gridSize) * gridSize;
-    return { ...action, world: { x: snappedX, y: snappedY } };
-  }
-
-  let pendingCommandStart: EditorState | null = null;
-
-  function duplicateSelection(state: EditorState): EditorState | null {
-    const selectedIds = state.ui.selectionIds;
-    if (selectedIds.length === 0) {
-      return null;
-    }
-    const shapes = { ...state.doc.shapes };
-    const pages = { ...state.doc.pages };
-    const nextSelection: string[] = [];
-
-    for (const id of selectedIds) {
-      const shape = shapes[id];
-      if (!shape) continue;
-      const cloned = ShapeRecord.clone(shape);
-      const newId = createId("shape");
-      const shifted = { ...cloned, id: newId, x: cloned.x + 12, y: cloned.y + 12 };
-      shapes[newId] = shifted;
-      const originalPage = state.doc.pages[shape.pageId];
-      if (!originalPage) continue;
-      const existingPage = pages[shape.pageId];
-      const pageClone = !existingPage || existingPage === originalPage
-        ? { ...originalPage, shapeIds: [...originalPage.shapeIds] }
-        : { ...existingPage, shapeIds: [...existingPage.shapeIds] };
-      pageClone.shapeIds.push(newId);
-      pages[shape.pageId] = pageClone;
-      nextSelection.push(newId);
-    }
-
-    if (!nextSelection.length) {
-      return null;
-    }
-
-    return { ...state, doc: { ...state.doc, shapes, pages }, ui: { ...state.ui, selectionIds: nextSelection } };
-  }
-
-  function reorderSelection(state: EditorState, direction: "forward" | "backward"): EditorState | null {
-    const pageId = state.ui.currentPageId;
-    if (!pageId) return null;
-    const page = state.doc.pages[pageId];
-    if (!page) return null;
-    const selection = new SvelteSet(state.ui.selectionIds);
-    if (selection.size === 0) {
-      return null;
-    }
-
-    const shapeIds = [...page.shapeIds];
-    let changed = false;
-
-    if (direction === "forward") {
-      for (let index = shapeIds.length - 2; index >= 0; index--) {
-        const id = shapeIds[index];
-        if (!selection.has(id)) continue;
-        const nextId = shapeIds[index + 1];
-        if (nextId && !selection.has(nextId)) {
-          shapeIds[index] = nextId;
-          shapeIds[index + 1] = id;
-          changed = true;
-        }
-      }
-    } else {
-      for (let index = 1; index < shapeIds.length; index++) {
-        const id = shapeIds[index];
-        if (!selection.has(id)) continue;
-        const prevId = shapeIds[index - 1];
-        if (prevId && !selection.has(prevId)) {
-          shapeIds[index] = prevId;
-          shapeIds[index - 1] = id;
-          changed = true;
-        }
-      }
-    }
-
-    if (!changed) {
-      return null;
-    }
-
-    return { ...state, doc: { ...state.doc, pages: { ...state.doc.pages, [pageId]: { ...page, shapeIds } } } };
-  }
-
-  function ungroupSelection(state: EditorState): EditorState | null {
-    const selectionIds = state.ui.selectionIds;
-    if (selectionIds.length === 0) {
-      return null;
-    }
-
-    const groupsToDissolve = new SvelteSet<string>();
-    const shapes = state.doc.shapes;
-
-    for (const id of selectionIds) {
-      const shape = shapes[id];
-      if (shape && shape.groupId) {
-        groupsToDissolve.add(shape.groupId);
-      }
-    }
-
-    if (groupsToDissolve.size === 0) {
-      return null;
-    }
-
-    const newShapes = { ...shapes };
-    let changed = false;
-
-    for (const id in newShapes) {
-      const shape = newShapes[id];
-      if (shape.groupId && groupsToDissolve.has(shape.groupId)) {
-        const newShape = { ...shape };
-        delete newShape.groupId;
-        newShapes[id] = newShape;
-        changed = true;
-      }
-    }
-
-    if (!changed) return null;
-
-    return { ...state, doc: { ...state.doc, shapes: newShapes } };
-  }
-
-  function handleKeyboardShortcuts(state: EditorState, action: Action): EditorState | null {
-    if (action.type !== "key-down") {
-      return null;
-    }
-
-    const primaryModifier = action.modifiers.meta || action.modifiers.ctrl;
-
-    if (primaryModifier && (action.key === "o" || action.key === "O")) {
-      fileBrowser.handleOpen();
-      return null;
-    }
-
-    if (primaryModifier && (action.key === "n" || action.key === "N")) {
-      fileBrowser.handleOpen();
-      return null;
-    }
-
-    const selectionIds = state.ui.selectionIds;
-    if (selectionIds.length === 0) {
-      return null;
-    }
-
-    if (action.key.startsWith("Arrow")) {
-      const step = action.modifiers.shift ? 10 : 1;
-      let dx = 0;
-      let dy = 0;
-      switch (action.key) {
-        case "ArrowLeft":
-          dx = -step;
-          break;
-        case "ArrowRight":
-          dx = step;
-          break;
-        case "ArrowUp":
-          dy = -step;
-          break;
-        case "ArrowDown":
-          dy = step;
-          break;
-      }
-      if (dx !== 0 || dy !== 0) {
-        const shapes = { ...state.doc.shapes };
-        let changed = false;
-        for (const id of selectionIds) {
-          const shape = shapes[id];
-          if (!shape) continue;
-          shapes[id] = { ...shape, x: shape.x + dx, y: shape.y + dy };
-          changed = true;
-        }
-        if (!changed) {
-          return null;
-        }
-        return { ...state, doc: { ...state.doc, shapes } };
-      }
-    }
-
-    if (primaryModifier && (action.key === "d" || action.key === "D")) {
-      return duplicateSelection(state);
-    }
-    if (primaryModifier && action.key === "]") {
-      return reorderSelection(state, "forward");
-    }
-    if (primaryModifier && action.key === "[") {
-      return reorderSelection(state, "backward");
-    }
-
-    if (primaryModifier && action.modifiers.shift && (action.key === "g" || action.key === "G")) {
-      return ungroupSelection(state);
-    }
-
-    return null;
-  }
-
-  function commitSnapshot(beforeState: EditorState, afterState: EditorState, action: Action) {
-    const kind = getCommandKind(beforeState, afterState);
-    const name = describeAction(action, kind);
-    const command = new SnapshotCommand(name, kind, EditorState.clone(beforeState), EditorState.clone(afterState));
-    store.executeCommand(command);
-    syncHandleState();
-  }
-
-  function handleAction(action: Action) {
+  function handleAction(action: import("@inkfinite/core").Action) {
     if (textEditor.isEditing && (action.type === "pointer-down" || action.type === "pointer-up")) {
       textEditor.commit();
     }
@@ -437,84 +242,7 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
       markdownEditor.commit();
     }
 
-    if (action.type === "pointer-move" && "world" in action && !panState.isPanning && !panState.spaceHeld) {
-      const hover = selectTool.getHandleAtPoint(store.getState(), action.world);
-      setHandleHover(hover);
-    }
-
-    if (action.type === "key-down" && action.key === " " && !action.repeat) {
-      panState.spaceHeld = true;
-      refreshCursor();
-      return;
-    }
-
-    if (action.type === "key-up" && action.key === " ") {
-      panState.spaceHeld = false;
-      panState.isPanning = false;
-      refreshCursor();
-      return;
-    }
-
-    if (action.type === "pointer-down" && (action.button === 1 || (action.button === 0 && panState.spaceHeld))) {
-      panState.isPanning = true;
-      panState.lastScreen = action.screen;
-      refreshCursor();
-      return;
-    }
-
-    if (action.type === "pointer-move" && panState.isPanning) {
-      const delta = { x: action.screen.x - panState.lastScreen.x, y: action.screen.y - panState.lastScreen.y };
-      panState.lastScreen = action.screen;
-      store.setState((state) => ({ ...state, camera: Camera.pan(state.camera, delta) }));
-      return;
-    }
-
-    if (action.type === "pointer-up" && panState.isPanning) {
-      panState.isPanning = false;
-      refreshCursor();
-      return;
-    }
-
-    if (panState.isPanning || panState.spaceHeld) {
-      return;
-    }
-
-    const actionWithSnap = applySnapping(action);
-    if ("world" in actionWithSnap) {
-      pointerState.snappedWorld = actionWithSnap.world;
-    }
-
-    if (actionWithSnap.type === "pointer-down" && actionWithSnap.button === 0) {
-      pointerState.isPointerDown = true;
-      setHandleHover(null);
-      pendingCommandStart = EditorState.clone(store.getState());
-    }
-
-    const before = store.getState();
-    const shortcutResult = handleKeyboardShortcuts(before, actionWithSnap);
-    const after = shortcutResult ?? routeAction(before, actionWithSnap, tools);
-
-    if (!statesEqual(before, after)) {
-      const kind = getCommandKind(before, after);
-      const shouldCommitImmediately = !pendingCommandStart && kind === "doc";
-
-      if (shouldCommitImmediately) {
-        commitSnapshot(before, after, actionWithSnap);
-      } else {
-        store.setState(() => after);
-        syncHandleState();
-      }
-    }
-
-    if (actionWithSnap.type === "pointer-up" && actionWithSnap.button === 0) {
-      pointerState.isPointerDown = false;
-      refreshCursor();
-
-      if (pendingCommandStart && !statesEqual(pendingCommandStart, after)) {
-        commitSnapshot(pendingCommandStart, after, actionWithSnap);
-      }
-      pendingCommandStart = null;
-    }
+    runtime.handleAction(action);
   }
 
   function handleCanvasDoubleClick(event: MouseEvent) {
@@ -573,7 +301,10 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
       snapProvider: { get: () => snapStore.get() },
       cursorProvider: { get: () => cursorStore.getState() },
       pointerStateProvider: {
-        get: () => ({ isPointerDown: pointerState.isPointerDown, snappedWorld: pointerState.snappedWorld }),
+        get: () => ({
+          isPointerDown: runtime.getInteractionState().pointerDown,
+          snappedWorld: pointerState.snappedWorld,
+        }),
       },
       handleProvider: { get: () => handleState.getSnapshot() },
       themeProvider: { get: () => themeStore.current },
@@ -749,7 +480,11 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
       ui: { ...state.ui, selectionIds: newSelection },
     };
 
-    const command = new SnapshotCommand("Insert Stencil", "doc", state, nextState);
-    store.executeCommand(command);
+    runtime.commit(
+      state,
+      nextState,
+      "Insert Stencil",
+      Action.keyDown("InsertStencil", "InsertStencil", { ctrl: false, shift: false, alt: false, meta: false }),
+    );
   }
 }

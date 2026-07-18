@@ -10,5 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "dprint check src/index.ts"
   },
-  "dependencies": { "@inkfinite/bindings": "workspace:*" }
+  "dependencies": {
+    "@inkfinite/bindings": "workspace:*",
+    "@inkfinite/core": "workspace:*"
+  }
 }

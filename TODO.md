@@ -1,7 +1,6 @@
 # Inkfinite vNext tickets
 
-These tickets implement [ROADMAP.md](ROADMAP.md). Work one ticket per fresh
-implementation context. A ticket can start when all of its blockers are done.
+These tickets implement [ROADMAP.md](ROADMAP.md).
 
 ## Milestone 1: Architecture gate
 
@@ -10,63 +9,13 @@ evidence.
 
 ### V2-01: Freeze compatibility fixtures and baselines
 
-What to build: Capture representative v1 web and desktop documents, invalid
-documents, rendering examples, and a generated 10,000-shape board before the
-model changes.
-
-Blocked by: None - can start immediately
-
-Acceptance criteria:
-
-- [x] Fixtures cover every current shape, bindings, groups, pages, Markdown,
-      stencils, history-relevant edits, and persisted ordering.
-- [x] Import, render, hit-test, open/save, and cursor-after-resize behavior have
-      baseline tests; known failures are marked as such rather than normalized.
-- [x] The performance harness records hardware, runtime versions, fixture seed,
-      visible-shape count, frame time, hit-test time, memory, open, and save time.
-- [x] Current package tests, type checks, web checks, lint, and desktop Rust tests
-      run from documented commands.
-
-Verification:
-
-```sh
-pnpm --filter @inkfinite/core test --run
-pnpm --filter @inkfinite/renderer test --run
-pnpm --filter @inkfinite/web test
-pnpm --filter @inkfinite/core typecheck
-pnpm --filter @inkfinite/renderer typecheck
-pnpm --filter @inkfinite/web check
-pnpm --filter @inkfinite/web lint
-cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
-```
+Captured representative v1 web and desktop documents, invalid documents, rendering
+examples, and a generated 10,000-shape board before the model changes.
 
 ### V2-02: Prove the CRDT boundary
 
-What to build: Implement a disposable Automerge proof through an
+Implemented a disposable Automerge proof through an
 Inkfinite-owned interface. Compare Yjs/Yrs only if Automerge misses a gate.
-
-Blocked by: V2-01
-
-Acceptance criteria:
-
-- [x] Rust and JavaScript round-trip the same nested maps, ordered child lists,
-      text, and 10,000-shape document without semantic drift.
-- [x] Two offline replicas merge concurrent property, list, text, delete, and
-      reparent edits and converge byte-independently to the same materialized
-      snapshot.
-- [x] Incremental patches, change heads, actor IDs, actor-scoped undo, sync,
-      save/load, and compaction are demonstrated.
-- [x] A merge is applied on a fork and adopted only after deterministic repair
-      and validation; duplicate children, missing parents, dangling bindings,
-      and zero-layer pages have convergence tests.
-- [x] Results compare time, memory, storage growth, API risk, and dependency
-      versions with the V2-01 baseline and record the final Automerge or Yjs/Yrs
-      decision in `ROADMAP.md`.
-
-Verification:
-
-- Run the proof's Rust, JavaScript, cross-language, convergence, and benchmark
-  suites twice with fixed seeds; both runs must materialize identical snapshots.
 
 ## Milestone 2: Rust document authority
 
@@ -75,145 +24,29 @@ document independently of Tauri and Svelte.
 
 ### V2-03: Scaffold the vNext project structure
 
-What to build: Create the target Cargo and pnpm workspace layout as a compileable
-shell before moving behavior or defining the v2 model.
-
-Blocked by: V2-02
-
-Acceptance criteria:
-
-- [x] A root Cargo workspace contains the model, CRDT, engine, file, protocol,
-      SVG, IPC, and CLI crates named in the roadmap.
-- [x] The pnpm workspace contains `@inkfinite/runtime`,
-      `@inkfinite/input-dom`, `@inkfinite/bindings`, and
-      `@inkfinite/renderer`; the existing apps and packages keep working in
-      place during the scaffold step.
-- [x] New crates and packages contain only minimal compileable entry points,
-      manifests, and dependency edges. This ticket moves no product behavior.
-- [x] Workspace commands can discover, build, test, type-check, and lint the new
-      members from the repository root.
-
-Verification:
-
-```sh
-cargo metadata --no-deps
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
-pnpm -r --if-present build
-pnpm -r --if-present typecheck
-```
+Created the target Cargo and pnpm workspace layout as a compileable shell
+before moving behavior or defining the v2 model.
 
 ### V2-04: Define the Rust document and protocol contracts
 
-What to build: Add typed v2 records, project-owned CRDT traits, and protocol
-records without UI, Tauri, transport, or CLI parsing dependencies.
-
-Blocked by: V2-03
-
-Acceptance criteria:
-
-- [x] The model covers pages, layers, scene hierarchy, built-in shape kinds,
-      bindings, assets, semantic metadata, provenance, opacity, and format IDs.
-- [x] Ordered child lists have one source of truth and public operations use
-      sibling anchors rather than numeric indexes.
-- [x] CRDT, engine, file, rendering, IPC, and CLI code depend on the contracts in
-      one direction; model and protocol crates do not import those consumers.
-- [x] `cargo test --workspace` and strict Clippy run from the repository root.
-
-Verification:
-
-```sh
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
-```
+Added typed v2 records, project-owned CRDT traits, and protocol records without UI,
+Tauri, transport, or CLI parsing dependencies.
 
 ### V2-05: Implement validated CRDT transactions
 
-What to build: Apply every durable operation through one engine transaction and
+Applies every durable operation through one engine transaction and
 one CRDT change, returning patches, heads, inverse metadata, affected IDs, and
 warnings.
 
-Blocked by: V2-04
-
-Acceptance criteria:
-
-- [x] Operations cover page, layer, shape, hierarchy, binding, asset, and layout
-      changes with head and record-version preconditions.
-- [x] Schema, precondition, permission, invariant, repair, and final snapshot
-      checks run on a fork before an atomic commit.
-- [x] Undo and redo emit actor-scoped compensating changes and preserve
-      intervening edits from other actors.
-- [x] Production `inkfinite-core::crdt` tests absorb the reusable V2-02 cases for
-      nested data, patches, heads, actor IDs, undo, fork repair, convergence,
-      transport-independent sync, save/load, compaction, and 10,000 shapes.
-      Preserve the measured benchmark result, then remove
-      `spikes/crdt-automerge`, its workspace entry, dependency, and root proof
-      commands. Keep the V1 compatibility fixtures and baselines.
-- [x] Queries support IDs, names, roles, tags, kinds, parents, layers, bounds,
-      and affected regions; alignment and distribution use the same engine.
-- [x] Property-based tests cover apply/invert, merge order, deterministic repair,
-      and convergence.
-
-Verification:
-
-```sh
-cargo test -p inkfinite-core
-test ! -d spikes/crdt-automerge
-```
-
 ### V2-06: Generate schemas and TypeScript bindings
 
-What to build: Generate document, transaction, and protocol bindings from Rust
-and prove the Rust and TypeScript shape registries agree.
-
-Blocked by: V2-04
-
-Acceptance criteria:
-
-- [x] Schemars emits JSON Schemas and `ts-rs` emits TypeScript bindings from the
-      authoritative Rust records.
-- [x] Shared fixtures verify kind names, property validation, serialization,
-      bounds, transforms, and geometry conventions in Rust and TypeScript.
-- [x] A check command fails on stale generated output; generated files carry a
-      clear do-not-edit header.
-- [x] Schema changes require fixture and migration updates.
-
-Verification:
-
-- `cargo run -p inkfinite-cli --bin generate-bindings` generates the
-  schemas, bindings, and shared fixture. Running it again leaves the generated
-  files unchanged.
-- `cargo run -p inkfinite-cli --bin generate-bindings -- --check` fails
-  when any generated artifact is stale.
-- `cargo test -p inkfinite-core` runs the Rust registry
-  and shared-fixture conformance tests.
-- `pnpm --filter @inkfinite/bindings test` typechecks the bindings and runs the
-  TypeScript fixture conformance test.
+Generates document, transaction, and protocol bindings from Rust and prove the Rust and
+TypeScript shape registries agree.
 
 ### V2-07: Import v1 and persist v2 safely
 
-What to build: Import `.inkfinite.json`, persist canonical `.inkfinite` CRDT
+Import `.inkfinite.json`, persist canonical `.inkfinite` CRDT
 files, export stable JSON snapshots, and recover from interrupted writes.
-
-Blocked by: V2-04, V2-05
-
-Acceptance criteria:
-
-- [x] Every V2-01 valid fixture imports with the same page, shape, binding,
-      group, style, and draw order; each page gains one default layer.
-- [x] Invalid or newer formats produce typed errors and never overwrite input.
-- [x] Saves use a same-directory temporary file, flush, atomic replacement where
-      supported, recovery copies, and advisory locking.
-- [x] Recovery stores a compact snapshot plus bounded change journal and can
-      restore after failures at each write step.
-- [x] JSON export is deterministic and documented as a snapshot that cannot
-      preserve CRDT history.
-
-Verification:
-
-```sh
-cargo test -p inkfinite-core file::
-```
 
 ## Milestone 3: Desktop vertical slice
 
@@ -224,36 +57,8 @@ not create a separate desktop component tree or theme.
 
 ### V2-08: Make Tauri own document sessions
 
-What to build: Replace frontend-owned desktop documents with a Rust session
-service and typed Tauri commands.
-
-Blocked by: V2-05, V2-06, V2-07
-
-Acceptance criteria:
-
-- [x] Sessions track path, CRDT state, materialized snapshot, actor undo/redo,
-      dirty state, locks, recovery, and sync state.
-- [x] Create/open/snapshot/commit/undo/redo/save/save-as/query/validate/close
-      commands call shared crates and return typed errors and patches.
-- [x] File I/O leaves the frontend and plugin capabilities are reduced to the
-      minimum still required.
-- [x] `apps/web` imports `@inkfinite/ui/styles.css` once and uses shared package
-      components for the desktop vertical slice instead of adding new local
-      copies under `apps/web/src/lib/components`.
-- [x] `apps/desktop` builds and packages the same `apps/web` frontend. Desktop-only
-      behavior stays in Tauri commands or thin adapters, while components,
-      themes, fonts, and icons come from `@inkfinite/ui`.
-- [x] Integration tests cover open, edit, save, reopen, undo, failed validation,
-      stale heads, and a simulated write failure.
-
-Verification:
-
-```sh
-cargo test -p desktop
-pnpm --filter @inkfinite/web test
-pnpm --filter @inkfinite/ui check
-pnpm --filter @inkfinite/ui test
-```
+Replaced frontend-owned desktop documents with a Rust session service and typed Tauri
+commands.
 
 ### V2-09: Extract the editor runtime and transaction drafts
 
@@ -265,18 +70,18 @@ Blocked by: V2-06, V2-08
 
 Acceptance criteria:
 
-- [ ] Camera, tools, selection, input routing, and gesture previews have no
+- [x] Camera, tools, selection, input routing, and gesture previews have no
       Svelte or persistence dependency.
-- [ ] Pointer movement stays local; each completed drag, resize, text edit,
+- [x] Pointer movement stays local; each completed drag, resize, text edit,
       stencil insertion, or shortcut produces one transaction draft.
-- [ ] The frontend document mirror changes only through snapshots or commit/sync
+- [x] The frontend document mirror changes only through snapshots or commit/sync
       patches from Rust.
-- [ ] Svelte adapters compose controls from `@inkfinite/ui`; reusable visual
+- [x] Svelte adapters compose controls from `@inkfinite/ui`; reusable visual
       components do not gain `@inkfinite/runtime`, persistence, or Tauri
       dependencies.
-- [ ] Existing keyboard, selection, text, Markdown, arrow, pen, grid snap,
+- [x] Existing keyboard, selection, text, Markdown, arrow, pen, grid snap,
       stencil, and history behavior remains covered.
-- [ ] One browser integration test performs drag → Rust commit → patch → redraw
+- [x] One browser integration test performs drag → Rust commit → patch → redraw
       → undo and compares the original document.
 
 Verification:

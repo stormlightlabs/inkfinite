@@ -9,7 +9,9 @@ export default defineConfig({
     alias: {
       "@inkfinite/bindings": new URL("../../packages/bindings/src/index.ts", import.meta.url).pathname,
       "@inkfinite/core": new URL("../../packages/core/src/index.ts", import.meta.url).pathname,
+      "@inkfinite/input-dom": new URL("../../packages/input-dom/src/index.ts", import.meta.url).pathname,
       "@inkfinite/renderer": new URL("../../packages/renderer/src/index.ts", import.meta.url).pathname,
+      "@inkfinite/runtime": new URL("../../packages/runtime/src/index.ts", import.meta.url).pathname,
       "@inkfinite/ui/styles.css": new URL("../../packages/ui/src/lib/styles/index.css", import.meta.url).pathname,
       "@inkfinite/ui": new URL("../../packages/ui/src/lib/index.ts", import.meta.url).pathname,
     },

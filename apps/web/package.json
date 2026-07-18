@@ -22,7 +22,9 @@
 		"dexie": "^4.2.1",
 		"@inkfinite/bindings": "workspace:*",
 		"@inkfinite/core": "workspace:*",
+		"@inkfinite/input-dom": "workspace:*",
 		"@inkfinite/renderer": "workspace:*",
+		"@inkfinite/runtime": "workspace:*",
 		"@inkfinite/ui": "workspace:*"
 	},
 	"devDependencies": {

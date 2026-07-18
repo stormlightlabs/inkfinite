@@ -424,24 +424,24 @@ fn refresh_inverse_preconditions(operations: &mut [Operation], document: &Docume
         match operation {
             Operation::RenamePage { page_id, expected_version, .. }
             | Operation::DeletePage { page_id, expected_version } => {
-                *expected_version = document.pages.get(page_id).map(|record| record.version)
+                *expected_version = document.pages.get(page_id).map(|record| record.version);
             }
             Operation::PatchLayer { layer_id, expected_version, .. }
             | Operation::ReorderLayer { layer_id, expected_version, .. }
             | Operation::DeleteLayer { layer_id, expected_version, .. } => {
-                *expected_version = document.layers.get(layer_id).map(|record| record.version)
+                *expected_version = document.layers.get(layer_id).map(|record| record.version);
             }
             Operation::PatchShape { shape_id, expected_version, .. }
             | Operation::ReparentShape { shape_id, expected_version, .. }
             | Operation::DeleteShape { shape_id, expected_version } => {
-                *expected_version = document.shapes.get(shape_id).map(|record| record.version)
+                *expected_version = document.shapes.get(shape_id).map(|record| record.version);
             }
             Operation::DeleteBinding { binding_id, expected_version } => {
                 *expected_version = document.bindings.get(binding_id).map(|record| record.version);
             }
             Operation::PatchAsset { asset_id, expected_version, .. }
             | Operation::DeleteAsset { asset_id, expected_version } => {
-                *expected_version = document.assets.get(asset_id).map(|record| record.version)
+                *expected_version = document.assets.get(asset_id).map(|record| record.version);
             }
             Operation::AlignShapes { shape_ids, expected_versions, .. }
             | Operation::DistributeShapes { shape_ids, expected_versions, .. } => {

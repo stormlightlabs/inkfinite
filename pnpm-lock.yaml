@@ -29,9 +29,15 @@ importers:
       '@inkfinite/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@inkfinite/input-dom':
+        specifier: workspace:*
+        version: link:../../packages/input-dom
       '@inkfinite/renderer':
         specifier: workspace:*
         version: link:../../packages/renderer
+      '@inkfinite/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
       '@inkfinite/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -232,6 +238,9 @@ importers:
       '@inkfinite/bindings':
         specifier: workspace:*
         version: link:../bindings
+      '@inkfinite/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/ui:
     dependencies:

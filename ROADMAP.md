@@ -42,9 +42,11 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
 - TypeScript currently owns a flat page/shape model, snapshot undo/redo, tools,
   and browser persistence. Web documents use Dexie; desktop documents use a
   thin adapter over Rust-owned sessions and typed Tauri commands.
-- `createCanvasController` combines tools, persistence, overlays, rendering, and
-  input. The renderer walks every shape on the page and resizes its backing
-  canvas on each draw.
+- `@inkfinite/runtime` owns framework-neutral camera, tool, selection, snapping,
+  shortcut, and gesture-preview state. `@inkfinite/input-dom` normalizes browser
+  events, while the Svelte canvas controller wires DOM overlays, rendering, and
+  session persistence around those packages. The renderer still walks every
+  shape on the page and resizes its backing canvas on each draw.
 - Built-in stencils, grid snapping, a dirty-frame loop, Markdown shapes, and
   cursor coordinate mapping already exist. vNext must preserve them while adding
   active-layer placement, measured rendering improvements, Markdown layout
@@ -180,6 +182,16 @@ save/query/validate/close commands, while `apps/web` keeps an in-memory editing
 mirror and a thin metadata/dialog adapter. Desktop document bytes no longer
 cross the frontend file APIs. Recovery and failure-path tests cover stale heads,
 failed validation, interrupted writes, and save-as path replacement.
+
+V2-09 completed on July 17, 2026. `@inkfinite/runtime` now owns normalized
+action routing, camera panning, selection shortcuts, grid snapping, and local
+gesture previews without importing Svelte, Tauri, or persistence code. Completed
+document gestures emit one runtime transaction draft; the Svelte adapter turns
+that boundary into one history command, and the desktop session adapter builds
+one Rust transaction before replacing its mirror from the returned snapshot.
+`@inkfinite/input-dom` owns browser listener and coordinate normalization. A
+browser integration test covers drag, simulated Rust commit, patch-driven
+redraw, and undo back to the original document.
 
 One Inkfinite transaction maps to one Automerge change. Causal heads, rather
 than a scalar revision, are the concurrency token. A local sequence number may

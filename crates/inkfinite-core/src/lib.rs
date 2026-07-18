@@ -16,6 +16,7 @@ use std::fmt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use thiserror::Error;
 use ts_rs::TS;
 
 /// Stable format identifier for an Inkfinite v2 document snapshot.
@@ -24,24 +25,102 @@ pub const INKFINITE_FORMAT_ID: &str = "inkfinite.document";
 /// First version of the Rust-owned Inkfinite document contract.
 pub const INKFINITE_FORMAT_VERSION: u32 = 2;
 
-// FIXME: This should be a shapekind enum with a display Impl or something
+/// A built-in shape registry key.
+///
+/// Document records retain their string `kind` field so the registry can grow
+/// without changing the serialized document contract. Use this enum whenever
+/// code specifically requires one of Inkfinite's built-in kinds.
+#[derive(Clone, Copy, Debug, Eq, Hash, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(rename_all = "snake_case")]
+pub enum BuiltinShapeKind {
+    /// Rectangle shape.
+    #[serde(rename = "rect")]
+    #[ts(rename = "rect")]
+    Rectangle,
+    /// Ellipse shape.
+    Ellipse,
+    /// Straight line shape.
+    Line,
+    /// Arrow shape.
+    Arrow,
+    /// Plain-text shape.
+    Text,
+    /// Freehand stroke shape.
+    Stroke,
+    /// Markdown shape.
+    Markdown,
+    /// Container shape.
+    Container,
+}
+
+impl BuiltinShapeKind {
+    /// Built-in kinds in their stable serialized order.
+    pub const ALL: [Self; 8] = [
+        Self::Rectangle,
+        Self::Ellipse,
+        Self::Line,
+        Self::Arrow,
+        Self::Text,
+        Self::Stroke,
+        Self::Markdown,
+        Self::Container,
+    ];
+
+    /// Returns the stable registry key for this kind.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Rectangle => "rect",
+            Self::Ellipse => "ellipse",
+            Self::Line => "line",
+            Self::Arrow => "arrow",
+            Self::Text => "text",
+            Self::Stroke => "stroke",
+            Self::Markdown => "markdown",
+            Self::Container => "container",
+        }
+    }
+
+    /// Parses a built-in registry key.
+    #[must_use]
+    pub const fn parse(value: &str) -> Option<Self> {
+        match value.as_bytes() {
+            b"rect" => Some(Self::Rectangle),
+            b"ellipse" => Some(Self::Ellipse),
+            b"line" => Some(Self::Line),
+            b"arrow" => Some(Self::Arrow),
+            b"text" => Some(Self::Text),
+            b"stroke" => Some(Self::Stroke),
+            b"markdown" => Some(Self::Markdown),
+            b"container" => Some(Self::Container),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for BuiltinShapeKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
 
 /// Built-in rectangle shape kind.
-pub const RECTANGLE_KIND: &str = "rect";
+pub const RECTANGLE_KIND: &str = BuiltinShapeKind::Rectangle.as_str();
 /// Built-in ellipse shape kind.
-pub const ELLIPSE_KIND: &str = "ellipse";
+pub const ELLIPSE_KIND: &str = BuiltinShapeKind::Ellipse.as_str();
 /// Built-in line shape kind.
-pub const LINE_KIND: &str = "line";
+pub const LINE_KIND: &str = BuiltinShapeKind::Line.as_str();
 /// Built-in arrow shape kind.
-pub const ARROW_KIND: &str = "arrow";
+pub const ARROW_KIND: &str = BuiltinShapeKind::Arrow.as_str();
 /// Built-in plain-text shape kind.
-pub const TEXT_KIND: &str = "text";
+pub const TEXT_KIND: &str = BuiltinShapeKind::Text.as_str();
 /// Built-in freehand stroke shape kind.
-pub const STROKE_KIND: &str = "stroke";
+pub const STROKE_KIND: &str = BuiltinShapeKind::Stroke.as_str();
 /// Built-in Markdown shape kind.
-pub const MARKDOWN_KIND: &str = "markdown";
+pub const MARKDOWN_KIND: &str = BuiltinShapeKind::Markdown.as_str();
 /// Built-in container shape kind.
-pub const CONTAINER_KIND: &str = "container";
+pub const CONTAINER_KIND: &str = BuiltinShapeKind::Container.as_str();
 
 /// Stable order of the built-in shape kinds exposed to both registries.
 pub const BUILTIN_SHAPE_KINDS: &[&str] = &[
@@ -72,7 +151,7 @@ pub const fn builtin_shape_kinds() -> &'static [&'static str] {
 /// Returns whether `kind` is one of the built-in shape registry keys.
 #[must_use]
 pub fn is_builtin_shape_kind(kind: &str) -> bool {
-    BUILTIN_SHAPE_KINDS.contains(&kind)
+    BuiltinShapeKind::parse(kind).is_some()
 }
 
 /// Kind-specific shape properties owned by the shape registry.
@@ -110,38 +189,21 @@ pub enum BindingAnchor {
 }
 
 /// Error returned when a shape registry property violates a shared registry rule.
-///
-/// FIXME: thiserror
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum ShapePropertyError {
     /// The shape kind is not part of the built-in registry.
+    #[error("unknown shape kind {kind}")]
     UnknownKind { kind: String },
     /// A dimension property was not a JSON number.
+    #[error("shape kind {kind} property {property} must be a number")]
     ExpectedNumber { kind: String, property: String },
     /// A dimension property was non-finite.
+    #[error("shape kind {kind} property {property} must be finite")]
     NonFiniteNumber { kind: String, property: String },
     /// A dimension property was negative.
+    #[error("shape kind {kind} property {property} must not be negative")]
     NegativeNumber { kind: String, property: String },
 }
-
-impl fmt::Display for ShapePropertyError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::UnknownKind { kind } => write!(formatter, "unknown shape kind {kind}"),
-            Self::ExpectedNumber { kind, property } => {
-                write!(formatter, "shape kind {kind} property {property} must be a number")
-            }
-            Self::NonFiniteNumber { kind, property } => {
-                write!(formatter, "shape kind {kind} property {property} must be finite")
-            }
-            Self::NegativeNumber { kind, property } => {
-                write!(formatter, "shape kind {kind} property {property} must not be negative")
-            }
-        }
-    }
-}
-
-impl std::error::Error for ShapePropertyError {}
 
 /// Anchor used to place an item in an ordered child list without numeric indexes.
 #[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
@@ -363,18 +425,9 @@ fn opacity_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema
 }
 
 /// Error returned when an opacity is non-finite or outside `0.0..=1.0`.
-///
-/// FIXME: thiserror
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Error, PartialEq)]
+#[error("opacity must be finite and between 0 and 1, got {0}")]
 pub struct InvalidOpacity(pub f32);
-
-impl fmt::Display for InvalidOpacity {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "opacity must be finite and between 0 and 1, got {}", self.0)
-    }
-}
-
-impl std::error::Error for InvalidOpacity {}
 
 /// Two-dimensional point or vector in document coordinates.
 #[derive(Clone, Copy, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
@@ -676,5 +729,11 @@ mod tests {
             validate_shape_properties("unknown", &BTreeMap::new()),
             Err(ShapePropertyError::UnknownKind { .. })
         ));
+        assert_eq!(BuiltinShapeKind::parse("rect"), Some(BuiltinShapeKind::Rectangle));
+        assert_eq!(BuiltinShapeKind::Rectangle.to_string(), RECTANGLE_KIND);
+        assert_eq!(
+            serde_json::to_value(BuiltinShapeKind::Rectangle).expect("built-in kind should serialize"),
+            Value::from(RECTANGLE_KIND)
+        );
     }
 }
