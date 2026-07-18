@@ -36,6 +36,10 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
 
 - The pnpm monorepo contains a TypeScript core, Canvas 2D renderer, SvelteKit web
   UI, and Tauri 2 wrapper.
+- `inkfinite-ui` provides shared Svelte components, theme tokens, fonts, and
+  icons for the browser and the Tauri-hosted frontend. Application-specific
+  components still live under `apps/web` and must move to the package as their
+  dependencies are separated.
 - TypeScript currently owns a flat page/shape model, snapshot undo/redo, tools,
   and persistence. Web documents use Dexie; desktop persistence is called from
   the frontend. The Rust backend only exposes file-management helpers.
@@ -69,7 +73,7 @@ TypeScript editor runtime
 | Concern                  | Choice                                                    |
 | ------------------------ | --------------------------------------------------------- |
 | Desktop                  | Tauri 2                                                   |
-| UI                       | SvelteKit and Svelte 5                                    |
+| UI                       | SvelteKit, Svelte 5, and shared `inkfinite-ui` components |
 | Interactive rendering    | Native Canvas 2D with positioned DOM editors              |
 | Durable model and engine | Rust                                                      |
 | Local-first state        | Automerge, isolated behind Inkfinite interfaces           |
@@ -101,6 +105,7 @@ patch for the frontend's read-only document mirror.
 | `renderer-canvas`  | Svelte-independent Canvas 2D renderer                                   |
 | `input-dom`        | Browser input normalization                                             |
 | `bindings`         | Generated TypeScript records; never hand-edited                         |
+| `inkfinite-ui`     | Shared Svelte components, themes, fonts, icons, stories, and UI tests   |
 
 Business logic must not depend on Tauri, Svelte, CLI parsing, or a transport.
 
@@ -279,6 +284,11 @@ Keep Canvas 2D. The renderer receives a snapshot, camera, session state, and an
 optional transaction preview. DOM overlays remain limited to active text and
 Markdown editing, menus, tooltips, accessibility controls, and proposal review.
 
+`apps/desktop` packages the `apps/web` SvelteKit build. Milestone 3 must update
+that shared frontend to consume `inkfinite-ui`; it must not introduce a second
+desktop component tree or duplicate theme. Desktop-only behavior belongs in
+Tauri commands and thin frontend adapters around shared components.
+
 Performance work is evidence-driven:
 
 - Resize the backing canvas only when CSS dimensions or device-pixel ratio
@@ -401,7 +411,9 @@ recovery prompts, and release migrations.
    transactions, validation, migrations, schemas, and generated bindings. Exit
    with convergent Rust tests and lossless v1 imports.
 3. **Desktop vertical slice:** make Rust own open, edit, undo, save, recovery, and
-   the frontend mirror. Exit with an end-to-end drag, reopen, and undo test.
+   the frontend mirror. Update `apps/web` to use `inkfinite-ui`, and package that
+   same frontend through `apps/desktop`. Exit with an end-to-end drag, reopen,
+   and undo test against the shared UI.
 4. **Editor structure and scale:** extract the editor runtime, fix resize cursor
    mapping, add culling/caches/benchmarks, and add a spatial index only if needed.
    Exit with the recorded 10,000-shape budget passing.
@@ -420,10 +432,11 @@ recovery prompts, and release migrations.
 
 ## Deferred milestones
 
-- Adapt the web app to the v2 Rust/CRDT authority after the desktop contracts and
-  file format stabilize. Its Dexie migration must backfill every existing board
-  with a default layer and preserve shape order. Keep the current web build green
-  during vNext work.
+- Adapt the standalone browser runtime and Dexie persistence to the v2 Rust/CRDT
+  authority after the desktop contracts and file format stabilize. Its migration
+  must backfill every existing board with a default layer and preserve shape
+  order. Shared `apps/web` components and `inkfinite-ui` adoption remain part of
+  milestone 3; keep the browser build green while desktop behavior changes.
 - Add hosted sync relay, identity, invitations, permissions, and ephemeral
   presence after local peer sync is correct and threat-modeled.
 - Consider WebGL, OffscreenCanvas, third-party shape plugins, Figma import,

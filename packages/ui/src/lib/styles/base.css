@@ -1,0 +1,19 @@
+html {
+  font-family: var(--ink-font-body);
+  background: var(--ink-canvas);
+}
+
+body {
+  margin: 0;
+  color: var(--ink-text);
+  background: var(--ink-canvas);
+  font-family: var(--ink-font-body);
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  color: var(--ink-on-accent);
+  background: var(--ink-accent);
+}

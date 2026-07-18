@@ -217,7 +217,9 @@ cargo test -p inkfinite-core file::
 ## Milestone 3: Desktop vertical slice
 
 Exit when a desktop gesture commits through Rust, redraws from a returned patch,
-survives reopen, and can be undone.
+survives reopen, and can be undone. The implementation must update `apps/web` to
+consume `inkfinite-ui`, because `apps/desktop` packages that SvelteKit build. Do
+not create a separate desktop component tree or theme.
 
 ### V2-08: Make Tauri own document sessions
 
@@ -234,6 +236,12 @@ Acceptance criteria:
       commands call shared crates and return typed errors and patches.
 - [ ] File I/O leaves the frontend and plugin capabilities are reduced to the
       minimum still required.
+- [ ] `apps/web` imports `inkfinite-ui/styles.css` once and uses shared package
+      components for the desktop vertical slice instead of adding new local
+      copies under `apps/web/src/lib/components`.
+- [ ] `apps/desktop` builds and packages the same `apps/web` frontend. Desktop-only
+      behavior stays in Tauri commands or thin adapters, while components,
+      themes, fonts, and icons come from `inkfinite-ui`.
 - [ ] Integration tests cover open, edit, save, reopen, undo, failed validation,
       stale heads, and a simulated write failure.
 
@@ -242,6 +250,8 @@ Verification:
 ```sh
 cargo test -p desktop
 pnpm --filter inkfinite-web test
+pnpm --filter inkfinite-ui check
+pnpm --filter inkfinite-ui test
 ```
 
 ### V2-09: Extract the editor runtime and transaction drafts
@@ -260,6 +270,8 @@ Acceptance criteria:
       stencil insertion, or shortcut produces one transaction draft.
 - [ ] The frontend document mirror changes only through snapshots or commit/sync
       patches from Rust.
+- [ ] Svelte adapters compose controls from `inkfinite-ui`; reusable visual
+      components do not gain editor-runtime, persistence, or Tauri dependencies.
 - [ ] Existing keyboard, selection, text, Markdown, arrow, pen, grid snap,
       stencil, and history behavior remains covered.
 - [ ] One browser integration test performs drag → Rust commit → patch → redraw

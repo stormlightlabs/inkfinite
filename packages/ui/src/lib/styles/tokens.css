@@ -1,0 +1,129 @@
+:root,
+[data-ink-theme="light"] {
+  color-scheme: light;
+
+  --ink-eldritch-background: #f0f3f4;
+  --ink-eldritch-current-line: #e2e6e8;
+  --ink-eldritch-surface: #d5d9db;
+  --ink-eldritch-overlay: #c9cbcd;
+  --ink-eldritch-foreground: #1e2029;
+  --ink-eldritch-comment: #5b73dc;
+  --ink-eldritch-green: #38ff9f;
+  --ink-eldritch-orange: #ffaf4d;
+  --ink-eldritch-pink: #fb5bb6;
+  --ink-eldritch-purple: #8a69f7;
+  --ink-eldritch-red: #fb5b66;
+
+  --ink-canvas: var(--ink-eldritch-background);
+  --ink-surface: var(--ink-eldritch-current-line);
+  --ink-surface-raised: #fff;
+  --ink-surface-hover: var(--ink-eldritch-surface);
+  --ink-text: var(--ink-eldritch-foreground);
+  --ink-text-muted: #495063;
+  --ink-heading: #4d348f;
+  --ink-border: #858a98;
+  --ink-border-strong: var(--ink-eldritch-foreground);
+  --ink-accent: var(--ink-eldritch-purple);
+  --ink-accent-hover: #7556dc;
+  --ink-accent-text: #6044bd;
+  --ink-focus: var(--ink-eldritch-comment);
+  --ink-danger: var(--ink-eldritch-red);
+  --ink-on-accent: #11131b;
+  --ink-on-danger: #11131b;
+  --ink-shadow-color: #1e2029;
+
+  --ink-font-body: "IBM Plex Sans Variable", "Segoe UI", sans-serif;
+  --ink-font-display: "Playpen Sans Variable", "Comic Sans MS", cursive;
+  --ink-type-xs: 0.75rem;
+  --ink-type-sm: 0.875rem;
+  --ink-type-base: 1rem;
+  --ink-type-lg: clamp(1.2rem, 1rem + 0.5vw, 1.5rem);
+
+  --ink-space-1: 0.25rem;
+  --ink-space-2: 0.5rem;
+  --ink-space-3: 0.75rem;
+  --ink-space-4: 1rem;
+  --ink-space-5: 1.5rem;
+  --ink-space-6: 2rem;
+  --ink-control-height-sm: 2rem;
+  --ink-control-height: 2.5rem;
+  --ink-line-width: 2px;
+  --ink-shadow-offset: 2px;
+  --ink-radius-wobbly: 4px 8px 5px 7px / 7px 5px 8px 4px;
+  --ink-radius-wobbly-small: 3px 6px 4px 5px / 5px 4px 6px 3px;
+  --ink-radius-panel: 9px 15px 11px 13px / 13px 9px 15px 11px;
+  --ink-radius-panel-small: 6px 10px 7px 9px / 9px 6px 10px 7px;
+  --ink-shadow-panel: 5px 6px 0 var(--ink-shadow-color);
+  --ink-shadow-toolbar: 3px 4px 0 var(--ink-shadow-color);
+  --ink-duration-fast: 120ms;
+  --ink-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-ink-theme="dark"] {
+  color-scheme: dark;
+
+  --ink-eldritch-background: #171928;
+  --ink-eldritch-current-line: #252738;
+  --ink-eldritch-surface: #353746;
+  --ink-eldritch-overlay: #474852;
+  --ink-eldritch-foreground: #d8e6e6;
+  --ink-eldritch-comment: #506299;
+  --ink-eldritch-green: #2dcc82;
+  --ink-eldritch-orange: #d4a666;
+  --ink-eldritch-pink: #d154a1;
+  --ink-eldritch-purple: #8b75d9;
+  --ink-eldritch-red: #cc5860;
+
+  --ink-canvas: var(--ink-eldritch-background);
+  --ink-surface: var(--ink-eldritch-current-line);
+  --ink-surface-raised: var(--ink-eldritch-surface);
+  --ink-surface-hover: var(--ink-eldritch-overlay);
+  --ink-text: var(--ink-eldritch-foreground);
+  --ink-text-muted: #a7b4bc;
+  --ink-heading: #c2b5f0;
+  --ink-border: #646675;
+  --ink-border-strong: #b8c5c8;
+  --ink-accent: var(--ink-eldritch-green);
+  --ink-accent-hover: #45dda0;
+  --ink-accent-text: #8de2bc;
+  --ink-focus: #7f91d8;
+  --ink-danger: var(--ink-eldritch-red);
+  --ink-on-accent: #101b18;
+  --ink-on-danger: #171928;
+  --ink-shadow-color: #080910;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-ink-theme]) {
+    color-scheme: dark;
+
+    --ink-eldritch-background: #171928;
+    --ink-eldritch-current-line: #252738;
+    --ink-eldritch-surface: #353746;
+    --ink-eldritch-overlay: #474852;
+    --ink-eldritch-foreground: #d8e6e6;
+    --ink-eldritch-comment: #506299;
+    --ink-eldritch-green: #2dcc82;
+    --ink-eldritch-orange: #d4a666;
+    --ink-eldritch-pink: #d154a1;
+    --ink-eldritch-purple: #8b75d9;
+    --ink-eldritch-red: #cc5860;
+    --ink-canvas: var(--ink-eldritch-background);
+    --ink-surface: var(--ink-eldritch-current-line);
+    --ink-surface-raised: var(--ink-eldritch-surface);
+    --ink-surface-hover: var(--ink-eldritch-overlay);
+    --ink-text: var(--ink-eldritch-foreground);
+    --ink-text-muted: #a7b4bc;
+    --ink-heading: #c2b5f0;
+    --ink-border: #646675;
+    --ink-border-strong: #b8c5c8;
+    --ink-accent: var(--ink-eldritch-green);
+    --ink-accent-hover: #45dda0;
+    --ink-accent-text: #8de2bc;
+    --ink-focus: #7f91d8;
+    --ink-danger: var(--ink-eldritch-red);
+    --ink-on-accent: #101b18;
+    --ink-on-danger: #171928;
+    --ink-shadow-color: #080910;
+  }
+}

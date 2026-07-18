@@ -1,0 +1,6 @@
+.svelte-kit
+dist
+playwright-report
+storybook-static
+test-results
+src/lib/styles/icons.css
