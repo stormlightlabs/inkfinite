@@ -10,7 +10,12 @@ version.workspace = true
 inkfinite-crdt.workspace = true
 inkfinite-engine.workspace = true
 inkfinite-model.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+inkfinite-protocol.workspace = true
 
 [lints]
 workspace = true
-

@@ -198,14 +198,14 @@ Blocked by: V2-04, V2-05
 
 Acceptance criteria:
 
-- [ ] Every V2-01 valid fixture imports with the same page, shape, binding,
+- [x] Every V2-01 valid fixture imports with the same page, shape, binding,
       group, style, and draw order; each page gains one default layer.
-- [ ] Invalid or newer formats produce typed errors and never overwrite input.
-- [ ] Saves use a same-directory temporary file, flush, atomic replacement where
+- [x] Invalid or newer formats produce typed errors and never overwrite input.
+- [x] Saves use a same-directory temporary file, flush, atomic replacement where
       supported, recovery copies, and advisory locking.
-- [ ] Recovery stores a compact snapshot plus bounded change journal and can
+- [x] Recovery stores a compact snapshot plus bounded change journal and can
       restore after failures at each write step.
-- [ ] JSON export is deterministic and documented as a snapshot that cannot
+- [x] JSON export is deterministic and documented as a snapshot that cannot
       preserve CRDT history.
 
 Verification:
@@ -603,5 +603,5 @@ pnpm --filter inkfinite-web lint
 
 ## Frontier
 
-V2-07 is the current frontier. Work it in a fresh implementation context before
-starting tickets that depend on safe v2 import and persistence.
+V2-08 is the current frontier. Work it in a fresh implementation context before
+starting tickets that depend on Rust-owned document sessions.

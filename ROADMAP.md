@@ -166,6 +166,14 @@ hit test for the frozen 10,000-shape board. The V1 medians are 0.61 ms and
 0.22 ms. V2-11 may add a spatial index only if its linear query path misses the
 1 ms budget.
 
+V2-07 completed on July 17, 2026. inkfinite-file imports the frozen v1 desktop
+and web envelopes into normalized pages, default layers, scene containers,
+bindings, styles, and deterministic draw order. It writes compact canonical
+Automerge files through same-directory temporary files, flushes before
+replacement, holds advisory locks, and retains bounded recovery snapshots plus
+encoded change journals across failed writes. JSON export is deterministic and
+history-free, as documented in [docs/v2-file-format.md](docs/v2-file-format.md).
+
 One Inkfinite transaction maps to one Automerge change. Causal heads, rather
 than a scalar revision, are the concurrency token. A local sequence number may
 be displayed, but callers use inspected heads and operation preconditions.
