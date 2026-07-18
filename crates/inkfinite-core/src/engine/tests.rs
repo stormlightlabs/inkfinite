@@ -2,16 +2,16 @@
 
 use std::collections::BTreeMap;
 
-use inkfinite_crdt::{AutomergeDocument, CrdtDocument};
-use inkfinite_model::{
+use crate::crdt::{AutomergeDocument, CrdtDocument};
+use crate::proto::{
+    Bounds, LayerPatch, Operation, Query, ShapeAlignment, ShapePatch, TransactionDraft,
+    TransactionId,
+};
+use crate::{
     ActorId, BindingAnchor, BindingId, BindingKind, BindingRecord, Document, DocumentId, LayerId,
     LayerRecord, Opacity, Origin, PageId, PageRecord, Provenance, RecordVersion, SemanticMetadata,
     ShapeId, ShapeKind, ShapeParent, ShapeProperties, ShapeRecord, ShapeStyle, SiblingAnchor,
     Timestamp, Transform, Vec2,
-};
-use inkfinite_protocol::{
-    Bounds, LayerPatch, Operation, Query, ShapeAlignment, ShapePatch, TransactionDraft,
-    TransactionId,
 };
 use proptest::prelude::*;
 use serde_json::json;
@@ -379,7 +379,7 @@ fn layer_visual_changes_return_regions_and_deletes_honor_locked_descendants() {
         "delete locked content",
         vec![Operation::DeleteLayer {
             layer_id: LayerId::from("layer:one"),
-            contents: inkfinite_protocol::LayerContentsDisposition::Delete,
+            contents: crate::proto::LayerContentsDisposition::Delete,
             expected_version: Some(RecordVersion(1)),
         }],
     );
@@ -448,9 +448,7 @@ fn queries_bounds_alignment_and_distribution_share_the_transaction_engine() {
     let result = engine.query(&query).unwrap();
     assert_eq!(
         result.records,
-        vec![inkfinite_protocol::RecordId::Shape(ShapeId::from(
-            "shape:a"
-        ))]
+        vec![crate::proto::RecordId::Shape(ShapeId::from("shape:a"))]
     );
 
     let align = transaction(

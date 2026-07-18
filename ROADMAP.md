@@ -93,20 +93,14 @@ patch for the frontend's read-only document mirror.
 
 ### Crate and package boundaries
 
-| Unit                   | Responsibility                                                           |
-| ---------------------- | ------------------------------------------------------------------------ |
-| `inkfinite-model`      | IDs, records, semantic metadata, versions, schema/binding generation     |
-| `inkfinite-crdt`       | Automerge mapping, heads, merge, sync, compaction, materialization       |
-| `inkfinite-engine`     | Transactions, inverse operations, validation, queries, layout, revisions |
-| `inkfinite-file`       | Import, migration, atomic saves, locking, recovery, export               |
-| `inkfinite-protocol`   | Serializable Tauri, CLI, and IPC requests and responses                  |
-| `inkfinite-render-svg` | Deterministic headless rendering of built-in shapes                      |
-| `inkfinite-ipc`        | Authenticated local-socket server and client                             |
-| `inkfinite-cli`        | `clap`, formatting, exit codes, and calls into shared crates             |
-| `editor-runtime`       | Framework-neutral tools, camera, selection, and previews                 |
-| `renderer-canvas`      | Svelte-independent Canvas 2D renderer                                    |
-| `input-dom`            | Browser input normalization                                              |
-| `bindings`            | Generated TypeScript records; never hand-edited                          |
+| Unit               | Responsibility                                                          |
+| ------------------ | ----------------------------------------------------------------------- |
+| `inkfinite-core`   | Document model and engine plus CRDT, file, protocol, rendering, and IPC |
+| `inkfinite-cli`    | `clap`, formatting, exit codes, and calls into shared Rust code         |
+| `editor-runtime`   | Framework-neutral tools, camera, selection, and previews                |
+| `renderer-canvas`  | Svelte-independent Canvas 2D renderer                                   |
+| `input-dom`        | Browser input normalization                                             |
+| `bindings`         | Generated TypeScript records; never hand-edited                         |
 
 Business logic must not depend on Tauri, Svelte, CLI parsing, or a transport.
 
@@ -135,8 +129,8 @@ V2-02 completed this gate on July 17, 2026. The proof exchanged compact files
 between Rust and JavaScript, converged offline edits independent of merge order,
 and validated deterministic hierarchy repair before adoption. Automerge passed,
 so Yjs/Yrs was not evaluated. V2-05 moved the reusable Rust coverage into
-`inkfinite-crdt` and `inkfinite-engine`, then removed the disposable proof. The
-measurements below preserve the architecture-gate evidence.
+`inkfinite-core::crdt` and the transaction engine, then removed the disposable
+proof. The measurements below preserve the architecture-gate evidence.
 
 On the V2-01 Apple M1 reference machine, the 3.98 MB, 10,000-shape JSON fixture
 produced a 211 KB compact Rust document. Rust import, load, and save took 1.76 s,
@@ -153,7 +147,7 @@ cross-language tests passed without changing the Inkfinite proof boundary.
 Production code depends on the Inkfinite-owned CRDT contracts rather than
 Automerge types, so changes to Automerge's low-level API remain isolated.
 
-V2-06 completed on July 17, 2026. `inkfinite-model` and `inkfinite-protocol`
+V2-06 completed on July 17, 2026. `inkfinite-core`'s root model and `proto` module
 derive Schemars and `ts-rs` bindings from the Rust records. The binding
 generator writes document, transaction, and protocol schemas under `schemas/`
 and bindings under `packages/bindings/src/`. Its `--check` mode fails
@@ -166,10 +160,10 @@ hit test for the frozen 10,000-shape board. The V1 medians are 0.61 ms and
 0.22 ms. V2-11 may add a spatial index only if its linear query path misses the
 1 ms budget.
 
-V2-07 completed on July 17, 2026. inkfinite-file imports the frozen v1 desktop
-and web envelopes into normalized pages, default layers, scene containers,
-bindings, styles, and deterministic draw order. It writes compact canonical
-Automerge files through same-directory temporary files, flushes before
+V2-07 completed on July 17, 2026. `inkfinite-core::file` imports the frozen v1
+desktop and web envelopes into normalized pages, default layers, scene
+containers, bindings, styles, and deterministic draw order. It writes compact
+canonical Automerge files through same-directory temporary files, flushes before
 replacement, holds advisory locks, and retains bounded recovery snapshots plus
 encoded change journals across failed writes. JSON export is deterministic and
 history-free, as documented in [docs/v2-file-format.md](docs/v2-file-format.md).
@@ -450,7 +444,8 @@ recovery prompts, and release migrations.
 ## Risks and open questions
 
 - Automerge's Rust API is lower-level than its JavaScript API. The architecture
-  gate must contain it inside `inkfinite-crdt`; Yjs/Yrs is the defined fallback.
+  gate must contain it inside `inkfinite-core::crdt`; Yjs/Yrs is the defined
+  fallback.
 - Concurrent hierarchy edits can violate referential invariants. Repair rules
   need property-based convergence tests before the v2 schema is frozen.
 - CRDT history, freehand strokes, assets, and large boards may raise memory and

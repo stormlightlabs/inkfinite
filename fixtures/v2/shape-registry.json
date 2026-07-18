@@ -1,6 +1,6 @@
 {
   "_do_not_edit": true,
-  "_generated_by": "cargo run -p inkfinite-protocol --bin generate-bindings",
+  "_generated_by": "cargo run -p inkfinite-cli --bin generate-bindings",
   "format": "inkfinite.shape-registry-fixture",
   "geometry": {
     "bounds": "axis_aligned_enclosing_bounds",

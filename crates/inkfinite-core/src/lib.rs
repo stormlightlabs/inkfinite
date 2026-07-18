@@ -1,4 +1,13 @@
-//! Durable, transport-independent records for Inkfinite v2 documents.
+//! Durable, transport-independent contracts and services for Inkfinite.
+
+#![forbid(unsafe_code)]
+
+pub mod crdt;
+pub mod engine;
+pub mod file;
+pub mod ipc;
+pub mod proto;
+pub mod render;
 
 use std::collections::BTreeMap;
 use std::fmt;

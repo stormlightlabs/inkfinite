@@ -6,12 +6,12 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use inkfinite_crdt::EncodedChange;
-use inkfinite_engine::{TransactionDraft, TransactionEngine};
-use inkfinite_model::{ActorId, ChangeHash, Document, DocumentId, DocumentSnapshot};
+use crate::crdt::EncodedChange;
+use crate::engine::{TransactionDraft, TransactionEngine};
+use crate::{ActorId, ChangeHash, Document, DocumentId, DocumentSnapshot};
 use serde::{Deserialize, Serialize};
 
-use crate::{FileError, ImportedV1, import_v1_json};
+use super::{FileError, ImportedV1, import_v1_json};
 
 const RECOVERY_FORMAT: &str = "inkfinite.recovery";
 const RECOVERY_VERSION: u32 = 1;
@@ -341,7 +341,7 @@ impl DocumentFile {
     pub fn commit(
         &mut self,
         transaction: TransactionDraft,
-    ) -> Result<inkfinite_engine::CommitResult, FileError> {
+    ) -> Result<crate::engine::CommitResult, FileError> {
         Ok(self.engine.commit(transaction)?)
     }
 

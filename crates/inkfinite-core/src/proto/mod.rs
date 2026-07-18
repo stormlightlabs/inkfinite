@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use inkfinite_model::{
+use crate::{
     ActorId, AssetId, AssetRecord, BindingId, BindingRecord, ChangeHash, ContainerLayout,
     DocumentId, DocumentSnapshot, LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord,
     RecordVersion, SemanticMetadata, ShapeId, ShapeParent, ShapeProperties, ShapeRecord,

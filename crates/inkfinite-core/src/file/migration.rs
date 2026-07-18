@@ -2,8 +2,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use inkfinite_engine::{TransactionEngine, validate_document};
-use inkfinite_model::{
+use crate::engine::{TransactionEngine, validate_document};
+use crate::{
     ActorId, BindingAnchor, BindingId, BindingKind, BindingRecord, Document, DocumentId, LayerId,
     LayerRecord, Opacity, Origin, PageId, PageRecord, Provenance, RecordVersion, SemanticMetadata,
     ShapeId, ShapeKind, ShapeParent, ShapeProperties, ShapeRecord, ShapeStyle, Timestamp,
@@ -12,7 +12,7 @@ use inkfinite_model::{
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
-use crate::FileError;
+use super::FileError;
 
 /// A normalized v2 document produced by importing a v1 JSON file.
 #[derive(Clone, Debug)]
@@ -368,7 +368,7 @@ fn migrate(envelope: LegacyEnvelope, actor_id: &ActorId) -> Result<ImportedV1, F
                 parent: ShapeParent::Layer(layer_id),
                 transform: identity_transform(),
                 child_ids: group.shape_ids.clone(),
-                layout: Some(inkfinite_model::ContainerLayout::Free),
+                layout: Some(crate::ContainerLayout::Free),
                 properties: ShapeProperties::new(),
                 metadata: imported_metadata(actor_id, timestamp, Some(group_id.clone())),
                 style: ShapeStyle {
@@ -422,7 +422,7 @@ fn migrate(envelope: LegacyEnvelope, actor_id: &ActorId) -> Result<ImportedV1, F
                 legacy_binding.from_shape_id
             )));
         }
-        if shapes[&source_shape_id].kind.as_str() != inkfinite_model::ARROW_KIND {
+        if shapes[&source_shape_id].kind.as_str() != crate::ARROW_KIND {
             return Err(invalid_v1(format!(
                 "binding {binding_key} source shape {} is not an arrow",
                 legacy_binding.from_shape_id

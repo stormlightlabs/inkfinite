@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use inkfinite_model::{ActorId, Document, DocumentId, ShapeId, ShapeProperties};
+use crate::{ActorId, Document, DocumentId, ShapeId, ShapeProperties};
 use serde_json::json;
 
 use super::{AutomergeDocument, AutomergeSyncSession, CrdtDocument, SyncSession};
@@ -54,9 +54,7 @@ fn changes_and_transport_independent_sync_converge() {
     let mut right = AutomergeDocument::load(&bytes, ActorId::from("actor:right")).unwrap();
     let base = left.heads();
     let mut changed = empty_document();
-    changed
-        .page_ids
-        .push(inkfinite_model::PageId::from("page:one"));
+    changed.page_ids.push(crate::PageId::from("page:one"));
     left.commit_document(&changed, "add page id").unwrap();
     assert_eq!(left.changes_since(&base).unwrap().len(), 1);
 
@@ -108,12 +106,12 @@ fn ten_thousand_shape_projection_round_trips() {
     assert_eq!(loaded.snapshot().unwrap().document, document);
 }
 
-fn crate_test_shape(index: u32) -> inkfinite_model::ShapeRecord {
-    use inkfinite_model::{
+fn crate_test_shape(index: u32) -> crate::ShapeRecord {
+    use crate::{
         LayerId, Opacity, Origin, Provenance, RecordVersion, SemanticMetadata, ShapeKind,
         ShapeParent, ShapeStyle, Timestamp, Transform, Vec2,
     };
-    inkfinite_model::ShapeRecord {
+    crate::ShapeRecord {
         id: ShapeId::new(format!("shape:{index:05}")),
         kind: ShapeKind::from("rect"),
         parent: ShapeParent::Layer(LayerId::from("layer:one")),

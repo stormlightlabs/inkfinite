@@ -1835,84 +1835,23 @@ dependencies = [
 name = "inkfinite-cli"
 version = "0.0.0"
 dependencies = [
- "inkfinite-engine",
- "inkfinite-file",
- "inkfinite-ipc",
- "inkfinite-model",
- "inkfinite-protocol",
- "inkfinite-render-svg",
+ "inkfinite-core",
+ "schemars 1.2.1",
+ "serde_json",
+ "ts-rs",
 ]
 
 [[package]]
-name = "inkfinite-crdt"
+name = "inkfinite-core"
 version = "0.0.0"
 dependencies = [
  "automerge",
- "inkfinite-model",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "inkfinite-engine"
-version = "0.0.0"
-dependencies = [
- "inkfinite-crdt",
- "inkfinite-model",
- "inkfinite-protocol",
  "proptest",
- "serde_json",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "inkfinite-file"
-version = "0.0.0"
-dependencies = [
- "inkfinite-crdt",
- "inkfinite-engine",
- "inkfinite-model",
- "inkfinite-protocol",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "inkfinite-ipc"
-version = "0.0.0"
-dependencies = [
- "inkfinite-engine",
- "inkfinite-protocol",
-]
-
-[[package]]
-name = "inkfinite-model"
-version = "0.0.0"
-dependencies = [
  "schemars 1.2.1",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
  "ts-rs",
-]
-
-[[package]]
-name = "inkfinite-protocol"
-version = "0.0.0"
-dependencies = [
- "inkfinite-model",
- "schemars 1.2.1",
- "serde",
- "serde_json",
- "ts-rs",
-]
-
-[[package]]
-name = "inkfinite-render-svg"
-version = "0.0.0"
-dependencies = [
- "inkfinite-model",
 ]
 
 [[package]]

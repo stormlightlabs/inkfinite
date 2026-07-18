@@ -1,16 +1,17 @@
 [package]
-name = "inkfinite-engine"
-description = "Validated transaction engine for Inkfinite documents"
+name = "inkfinite-core"
+description = "Shared document contracts and services for Inkfinite"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-inkfinite-crdt.workspace = true
-inkfinite-model.workspace = true
-inkfinite-protocol.workspace = true
+automerge.workspace = true
+schemars.workspace = true
+serde.workspace = true
 serde_json.workspace = true
+ts-rs.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

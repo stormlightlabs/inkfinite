@@ -3,12 +3,12 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use inkfinite_engine::TransactionDraft;
-use inkfinite_model::{
+use crate::engine::TransactionDraft;
+use crate::proto::{Operation, TransactionId};
+use crate::{
     ActorId, Document, DocumentId, LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord,
     RecordVersion, Timestamp,
 };
-use inkfinite_protocol::{Operation, TransactionId};
 use serde_json::Value;
 
 use super::{
@@ -20,7 +20,7 @@ static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[test]
 fn imports_all_valid_v1_features_into_normalized_v2_records() {
-    let input = include_str!("../../../fixtures/v1/desktop/all-features.inkfinite.json");
+    let input = include_str!("../../../../fixtures/v1/desktop/all-features.inkfinite.json");
     let imported = import_v1_json(input, ActorId::from("actor:test")).expect("fixture imports");
     let source: Value = serde_json::from_str(input).expect("fixture JSON");
     let document = &imported.document;
@@ -35,7 +35,7 @@ fn imports_all_valid_v1_features_into_normalized_v2_records() {
         document
             .page_ids
             .iter()
-            .map(inkfinite_model::PageId::as_str)
+            .map(crate::PageId::as_str)
             .collect::<Vec<_>>(),
         expected_page_ids
     );
@@ -91,23 +91,24 @@ fn imports_all_valid_v1_features_into_normalized_v2_records() {
     );
     assert!(matches!(
         document.bindings[&"binding:arrow-start".into()].anchor,
-        inkfinite_model::BindingAnchor::Edge { x: 1.0, y: 0.0 }
+        crate::BindingAnchor::Edge { x: 1.0, y: 0.0 }
     ));
     assert!(matches!(
         document.bindings[&"binding:arrow-end".into()].anchor,
-        inkfinite_model::BindingAnchor::Center
+        crate::BindingAnchor::Center
     ));
 }
 
 #[test]
 fn imports_web_and_performance_v1_fixtures() {
-    let web = include_str!("../../../fixtures/v1/web/all-features.web.json");
+    let web = include_str!("../../../../fixtures/v1/web/all-features.web.json");
     let imported = import_v1_json(web, ActorId::from("actor:web")).expect("web fixture imports");
     assert_eq!(imported.document.page_ids.len(), 2);
     assert_eq!(imported.document.layers.len(), 2);
     assert_eq!(imported.document.shapes.len(), 16);
 
-    let performance = include_str!("../../../fixtures/v1/performance/board-10000.inkfinite.json");
+    let performance =
+        include_str!("../../../../fixtures/v1/performance/board-10000.inkfinite.json");
     let imported = import_v1_json(performance, ActorId::from("actor:performance"))
         .expect("large fixture imports");
     assert_eq!(imported.document.page_ids, vec![PageId::from("page:10000")]);
@@ -125,10 +126,10 @@ fn imports_web_and_performance_v1_fixtures() {
 fn rejects_invalid_and_newer_inputs_before_persistence() {
     let actor = ActorId::from("actor:test");
     let invalid_inputs = [
-        include_str!("../../../fixtures/v1/invalid/malformed-json.inkfinite.json"),
-        include_str!("../../../fixtures/v1/invalid/missing-envelope-fields.json"),
-        include_str!("../../../fixtures/v1/invalid/dangling-references.inkfinite.json"),
-        include_str!("../../../fixtures/v1/invalid/duplicate-order.inkfinite.json"),
+        include_str!("../../../../fixtures/v1/invalid/malformed-json.inkfinite.json"),
+        include_str!("../../../../fixtures/v1/invalid/missing-envelope-fields.json"),
+        include_str!("../../../../fixtures/v1/invalid/dangling-references.inkfinite.json"),
+        include_str!("../../../../fixtures/v1/invalid/duplicate-order.inkfinite.json"),
     ];
     for input in invalid_inputs {
         assert!(
@@ -152,7 +153,7 @@ fn rejects_invalid_and_newer_inputs_before_persistence() {
     let destination = temporary.path.join("existing.inkfinite");
     fs::write(
         &source,
-        include_str!("../../../fixtures/v1/invalid/duplicate-order.inkfinite.json"),
+        include_str!("../../../../fixtures/v1/invalid/duplicate-order.inkfinite.json"),
     )
     .expect("write source");
     fs::write(&destination, b"keep this file").expect("write destination");
@@ -166,7 +167,7 @@ fn rejects_invalid_and_newer_inputs_before_persistence() {
 
 #[test]
 fn canonical_sessions_lock_save_reopen_and_export_deterministically() {
-    let input = include_str!("../../../fixtures/v1/desktop/all-features.inkfinite.json");
+    let input = include_str!("../../../../fixtures/v1/desktop/all-features.inkfinite.json");
     let imported = import_v1_json(input, ActorId::from("actor:test")).expect("fixture imports");
     let expected_document = imported.document.clone();
     let temporary = TestDirectory::new();
@@ -200,7 +201,7 @@ fn canonical_sessions_lock_save_reopen_and_export_deterministically() {
 
     let canonical_bytes = fs::read(&canonical).expect("canonical bytes");
     assert!(serde_json::from_slice::<Value>(&canonical_bytes).is_err());
-    let exported: inkfinite_model::DocumentSnapshot =
+    let exported: crate::DocumentSnapshot =
         serde_json::from_str(&fs::read_to_string(&snapshot_json).expect("snapshot JSON"))
             .expect("snapshot parses");
     assert_eq!(exported.document, expected_document);
@@ -297,11 +298,11 @@ fn recovery_restores_journal_after_canonical_replace_failure() {
     );
 }
 
-fn flatten_shape_order(document: &Document, shape_ids: &[inkfinite_model::ShapeId]) -> Vec<String> {
+fn flatten_shape_order(document: &Document, shape_ids: &[crate::ShapeId]) -> Vec<String> {
     let mut flattened = Vec::new();
     for shape_id in shape_ids {
         if let Some(shape) = document.shapes.get(shape_id) {
-            if shape.kind.as_str() != inkfinite_model::CONTAINER_KIND {
+            if shape.kind.as_str() != crate::CONTAINER_KIND {
                 flattened.push(shape_id.as_str().to_owned());
             }
             flattened.extend(flatten_shape_order(document, &shape.child_ids));

@@ -1,8 +1,8 @@
-use inkfinite_model::{
+use inkfinite_core::proto::{Bounds, TransactionDraft};
+use inkfinite_core::{
     GEOMETRY_BOUNDS, GEOMETRY_COORDINATE_SYSTEM, GEOMETRY_ROTATION, ShapeProperties, ShapeRecord,
     builtin_shape_kinds, validate_shape_properties,
 };
-use inkfinite_protocol::{Bounds, TransactionDraft};
 use serde_json::Value;
 
 #[test]
@@ -74,7 +74,7 @@ fn shared_shape_fixture_matches_the_rust_registry_and_bindings() {
     assert_bounds_close(actual, expected);
 }
 
-fn transformed_bounds(width: f64, height: f64, transform: inkfinite_model::Transform) -> Bounds {
+fn transformed_bounds(width: f64, height: f64, transform: inkfinite_core::Transform) -> Bounds {
     let cos = transform.rotation.cos();
     let sin = transform.rotation.sin();
     let points = [(0.0, 0.0), (width, 0.0), (0.0, height), (width, height)].map(|(x, y)| {

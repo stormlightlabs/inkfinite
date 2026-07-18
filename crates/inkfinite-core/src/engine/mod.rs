@@ -5,22 +5,22 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
-use inkfinite_crdt::{AutomergeDocument, CrdtError, EncodedChange};
-use inkfinite_model::{
-    ActorId, AssetId, BindingId, ChangeHash, ContainerLayout, Document, DocumentId, LayerId,
-    Origin, PageId, RecordVersion, ShapeId, ShapeParent, ShapeProperties, ShapeRecord,
-    SiblingAnchor,
-};
-use inkfinite_protocol::{
+use crate::crdt::{AutomergeDocument, CrdtError, EncodedChange};
+use crate::proto::{
     AffectedRegion, AssetPatch, Bounds, DocumentPatch, InverseMetadata, LayerContentsDisposition,
     LayerPatch, LayoutAxis, Operation, Query, QueryResult, RecordId, ShapeAlignment, ShapePatch,
     TransactionId, Warning,
 };
+use crate::{
+    ActorId, AssetId, BindingId, ChangeHash, ContainerLayout, Document, DocumentId, LayerId,
+    Origin, PageId, RecordVersion, ShapeId, ShapeParent, ShapeProperties, ShapeRecord,
+    SiblingAnchor,
+};
 use thiserror::Error;
 
-pub use inkfinite_crdt::CrdtDocument;
-pub use inkfinite_model::DocumentSnapshot;
-pub use inkfinite_protocol::{CommitResult, TransactionDraft};
+pub use crate::DocumentSnapshot;
+pub use crate::crdt::CrdtDocument;
+pub use crate::proto::{CommitResult, TransactionDraft};
 
 /// Recoverable rejection from transaction, merge, validation, or query processing.
 #[derive(Debug, Error)]
@@ -61,11 +61,11 @@ struct HistoryEntry {
 
 #[derive(Clone, Default)]
 struct ExpectedRecords {
-    pages: BTreeMap<PageId, inkfinite_model::PageRecord>,
-    layers: BTreeMap<LayerId, inkfinite_model::LayerRecord>,
+    pages: BTreeMap<PageId, crate::PageRecord>,
+    layers: BTreeMap<LayerId, crate::LayerRecord>,
     shapes: BTreeMap<ShapeId, ShapeRecord>,
-    bindings: BTreeMap<BindingId, inkfinite_model::BindingRecord>,
-    assets: BTreeMap<AssetId, inkfinite_model::AssetRecord>,
+    bindings: BTreeMap<BindingId, crate::BindingRecord>,
+    assets: BTreeMap<AssetId, crate::AssetRecord>,
 }
 
 /// Rust-owned document state plus actor-scoped undo and redo metadata.
@@ -382,7 +382,7 @@ impl TransactionEngine {
             base_heads: self.crdt.heads(),
             description: format!("{action} actor transaction"),
             operations,
-            timestamp: inkfinite_model::Timestamp(self.history_sequence.cast_signed()),
+            timestamp: crate::Timestamp(self.history_sequence.cast_signed()),
         }
     }
 }
@@ -831,8 +831,8 @@ fn merge_shape_compensation(
     current: &ShapeRecord,
 ) -> Result<(), EngineError> {
     if let Some(before) = patch.transform {
-        patch.transform = Some(inkfinite_model::Transform {
-            translation: inkfinite_model::Vec2 {
+        patch.transform = Some(crate::Transform {
+            translation: crate::Vec2 {
                 x: merge_history_value(
                     &before.translation.x,
                     &expected.transform.translation.x,
@@ -921,7 +921,7 @@ fn merge_shape_compensation(
         patch.metadata = Some(merged);
     }
     if let Some(before) = patch.style {
-        patch.style = Some(inkfinite_model::ShapeStyle {
+        patch.style = Some(crate::ShapeStyle {
             opacity: merge_history_value(
                 &before.opacity,
                 &expected.style.opacity,
@@ -1160,7 +1160,7 @@ fn apply_operation(
             binding_id,
             expected_version,
         } => {
-            let binding = inkfinite_model::BindingRecord {
+            let binding = crate::BindingRecord {
                 version: RecordVersion(1),
                 ..binding(document, binding_id, *expected_version)?.clone()
             };
@@ -1185,7 +1185,7 @@ fn apply_operation(
             asset_id,
             expected_version,
         } => {
-            let asset = inkfinite_model::AssetRecord {
+            let asset = crate::AssetRecord {
                 version: RecordVersion(1),
                 ..asset(document, asset_id, *expected_version)?.clone()
             };
@@ -1383,7 +1383,7 @@ fn delete_page(
         .flat_map(|layer_id| descendant_ids_for_layer(document, layer_id))
         .collect();
     let mut inverse = vec![Operation::CreatePage {
-        page: inkfinite_model::PageRecord {
+        page: crate::PageRecord {
             layer_ids: Vec::new(),
             version: RecordVersion(1),
             ..page.clone()
@@ -1449,7 +1449,7 @@ fn delete_layer(
             }
             let root_ids = layer.shape_ids.clone();
             let mut inverse = vec![Operation::CreateLayer {
-                layer: inkfinite_model::LayerRecord {
+                layer: crate::LayerRecord {
                     shape_ids: Vec::new(),
                     version: RecordVersion(1),
                     ..layer.clone()
@@ -1482,7 +1482,7 @@ fn delete_layer(
         }
         LayerContentsDisposition::Delete => {
             let mut inverse = vec![Operation::CreateLayer {
-                layer: inkfinite_model::LayerRecord {
+                layer: crate::LayerRecord {
                     shape_ids: Vec::new(),
                     version: RecordVersion(1),
                     ..layer.clone()
@@ -1505,7 +1505,7 @@ fn delete_layer(
 
 fn remove_layer_record(
     document: &mut Document,
-    layer: &inkfinite_model::LayerRecord,
+    layer: &crate::LayerRecord,
 ) -> Result<(), EngineError> {
     let page = document
         .pages
@@ -1587,7 +1587,7 @@ fn append_binding_restoration(
             || shape_ids.contains(&binding.target_shape_id)
         {
             operations.push(Operation::CreateBinding {
-                binding: inkfinite_model::BindingRecord {
+                binding: crate::BindingRecord {
                     version: RecordVersion(1),
                     ..binding.clone()
                 },
@@ -1884,9 +1884,9 @@ pub fn validate_document(document: &Document) -> Result<(), EngineError> {
 }
 
 fn validate_shape_schema(shape: &ShapeRecord) -> Result<(), EngineError> {
-    inkfinite_model::validate_shape_properties(shape.kind.as_str(), &shape.properties)
+    crate::validate_shape_properties(shape.kind.as_str(), &shape.properties)
         .map_err(|error| EngineError::Schema(format!("shape {}: {error}", shape.id)))?;
-    if shape.kind.as_str() != inkfinite_model::CONTAINER_KIND
+    if shape.kind.as_str() != crate::CONTAINER_KIND
         && (!shape.child_ids.is_empty() || shape.layout.is_some())
     {
         return Err(EngineError::Schema(format!(
@@ -1947,7 +1947,7 @@ fn validate_shape_schema(shape: &ShapeRecord) -> Result<(), EngineError> {
 fn validate_layout_numbers(
     shape: &ShapeRecord,
     gap: f64,
-    padding: &inkfinite_model::Insets,
+    padding: &crate::Insets,
 ) -> Result<(), EngineError> {
     if ![
         gap,
@@ -2016,18 +2016,19 @@ pub fn repair_document(document: &mut Document) -> Result<Vec<Warning>, EngineEr
         layers.dedup();
         if layers.is_empty() {
             let layer_id = LayerId::new(format!("layer:recovered:{}", page_id.as_str()));
-            document.layers.entry(layer_id.clone()).or_insert_with(|| {
-                inkfinite_model::LayerRecord {
+            document
+                .layers
+                .entry(layer_id.clone())
+                .or_insert_with(|| crate::LayerRecord {
                     id: layer_id.clone(),
                     page_id: page_id.clone(),
                     name: "Recovered".into(),
                     shape_ids: Vec::new(),
                     visible: true,
                     locked: false,
-                    opacity: inkfinite_model::Opacity::OPAQUE,
+                    opacity: crate::Opacity::OPAQUE,
                     version: RecordVersion(1),
-                }
-            });
+                });
             layers.push(layer_id.clone());
             warnings.push(warning(
                 "recovered_layer",
@@ -2481,7 +2482,7 @@ fn world_shape_bounds(document: &Document, shape_id: &ShapeId) -> Bounds {
     bounds
 }
 
-fn transformed_bounds(width: f64, height: f64, transform: inkfinite_model::Transform) -> Bounds {
+fn transformed_bounds(width: f64, height: f64, transform: crate::Transform) -> Bounds {
     let cos = transform.rotation.cos();
     let sin = transform.rotation.sin();
     let points = [(0.0, 0.0), (width, 0.0), (0.0, height), (width, height)].map(|(x, y)| {
@@ -2611,7 +2612,7 @@ fn ensure_acyclic(document: &Document, start: &ShapeId) -> Result<(), EngineErro
 
 fn ensure_binding_endpoints(
     document: &Document,
-    binding: &inkfinite_model::BindingRecord,
+    binding: &crate::BindingRecord,
 ) -> Result<(), EngineError> {
     if !document.shapes.contains_key(&binding.source_shape_id)
         || !document.shapes.contains_key(&binding.target_shape_id)
@@ -2671,7 +2672,7 @@ fn page<'a>(
     document: &'a Document,
     id: &PageId,
     expected: Option<RecordVersion>,
-) -> Result<&'a inkfinite_model::PageRecord, EngineError> {
+) -> Result<&'a crate::PageRecord, EngineError> {
     let value = document
         .pages
         .get(id)
@@ -2683,7 +2684,7 @@ fn page_mut<'a>(
     document: &'a mut Document,
     id: &PageId,
     expected: Option<RecordVersion>,
-) -> Result<&'a mut inkfinite_model::PageRecord, EngineError> {
+) -> Result<&'a mut crate::PageRecord, EngineError> {
     let value = document
         .pages
         .get_mut(id)
@@ -2695,7 +2696,7 @@ fn layer<'a>(
     document: &'a Document,
     id: &LayerId,
     expected: Option<RecordVersion>,
-) -> Result<&'a inkfinite_model::LayerRecord, EngineError> {
+) -> Result<&'a crate::LayerRecord, EngineError> {
     let value = document
         .layers
         .get(id)
@@ -2707,7 +2708,7 @@ fn layer_mut<'a>(
     document: &'a mut Document,
     id: &LayerId,
     expected: Option<RecordVersion>,
-) -> Result<&'a mut inkfinite_model::LayerRecord, EngineError> {
+) -> Result<&'a mut crate::LayerRecord, EngineError> {
     let value = document
         .layers
         .get_mut(id)
@@ -2743,7 +2744,7 @@ fn binding<'a>(
     document: &'a Document,
     id: &BindingId,
     expected: Option<RecordVersion>,
-) -> Result<&'a inkfinite_model::BindingRecord, EngineError> {
+) -> Result<&'a crate::BindingRecord, EngineError> {
     let value = document
         .bindings
         .get(id)
@@ -2755,7 +2756,7 @@ fn asset<'a>(
     document: &'a Document,
     id: &AssetId,
     expected: Option<RecordVersion>,
-) -> Result<&'a inkfinite_model::AssetRecord, EngineError> {
+) -> Result<&'a crate::AssetRecord, EngineError> {
     let value = document
         .assets
         .get(id)
@@ -2767,7 +2768,7 @@ fn asset_mut<'a>(
     document: &'a mut Document,
     id: &AssetId,
     expected: Option<RecordVersion>,
-) -> Result<&'a mut inkfinite_model::AssetRecord, EngineError> {
+) -> Result<&'a mut crate::AssetRecord, EngineError> {
     let value = document
         .assets
         .get_mut(id)
@@ -2905,7 +2906,7 @@ fn remove_shape_child(
 fn containing_layer<'a>(
     document: &'a Document,
     shape: &ShapeRecord,
-) -> Option<&'a inkfinite_model::LayerRecord> {
+) -> Option<&'a crate::LayerRecord> {
     let mut parent = shape.parent.clone();
     loop {
         match parent {

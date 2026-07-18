@@ -142,7 +142,7 @@ Acceptance criteria:
       checks run on a fork before an atomic commit.
 - [x] Undo and redo emit actor-scoped compensating changes and preserve
       intervening edits from other actors.
-- [x] Production `inkfinite-crdt` tests absorb the reusable V2-02 cases for
+- [x] Production `inkfinite-core::crdt` tests absorb the reusable V2-02 cases for
       nested data, patches, heads, actor IDs, undo, fork repair, convergence,
       transport-independent sync, save/load, compaction, and 10,000 shapes.
       Preserve the measured benchmark result, then remove
@@ -156,7 +156,7 @@ Acceptance criteria:
 Verification:
 
 ```sh
-cargo test -p inkfinite-engine -p inkfinite-crdt
+cargo test -p inkfinite-core
 test ! -d spikes/crdt-automerge
 ```
 
@@ -179,12 +179,12 @@ Acceptance criteria:
 
 Verification:
 
-- `cargo run -p inkfinite-protocol --bin generate-bindings` generates the
+- `cargo run -p inkfinite-cli --bin generate-bindings` generates the
   schemas, bindings, and shared fixture. Running it again leaves the generated
   files unchanged.
-- `cargo run -p inkfinite-protocol --bin generate-bindings -- --check` fails
+- `cargo run -p inkfinite-cli --bin generate-bindings -- --check` fails
   when any generated artifact is stale.
-- `cargo test -p inkfinite-model -p inkfinite-protocol` runs the Rust registry
+- `cargo test -p inkfinite-core` runs the Rust registry
   and shared-fixture conformance tests.
 - `pnpm --filter bindings test` typechecks the bindings and runs the
   TypeScript fixture conformance test.
@@ -211,7 +211,7 @@ Acceptance criteria:
 Verification:
 
 ```sh
-cargo test -p inkfinite-file
+cargo test -p inkfinite-core file::
 ```
 
 ## Milestone 3: Desktop vertical slice
@@ -409,7 +409,7 @@ Acceptance criteria:
 Verification:
 
 ```sh
-cargo test -p inkfinite-render-svg
+cargo test -p inkfinite-core render::
 ```
 
 ### V2-15: Ship read-only and schema CLI commands
@@ -485,7 +485,8 @@ Acceptance criteria:
 Verification:
 
 ```sh
-cargo test -p inkfinite-ipc -p inkfinite-cli -p desktop
+cargo test -p inkfinite-core ipc::
+cargo test -p inkfinite-cli -p desktop
 ```
 
 ### V2-18: Add reviewable agent proposals and explicit apply

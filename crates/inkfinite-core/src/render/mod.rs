@@ -1,3 +1,3 @@
 //! Deterministic SVG rendering boundary.
 
-pub use inkfinite_model::DocumentSnapshot;
+pub use crate::DocumentSnapshot;

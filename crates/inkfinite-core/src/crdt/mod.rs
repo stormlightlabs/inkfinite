@@ -4,15 +4,15 @@
 
 use std::str::FromStr;
 
+use crate::{
+    ActorId, ChangeHash, Document, DocumentId, DocumentSnapshot, FormatId, INKFINITE_FORMAT_ID,
+    INKFINITE_FORMAT_VERSION,
+};
 use automerge::sync::{State as AutomergeSyncState, SyncDoc};
 use automerge::transaction::{CommitOptions, Transactable};
 use automerge::{
     ActorId as AutomergeActorId, AutoCommit, AutoSerde, Change, ObjId, ObjType, ROOT, ReadDoc,
     ScalarValue,
-};
-use inkfinite_model::{
-    ActorId, ChangeHash, Document, DocumentId, DocumentSnapshot, FormatId, INKFINITE_FORMAT_ID,
-    INKFINITE_FORMAT_VERSION,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};

@@ -9,7 +9,7 @@
 
 use std::path::PathBuf;
 
-use inkfinite_engine::EngineError;
+use crate::engine::EngineError;
 use thiserror::Error;
 
 /// Recoverable failure at the import, persistence, or recovery boundary.
@@ -64,9 +64,9 @@ pub enum FileError {
 mod migration;
 mod persistence;
 
-pub use inkfinite_crdt::CrdtDocument;
-pub use inkfinite_engine::{CommitResult, TransactionDraft, TransactionEngine};
-pub use inkfinite_model::DocumentSnapshot;
+pub use crate::DocumentSnapshot;
+pub use crate::crdt::CrdtDocument;
+pub use crate::engine::{CommitResult, TransactionDraft, TransactionEngine};
 pub use migration::{ImportedV1, import_v1_json, parse_v1_json};
 pub use persistence::{
     DocumentFile, PersistenceOptions, SaveResult, export_snapshot_json, import_v1_file,
