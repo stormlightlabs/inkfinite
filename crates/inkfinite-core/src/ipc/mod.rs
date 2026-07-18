@@ -18,8 +18,10 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::DocumentSnapshot;
 use crate::file::FileError;
-use crate::proto::{PROTOCOL_ID, PROTOCOL_VERSION, Query, QueryResult, SessionId};
-use crate::session::{SessionError, SessionService, SessionStatus};
+use crate::proto::{
+    ApplyAuthorization, PROTOCOL_ID, PROTOCOL_VERSION, Proposal, ProposalId, Query, QueryResult, SessionId,
+};
+use crate::session::{SessionCommit, SessionError, SessionService, SessionStatus};
 
 pub use crate::engine::{CommitResult, TransactionDraft};
 pub use crate::proto::{ProtocolError, Request, Response};
@@ -70,6 +72,38 @@ pub enum AppRequest {
         /// Shared semantic and hierarchy filters.
         query: Query,
     },
+    /// Validate and store an agent transaction for desktop review.
+    Propose {
+        /// Session to propose against, or the only open session when omitted.
+        session_id: Option<SessionId>,
+        /// Agent transaction to validate and preview.
+        transaction: TransactionDraft,
+    },
+    /// Accept all or selected operations from a reviewed proposal.
+    AcceptProposal {
+        /// Session owning the proposal, or the only open session when omitted.
+        session_id: Option<SessionId>,
+        /// Proposal to accept.
+        proposal_id: ProposalId,
+        /// Zero-based operation positions, or all operations when omitted.
+        operation_positions: Option<Vec<u32>>,
+    },
+    /// Reject a reviewed proposal without changing the document.
+    RejectProposal {
+        /// Session owning the proposal, or the only open session when omitted.
+        session_id: Option<SessionId>,
+        /// Proposal to reject.
+        proposal_id: ProposalId,
+    },
+    /// Apply an agent transaction after consuming explicit desktop authorization.
+    Apply {
+        /// Session to change, or the only open session when omitted.
+        session_id: Option<SessionId>,
+        /// Agent transaction to validate and apply.
+        transaction: TransactionDraft,
+        /// One-time authorization issued by the desktop UI.
+        authorization: ApplyAuthorization,
+    },
     /// Ask the desktop frontend to bring its main window forward.
     Focus,
 }
@@ -100,6 +134,12 @@ pub enum AppResponse {
     Snapshot(DocumentSnapshot),
     /// Shared deterministic query result.
     QueryResult(QueryResult),
+    /// A transaction was validated and stored for review.
+    Proposal(Proposal),
+    /// A proposal was rejected and removed.
+    ProposalRejected,
+    /// A directly authorized transaction was committed.
+    Committed(Box<SessionCommit>),
     /// The focus notification was emitted.
     Focused,
 }
@@ -381,6 +421,42 @@ pub fn dispatch(service: &mut SessionService, request: AppRequest) -> Result<App
                 .map(AppResponse::QueryResult)
                 .map_err(|error| session_protocol_error(&error))
         }
+        AppRequest::Propose { session_id, transaction } => {
+            let session_id = service
+                .resolve_session_id(session_id.as_ref())
+                .map_err(|error| session_protocol_error(&error))?;
+            service
+                .propose(&session_id, transaction)
+                .map(AppResponse::Proposal)
+                .map_err(|error| session_protocol_error(&error))
+        }
+        AppRequest::AcceptProposal { session_id, proposal_id, operation_positions } => {
+            let session_id = service
+                .resolve_session_id(session_id.as_ref())
+                .map_err(|error| session_protocol_error(&error))?;
+            service
+                .accept_proposal(&session_id, &proposal_id, operation_positions.as_deref())
+                .map(|commit| AppResponse::Committed(Box::new(commit)))
+                .map_err(|error| session_protocol_error(&error))
+        }
+        AppRequest::RejectProposal { session_id, proposal_id } => {
+            let session_id = service
+                .resolve_session_id(session_id.as_ref())
+                .map_err(|error| session_protocol_error(&error))?;
+            service
+                .reject_proposal(&session_id, &proposal_id)
+                .map(|()| AppResponse::ProposalRejected)
+                .map_err(|error| session_protocol_error(&error))
+        }
+        AppRequest::Apply { session_id, transaction, authorization } => {
+            let session_id = service
+                .resolve_session_id(session_id.as_ref())
+                .map_err(|error| session_protocol_error(&error))?;
+            service
+                .apply_authorized(&session_id, &authorization, transaction)
+                .map(|commit| AppResponse::Committed(Box::new(commit)))
+                .map_err(|error| session_protocol_error(&error))
+        }
         AppRequest::Focus => Ok(AppResponse::Focused),
     }
 }
@@ -394,6 +470,19 @@ pub fn session_protocol_error(error: &SessionError) -> ProtocolError {
         SessionError::SessionSelectionRequired { .. } => "session_selection_required",
         SessionError::ActorMismatch { .. } => "actor_mismatch",
         SessionError::StaleHeads => "stale_heads",
+        SessionError::ProposalLimit(_)
+        | SessionError::ProposalTooLarge { .. }
+        | SessionError::ProposalDescriptionTooLong { .. } => "proposal_limit",
+        SessionError::AgentOriginRequired => "agent_origin_required",
+        SessionError::ProposalNotFound(_) => "proposal_not_found",
+        SessionError::ProposalExpired(_) => "proposal_expired",
+        SessionError::ProposalStale { .. } => "proposal_stale",
+        SessionError::ProposalConflict { .. } => "proposal_conflict",
+        SessionError::InvalidProposalSelection(_) => "invalid_proposal_selection",
+        SessionError::AuthorizationRequired => "authorization_required",
+        SessionError::InvalidAuthorization => "invalid_authorization",
+        SessionError::AuthorizationExpired => "authorization_expired",
+        SessionError::AuthorizationUnavailable(_) => "authorization_unavailable",
         SessionError::AlreadyOpen { .. } => "document_already_open",
         SessionError::File(file_error) => match file_error {
             FileError::Locked { .. } => "document_locked",
@@ -411,7 +500,15 @@ pub fn session_protocol_error(error: &SessionError) -> ProtocolError {
         },
         SessionError::Engine(_) => "document_engine_error",
     };
-    protocol_error(code, error.to_string())
+    let details = match error {
+        SessionError::ProposalStale { proposal, .. } => serde_json::to_value(proposal).ok(),
+        SessionError::ProposalConflict { proposal_id, message } => Some(serde_json::json!({
+            "proposal_id": proposal_id,
+            "message": message,
+        })),
+        _ => None,
+    };
+    ProtocolError { code: code.into(), message: error.to_string(), details }
 }
 
 /// Sends one request to the currently published desktop process.

@@ -3,7 +3,8 @@ import { initialPersistenceStatus } from '../platform';
 import type {
 	DesktopDocumentRepo,
 	EditorPlatformAdapter,
-	EditorPlatformSession
+	EditorPlatformSession,
+	LiveProposal
 } from '../platform';
 import { createBrushStore, createSnapStore, createStatusStore } from '../status';
 import type { BrushStore, SnapStore, StatusStore } from '../status';
@@ -66,6 +67,9 @@ export function createCanvasController(
 	let persistenceStatusStore = $state<StatusStore>(fallbackStatusStore);
 	let activeBoardId: string | null = null;
 	let desktopRepo: DesktopDocumentRepo | null = null;
+	let proposal = $state<LiveProposal | null>(null);
+	let proposalMessage = $state<string | null>(null);
+	let unsubscribeProposal: (() => void) | null = null;
 	let removeBeforeUnload: (() => void) | null = null;
 	let stencilPaletteOpen = $state(false);
 	let overlayViewport = $state<Viewport>({ width: 1, height: 1 });
@@ -411,6 +415,13 @@ export function createCanvasController(
 		sink = platformSession.sink;
 		persistenceStatusStore = platformSession.status;
 		desktopRepo = platformSession.desktop ?? null;
+		if (desktopRepo) {
+			proposal = desktopRepo.getProposal();
+			unsubscribeProposal = desktopRepo.subscribeProposal((update) => {
+				proposal = update.proposal;
+				proposalMessage = update.message ?? null;
+			});
+		}
 
 		if (platform === 'desktop') {
 			if (desktopRepo) {
@@ -450,6 +461,7 @@ export function createCanvasController(
 	onDestroy(() => {
 		renderer?.dispose();
 		inputAdapter?.dispose();
+		unsubscribeProposal?.();
 		platformSession?.dispose?.();
 		if (platform === 'desktop') {
 			void sink
@@ -485,6 +497,20 @@ export function createCanvasController(
 		brushStore,
 		setCanvasRef,
 		marqueeRect: () => marqueeRect,
+		proposal: () => proposal,
+		proposalMessage: () => proposalMessage,
+		acceptProposal: (operationPositions?: number[]) => {
+			if (!desktopRepo || !proposal) return Promise.reject(new Error('No proposal is open'));
+			return desktopRepo.acceptProposal(proposal.id, operationPositions);
+		},
+		rejectProposal: () => {
+			if (!desktopRepo || !proposal) return Promise.reject(new Error('No proposal is open'));
+			return desktopRepo.rejectProposal(proposal.id);
+		},
+		authorizeApply: () => {
+			if (!desktopRepo) return Promise.reject(new Error('No desktop session is open'));
+			return desktopRepo.authorizeApply();
+		},
 		insertStencil,
 		commitLayerState,
 		get stencilPaletteOpen() {

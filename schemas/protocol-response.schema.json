@@ -23,6 +23,29 @@
       ],
       "type": "object"
     },
+    "ApplyAuthorization": {
+      "description": "One-time user authorization for a direct live agent apply.",
+      "properties": {
+        "expires_at": {
+          "$ref": "#/$defs/Timestamp",
+          "description": "Wall-clock expiry retained for clients and diagnostics."
+        },
+        "session_id": {
+          "$ref": "#/$defs/SessionId",
+          "description": "Session for which the authorization was issued."
+        },
+        "token": {
+          "description": "Opaque single-use token issued by the desktop UI.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "token",
+        "session_id",
+        "expires_at"
+      ],
+      "type": "object"
+    },
     "AssetId": {
       "description": "Stable identifier for an embedded or linked asset.",
       "type": "string"
@@ -1387,6 +1410,17 @@
     "Proposal": {
       "description": "Validated transaction held for explicit user review.",
       "properties": {
+        "affected_regions": {
+          "description": "Document-coordinate regions affected by the proposed geometry.",
+          "items": {
+            "$ref": "#/$defs/AffectedRegion"
+          },
+          "type": "array"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Timestamp",
+          "description": "Wall-clock expiry retained for clients and diagnostics."
+        },
         "id": {
           "$ref": "#/$defs/ProposalId",
           "description": "Stable proposal identifier."
@@ -1411,7 +1445,9 @@
         "id",
         "transaction",
         "preview",
-        "warnings"
+        "affected_regions",
+        "warnings",
+        "expires_at"
       ],
       "type": "object"
     },
@@ -2306,6 +2342,23 @@
         },
         "value": {
           "$ref": "#/$defs/Proposal"
+        }
+      },
+      "required": [
+        "type",
+        "value"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "A one-time direct-apply authorization was issued.",
+      "properties": {
+        "type": {
+          "const": "apply_authorized",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/ApplyAuthorization"
         }
       },
       "required": [

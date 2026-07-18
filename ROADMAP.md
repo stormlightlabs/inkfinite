@@ -1,6 +1,6 @@
 # Inkfinite vNext / Version 2
 
-Status: implementation in progress; V2-01 through V2-17 are complete
+Status: implementation in progress; V2-01 through V2-18 are complete
 
 This is the product and architecture contract for vNext. [TODO.md](TODO.md) is
 the implementation queue.
@@ -63,9 +63,9 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
 - The desktop owns an authenticated, versioned local IPC server. The CLI can
   inspect open sessions, query the same materialized records as file mode, and
   request frontend focus without a TCP listener or background daemon.
-- [TODO.md](TODO.md) starts the remaining work at V2-18: reviewable live
-  proposals, followed by sync, agent packaging, release verification, and v1
-  compatibility removal.
+- [TODO.md](TODO.md) starts the remaining work at V2-19: offline replica sync,
+  followed by agent packaging, release verification, and v1 compatibility
+  removal.
 
 ## Architecture
 
@@ -99,7 +99,7 @@ TypeScript editor runtime
 | Local-first state        | Automerge, isolated behind Inkfinite interfaces            |
 | CLI                      | Rust and `clap`                                            |
 | Schemas and bindings     | Serde, Schemars, and `ts-rs`                               |
-| Desktop control          | Planned local sockets and length-prefixed messages         |
+| Desktop control          | Authenticated local sockets and length-prefixed messages   |
 | Async I/O                | Tokio where needed                                         |
 | Agent integration        | CLI and bundled `SKILL.md`                                 |
 
@@ -329,7 +329,10 @@ never edit document bytes manually.
 ## Live control and collaboration
 
 The CLI connects to the running desktop app for `app status`, `app inspect`,
-`app query`, and `app focus`. V2-18 will add proposals and explicit apply.
+`app query`, and `app focus`. It can also propose a transaction for review with
+`app propose`, accept all or selected operations with `app accept`, reject it with
+`app reject`, or apply a transaction directly only with a one-time authorization
+issued by the desktop UI via `app apply`.
 
 `app propose` is the default agent path. Rust validates it and the UI shows a
 ghost preview plus created, changed, and deleted IDs. Rejection changes nothing.
@@ -337,11 +340,13 @@ Partial acceptance creates a new transaction from the selected operations and
 revalidates it against current heads. `app apply` requires explicit user
 authorization.
 
-V2-17 uses a per-user Unix-domain socket or Windows named pipe, a protected
-per-session token, protocol versions, length-prefixed messages, and strict size
-limits. It does not expose public TCP or local HTTP. The Tauri process owns the
-server and removes its discovery record when it exits; vNext has no background
-daemon.
+V2-17 and V2-18 use a per-user Unix-domain socket or Windows named pipe, a
+protected per-session token, protocol versions, length-prefixed messages, and
+strict size limits. Proposals are bounded and expire; partial acceptance creates
+and revalidates a new transaction, while direct apply consumes a short-lived,
+one-time authorization grant. The server does not expose public TCP or local
+HTTP. The Tauri process owns the server and removes its discovery record when it
+exits; vNext has no background daemon.
 
 Automerge sync between trusted peers is a vNext deliverable. The sync layer must
 be transport-independent and prove offline concurrent edits between two app
@@ -415,9 +420,9 @@ deterministic SVG, and the mutating file-mode CLI all passed.
 - **Milestone 5, layers and styles:** complete.
 - **Milestone 6, CLI and SVG:** complete. The file-mode CLI exposes the SVG
   renderer and validated, atomic mutation commands.
-- **Milestone 7, live control and sync:** authenticated local IPC is complete;
-  reviewable proposals, explicit apply, and two-replica offline convergence
-  remain.
+- **Milestone 7, live control and sync:** authenticated IPC, reviewable
+  proposals, explicit apply, and one-time authorization are complete; two-replica
+  offline convergence remains.
 - **Milestone 8, agent and release readiness:** bundle the agent skill, record
   release evidence, replace useful v1 coverage with v2-native fixtures, remove
   the unreleased v1 compatibility surface, and rerun the release matrix.

@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import type {
 	BoardExport,
 	BoardMeta,
@@ -16,6 +17,7 @@ import type {
 import { createId } from '@inkfinite/core';
 import type {
 	BindingRecord as V2BindingRecord,
+	ApplyAuthorization,
 	ChangeHash,
 	CommitResult,
 	ContainerLayout,
@@ -23,6 +25,7 @@ import type {
 	Query,
 	QueryResult,
 	Provenance,
+	Proposal,
 	ShapeProperties,
 	ShapeRecord,
 	ShapeStyle,
@@ -56,6 +59,9 @@ export type SessionCommit = { commit: CommitResult; status: SessionStatus };
 /** Result returned after persisting a session. */
 export type SessionSaved = { save: { path: string; heads: ChangeHash[] }; status: SessionStatus };
 
+/** State update emitted when a live proposal is created, refreshed, or cleared. */
+export type ProposalUpdate = { proposal: Proposal | null; message?: string };
+
 /** Typed command boundary used by the desktop adapter and its tests. */
 export interface SessionApi {
 	createDocument(args: {
@@ -67,6 +73,14 @@ export interface SessionApi {
 	openDocument(args: { path: string; actor_id: string }): Promise<SessionOpened>;
 	snapshot(args: { session_id: string }): Promise<SessionStatus>;
 	commit(args: { session_id: string; transaction: TransactionDraft }): Promise<SessionCommit>;
+	propose(args: { session_id: string; transaction: TransactionDraft }): Promise<Proposal>;
+	acceptProposal(args: {
+		session_id: string;
+		proposal_id: string;
+		operation_positions?: number[];
+	}): Promise<SessionCommit>;
+	rejectProposal(args: { session_id: string; proposal_id: string }): Promise<void>;
+	authorizeApply(args: { session_id: string }): Promise<ApplyAuthorization>;
 	undo(args: { session_id: string; actor_id: string }): Promise<SessionCommit>;
 	redo(args: { session_id: string; actor_id: string }): Promise<SessionCommit>;
 	save(args: { session_id: string; expected_heads: ChangeHash[] }): Promise<SessionSaved>;
@@ -82,6 +96,10 @@ function createSessionApi(): SessionApi {
 		openDocument: (args) => invoke<SessionOpened>('open_document', args),
 		snapshot: (args) => invoke<SessionStatus>('snapshot', args),
 		commit: (args) => invoke<SessionCommit>('commit', args),
+		propose: (args) => invoke<Proposal>('propose', args),
+		acceptProposal: (args) => invoke<SessionCommit>('accept_proposal', args),
+		rejectProposal: (args) => invoke<void>('reject_proposal', args),
+		authorizeApply: (args) => invoke<ApplyAuthorization>('authorize_apply', args),
 		undo: (args) => invoke<SessionCommit>('undo', args),
 		redo: (args) => invoke<SessionCommit>('redo', args),
 		save: (args) => invoke<SessionSaved>('save', args),
@@ -105,6 +123,11 @@ export type DesktopSessionRepo = PersistentDocRepo & {
 	query(query: Query): Promise<QueryResult>;
 	validate(): Promise<SessionStatus>;
 	getSessionStatus(): SessionStatus | null;
+	getProposal(): Proposal | null;
+	subscribeProposal(listener: (update: ProposalUpdate) => void): () => void;
+	acceptProposal(proposalId: string, operationPositions?: number[]): Promise<void>;
+	rejectProposal(proposalId: string): Promise<void>;
+	authorizeApply(): Promise<ApplyAuthorization>;
 	closeSession(): Promise<void>;
 };
 
@@ -119,7 +142,50 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 	let currentBoard: BoardMeta | null = null;
 	let currentDoc: LoadedDoc | null = null;
 	let currentStatus: SessionStatus | null = null;
+	let currentProposal: Proposal | null = null;
+	const proposalListeners = new Set<(update: ProposalUpdate) => void>();
+	const liveUnlisteners: Array<() => void> = [];
 	const boardFiles = new Map<string, FileHandle>();
+
+	type ProposalEvent = { session_id?: string | null; proposal: Proposal };
+	type ProposalClearedEvent = { message?: string };
+	type LiveCommitEvent = { session_id?: string | null; commit: SessionCommit };
+
+	function notifyProposal(update: ProposalUpdate) {
+		currentProposal = update.proposal;
+		for (const listener of proposalListeners) listener(update);
+	}
+
+	function eventBelongsToCurrentSession(sessionId?: string | null): boolean {
+		return Boolean(currentStatus && (!sessionId || sessionId === currentStatus.session_id));
+	}
+
+	function startLiveListeners() {
+		void listen<ProposalEvent>('inkfinite-proposal', (event) => {
+			if (eventBelongsToCurrentSession(event.payload.session_id)) {
+				notifyProposal({ proposal: event.payload.proposal });
+			}
+		})
+			.then((stop) => liveUnlisteners.push(stop))
+			.catch(() => undefined);
+		void listen<ProposalClearedEvent>('inkfinite-proposal-cleared', (event) => {
+			if (currentStatus) notifyProposal({ proposal: null, message: event.payload.message });
+		})
+			.then((stop) => liveUnlisteners.push(stop))
+			.catch(() => undefined);
+		void listen<LiveCommitEvent>('inkfinite-live-commit', (event) => {
+			if (!eventBelongsToCurrentSession(event.payload.session_id)) return;
+			updateStatus(event.payload.commit.status);
+			notifyProposal({
+				proposal: null,
+				message: 'The document changed while this proposal was open. Review it again.'
+			});
+		})
+			.then((stop) => liveUnlisteners.push(stop))
+			.catch(() => undefined);
+	}
+
+	startLiveListeners();
 
 	function setCurrentState(status: SessionStatus, boardName?: string) {
 		currentStatus = status;
@@ -151,6 +217,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 	async function closeCurrentSession() {
 		if (!currentStatus) return;
 		await api.close({ session_id: currentStatus.session_id });
+		notifyProposal({ proposal: null });
 		currentStatus = null;
 		currentFile = null;
 		currentBoard = null;
@@ -295,6 +362,12 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		};
 		const committed = await api.commit({ session_id: currentStatus.session_id, transaction });
 		updateStatus(committed.status);
+		if (currentProposal) {
+			notifyProposal({
+				proposal: null,
+				message: 'The document changed while this proposal was open. Review it again.'
+			});
+		}
 		// Desktop edits are persisted by the backend service before the input event
 		// queue advances, so reopening cannot lose a completed gesture.
 		await saveCurrentSession();
@@ -344,6 +417,12 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		if (!currentStatus) return;
 		const result = await api.undo({ session_id: currentStatus.session_id, actor_id: ACTOR_ID });
 		updateStatus(result.status);
+		if (currentProposal) {
+			notifyProposal({
+				proposal: null,
+				message: 'The document changed while this proposal was open. Review it again.'
+			});
+		}
 		await saveCurrentSession();
 	}
 
@@ -351,6 +430,12 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		if (!currentStatus) return;
 		const result = await api.redo({ session_id: currentStatus.session_id, actor_id: ACTOR_ID });
 		updateStatus(result.status);
+		if (currentProposal) {
+			notifyProposal({
+				proposal: null,
+				message: 'The document changed while this proposal was open. Review it again.'
+			});
+		}
 		await saveCurrentSession();
 	}
 
@@ -364,6 +449,39 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		const status = await api.validate({ session_id: currentStatus.session_id });
 		updateStatus(status);
 		return status;
+	}
+
+	function getProposal(): Proposal | null {
+		return currentProposal;
+	}
+
+	function subscribeProposal(listener: (update: ProposalUpdate) => void): () => void {
+		proposalListeners.add(listener);
+		if (currentProposal) listener({ proposal: currentProposal });
+		return () => proposalListeners.delete(listener);
+	}
+
+	async function acceptProposal(proposalId: string, operationPositions?: number[]): Promise<void> {
+		if (!currentStatus) throw new Error('No board loaded');
+		const result = await api.acceptProposal({
+			session_id: currentStatus.session_id,
+			proposal_id: proposalId,
+			...(operationPositions ? { operation_positions: operationPositions } : {})
+		});
+		updateStatus(result.status);
+		notifyProposal({ proposal: null });
+		await saveCurrentSession();
+	}
+
+	async function rejectProposal(proposalId: string): Promise<void> {
+		if (!currentStatus) throw new Error('No board loaded');
+		await api.rejectProposal({ session_id: currentStatus.session_id, proposal_id: proposalId });
+		notifyProposal({ proposal: null });
+	}
+
+	async function authorizeApply(): Promise<ApplyAuthorization> {
+		if (!currentStatus) throw new Error('No board loaded');
+		return api.authorizeApply({ session_id: currentStatus.session_id });
 	}
 
 	return {
@@ -387,6 +505,11 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		query,
 		validate,
 		getSessionStatus: () => currentStatus,
+		getProposal,
+		subscribeProposal,
+		acceptProposal,
+		rejectProposal,
+		authorizeApply,
 		closeSession: closeCurrentSession
 	};
 }

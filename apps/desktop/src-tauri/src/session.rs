@@ -2,12 +2,16 @@
 
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use inkfinite_core::proto::{DocumentPath, ProtocolError, Query, QueryResult, SessionId, TransactionDraft};
+use inkfinite_core::proto::{
+    ApplyAuthorization, DocumentPath, Proposal, ProposalId, ProtocolError, Query, QueryResult, SessionId,
+    TransactionDraft,
+};
 use inkfinite_core::session::{
     SessionCommit, SessionError, SessionOpened, SessionSaved, SessionService, SessionStatus,
 };
 use inkfinite_core::{ActorId, ChangeHash, DocumentId};
-use tauri::State;
+use serde_json::json;
+use tauri::{AppHandle, Emitter, State};
 
 type Result<T> = std::result::Result<T, ProtocolError>;
 
@@ -78,6 +82,60 @@ pub fn commit(
 ) -> Result<SessionCommit> {
     lock_service(&state)?
         .commit(&SessionId(session_id), transaction)
+        .map_err(to_protocol_error)
+}
+
+/// Validates and stores an agent transaction for desktop proposal review.
+#[tauri::command]
+pub fn propose(state: State<'_, DesktopState>, session_id: String, transaction: TransactionDraft) -> Result<Proposal> {
+    lock_service(&state)?
+        .propose(&SessionId(session_id), transaction)
+        .map_err(to_protocol_error)
+}
+
+/// Accepts all or selected operations from a reviewed proposal.
+#[tauri::command]
+pub fn accept_proposal(
+    app: AppHandle, state: State<'_, DesktopState>, session_id: String, proposal_id: ProposalId,
+    operation_positions: Option<Vec<u32>>,
+) -> Result<SessionCommit> {
+    let session_id = SessionId(session_id);
+    let result = lock_service(&state)?.accept_proposal(&session_id, &proposal_id, operation_positions.as_deref());
+    match result {
+        Ok(commit) => Ok(commit),
+        Err(error) => {
+            let protocol_error = to_protocol_error(error);
+            if protocol_error.code == "proposal_stale" {
+                if let Some(proposal) = protocol_error.details.as_ref() {
+                    let _ = app.emit(
+                        super::ipc::PROPOSAL_EVENT,
+                        json!({ "session_id": session_id, "proposal": proposal }),
+                    );
+                }
+            } else if protocol_error.code == "proposal_conflict" {
+                let _ = app.emit(
+                    super::ipc::PROPOSAL_CLEARED_EVENT,
+                    json!({ "message": protocol_error.message }),
+                );
+            }
+            Err(protocol_error)
+        }
+    }
+}
+
+/// Rejects a reviewed proposal without changing the document.
+#[tauri::command]
+pub fn reject_proposal(state: State<'_, DesktopState>, session_id: String, proposal_id: ProposalId) -> Result<()> {
+    lock_service(&state)?
+        .reject_proposal(&SessionId(session_id), &proposal_id)
+        .map_err(to_protocol_error)
+}
+
+/// Issues a one-time authorization for a direct live agent apply.
+#[tauri::command]
+pub fn authorize_apply(state: State<'_, DesktopState>, session_id: String) -> Result<ApplyAuthorization> {
+    lock_service(&state)?
+        .authorize_apply(&SessionId(session_id))
         .map_err(to_protocol_error)
 }
 

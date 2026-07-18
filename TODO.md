@@ -154,21 +154,25 @@ Blocked by: V2-09, V2-16, V2-17
 
 Acceptance criteria:
 
-- [ ] `app propose` validates without committing and previews geometry plus
+- [x] `app propose` validates without committing and previews geometry plus
       created, changed, and deleted IDs in the desktop UI.
-- [ ] Reject changes nothing; full accept commits once; partial accept builds a
+- [x] Reject changes nothing; full accept commits once; partial accept builds a
       new transaction and revalidates it against current heads.
-- [ ] Intervening local or remote edits produce a refreshed preview or a clear
+- [x] Intervening local or remote edits produce a refreshed preview or a clear
       conflict, never a stale silent commit.
-- [ ] `app apply` requires explicit authorization conveyed through protocol state,
+- [x] `app apply` requires explicit authorization conveyed through protocol state,
       not a UI convention, and creates normal history/provenance.
-- [ ] Proposal limits, timeout/expiry, permissions, and malformed operations have
+- [x] Proposal limits, timeout/expiry, permissions, and malformed operations have
       integration and accessibility tests.
 
 Verification:
 
 - Run end-to-end propose/reject/accept/partial/stale/direct-apply flows and compare
   persisted documents after reopen.
+
+Implemented with Rust proposal storage and revalidation, authenticated IPC/Tauri
+commands, CLI subcommands, desktop ghost previews, explicit one-time apply grants,
+and integration/accessibility coverage.
 
 ### V2-19: Sync two offline replicas
 
@@ -317,4 +321,4 @@ Verification:
 
 ## Frontier
 
-V2-18 is the current frontier. Add reviewable live proposals and explicit apply.
+V2-19 is the current frontier. Sync two offline replicas and prove convergence.

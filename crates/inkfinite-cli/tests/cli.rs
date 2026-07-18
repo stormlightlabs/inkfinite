@@ -11,7 +11,9 @@ use std::thread;
 
 use inkfinite_core::file::DocumentFile;
 #[cfg(unix)]
-use inkfinite_core::ipc::{self, AppRequest, AppResponse, DiscoveryRecord, RequestEnvelope, ResponseEnvelope};
+use inkfinite_core::ipc::{
+    self, AppRequest, AppResponse, DiscoveryRecord, RequestEnvelope, RequestGuard, ResponseEnvelope,
+};
 use inkfinite_core::proto::{Operation, TransactionDraft, TransactionId};
 use inkfinite_core::{
     ActorId, DocumentId, Opacity, Origin, Provenance, RecordVersion, SemanticMetadata, ShapeId, ShapeKind, ShapeParent,
@@ -623,6 +625,10 @@ fn live_commands_read_shared_records_from_the_authenticated_local_server() {
                         bounds: BTreeMap::new(),
                     }),
                     AppRequest::Focus => AppResponse::Focused,
+                    AppRequest::Propose { .. }
+                    | AppRequest::AcceptProposal { .. }
+                    | AppRequest::RejectProposal { .. }
+                    | AppRequest::Apply { .. } => panic!("proposal requests are outside this IPC fixture"),
                 };
                 ipc::write_frame(&mut stream, &ResponseEnvelope { request_id, result: Ok(response) })
                     .await
@@ -661,6 +667,182 @@ fn live_commands_read_shared_records_from_the_authenticated_local_server() {
             .unwrap()
             .contains("Desktop focus requested")
     );
+}
+
+#[cfg(unix)]
+#[test]
+#[allow(clippy::too_many_lines)]
+fn live_propose_accept_partial_and_authorized_apply_round_trip_through_cli() {
+    use std::os::unix::fs::FileTypeExt;
+    use std::os::unix::net::{UnixListener, UnixStream};
+    use std::sync::mpsc;
+
+    use inkfinite_core::proto::ProtocolError;
+    use inkfinite_core::session::SessionService;
+
+    let _guard = IPC_TEST_LOCK.lock().unwrap();
+    ipc::ensure_ipc_directory().unwrap();
+    let endpoint = ipc::endpoint_name();
+    let endpoint_path = Path::new(&endpoint);
+    if UnixStream::connect(endpoint_path).is_ok() {
+        return;
+    }
+    if let Ok(metadata) = fs::symlink_metadata(endpoint_path) {
+        if !metadata.file_type().is_socket() {
+            return;
+        }
+        fs::remove_file(endpoint_path).unwrap();
+    }
+
+    let temporary = TestDirectory::new("live-proposals");
+    let document_path = temporary.path.join("live.inkfinite");
+    let transaction_path = temporary.path.join("transaction.json");
+    let document_id = DocumentId::from("document:live-proposals");
+    let actor = ActorId::from("actor:live-proposals");
+    let document = blank_document(&document_id, Some("Live proposals"));
+    let mut file = DocumentFile::create(&document_path, document_id, actor.clone(), document).unwrap();
+    let snapshot = file.snapshot().unwrap();
+    drop(file);
+
+    let page_id = snapshot.document.page_ids[0].clone();
+    let proposal_transaction = TransactionDraft {
+        id: TransactionId("transaction:proposal".into()),
+        actor_id: actor.clone(),
+        origin: Origin::Agent,
+        base_heads: snapshot.heads.clone(),
+        description: "preview a page rename".into(),
+        operations: vec![Operation::RenamePage {
+            page_id: page_id.clone(),
+            name: "Proposed".into(),
+            expected_version: None,
+        }],
+        timestamp: Timestamp(10),
+    };
+    fs::write(
+        &transaction_path,
+        serde_json::to_vec_pretty(&proposal_transaction).unwrap(),
+    )
+    .unwrap();
+
+    let mut service = SessionService::new();
+    let opened = service.open(&document_path, actor.clone()).unwrap();
+    let session_id = opened.session_id.clone();
+    let authorization = service.authorize_apply(&session_id).unwrap();
+    let authorization_token = authorization.token.clone();
+
+    let previous_discovery = ipc::read_discovery(&ipc::discovery_path()).ok();
+    let discovery = DiscoveryRecord {
+        protocol_id: inkfinite_core::proto::PROTOCOL_ID.into(),
+        version: inkfinite_core::proto::PROTOCOL_VERSION,
+        endpoint: endpoint.clone(),
+        token: "cli-proposal-test-token".into(),
+    };
+    let listener = UnixListener::bind(endpoint_path).unwrap();
+    listener.set_nonblocking(true).unwrap();
+    ipc::write_discovery(&ipc::discovery_path(), &discovery).unwrap();
+
+    let (final_snapshot_sender, final_snapshot_receiver) = mpsc::channel();
+    let server_token = discovery.token.clone();
+    let server = thread::spawn(move || {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async move {
+            let listener = tokio::net::UnixListener::from_std(listener).unwrap();
+            let mut guard = RequestGuard::new(server_token);
+            for _ in 0..3 {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let request = ipc::read_frame::<RequestEnvelope>(&mut stream).await.unwrap();
+                guard.validate(&request).unwrap();
+                let request_id = request.request_id;
+                let result: Result<AppResponse, ProtocolError> = ipc::dispatch(&mut service, request.request);
+                ipc::write_frame(&mut stream, &ResponseEnvelope { request_id, result })
+                    .await
+                    .unwrap();
+            }
+            let status = service.status(&session_id).unwrap();
+            service.save(&session_id, &status.snapshot.heads).unwrap();
+            let final_snapshot = service.status(&session_id).unwrap().snapshot;
+            service.close(&session_id).unwrap();
+            final_snapshot_sender.send(final_snapshot).unwrap();
+        });
+    });
+
+    let proposed = run([
+        "app",
+        "propose",
+        "--session-id",
+        "session:1",
+        "--transaction",
+        path(&transaction_path),
+        "--json",
+    ]);
+    assert_success(&proposed);
+    let proposed_json = parse_stdout(&proposed);
+    assert_eq!(proposed_json["id"], "proposal:1");
+    assert_eq!(proposed_json["preview"]["changed"].as_array().unwrap().len(), 1);
+
+    let accepted = run([
+        "app",
+        "accept",
+        "--session-id",
+        "session:1",
+        "--proposal-id",
+        "proposal:1",
+        "--json",
+    ]);
+    assert_success(&accepted);
+    let accepted_json = parse_stdout(&accepted);
+    let accepted_heads = accepted_json["status"]["snapshot"]["heads"].clone();
+    let direct_transaction = TransactionDraft {
+        id: TransactionId("transaction:authorized".into()),
+        actor_id: actor,
+        origin: Origin::Agent,
+        base_heads: serde_json::from_value(accepted_heads).unwrap(),
+        description: "authorized direct edit".into(),
+        operations: vec![Operation::RenamePage { page_id, name: "Applied".into(), expected_version: None }],
+        timestamp: Timestamp(11),
+    };
+    fs::write(
+        &transaction_path,
+        serde_json::to_vec_pretty(&direct_transaction).unwrap(),
+    )
+    .unwrap();
+
+    let applied = run([
+        "app",
+        "apply",
+        "--session-id",
+        "session:1",
+        "--transaction",
+        path(&transaction_path),
+        "--authorization",
+        &authorization_token,
+        "--json",
+    ]);
+    assert_success(&applied);
+    assert_eq!(parse_stdout(&applied)["status"]["dirty"], true);
+
+    server.join().unwrap();
+    let final_snapshot = final_snapshot_receiver.recv().unwrap();
+    assert_eq!(final_snapshot.document.pages.values().next().unwrap().name, "Applied");
+    let mut reopened = DocumentFile::open(&document_path, ActorId::from("actor:verify")).unwrap();
+    assert_eq!(
+        reopened
+            .snapshot()
+            .unwrap()
+            .document
+            .pages
+            .values()
+            .next()
+            .unwrap()
+            .name,
+        "Applied"
+    );
+
+    let _ = ipc::remove_discovery(&ipc::discovery_path(), &discovery);
+    let _ = fs::remove_file(endpoint_path);
+    if let Some(previous) = previous_discovery {
+        ipc::write_discovery(&ipc::discovery_path(), &previous).unwrap();
+    }
 }
 
 fn run<const N: usize>(args: [&str; N]) -> Output {

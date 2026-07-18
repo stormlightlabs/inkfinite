@@ -518,7 +518,15 @@ transaction: TransactionDraft,
  */
 preview: DocumentPatch, 
 /**
+ * Document-coordinate regions affected by the proposed geometry.
+ */
+affected_regions: Array<AffectedRegion>, 
+/**
  * Validation or repair warnings shown before acceptance.
  */
-warnings: Array<Warning>, };
+warnings: Array<Warning>, 
+/**
+ * Wall-clock expiry retained for clients and diagnostics.
+ */
+expires_at: Timestamp, };
 

@@ -5,6 +5,7 @@
 	import FileBrowser from '../filebrowser/FileBrowser.svelte';
 	import StencilPalette from '../components/StencilPalette.svelte';
 	import LayerPanel from '../components/LayerPanel.svelte';
+	import ProposalReview from '../components/ProposalReview.svelte';
 	import { createCanvasController } from './canvas-store.svelte';
 	import { draggingStencil, endDrag } from '../dnd.svelte';
 	import type { EditorPlatformAdapter } from '../platform';
@@ -32,6 +33,8 @@
 	let markdownEditorCurrent = $derived(c.markdownEditor.current);
 	let persistenceStatusStore = $derived(c.persistenceStatusStore());
 	let marqueeRect = $derived(c.marqueeRect());
+	let liveProposal = $derived(c.proposal());
+	let proposalMessage = $derived(c.proposalMessage());
 
 	$effect(() => {
 		c.setCanvasRef(canvasEl);
@@ -132,6 +135,23 @@
 			bind:this={canvasEl}
 			ondblclick={c.handleCanvasDoubleClick}
 			onpointerleave={c.handlePointerLeave}></canvas>
+		{#if liveProposal}
+			<div class="proposal-ghost-layer" aria-hidden="true">
+				{#each liveProposal.affected_regions as region}
+					{@const viewport = c.getViewport()}
+					{@const bounds = region.bounds}
+					{@const topLeft = Camera.worldToScreen(c.store.getState().camera, { x: bounds.x, y: bounds.y }, viewport)}
+					{@const bottomRight = Camera.worldToScreen(
+						c.store.getState().camera,
+						{ x: bounds.x + bounds.width, y: bounds.y + bounds.height },
+						viewport
+					)}
+					<div
+						class="proposal-ghost"
+						style={`left:${Math.min(topLeft.x, bottomRight.x)}px; top:${Math.min(topLeft.y, bottomRight.y)}px; width:${Math.abs(bottomRight.x - topLeft.x)}px; height:${Math.abs(bottomRight.y - topLeft.y)}px`}></div>
+				{/each}
+			</div>
+		{/if}
 		<LayerPanel store={c.store} onCommit={c.commitLayerState} />
 		{#if textEditorCurrent}
 			{@const layout = c.textEditor.getLayout()}
@@ -210,6 +230,12 @@
 			</div>
 		{/if}
 	</div>
+	<ProposalReview
+		proposal={liveProposal}
+		message={proposalMessage}
+		onAccept={c.acceptProposal}
+		onReject={c.rejectProposal}
+		onAuthorize={c.authorizeApply} />
 	<HistoryViewer store={c.store} bind:open={historyViewerOpen} onClose={c.history.handleClose} />
 	<StatusBar
 		store={c.store}
@@ -241,6 +267,7 @@
 		width: 100%;
 		height: 100%;
 		min-height: 0;
+		position: relative;
 		display: flex;
 		flex-direction: column;
 	}
@@ -257,6 +284,32 @@
 		display: block;
 		touch-action: none;
 		cursor: default;
+	}
+
+	.proposal-ghost-layer {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		z-index: 1;
+	}
+
+	.proposal-ghost {
+		position: absolute;
+		box-sizing: border-box;
+		border: 1px dashed color-mix(in srgb, var(--accent) 82%, white 18%);
+		background: color-mix(in srgb, var(--accent) 13%, transparent);
+		box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent) inset;
+		animation: proposal-pulse 1.8s ease-in-out infinite;
+	}
+
+	@keyframes proposal-pulse {
+		0%,
+		100% {
+			opacity: 0.58;
+		}
+		50% {
+			opacity: 0.95;
+		}
 	}
 
 	.canvas-text-editor {

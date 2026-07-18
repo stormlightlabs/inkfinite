@@ -116,13 +116,20 @@ Run `inkfinite --help` for examples and the complete command reference.
 ### Live desktop control
 
 With the desktop app running, use `app status`, `app inspect`, and `app query` to
-read its open sessions. `app focus` asks the frontend to bring its window forward:
+read its open sessions. `app focus` asks the frontend to bring its window forward.
+Use `app propose` to send a transaction for ghost-preview review, then accept all
+or selected operations with `app accept`, or reject it with `app reject`. Direct
+`app apply` requires a one-time authorization token issued by the desktop UI:
 
 ```sh
 inkfinite app status --json
 inkfinite app inspect --json
 inkfinite app query --role architecture.service --json
 inkfinite app focus
+inkfinite app propose --transaction transaction.json --json
+inkfinite app accept --proposal-id proposal:1 --operation-position 0
+inkfinite app reject --proposal-id proposal:2
+inkfinite app apply --transaction transaction.json --authorization TOKEN --json
 ```
 
 The desktop publishes a per-user Unix-domain socket on Unix-like systems or a

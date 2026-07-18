@@ -49,7 +49,9 @@ pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(
         "global_options": ["--json", "--non-interactive"],
         "json_stdout_is_machine_only": true,
         "live_mode": {
-            "commands": ["status", "inspect", "query", "focus"],
+            "commands": ["status", "inspect", "query", "focus", "propose", "accept", "reject", "apply"],
+            "proposal_review": true,
+            "direct_apply_requires_one_time_authorization": true,
             "transport": "authenticated_local_socket",
             "tcp_or_http": false
         },
@@ -81,7 +83,11 @@ pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(
         "Commands: new, inspect, query, app, validate, apply, shape, connect, layout, render, schema, capabilities"
     )
     .map_err(map_output_error)?;
-    writeln!(stdout, "Live mode: app status, app inspect, app query, app focus").map_err(map_output_error)?;
+    writeln!(
+        stdout,
+        "Live mode: app status, app inspect, app query, app focus, app propose, app accept, app reject, app apply"
+    )
+    .map_err(map_output_error)?;
     writeln!(stdout, "Global options: --json, --non-interactive").map_err(map_output_error)?;
     writeln!(stdout, "Schemas: document, transaction, protocol").map_err(map_output_error)?;
     writeln!(stdout, "JSON: machine data on stdout; diagnostics on stderr").map_err(map_output_error)

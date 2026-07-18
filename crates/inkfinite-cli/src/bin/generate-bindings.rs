@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use inkfinite_core::proto::{
-    AffectedRegion, AssetPatch, Bounds, CommitResult, DocumentPatch, DocumentPath, InverseMetadata,
+    AffectedRegion, ApplyAuthorization, AssetPatch, Bounds, CommitResult, DocumentPatch, DocumentPath, InverseMetadata,
     LayerContentsDisposition, LayerPatch, LayoutAxis, Operation, Proposal, ProposalId, ProtocolError, Query,
     QueryResult, RecordId, Request, Response, SaveResult, SessionId, ShapeAlignment, ShapePatch, TransactionDraft,
     TransactionId, Warning,
@@ -203,12 +203,13 @@ fn protocol_bindings() -> String {
     let config = ts_config();
     let mut output = GENERATED_TS_HEADER.to_owned();
     output.push_str(
-        "import type { ActorId, ChangeHash, DocumentId, DocumentSnapshot, JsonValue, Origin } from \"./model.js\";\n",
+        "import type { ActorId, ChangeHash, DocumentId, DocumentSnapshot, JsonValue, Origin, Timestamp } from \"./model.js\";\n",
     );
     output.push_str(
         "import type { CommitResult, DocumentPath, Proposal, ProposalId, Query, QueryResult, SaveResult, TransactionDraft } from \"./transaction.js\";\n\n",
     );
     append_declaration::<SessionId>(&mut output, &config);
+    append_declaration::<ApplyAuthorization>(&mut output, &config);
     append_declaration::<Request>(&mut output, &config);
     append_declaration::<Response>(&mut output, &config);
     append_declaration::<ProtocolError>(&mut output, &config);

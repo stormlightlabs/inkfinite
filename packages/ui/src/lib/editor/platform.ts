@@ -10,6 +10,26 @@ import type { StatusStore } from "./status";
 /** Runtime selected by an application composition root. */
 export type EditorPlatform = "web" | "desktop";
 
+/** Small, renderer-facing projection of a Rust live proposal. */
+export type LiveProposal = {
+  id: string;
+  transaction: { operations: readonly unknown[] };
+  preview: {
+    created: readonly unknown[];
+    changed: readonly unknown[];
+    deleted: readonly unknown[];
+  };
+  affected_regions: Array<{
+    page_id: string;
+    bounds: { x: number; y: number; width: number; height: number };
+  }>;
+  warnings: Array<{ code: string; message: string }>;
+  expires_at: number;
+};
+
+/** Change notification used by the desktop review surface. */
+export type ProposalUpdate = { proposal: LiveProposal | null; message?: string };
+
 /**
  * Desktop-only capabilities consumed by the shared editor.
  *
@@ -23,6 +43,11 @@ export interface DesktopDocumentRepo extends PersistentDocRepo {
   setWorkspaceDir(path: string | null): Promise<void>;
   pickWorkspaceDir(): Promise<string | null>;
   closeSession(): Promise<void>;
+  getProposal(): LiveProposal | null;
+  subscribeProposal(listener: (update: ProposalUpdate) => void): () => void;
+  acceptProposal(proposalId: string, operationPositions?: number[]): Promise<void>;
+  rejectProposal(proposalId: string): Promise<void>;
+  authorizeApply(): Promise<{ token: string; session_id: string; expires_at: number }>;
 }
 
 /** Connected persistence services used for one mounted editor. */

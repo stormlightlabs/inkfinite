@@ -6,16 +6,32 @@
 //! Adapters can expose this service over Tauri, local IPC, or a CLI without
 //! moving document bytes into the frontend.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::engine::{EngineError, validate_document};
 use crate::file::{DocumentFile, FileError};
-use crate::proto::{CommitResult, DocumentPath, Query, QueryResult, SaveResult, SessionId, TransactionDraft};
-use crate::{ActorId, DocumentId, DocumentSnapshot, blank_document};
+use crate::proto::{
+    ApplyAuthorization, CommitResult, DocumentPath, Proposal, ProposalId, Query, QueryResult, SaveResult, SessionId,
+    TransactionDraft, TransactionId, Warning,
+};
+use crate::{ActorId, DocumentId, DocumentSnapshot, Origin, Timestamp, blank_document};
+
+/// Maximum number of pending proposals held by one live session.
+pub const MAX_PROPOSALS_PER_SESSION: usize = 32;
+/// Maximum number of operations accepted by a proposal or direct live apply.
+pub const MAX_PROPOSAL_OPERATIONS: usize = 256;
+/// Maximum UTF-8 byte length of a proposal description.
+pub const MAX_PROPOSAL_DESCRIPTION_BYTES: usize = 4096;
+/// Monotonic lifetime of an unaccepted proposal.
+pub const PROPOSAL_TTL: Duration = Duration::from_secs(5 * 60);
+/// Monotonic lifetime of a one-time direct-apply authorization.
+pub const APPLY_AUTHORIZATION_TTL: Duration = Duration::from_secs(2 * 60);
 
 /// State of the session's future synchronization boundary.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -101,6 +117,63 @@ pub enum SessionError {
     /// The caller inspected heads that are no longer current.
     #[error("stale session heads")]
     StaleHeads,
+    /// A live proposal exceeded the session's bounded proposal store.
+    #[error("the session already holds {0} pending proposals")]
+    ProposalLimit(usize),
+    /// A proposal contains more operations than the live control boundary permits.
+    #[error("proposal contains {count} operations; the limit is {max}")]
+    ProposalTooLarge {
+        /// Number of operations supplied by the caller.
+        count: usize,
+        /// Maximum number of operations accepted by the boundary.
+        max: usize,
+    },
+    /// A proposal description exceeds the live control boundary.
+    #[error("proposal description exceeds the {max} byte limit")]
+    ProposalDescriptionTooLong {
+        /// Maximum UTF-8 byte length.
+        max: usize,
+    },
+    /// The live proposal boundary only accepts agent-originated transactions.
+    #[error("live proposals and direct applies require agent origin")]
+    AgentOriginRequired,
+    /// No pending proposal has the requested identifier.
+    #[error("proposal not found: {0:?}")]
+    ProposalNotFound(ProposalId),
+    /// A pending proposal passed its review window.
+    #[error("proposal expired: {0:?}")]
+    ProposalExpired(ProposalId),
+    /// A proposal was refreshed after its inspected heads changed.
+    #[error("proposal {proposal_id:?} is stale; its preview was refreshed")]
+    ProposalStale {
+        /// Proposal whose preview was refreshed.
+        proposal_id: ProposalId,
+        /// Refreshed proposal for the UI or caller to review.
+        proposal: Box<Proposal>,
+    },
+    /// A proposal could not be refreshed after intervening edits.
+    #[error("proposal {proposal_id:?} conflicts with the current document: {message}")]
+    ProposalConflict {
+        /// Proposal that could not be refreshed.
+        proposal_id: ProposalId,
+        /// Actionable conflict detail.
+        message: String,
+    },
+    /// A partial acceptance selected no valid operations.
+    #[error("invalid proposal operation selection: {0}")]
+    InvalidProposalSelection(String),
+    /// The desktop UI did not issue an explicit direct-apply authorization.
+    #[error("explicit apply authorization is required")]
+    AuthorizationRequired,
+    /// The supplied authorization was issued for another session or token.
+    #[error("explicit apply authorization is invalid")]
+    InvalidAuthorization,
+    /// The supplied authorization passed its expiry time.
+    #[error("explicit apply authorization expired")]
+    AuthorizationExpired,
+    /// The operating system could not create a one-time authorization token.
+    #[error("could not create apply authorization: {0}")]
+    AuthorizationUnavailable(String),
     /// Two commands attempted to open the same path through one service.
     #[error("document is already open in session {session_id:?}: {path:?}")]
     AlreadyOpen {
@@ -120,12 +193,27 @@ pub enum SessionError {
 struct DocumentSession {
     file: DocumentFile,
     sync: SyncState,
+    proposals: BTreeMap<ProposalId, PendingProposal>,
+    expired_proposals: BTreeSet<ProposalId>,
+    authorizations: BTreeMap<String, ApplyGrant>,
+}
+
+#[derive(Clone)]
+struct PendingProposal {
+    proposal: Proposal,
+    created_at: Instant,
+}
+
+struct ApplyGrant {
+    authorization: ApplyAuthorization,
+    expires_at: Instant,
 }
 
 /// In-process owner of all open desktop document sessions.
 pub struct SessionService {
     sessions: BTreeMap<SessionId, DocumentSession>,
     next_session_number: u64,
+    next_proposal_number: u64,
 }
 
 impl Default for SessionService {
@@ -138,7 +226,7 @@ impl SessionService {
     /// Creates an empty service with no open files.
     #[must_use]
     pub fn new() -> Self {
-        Self { sessions: BTreeMap::new(), next_session_number: 0 }
+        Self { sessions: BTreeMap::new(), next_session_number: 0, next_proposal_number: 0 }
     }
 
     /// Creates and persists a new canonical document session.
@@ -184,6 +272,7 @@ impl SessionService {
     /// Returns [`SessionError::NotFound`] or a snapshot/recovery error.
     pub fn status(&mut self, session_id: &SessionId) -> Result<SessionStatus, SessionError> {
         let session = self.session_mut(session_id)?;
+        session.expire_state();
         session.status(session_id)
     }
 
@@ -233,6 +322,161 @@ impl SessionService {
     ) -> Result<SessionCommit, SessionError> {
         let session = self.session_mut(session_id)?;
         ensure_actor(session.file.actor_id(), &transaction.actor_id)?;
+        let commit = session.file.commit(transaction)?;
+        let status = session.status(session_id)?;
+        Ok(SessionCommit { commit, status })
+    }
+
+    /// Validates and stores one agent transaction for explicit desktop review.
+    ///
+    /// The document, CRDT heads, and history remain unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed limit, authorization, validation, or session error.
+    pub fn propose(&mut self, session_id: &SessionId, transaction: TransactionDraft) -> Result<Proposal, SessionError> {
+        self.next_proposal_number = self.next_proposal_number.saturating_add(1);
+        let proposal_id = ProposalId(format!("proposal:{}", self.next_proposal_number));
+        let session = self.session_mut(session_id)?;
+        session.expire_state();
+        if session.proposals.len() >= MAX_PROPOSALS_PER_SESSION {
+            return Err(SessionError::ProposalLimit(MAX_PROPOSALS_PER_SESSION));
+        }
+        ensure_actor(session.file.actor_id(), &transaction.actor_id)?;
+        validate_live_transaction(&transaction)?;
+        let proposal = create_proposal(&mut session.file, proposal_id, transaction, None)?;
+        session.proposals.insert(
+            proposal.id.clone(),
+            PendingProposal { proposal: proposal.clone(), created_at: Instant::now() },
+        );
+        Ok(proposal)
+    }
+
+    /// Accepts all or selected operations from a pending proposal.
+    ///
+    /// The original causal heads must still be current. When they changed,
+    /// the stored proposal is refreshed and [`SessionError::ProposalStale`]
+    /// returns the new preview without committing anything.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed proposal, validation, permission, or stale-head error.
+    pub fn accept_proposal(
+        &mut self, session_id: &SessionId, proposal_id: &ProposalId, operation_positions: Option<&[u32]>,
+    ) -> Result<SessionCommit, SessionError> {
+        let session = self.session_mut(session_id)?;
+        session.expire_state();
+        let pending = session.proposals.get(proposal_id).cloned().ok_or_else(|| {
+            if session.expired_proposals.remove(proposal_id) {
+                SessionError::ProposalExpired(proposal_id.clone())
+            } else {
+                SessionError::ProposalNotFound(proposal_id.clone())
+            }
+        })?;
+        let current_heads = session.file.snapshot()?.heads;
+        if !same_heads(&current_heads, &pending.proposal.transaction.base_heads) {
+            let mut refreshed_transaction = pending.proposal.transaction.clone();
+            refreshed_transaction.base_heads = current_heads;
+            let refreshed = match create_proposal(
+                &mut session.file,
+                pending.proposal.id.clone(),
+                refreshed_transaction,
+                Some(pending.proposal.expires_at),
+            ) {
+                Ok(proposal) => proposal,
+                Err(error) => {
+                    return Err(SessionError::ProposalConflict {
+                        proposal_id: proposal_id.clone(),
+                        message: error.to_string(),
+                    });
+                }
+            };
+            session.proposals.insert(
+                proposal_id.clone(),
+                PendingProposal { proposal: refreshed.clone(), created_at: pending.created_at },
+            );
+            return Err(SessionError::ProposalStale {
+                proposal_id: proposal_id.clone(),
+                proposal: Box::new(refreshed),
+            });
+        }
+
+        let operations = select_operations(&pending.proposal.transaction.operations, operation_positions)?;
+        let transaction = if operation_positions.is_none() {
+            pending.proposal.transaction.clone()
+        } else {
+            let mut transaction = pending.proposal.transaction.clone();
+            transaction.id = TransactionId(format!("{}:partial", pending.proposal.id.0));
+            transaction.description = format!("{} (partial proposal acceptance)", transaction.description);
+            transaction.operations = operations;
+            transaction
+        };
+        let commit = session.file.commit(transaction)?;
+        session.proposals.remove(proposal_id);
+        let status = session.status(session_id)?;
+        Ok(SessionCommit { commit, status })
+    }
+
+    /// Rejects and removes a pending proposal without changing the document.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SessionError::ProposalNotFound`] or [`SessionError::ProposalExpired`].
+    pub fn reject_proposal(&mut self, session_id: &SessionId, proposal_id: &ProposalId) -> Result<(), SessionError> {
+        let session = self.session_mut(session_id)?;
+        session.expire_state();
+        if session.proposals.remove(proposal_id).is_some() {
+            Ok(())
+        } else if session.expired_proposals.remove(proposal_id) {
+            Err(SessionError::ProposalExpired(proposal_id.clone()))
+        } else {
+            Err(SessionError::ProposalNotFound(proposal_id.clone()))
+        }
+    }
+
+    /// Issues a one-time authorization that the desktop UI can pass to a
+    /// direct live apply request.
+    ///
+    /// # Errors
+    ///
+    /// Returns a session lookup or operating-system random-source error.
+    pub fn authorize_apply(&mut self, session_id: &SessionId) -> Result<ApplyAuthorization, SessionError> {
+        let session = self.session_mut(session_id)?;
+        session.expire_state();
+        let token = random_token().map_err(SessionError::AuthorizationUnavailable)?;
+        let expires_at = Instant::now() + APPLY_AUTHORIZATION_TTL;
+        let authorization = ApplyAuthorization {
+            token: token.clone(),
+            session_id: session_id.clone(),
+            expires_at: timestamp_after(APPLY_AUTHORIZATION_TTL),
+        };
+        session
+            .authorizations
+            .insert(token, ApplyGrant { authorization: authorization.clone(), expires_at });
+        Ok(authorization)
+    }
+
+    /// Applies one agent transaction after consuming a one-time desktop grant.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed authorization, validation, permission, or persistence error.
+    pub fn apply_authorized(
+        &mut self, session_id: &SessionId, authorization: &ApplyAuthorization, transaction: TransactionDraft,
+    ) -> Result<SessionCommit, SessionError> {
+        let session = self.session_mut(session_id)?;
+        session.expire_state();
+        let Some(grant) = session.authorizations.remove(&authorization.token) else {
+            return Err(SessionError::AuthorizationRequired);
+        };
+        if grant.authorization.token != authorization.token || grant.authorization.session_id != *session_id {
+            return Err(SessionError::InvalidAuthorization);
+        }
+        if Instant::now() >= grant.expires_at {
+            return Err(SessionError::AuthorizationExpired);
+        }
+        ensure_actor(session.file.actor_id(), &transaction.actor_id)?;
+        validate_live_transaction(&transaction)?;
         let commit = session.file.commit(transaction)?;
         let status = session.status(session_id)?;
         Ok(SessionCommit { commit, status })
@@ -357,7 +601,13 @@ impl SessionService {
 
         self.next_session_number = self.next_session_number.saturating_add(1);
         let session_id = SessionId(format!("session:{}", self.next_session_number));
-        let mut session = DocumentSession { file, sync: SyncState::Disabled };
+        let mut session = DocumentSession {
+            file,
+            sync: SyncState::Disabled,
+            proposals: BTreeMap::new(),
+            expired_proposals: BTreeSet::new(),
+            authorizations: BTreeMap::new(),
+        };
         let status = session.status(&session_id)?;
         self.sessions.insert(session_id.clone(), session);
         Ok(SessionOpened { session_id, status })
@@ -371,6 +621,25 @@ impl SessionService {
 }
 
 impl DocumentSession {
+    fn expire_state(&mut self) {
+        let now = Instant::now();
+        let expired = self
+            .proposals
+            .iter()
+            .filter(|(_, pending)| now.duration_since(pending.created_at) >= PROPOSAL_TTL)
+            .map(|(proposal_id, _)| proposal_id.clone())
+            .collect::<Vec<_>>();
+        for proposal_id in expired {
+            self.proposals.remove(&proposal_id);
+            self.expired_proposals.insert(proposal_id);
+        }
+        while self.expired_proposals.len() > MAX_PROPOSALS_PER_SESSION {
+            let Some(oldest) = self.expired_proposals.iter().next().cloned() else { break };
+            self.expired_proposals.remove(&oldest);
+        }
+        self.authorizations.retain(|_, grant| now < grant.expires_at);
+    }
+
     fn status(&mut self, session_id: &SessionId) -> Result<SessionStatus, SessionError> {
         let snapshot = self.file.snapshot()?;
         let dirty = self.file.is_dirty()?;
@@ -388,6 +657,97 @@ impl DocumentSession {
             sync: self.sync.clone(),
         })
     }
+}
+
+fn create_proposal(
+    file: &mut DocumentFile, id: ProposalId, transaction: TransactionDraft, expires_at: Option<Timestamp>,
+) -> Result<Proposal, SessionError> {
+    let preview = file.engine_mut().preview(&transaction)?;
+    Ok(Proposal {
+        id,
+        transaction,
+        preview: preview.patch,
+        affected_regions: preview.affected_regions,
+        warnings: Vec::<Warning>::new(),
+        expires_at: expires_at.unwrap_or_else(|| timestamp_after(PROPOSAL_TTL)),
+    })
+}
+
+fn validate_live_transaction(transaction: &TransactionDraft) -> Result<(), SessionError> {
+    if transaction.origin != Origin::Agent {
+        return Err(SessionError::AgentOriginRequired);
+    }
+    if transaction.operations.len() > MAX_PROPOSAL_OPERATIONS {
+        return Err(SessionError::ProposalTooLarge {
+            count: transaction.operations.len(),
+            max: MAX_PROPOSAL_OPERATIONS,
+        });
+    }
+    if transaction.description.len() > MAX_PROPOSAL_DESCRIPTION_BYTES {
+        return Err(SessionError::ProposalDescriptionTooLong { max: MAX_PROPOSAL_DESCRIPTION_BYTES });
+    }
+    Ok(())
+}
+
+fn select_operations(
+    operations: &[crate::proto::Operation], positions: Option<&[u32]>,
+) -> Result<Vec<crate::proto::Operation>, SessionError> {
+    let Some(positions) = positions else {
+        return Ok(operations.to_vec());
+    };
+    if positions.is_empty() {
+        return Err(SessionError::InvalidProposalSelection(
+            "at least one operation is required".into(),
+        ));
+    }
+    let mut selected = BTreeSet::new();
+    for position in positions {
+        let index = usize::try_from(*position)
+            .map_err(|_| SessionError::InvalidProposalSelection(format!("operation position {position} is invalid")))?;
+        if index >= operations.len() {
+            return Err(SessionError::InvalidProposalSelection(format!(
+                "operation position {position} is outside the proposal"
+            )));
+        }
+        if !selected.insert(index) {
+            return Err(SessionError::InvalidProposalSelection(format!(
+                "operation position {position} was selected more than once"
+            )));
+        }
+    }
+    Ok(selected.into_iter().map(|index| operations[index].clone()).collect())
+}
+
+fn same_heads(left: &[crate::ChangeHash], right: &[crate::ChangeHash]) -> bool {
+    let mut left = left.to_vec();
+    let mut right = right.to_vec();
+    left.sort();
+    right.sort();
+    left == right
+}
+
+fn timestamp_after(duration: Duration) -> Timestamp {
+    let now = timestamp_now().0;
+    let millis = i64::try_from(duration.as_millis()).unwrap_or(i64::MAX);
+    Timestamp(now.saturating_add(millis))
+}
+
+fn timestamp_now() -> Timestamp {
+    let millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or_default();
+    Timestamp(i64::try_from(millis).unwrap_or(i64::MAX))
+}
+
+fn random_token() -> Result<String, String> {
+    let mut bytes = [0_u8; 32];
+    getrandom::fill(&mut bytes).map_err(|error| error.to_string())?;
+    let mut token = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        write!(&mut token, "{byte:02x}").map_err(|error| error.to_string())?;
+    }
+    Ok(token)
 }
 
 fn ensure_actor(expected: &ActorId, actual: &ActorId) -> Result<(), SessionError> {
@@ -525,6 +885,259 @@ mod tests {
         fs::remove_dir(&path).expect("remove failure directory");
         fs::rename(&backup, &path).expect("restore canonical");
         remove_test_directory(root);
+    }
+
+    #[test]
+    fn proposal_rejection_leaves_heads_and_bytes_unchanged() {
+        let root = test_directory();
+        let path = root.join("proposal-reject.inkfinite");
+        let actor = ActorId::from("actor:proposal");
+        let mut service = SessionService::new();
+        let opened = service
+            .create(&path, DocumentId::from("document:proposal-reject"), actor.clone(), None)
+            .expect("create session");
+        let before = service.status(&opened.session_id).expect("status");
+        let before_bytes = fs::read(&path).expect("read canonical file");
+        let proposal = service
+            .propose(
+                &opened.session_id,
+                agent_rename(&before.snapshot, actor, "Preview only"),
+            )
+            .expect("propose transaction");
+
+        assert_eq!(
+            proposal.preview.changed,
+            vec![crate::proto::RecordId::Page(PageId::from(
+                "page:document:proposal-reject:1"
+            ))]
+        );
+        assert_eq!(
+            service
+                .status(&opened.session_id)
+                .expect("status after proposal")
+                .snapshot,
+            before.snapshot
+        );
+        service
+            .reject_proposal(&opened.session_id, &proposal.id)
+            .expect("reject proposal");
+        assert_eq!(fs::read(&path).expect("read unchanged canonical file"), before_bytes);
+        assert_eq!(
+            service.status(&opened.session_id).expect("final status").snapshot,
+            before.snapshot
+        );
+
+        service.close(&opened.session_id).expect("close session");
+        remove_test_directory(root);
+    }
+
+    #[test]
+    fn partial_acceptance_commits_only_selected_operations() {
+        let root = test_directory();
+        let path = root.join("proposal-partial.inkfinite");
+        let actor = ActorId::from("actor:proposal");
+        let mut service = SessionService::new();
+        let opened = service
+            .create(
+                &path,
+                DocumentId::from("document:proposal-partial"),
+                actor.clone(),
+                None,
+            )
+            .expect("create session");
+        let snapshot = opened.status.snapshot.clone();
+        let page_id = snapshot.document.page_ids[0].clone();
+        let layer_id = snapshot.document.pages[&page_id].layer_ids[0].clone();
+        let transaction = TransactionDraft {
+            id: TransactionId("transaction:proposal-partial".into()),
+            actor_id: actor,
+            origin: Origin::Agent,
+            base_heads: snapshot.heads,
+            description: "rename page and layer".into(),
+            operations: vec![
+                Operation::RenamePage { page_id, name: "Renamed page".into(), expected_version: None },
+                Operation::PatchLayer {
+                    layer_id,
+                    patch: crate::proto::LayerPatch { name: Some("Renamed layer".into()), ..Default::default() },
+                    expected_version: None,
+                },
+            ],
+            timestamp: Timestamp(2),
+        };
+        let proposal = service
+            .propose(&opened.session_id, transaction)
+            .expect("propose transaction");
+        let accepted = service
+            .accept_proposal(&opened.session_id, &proposal.id, Some(&[1_u32]))
+            .expect("accept selected operation");
+
+        assert_eq!(accepted.commit.patch.changed.len(), 1);
+        let status = service
+            .status(&opened.session_id)
+            .expect("status after partial acceptance");
+        assert_eq!(status.snapshot.document.pages.values().next().unwrap().name, "Page 1");
+        assert_eq!(
+            status.snapshot.document.layers.values().next().unwrap().name,
+            "Renamed layer"
+        );
+
+        service.close(&opened.session_id).expect("close session");
+        remove_test_directory(root);
+    }
+
+    #[test]
+    fn stale_acceptance_refreshes_preview_without_committing() {
+        let root = test_directory();
+        let path = root.join("proposal-stale.inkfinite");
+        let actor = ActorId::from("actor:proposal");
+        let mut service = SessionService::new();
+        let opened = service
+            .create(&path, DocumentId::from("document:proposal-stale"), actor.clone(), None)
+            .expect("create session");
+        let snapshot = opened.status.snapshot.clone();
+        let proposal = service
+            .propose(
+                &opened.session_id,
+                agent_rename(&snapshot, actor.clone(), "Agent result"),
+            )
+            .expect("propose transaction");
+        service
+            .commit(
+                &opened.session_id,
+                rename_transaction(&snapshot, actor.clone(), "Local edit"),
+            )
+            .expect("intervening local edit");
+
+        let error = service
+            .accept_proposal(&opened.session_id, &proposal.id, None)
+            .expect_err("stale acceptance must not commit");
+        let refreshed = match error {
+            SessionError::ProposalStale { proposal, .. } => proposal,
+            other => panic!("expected refreshed proposal, got {other:?}"),
+        };
+        assert_eq!(
+            refreshed.transaction.base_heads,
+            service.status(&opened.session_id).unwrap().snapshot.heads
+        );
+        assert_eq!(
+            service
+                .status(&opened.session_id)
+                .unwrap()
+                .snapshot
+                .document
+                .pages
+                .values()
+                .next()
+                .unwrap()
+                .name,
+            "Local edit"
+        );
+
+        let accepted = service
+            .accept_proposal(&opened.session_id, &refreshed.id, None)
+            .expect("accept refreshed proposal");
+        assert_eq!(accepted.commit.patch.changed.len(), 1);
+        assert_eq!(
+            service
+                .status(&opened.session_id)
+                .unwrap()
+                .snapshot
+                .document
+                .pages
+                .values()
+                .next()
+                .unwrap()
+                .name,
+            "Agent result"
+        );
+
+        service.close(&opened.session_id).expect("close session");
+        remove_test_directory(root);
+    }
+
+    #[test]
+    fn direct_apply_consumes_explicit_authorization_once() {
+        let root = test_directory();
+        let path = root.join("apply-authorized.inkfinite");
+        let actor = ActorId::from("actor:proposal");
+        let mut service = SessionService::new();
+        let opened = service
+            .create(
+                &path,
+                DocumentId::from("document:apply-authorized"),
+                actor.clone(),
+                None,
+            )
+            .expect("create session");
+        let snapshot = opened.status.snapshot.clone();
+        let transaction = agent_rename(&snapshot, actor, "Authorized edit");
+        let authorization = service.authorize_apply(&opened.session_id).expect("authorize apply");
+        service
+            .apply_authorized(&opened.session_id, &authorization, transaction.clone())
+            .expect("apply authorized transaction");
+        assert!(matches!(
+            service.apply_authorized(&opened.session_id, &authorization, transaction),
+            Err(SessionError::AuthorizationRequired)
+        ));
+
+        service.close(&opened.session_id).expect("close session");
+        remove_test_directory(root);
+    }
+
+    #[test]
+    fn expired_proposals_and_oversized_transactions_are_rejected() {
+        let root = test_directory();
+        let path = root.join("proposal-limits.inkfinite");
+        let actor = ActorId::from("actor:proposal");
+        let mut service = SessionService::new();
+        let opened = service
+            .create(&path, DocumentId::from("document:proposal-limits"), actor.clone(), None)
+            .expect("create session");
+        let snapshot = opened.status.snapshot.clone();
+        let mut oversized = agent_rename(&snapshot, actor.clone(), "Too many operations");
+        oversized.operations = (0..=MAX_PROPOSAL_OPERATIONS)
+            .map(|_| Operation::RenamePage {
+                page_id: snapshot.document.page_ids[0].clone(),
+                name: "same".into(),
+                expected_version: None,
+            })
+            .collect();
+        assert!(matches!(
+            service.propose(&opened.session_id, oversized),
+            Err(SessionError::ProposalTooLarge { .. })
+        ));
+
+        let proposal = service
+            .propose(&opened.session_id, agent_rename(&snapshot, actor, "Will expire"))
+            .expect("propose expiring transaction");
+        service
+            .sessions
+            .get_mut(&opened.session_id)
+            .unwrap()
+            .proposals
+            .get_mut(&proposal.id)
+            .unwrap()
+            .created_at = Instant::now()
+            .checked_sub(PROPOSAL_TTL)
+            .expect("proposal TTL is representable");
+        assert!(matches!(
+            service.accept_proposal(&opened.session_id, &proposal.id, None),
+            Err(SessionError::ProposalExpired(_))
+        ));
+
+        service.close(&opened.session_id).expect("close session");
+        remove_test_directory(root);
+    }
+
+    fn agent_rename(snapshot: &DocumentSnapshot, actor_id: ActorId, name: &str) -> TransactionDraft {
+        let mut transaction = rename_transaction(snapshot, actor_id, name);
+        transaction.origin = Origin::Agent;
+        transaction.operations = vec![Operation::RenamePage {
+            page_id: snapshot.document.page_ids[0].clone(),
+            name: name.into(),
+            expected_version: None,
+        }];
+        transaction
     }
 
     fn rename_transaction(snapshot: &DocumentSnapshot, actor_id: ActorId, name: &str) -> TransactionDraft {

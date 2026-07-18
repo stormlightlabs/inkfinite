@@ -1,8 +1,10 @@
 import type { DesktopFileOps, FileHandle } from "@inkfinite/core";
 import type {
-  ChangeHash,
-  DocumentSnapshot,
-  TransactionDraft,
+	ApplyAuthorization,
+	ChangeHash,
+	DocumentSnapshot,
+	Proposal,
+	TransactionDraft,
 } from "@inkfinite/bindings";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
@@ -151,6 +153,22 @@ function createFakeSessionApi() {
         commit: commitResult(args.transaction, next),
         status: statusFor(args.session_id, session),
       };
+    },
+
+    async propose(_args: Parameters<SessionApi["propose"]>[0]): Promise<Proposal> {
+      throw new Error("Proposals are not part of this fake session");
+    },
+
+    async acceptProposal(_args: Parameters<SessionApi["acceptProposal"]>[0]): Promise<SessionCommit> {
+      throw new Error("Proposals are not part of this fake session");
+    },
+
+    async rejectProposal(_args: Parameters<SessionApi["rejectProposal"]>[0]): Promise<void> {
+      throw new Error("Proposals are not part of this fake session");
+    },
+
+    async authorizeApply(_args: Parameters<SessionApi["authorizeApply"]>[0]): Promise<ApplyAuthorization> {
+      throw new Error("Apply authorization is not part of this fake session");
     },
 
     async undo(args: Parameters<SessionApi["undo"]>[0]): Promise<SessionCommit> {

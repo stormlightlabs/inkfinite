@@ -1,12 +1,15 @@
 //! Commands for inspecting and focusing a running desktop app.
 
 use inkfinite_core::ipc::{self, AppRequest, AppResponse, IpcError};
-use inkfinite_core::proto::{Query, RecordId};
+use inkfinite_core::proto::{ApplyAuthorization, ProposalId, Query, RecordId, SessionId};
 use inkfinite_core::{LayerId, PageId};
 
-use super::args::{AppCommand, AppInspectArgs, AppQueryArgs};
+use super::apply::read_transaction;
+use super::args::{
+    AppAcceptArgs, AppApplyArgs, AppCommand, AppInspectArgs, AppProposeArgs, AppQueryArgs, AppRejectArgs,
+};
 use super::support::{map_output_error, write_heads, write_json};
-use super::{CliError, EXIT_INPUT, EXIT_INVALID, Result, Write, anyhow, json};
+use super::{CliError, EXIT_CONFLICT, EXIT_INPUT, EXIT_INVALID, Result, Write, anyhow, json};
 
 /// Runs one authenticated read-only desktop command.
 pub fn run_app_command(command: AppCommand, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
@@ -14,6 +17,10 @@ pub fn run_app_command(command: AppCommand, json_output: bool, stdout: &mut dyn 
         AppCommand::Status => status(json_output, stdout),
         AppCommand::Inspect(args) => inspect(args, json_output, stdout),
         AppCommand::Query(args) => query(args, json_output, stdout),
+        AppCommand::Propose(args) => propose(args, json_output, stdout),
+        AppCommand::Accept(args) => accept(args, json_output, stdout),
+        AppCommand::Reject(args) => reject(args, json_output, stdout),
+        AppCommand::Apply(args) => apply(args, json_output, stdout),
         AppCommand::Focus => focus(json_output, stdout),
     }
 }
@@ -115,13 +122,117 @@ fn focus(json_output: bool, stdout: &mut dyn Write) -> Result<()> {
     }
 }
 
+fn propose(args: AppProposeArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
+    let transaction = read_transaction(&args.transaction)?;
+    let response = send(AppRequest::Propose { session_id: args.session_id.map(SessionId), transaction })?;
+    let AppResponse::Proposal(proposal) = response else {
+        return unexpected_response("propose");
+    };
+    if json_output {
+        return write_json(stdout, &proposal);
+    }
+    writeln!(stdout, "Proposal: {}", proposal.id.0).map_err(map_output_error)?;
+    write_heads(stdout, &proposal.transaction.base_heads)?;
+    writeln!(stdout, "Created: {}", proposal.preview.created.len()).map_err(map_output_error)?;
+    writeln!(stdout, "Changed: {}", proposal.preview.changed.len()).map_err(map_output_error)?;
+    writeln!(stdout, "Deleted: {}", proposal.preview.deleted.len()).map_err(map_output_error)?;
+    writeln!(stdout, "Affected regions: {}", proposal.affected_regions.len()).map_err(map_output_error)
+}
+
+fn accept(args: AppAcceptArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
+    let operation_positions = (!args.operation_positions.is_empty()).then_some(args.operation_positions);
+    let response = send(AppRequest::AcceptProposal {
+        session_id: args.session_id.map(SessionId),
+        proposal_id: ProposalId(args.proposal_id),
+        operation_positions,
+    })?;
+    let AppResponse::Committed(commit) = response else {
+        return unexpected_response("accept");
+    };
+    write_commit(&commit, json_output, stdout)
+}
+
+fn reject(args: AppRejectArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
+    let response = send(AppRequest::RejectProposal {
+        session_id: args.session_id.map(SessionId),
+        proposal_id: ProposalId(args.proposal_id),
+    })?;
+    if !matches!(response, AppResponse::ProposalRejected) {
+        return unexpected_response("reject");
+    }
+    if json_output {
+        write_json(stdout, &json!({ "rejected": true }))
+    } else {
+        writeln!(stdout, "Proposal rejected").map_err(map_output_error)
+    }
+}
+
+fn apply(args: AppApplyArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
+    let transaction = read_transaction(&args.transaction)?;
+    let session_id = resolve_session_id(args.session_id)?;
+    let authorization = ApplyAuthorization {
+        token: args.authorization,
+        session_id: session_id.clone(),
+        expires_at: inkfinite_core::Timestamp(0),
+    };
+    let response = send(AppRequest::Apply { session_id: Some(session_id), transaction, authorization })?;
+    let AppResponse::Committed(commit) = response else {
+        return unexpected_response("apply");
+    };
+    write_commit(&commit, json_output, stdout)
+}
+
+fn resolve_session_id(session_id: Option<String>) -> Result<SessionId> {
+    if let Some(session_id) = session_id {
+        return Ok(SessionId(session_id));
+    }
+    let response = send(AppRequest::Status)?;
+    let AppResponse::Status(statuses) = response else {
+        return Err(CliError::new(
+            EXIT_INVALID,
+            anyhow!("desktop app returned an unexpected response for status"),
+        ));
+    };
+    let [status] = statuses.as_slice() else {
+        return Err(CliError::new(
+            EXIT_INPUT,
+            anyhow!("--session-id is required when the desktop has zero or multiple open sessions"),
+        ));
+    };
+    Ok(status.session_id.clone())
+}
+
+fn write_commit(
+    commit: &inkfinite_core::session::SessionCommit, json_output: bool, stdout: &mut dyn Write,
+) -> Result<()> {
+    if json_output {
+        return write_json(stdout, commit);
+    }
+    writeln!(stdout, "Transaction: {}", commit.commit.transaction_id.0).map_err(map_output_error)?;
+    write_heads(stdout, &commit.commit.heads)?;
+    writeln!(stdout, "Created: {}", commit.commit.patch.created.len()).map_err(map_output_error)?;
+    writeln!(stdout, "Changed: {}", commit.commit.patch.changed.len()).map_err(map_output_error)?;
+    writeln!(stdout, "Deleted: {}", commit.commit.patch.deleted.len()).map_err(map_output_error)
+}
+
 fn send(request: AppRequest) -> Result<AppResponse> {
     let runtime = tokio::runtime::Runtime::new()
         .map_err(|error| CliError::new(EXIT_INPUT, anyhow!(error)).context("could not start the IPC runtime"))?;
     let response = runtime.block_on(ipc::send(request)).map_err(map_ipc_error)?;
-    response
-        .result
-        .map_err(|error| CliError::new(EXIT_INVALID, anyhow!("[{}] {}", error.code, error.message)))
+    response.result.map_err(|error| {
+        let exit_code = match error.code.as_str() {
+            "proposal_stale"
+            | "proposal_conflict"
+            | "stale_heads"
+            | "authorization_required"
+            | "invalid_authorization"
+            | "authorization_expired"
+            | "actor_mismatch"
+            | "document_engine_error" => EXIT_CONFLICT,
+            _ => EXIT_INVALID,
+        };
+        CliError::new(exit_code, anyhow!("[{}] {}", error.code, error.message))
+    })
 }
 
 fn map_ipc_error(error: IpcError) -> CliError {

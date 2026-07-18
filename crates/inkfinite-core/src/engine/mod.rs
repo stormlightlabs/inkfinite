@@ -42,6 +42,27 @@ use operations::apply_operation;
 use policy::{validate_permissions, validate_transaction_schema};
 use query::query_document;
 
+/// Validated transaction result that has not been committed to the CRDT.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TransactionPreview {
+    /// Materialized document after applying the transaction.
+    pub document: Document,
+    /// Records created, changed, or deleted by the transaction.
+    pub patch: DocumentPatch,
+    /// Records affected directly or through hierarchy repairs.
+    pub affected_ids: Vec<RecordId>,
+    /// Document-coordinate regions invalidated by the transaction.
+    pub affected_regions: Vec<AffectedRegion>,
+}
+
+struct PreparedTransaction {
+    document: Document,
+    inverse: Vec<Operation>,
+    patch: DocumentPatch,
+    affected_ids: Vec<RecordId>,
+    affected_regions: Vec<AffectedRegion>,
+}
+
 /// Rust-owned document state plus actor-scoped undo and redo metadata.
 pub struct TransactionEngine {
     crdt: AutomergeDocument,
@@ -120,6 +141,19 @@ impl TransactionEngine {
     /// permissions, invariants, or CRDT persistence checks fail.
     pub fn commit(&mut self, transaction: TransactionDraft) -> Result<CommitResult, EngineError> {
         self.commit_internal(transaction, true)
+    }
+
+    /// Validates a transaction and returns its materialized geometry without
+    /// changing the CRDT or either history stack.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same schema, head, permission, precondition, and invariant
+    /// failures as [`Self::commit`].
+    pub fn preview(&mut self, transaction: &TransactionDraft) -> Result<TransactionPreview, EngineError> {
+        let PreparedTransaction { document, patch, affected_ids, affected_regions, .. } =
+            self.prepare_transaction(transaction)?;
+        Ok(TransactionPreview { document, patch, affected_ids, affected_regions })
     }
 
     /// Compensates the latest eligible transaction from `actor_id`.
@@ -260,28 +294,8 @@ impl TransactionEngine {
     fn commit_internal(
         &mut self, transaction: TransactionDraft, track_history: bool,
     ) -> Result<CommitResult, EngineError> {
-        validate_transaction_schema(&transaction)?;
-        let current_heads = self.crdt.heads();
-        if canonical_heads(&transaction.base_heads) != canonical_heads(&current_heads) {
-            return Err(EngineError::StaleHeads);
-        }
-
-        let before = self.crdt.snapshot()?.document;
-        let mut candidate = before.clone();
-        let mut inverse = Vec::new();
-        for operation in &transaction.operations {
-            validate_permissions(&candidate, operation, &transaction.origin)?;
-            let operation_inverse = apply_operation(&mut candidate, operation)?;
-            inverse.splice(0..0, operation_inverse);
-        }
-        validate_document(&candidate)?;
-        refresh_inverse_preconditions(&mut inverse, &candidate);
-
-        let (patch, affected_ids) = diff_documents(&before, &candidate);
-        if affected_ids.is_empty() {
-            return Err(EngineError::Schema("transaction must produce a durable change".into()));
-        }
-        let affected_regions = affected_regions(&before, &candidate, &affected_ids);
+        let PreparedTransaction { document: candidate, inverse, patch, affected_ids, affected_regions } =
+            self.prepare_transaction(&transaction)?;
         let mut fork = self.crdt.clone();
         fork.set_actor(&transaction.actor_id);
         let outcome = fork.commit_document(&candidate, &transaction.description)?;
@@ -309,6 +323,32 @@ impl TransactionEngine {
             inverse: inverse_metadata,
             warnings: Vec::new(),
         })
+    }
+
+    fn prepare_transaction(&mut self, transaction: &TransactionDraft) -> Result<PreparedTransaction, EngineError> {
+        validate_transaction_schema(transaction)?;
+        let current_heads = self.crdt.heads();
+        if canonical_heads(&transaction.base_heads) != canonical_heads(&current_heads) {
+            return Err(EngineError::StaleHeads);
+        }
+
+        let before = self.crdt.snapshot()?.document;
+        let mut candidate = before.clone();
+        let mut inverse = Vec::new();
+        for operation in &transaction.operations {
+            validate_permissions(&candidate, operation, &transaction.origin)?;
+            let operation_inverse = apply_operation(&mut candidate, operation)?;
+            inverse.splice(0..0, operation_inverse);
+        }
+        validate_document(&candidate)?;
+        refresh_inverse_preconditions(&mut inverse, &candidate);
+
+        let (patch, affected_ids) = diff_documents(&before, &candidate);
+        if affected_ids.is_empty() {
+            return Err(EngineError::Schema("transaction must produce a durable change".into()));
+        }
+        let affected_regions = affected_regions(&before, &candidate, &affected_ids);
+        Ok(PreparedTransaction { document: candidate, inverse, patch, affected_ids, affected_regions })
     }
 
     fn history_transaction(

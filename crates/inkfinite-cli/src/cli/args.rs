@@ -460,6 +460,32 @@ pub enum AppCommand {
     inkfinite app query --session-id session:1 --kind rect
 ")]
     Query(AppQueryArgs),
+    /// Validate and send an agent transaction to the desktop for review.
+    #[command(after_help = "Examples:
+
+    inkfinite app propose --transaction transaction.json --json
+    cat transaction.json | inkfinite app propose --transaction - --json
+")]
+    Propose(AppProposeArgs),
+    /// Accept all or selected operations from a reviewed proposal.
+    #[command(after_help = "Examples:
+
+    inkfinite app accept --proposal-id proposal:1 --json
+    inkfinite app accept --proposal-id proposal:1 --operation-position 0 --operation-position 2
+")]
+    Accept(AppAcceptArgs),
+    /// Reject a reviewed proposal without changing the document.
+    #[command(after_help = "Example:
+
+    inkfinite app reject --proposal-id proposal:1
+")]
+    Reject(AppRejectArgs),
+    /// Apply an agent transaction using a one-time authorization issued by the desktop UI.
+    #[command(after_help = "Example:
+
+    inkfinite app apply --transaction transaction.json --authorization TOKEN --json
+")]
+    Apply(AppApplyArgs),
     /// Ask the desktop frontend to focus its main window.
     #[command(after_help = "Example:
 
@@ -507,6 +533,52 @@ pub struct AppQueryArgs {
     /// Restrict shapes to bounds formatted as x,y,width,height.
     #[arg(long, value_name = "X,Y,WIDTH,HEIGHT", value_parser = parse_bounds)]
     pub bounds: Option<Bounds>,
+}
+
+#[derive(Debug, Args)]
+pub struct AppProposeArgs {
+    /// Transaction JSON file, or - to read standard input.
+    #[arg(long, value_name = "TRANSACTION")]
+    pub transaction: PathBuf,
+    /// Propose against this session, or the only open session when omitted.
+    #[arg(long, value_name = "SESSION_ID")]
+    pub session_id: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct AppAcceptArgs {
+    /// Proposal to accept.
+    #[arg(long, value_name = "PROPOSAL_ID")]
+    pub proposal_id: String,
+    /// Zero-based operation position to accept. Repeat for partial acceptance.
+    #[arg(long = "operation-position", value_name = "INDEX")]
+    pub operation_positions: Vec<u32>,
+    /// Accept in this session, or the only open session when omitted.
+    #[arg(long, value_name = "SESSION_ID")]
+    pub session_id: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct AppRejectArgs {
+    /// Proposal to reject.
+    #[arg(long, value_name = "PROPOSAL_ID")]
+    pub proposal_id: String,
+    /// Reject in this session, or the only open session when omitted.
+    #[arg(long, value_name = "SESSION_ID")]
+    pub session_id: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct AppApplyArgs {
+    /// Transaction JSON file, or - to read standard input.
+    #[arg(long, value_name = "TRANSACTION")]
+    pub transaction: PathBuf,
+    /// One-time authorization copied from the desktop review surface.
+    #[arg(long, value_name = "TOKEN")]
+    pub authorization: String,
+    /// Apply in this session, or the only open session when omitted.
+    #[arg(long, value_name = "SESSION_ID")]
+    pub session_id: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]

@@ -32,6 +32,17 @@ pub struct SessionId(pub String);
 #[serde(transparent)]
 pub struct ProposalId(pub String);
 
+/// One-time user authorization for a direct live agent apply.
+#[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+pub struct ApplyAuthorization {
+    /// Opaque single-use token issued by the desktop UI.
+    pub token: String,
+    /// Session for which the authorization was issued.
+    pub session_id: SessionId,
+    /// Wall-clock expiry retained for clients and diagnostics.
+    pub expires_at: Timestamp,
+}
+
 /// Cross-platform serialized document path used at file-service boundaries.
 #[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(transparent)]
@@ -420,8 +431,12 @@ pub struct Proposal {
     pub transaction: TransactionDraft,
     /// Preview patch shown by the UI.
     pub preview: DocumentPatch,
+    /// Document-coordinate regions affected by the proposed geometry.
+    pub affected_regions: Vec<AffectedRegion>,
     /// Validation or repair warnings shown before acceptance.
     pub warnings: Vec<Warning>,
+    /// Wall-clock expiry retained for clients and diagnostics.
+    pub expires_at: Timestamp,
 }
 
 /// Transport-independent request accepted by desktop commands, IPC, or CLI adapters.
@@ -460,6 +475,20 @@ pub enum Request {
         session_id: SessionId,
         /// Transaction to preview.
         transaction: TransactionDraft,
+    },
+    /// Issue a one-time authorization for a direct live apply.
+    AuthorizeApply {
+        /// Open session to authorize.
+        session_id: SessionId,
+    },
+    /// Apply a transaction directly after explicit desktop authorization.
+    Apply {
+        /// Open session to change.
+        session_id: SessionId,
+        /// Transaction to validate and apply.
+        transaction: TransactionDraft,
+        /// One-time authorization issued by the desktop UI.
+        authorization: ApplyAuthorization,
     },
     /// Accept all or selected operations from a proposal and revalidate at current heads.
     AcceptProposal {
@@ -538,6 +567,8 @@ pub enum Response {
     Committed(CommitResult),
     /// A transaction was validated and held for user review.
     Proposed(Proposal),
+    /// A one-time direct-apply authorization was issued.
+    ApplyAuthorized(ApplyAuthorization),
     /// A proposal was rejected and removed.
     ProposalRejected,
     /// A document was persisted.
