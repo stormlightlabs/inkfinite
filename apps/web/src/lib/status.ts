@@ -1,7 +1,7 @@
 import { liveQuery } from "dexie";
-import type { BrushConfig, DocPatch, PersistenceSink, PersistenceSinkOptions, PersistentDocRepo } from "inkfinite-core";
-import { createPersistenceSink } from "inkfinite-core";
-import type { InkfiniteDB, PersistenceStatus } from "inkfinite-core";
+import type { BrushConfig, DocPatch, PersistenceSink, PersistenceSinkOptions, PersistentDocRepo } from "@inkfinite/core";
+import { createPersistenceSink } from "@inkfinite/core";
+import type { InkfiniteDB, PersistenceStatus } from "@inkfinite/core";
 
 type StatusListener = (status: PersistenceStatus) => void;
 

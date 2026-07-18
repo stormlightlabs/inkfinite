@@ -75,7 +75,7 @@ vi.mock(
   }),
 );
 
-vi.mock("inkfinite-renderer", () => {
+vi.mock("@inkfinite/renderer", () => {
   return { createRenderer: vi.fn(() => ({ dispose: vi.fn(), markDirty: vi.fn() })) };
 });
 
@@ -86,8 +86,8 @@ const createDoc = () => ({
   order: { pageIds: ["page:1"], shapeOrder: { "page:1": [] } },
 });
 
-vi.mock("inkfinite-core", async () => {
-  const actual = await vi.importActual<typeof import("inkfinite-core")>("inkfinite-core");
+vi.mock("@inkfinite/core", async () => {
+  const actual = await vi.importActual<typeof import("@inkfinite/core")>("@inkfinite/core");
   const { sinkEnqueueSpy, storeInstances } = coreMocks;
 
   class BaseTool {
@@ -331,7 +331,7 @@ vi.mock("inkfinite-core", async () => {
   };
 });
 
-import * as InkfiniteCore from "inkfinite-core";
+import * as InkfiniteCore from "@inkfinite/core";
 import Canvas from "../canvas/Canvas.svelte";
 const { sinkEnqueueSpy, storeInstances } = coreMocks;
 

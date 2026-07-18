@@ -1,5 +1,5 @@
 import type { DesktopDocRepo } from "$lib/persistence/desktop";
-import type { BoardMeta, LoadedDoc, PersistentDocRepo } from "inkfinite-core";
+import type { BoardMeta, LoadedDoc, PersistentDocRepo } from "@inkfinite/core";
 
 function isUserCancelled(error: unknown) {
   return error instanceof Error && /cancel/i.test(error.message);

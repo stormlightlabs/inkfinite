@@ -23,7 +23,7 @@
 		Store,
 		TextShape,
 		ToolId
-	} from 'inkfinite-core';
+	} from '@inkfinite/core';
 	import {
 		EditorState,
 		exportToSVG,
@@ -32,7 +32,7 @@
 		getShapesOnCurrentPage,
 		shapeBounds,
 		SnapshotCommand
-	} from 'inkfinite-core';
+	} from '@inkfinite/core';
 	import { fade } from 'svelte/transition';
 	import icon from '../assets/favicon.svg';
 	import ArrowPopover from './ArrowPopover.svelte';

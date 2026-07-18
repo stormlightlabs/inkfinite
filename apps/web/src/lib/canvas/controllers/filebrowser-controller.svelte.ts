@@ -6,7 +6,7 @@ import {
   type BoardInspectorData,
   type FileBrowserViewModel,
   type PersistentDocRepo,
-} from "inkfinite-core";
+} from "@inkfinite/core";
 
 export class FileBrowserController {
   open = $state(false);

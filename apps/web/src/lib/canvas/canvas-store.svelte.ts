@@ -27,10 +27,10 @@ import {
   SnapshotCommand,
   Store,
   TextTool,
-} from "inkfinite-core";
-import type { Action, Box2, LoadedDoc, PersistenceSink, PersistentDocRepo, Viewport } from "inkfinite-core";
-import { stencils } from "inkfinite-core";
-import { createRenderer, type Renderer } from "inkfinite-renderer";
+} from "@inkfinite/core";
+import type { Action, Box2, LoadedDoc, PersistenceSink, PersistentDocRepo, Viewport } from "@inkfinite/core";
+import { stencils } from "@inkfinite/core";
+import { createRenderer, type Renderer } from "@inkfinite/renderer";
 
 type Stencil = stencils.Stencil;
 import { onDestroy, onMount } from "svelte";
@@ -614,7 +614,7 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
       }
     } else {
       webDb = new InkfiniteDB();
-      const { createWebDocRepo, createPersistenceSink } = await import("inkfinite-core");
+      const { createWebDocRepo, createPersistenceSink } = await import("@inkfinite/core");
       const { liveQuery } = await import("dexie");
       repo = createWebDocRepo(webDb);
       sink = createPersistenceSink(repo);

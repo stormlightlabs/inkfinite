@@ -1,5 +1,5 @@
 {
-	"name": "inkfinite-web",
+	"name": "@inkfinite/web",
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
@@ -21,8 +21,8 @@
 		"@tauri-apps/plugin-fs": "^2.4.4",
 		"@tauri-apps/plugin-store": "^2.4.1",
 		"dexie": "^4.2.1",
-		"inkfinite-core": "workspace:*",
-		"inkfinite-renderer": "workspace:*"
+		"@inkfinite/core": "workspace:*",
+		"@inkfinite/renderer": "workspace:*"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^1.4.0",

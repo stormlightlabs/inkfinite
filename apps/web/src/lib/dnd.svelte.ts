@@ -1,4 +1,4 @@
-import { stencils } from "inkfinite-core";
+import { stencils } from "@inkfinite/core";
 
 type Stencil = stencils.Stencil;
 

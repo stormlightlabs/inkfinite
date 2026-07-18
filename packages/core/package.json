@@ -1,5 +1,5 @@
 {
-  "name": "inkfinite-core",
+  "name": "@inkfinite/core",
   "type": "module",
   "version": "0.0.0",
   "description": "A starter for creating a TypeScript package.",

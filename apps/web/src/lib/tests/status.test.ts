@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Observable, Observer, Subscription } from "dexie";
-import type { DocPatch, InkfiniteDB, PageRecord, PersistentDocRepo } from "inkfinite-core";
+import type { DocPatch, InkfiniteDB, PageRecord, PersistentDocRepo } from "@inkfinite/core";
 import { describe, expect, it, vi } from "vitest";
 import { createPersistenceManager, type PersistenceManagerOptions } from "../status";
 

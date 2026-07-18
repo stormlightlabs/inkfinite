@@ -1,6 +1,6 @@
 import FileBrowser from "$lib/filebrowser/FileBrowser.svelte";
-import type { BoardMeta, FileBrowserViewModel } from "inkfinite-core";
-import { FileBrowserVM } from "inkfinite-core";
+import type { BoardMeta, FileBrowserViewModel } from "@inkfinite/core";
+import { FileBrowserVM } from "@inkfinite/core";
 import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page } from "vitest/browser";

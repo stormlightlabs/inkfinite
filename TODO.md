@@ -30,13 +30,13 @@ Acceptance criteria:
 Verification:
 
 ```sh
-pnpm --filter inkfinite-core test --run
-pnpm --filter inkfinite-renderer test --run
-pnpm --filter inkfinite-web test
-pnpm --filter inkfinite-core typecheck
-pnpm --filter inkfinite-renderer typecheck
-pnpm --filter inkfinite-web check
-pnpm --filter inkfinite-web lint
+pnpm --filter @inkfinite/core test --run
+pnpm --filter @inkfinite/renderer test --run
+pnpm --filter @inkfinite/web test
+pnpm --filter @inkfinite/core typecheck
+pnpm --filter @inkfinite/renderer typecheck
+pnpm --filter @inkfinite/web check
+pnpm --filter @inkfinite/web lint
 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 ```
 
@@ -84,9 +84,10 @@ Acceptance criteria:
 
 - [x] A root Cargo workspace contains the model, CRDT, engine, file, protocol,
       SVG, IPC, and CLI crates named in the roadmap.
-- [x] The pnpm workspace contains `editor-runtime`, `renderer-canvas`,
-      `input-dom`, and `bindings`; the existing apps and packages keep
-      working in place during the scaffold step.
+- [x] The pnpm workspace contains `@inkfinite/runtime`,
+      `@inkfinite/input-dom`, `@inkfinite/bindings`, and
+      `@inkfinite/renderer`; the existing apps and packages keep working in
+      place during the scaffold step.
 - [x] New crates and packages contain only minimal compileable entry points,
       manifests, and dependency edges. This ticket moves no product behavior.
 - [x] Workspace commands can discover, build, test, type-check, and lint the new
@@ -186,7 +187,7 @@ Verification:
   when any generated artifact is stale.
 - `cargo test -p inkfinite-core` runs the Rust registry
   and shared-fixture conformance tests.
-- `pnpm --filter bindings test` typechecks the bindings and runs the
+- `pnpm --filter @inkfinite/bindings test` typechecks the bindings and runs the
   TypeScript fixture conformance test.
 
 ### V2-07: Import v1 and persist v2 safely
@@ -218,7 +219,7 @@ cargo test -p inkfinite-core file::
 
 Exit when a desktop gesture commits through Rust, redraws from a returned patch,
 survives reopen, and can be undone. The implementation must update `apps/web` to
-consume `inkfinite-ui`, because `apps/desktop` packages that SvelteKit build. Do
+consume `@inkfinite/ui`, because `apps/desktop` packages that SvelteKit build. Do
 not create a separate desktop component tree or theme.
 
 ### V2-08: Make Tauri own document sessions
@@ -236,12 +237,12 @@ Acceptance criteria:
       commands call shared crates and return typed errors and patches.
 - [ ] File I/O leaves the frontend and plugin capabilities are reduced to the
       minimum still required.
-- [ ] `apps/web` imports `inkfinite-ui/styles.css` once and uses shared package
+- [ ] `apps/web` imports `@inkfinite/ui/styles.css` once and uses shared package
       components for the desktop vertical slice instead of adding new local
       copies under `apps/web/src/lib/components`.
 - [ ] `apps/desktop` builds and packages the same `apps/web` frontend. Desktop-only
       behavior stays in Tauri commands or thin adapters, while components,
-      themes, fonts, and icons come from `inkfinite-ui`.
+      themes, fonts, and icons come from `@inkfinite/ui`.
 - [ ] Integration tests cover open, edit, save, reopen, undo, failed validation,
       stale heads, and a simulated write failure.
 
@@ -249,9 +250,9 @@ Verification:
 
 ```sh
 cargo test -p desktop
-pnpm --filter inkfinite-web test
-pnpm --filter inkfinite-ui check
-pnpm --filter inkfinite-ui test
+pnpm --filter @inkfinite/web test
+pnpm --filter @inkfinite/ui check
+pnpm --filter @inkfinite/ui test
 ```
 
 ### V2-09: Extract the editor runtime and transaction drafts
@@ -270,8 +271,9 @@ Acceptance criteria:
       stencil insertion, or shortcut produces one transaction draft.
 - [ ] The frontend document mirror changes only through snapshots or commit/sync
       patches from Rust.
-- [ ] Svelte adapters compose controls from `inkfinite-ui`; reusable visual
-      components do not gain editor-runtime, persistence, or Tauri dependencies.
+- [ ] Svelte adapters compose controls from `@inkfinite/ui`; reusable visual
+      components do not gain `@inkfinite/runtime`, persistence, or Tauri
+      dependencies.
 - [ ] Existing keyboard, selection, text, Markdown, arrow, pen, grid snap,
       stencil, and history behavior remains covered.
 - [ ] One browser integration test performs drag → Rust commit → patch → redraw
@@ -280,9 +282,9 @@ Acceptance criteria:
 Verification:
 
 ```sh
-pnpm --filter inkfinite-core test --run
-pnpm --filter inkfinite-web test
-pnpm --filter inkfinite-web check
+pnpm --filter @inkfinite/core test --run
+pnpm --filter @inkfinite/web test
+pnpm --filter @inkfinite/web check
 ```
 
 ## Milestone 4: Editor structure and scale
@@ -605,13 +607,13 @@ Verification:
 ```sh
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
-pnpm --filter inkfinite-core test --run
-pnpm --filter inkfinite-renderer test --run
-pnpm --filter inkfinite-web test
-pnpm --filter inkfinite-core typecheck
-pnpm --filter inkfinite-renderer typecheck
-pnpm --filter inkfinite-web check
-pnpm --filter inkfinite-web lint
+pnpm --filter @inkfinite/core test --run
+pnpm --filter @inkfinite/renderer test --run
+pnpm --filter @inkfinite/web test
+pnpm --filter @inkfinite/core typecheck
+pnpm --filter @inkfinite/renderer typecheck
+pnpm --filter @inkfinite/web check
+pnpm --filter @inkfinite/web lint
 ```
 
 ## Frontier

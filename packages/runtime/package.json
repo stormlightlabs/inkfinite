@@ -1,5 +1,5 @@
 {
-  "name": "renderer-canvas",
+  "name": "@inkfinite/runtime",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,5 +10,5 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "dprint check src/index.ts"
   },
-  "dependencies": { "bindings": "workspace:*", "editor-runtime": "workspace:*" }
+  "dependencies": { "@inkfinite/bindings": "workspace:*" }
 }

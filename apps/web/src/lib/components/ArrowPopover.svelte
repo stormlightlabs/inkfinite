@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { ArrowShape, Store } from 'inkfinite-core';
-	import { EditorState, getSelectedShapes, SnapshotCommand } from 'inkfinite-core';
+	import type { ArrowShape, Store } from '@inkfinite/core';
+	import { EditorState, getSelectedShapes, SnapshotCommand } from '@inkfinite/core';
 
 	type Props = { store: Store; disabled?: boolean };
 

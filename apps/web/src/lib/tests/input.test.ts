@@ -1,4 +1,4 @@
-import { type Action as ActionType, Camera } from "inkfinite-core";
+import { type Action as ActionType, Camera } from "@inkfinite/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createInputAdapter, InputAdapter } from "../input";
 

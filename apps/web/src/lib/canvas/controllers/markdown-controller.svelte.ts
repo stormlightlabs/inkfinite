@@ -1,4 +1,4 @@
-import { Camera, EditorState, SnapshotCommand, type Store, type Viewport } from "inkfinite-core";
+import { Camera, EditorState, SnapshotCommand, type Store, type Viewport } from "@inkfinite/core";
 
 /**
  * Controller for markdown block editing

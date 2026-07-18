@@ -3,7 +3,7 @@
  * Used when the web app is running inside Tauri
  */
 
-import type { BoardExport, BoardMeta, DocPatch, LoadedDoc, PageRecord, PersistentDocRepo } from "inkfinite-core";
+import type { BoardExport, BoardMeta, DocPatch, LoadedDoc, PageRecord, PersistentDocRepo } from "@inkfinite/core";
 import {
   createFileData,
   createId,
@@ -12,7 +12,7 @@ import {
   loadedDocFromFileData,
   parseDesktopFile,
   serializeDesktopFile,
-} from "inkfinite-core";
+} from "@inkfinite/core";
 import type { DesktopFileOps } from "../fileops";
 
 export type DesktopDocRepo = PersistentDocRepo & {

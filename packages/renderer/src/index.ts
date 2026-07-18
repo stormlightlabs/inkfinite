@@ -13,7 +13,7 @@ import type {
   TextShape,
   Vec2,
   Viewport,
-} from "inkfinite-core";
+} from "@inkfinite/core";
 import {
   computeOrthogonalPath,
   computeOutline,
@@ -22,7 +22,7 @@ import {
   getShapesOnCurrentPage,
   resolveArrowEndpoints,
   shapeBounds,
-} from "inkfinite-core";
+} from "@inkfinite/core";
 
 export interface Renderer {
   /**

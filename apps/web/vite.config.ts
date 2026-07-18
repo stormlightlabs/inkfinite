@@ -7,8 +7,8 @@ export default defineConfig({
   plugins: [sveltekit(), devtoolsJson()],
   resolve: {
     alias: {
-      "inkfinite-core": new URL("../../packages/core/src/index.ts", import.meta.url).pathname,
-      "inkfinite-renderer": new URL("../../packages/renderer/src/index.ts", import.meta.url).pathname,
+      "@inkfinite/core": new URL("../../packages/core/src/index.ts", import.meta.url).pathname,
+      "@inkfinite/renderer": new URL("../../packages/renderer/src/index.ts", import.meta.url).pathname,
     },
   },
   test: {

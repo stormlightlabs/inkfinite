@@ -1,5 +1,5 @@
 {
-  "name": "inkfinite-renderer",
+  "name": "@inkfinite/renderer",
   "type": "module",
   "version": "0.0.0",
   "description": "A starter for creating a TypeScript package.",
@@ -34,7 +34,7 @@
     "vitest": "^4.0.16"
   },
   "dependencies": {
-    "inkfinite-core": "workspace:*",
+    "@inkfinite/core": "workspace:*",
     "rehype-stringify": "^10.0.1",
     "remark-gfm": "^4.0.1",
     "remark-parse": "^11.0.0",

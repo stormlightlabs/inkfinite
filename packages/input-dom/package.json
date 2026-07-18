@@ -1,5 +1,5 @@
 {
-  "name": "input-dom",
+  "name": "@inkfinite/input-dom",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,5 +10,5 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "dprint check src/index.ts"
   },
-  "dependencies": { "editor-runtime": "workspace:*" }
+  "dependencies": { "@inkfinite/runtime": "workspace:*" }
 }

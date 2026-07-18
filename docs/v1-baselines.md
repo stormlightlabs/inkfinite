@@ -41,8 +41,8 @@ Build the two packages used by the harness, then capture a new machine-specific
 result:
 
 ```sh
-pnpm --filter inkfinite-core build
-pnpm --filter inkfinite-renderer build
+pnpm --filter @inkfinite/core build
+pnpm --filter @inkfinite/renderer build
 pnpm baseline:v1
 ```
 
@@ -60,13 +60,13 @@ channel.
 
 ```sh
 pnpm install
-pnpm --filter inkfinite-core test --run
-pnpm --filter inkfinite-renderer test --run
-pnpm --filter inkfinite-web test
-pnpm --filter inkfinite-core typecheck
-pnpm --filter inkfinite-renderer typecheck
-pnpm --filter inkfinite-web check
-pnpm --filter inkfinite-web lint
+pnpm --filter @inkfinite/core test --run
+pnpm --filter @inkfinite/renderer test --run
+pnpm --filter @inkfinite/web test
+pnpm --filter @inkfinite/core typecheck
+pnpm --filter @inkfinite/renderer typecheck
+pnpm --filter @inkfinite/web check
+pnpm --filter @inkfinite/web lint
 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 ```
 

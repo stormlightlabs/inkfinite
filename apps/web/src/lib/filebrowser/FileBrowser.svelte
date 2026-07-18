@@ -7,8 +7,8 @@
 		BoardMeta,
 		FileBrowserViewModel,
 		InkfiniteDB
-	} from 'inkfinite-core';
-	import { BoardStatsOps, FileBrowserVM } from 'inkfinite-core';
+	} from '@inkfinite/core';
+	import { BoardStatsOps, FileBrowserVM } from '@inkfinite/core';
 	import type { Snippet } from 'svelte';
 
 	type Props = {

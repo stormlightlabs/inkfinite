@@ -1,5 +1,5 @@
-import type { PersistentDocRepo } from "inkfinite-core";
-import { createWebDocRepo, InkfiniteDB } from "inkfinite-core";
+import type { PersistentDocRepo } from "@inkfinite/core";
+import { createWebDocRepo, InkfiniteDB } from "@inkfinite/core";
 import { createDesktopFileOps } from "./fileops";
 import { createDesktopDocRepo, type DesktopDocRepo } from "./persistence/desktop";
 

@@ -2,7 +2,7 @@
  * Unit tests for keyboard shortcuts (Cmd+O, Cmd+N)
  */
 
-import type { KeyDownAction } from "inkfinite-core";
+import type { KeyDownAction } from "@inkfinite/core";
 import { describe, expect, it, vi } from "vitest";
 
 describe("Keyboard shortcuts", () => {

@@ -7,7 +7,7 @@ import {
   SnapshotCommand,
   type Store,
   type Viewport,
-} from "inkfinite-core";
+} from "@inkfinite/core";
 
 export class ArrowLabelEditorController {
   current = $state<{ shapeId: string; value: string } | null>(null);

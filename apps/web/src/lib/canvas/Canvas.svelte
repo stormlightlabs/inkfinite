@@ -6,7 +6,7 @@
 	import StencilPalette from '$lib/components/StencilPalette.svelte';
 	import { createCanvasController } from './canvas-store.svelte.ts';
 	import { draggingStencil, endDrag } from '$lib/dnd.svelte';
-	import { Camera, stencils } from 'inkfinite-core';
+	import { Camera, stencils } from '@inkfinite/core';
 
 	let canvasEl = $state<HTMLCanvasElement | null>(null);
 	let textEditorEl = $state<HTMLTextAreaElement | null>(null);

@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { load } from "@tauri-apps/plugin-store";
-import type { DesktopFileOps, DirectoryEntry, FileHandle } from "inkfinite-core";
+import type { DesktopFileOps, DirectoryEntry, FileHandle } from "@inkfinite/core";
 
 export type { DesktopFileOps };
 

@@ -1,4 +1,4 @@
-import type { ToolId } from "inkfinite-core";
+import type { ToolId } from "@inkfinite/core";
 
 export const HELP_LINKS = [{
   label: "Project README",

@@ -1,4 +1,4 @@
-import { PageRecord, ShapeRecord, Store } from "inkfinite-core";
+import { PageRecord, ShapeRecord, Store } from "@inkfinite/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRenderer } from "../src";
 

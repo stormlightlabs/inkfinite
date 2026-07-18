@@ -8,7 +8,7 @@
 		type Store,
 		EditorState as EditorStateOps,
 		buildStatusBarVM
-	} from 'inkfinite-core';
+	} from '@inkfinite/core';
 
 	type Props = { store: Store; cursor: CursorStore; persistence: StatusStore; snap: SnapStore };
 

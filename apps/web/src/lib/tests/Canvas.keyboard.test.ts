@@ -1,4 +1,4 @@
-import type { Action, Command, Store } from "inkfinite-core";
+import type { Action, Command, Store } from "@inkfinite/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render } from "vitest-browser-svelte";
 
@@ -94,12 +94,12 @@ vi.mock(
   }),
 );
 
-vi.mock("inkfinite-renderer", () => {
+vi.mock("@inkfinite/renderer", () => {
   return { createRenderer: vi.fn(() => ({ dispose: vi.fn(), markDirty: vi.fn() })) };
 });
 
-vi.mock("inkfinite-core", async () => {
-  const actual = await vi.importActual<typeof import("inkfinite-core")>("inkfinite-core");
+vi.mock("@inkfinite/core", async () => {
+  const actual = await vi.importActual<typeof import("@inkfinite/core")>("@inkfinite/core");
   const { executeCommandSpy } = coreMocks;
 
   class MockStore extends actual.Store {

@@ -6,7 +6,7 @@
 	 * Shows command names and timestamps.
 	 */
 
-	import type { Store } from 'inkfinite-core';
+	import type { Store } from '@inkfinite/core';
 	import Sheet from './Sheet.svelte';
 
 	type Props = { store: Store; open: boolean; onClose: () => void };

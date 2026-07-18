@@ -1,5 +1,5 @@
 {
-  "name": "bindings",
+  "name": "@inkfinite/bindings",
   "version": "0.0.0",
   "private": true,
   "type": "module",

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { stencils } from 'inkfinite-core';
+	import { stencils } from '@inkfinite/core';
 	import { startDrag, endDrag, draggingStencil } from '../dnd.svelte';
 	import Sheet from '$lib/components/Sheet.svelte';
 	import Icon from '$lib/components/Icon.svelte';

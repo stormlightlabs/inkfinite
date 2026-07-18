@@ -36,7 +36,7 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
 
 - The pnpm monorepo contains a TypeScript core, Canvas 2D renderer, SvelteKit web
   UI, and Tauri 2 wrapper.
-- `inkfinite-ui` provides shared Svelte components, theme tokens, fonts, and
+- `@inkfinite/ui` provides shared Svelte components, theme tokens, fonts, and
   icons for the browser and the Tauri-hosted frontend. Application-specific
   components still live under `apps/web` and must move to the package as their
   dependencies are separated.
@@ -70,18 +70,18 @@ TypeScript editor runtime
 
 ### Technology
 
-| Concern                  | Choice                                                    |
-| ------------------------ | --------------------------------------------------------- |
-| Desktop                  | Tauri 2                                                   |
-| UI                       | SvelteKit, Svelte 5, and shared `inkfinite-ui` components |
-| Interactive rendering    | Native Canvas 2D with positioned DOM editors              |
-| Durable model and engine | Rust                                                      |
-| Local-first state        | Automerge, isolated behind Inkfinite interfaces           |
-| CLI                      | Rust and `clap`                                           |
-| Schemas and bindings     | Serde, Schemars, and `ts-rs`                              |
-| Desktop control          | `interprocess` local sockets and length-prefixed messages |
-| Async I/O                | Tokio where needed                                        |
-| Agent integration        | CLI and bundled `SKILL.md`                                |
+| Concern                  | Choice                                                     |
+| ------------------------ | ---------------------------------------------------------- |
+| Desktop                  | Tauri 2                                                    |
+| UI                       | SvelteKit, Svelte 5, and shared `@inkfinite/ui` components |
+| Interactive rendering    | Native Canvas 2D with positioned DOM editors               |
+| Durable model and engine | Rust                                                       |
+| Local-first state        | Automerge, isolated behind Inkfinite interfaces            |
+| CLI                      | Rust and `clap`                                            |
+| Schemas and bindings     | Serde, Schemars, and `ts-rs`                               |
+| Desktop control          | `interprocess` local sockets and length-prefixed messages  |
+| Async I/O                | Tokio where needed                                         |
+| Agent integration        | CLI and bundled `SKILL.md`                                 |
 
 ### Ownership boundary
 
@@ -97,15 +97,15 @@ patch for the frontend's read-only document mirror.
 
 ### Crate and package boundaries
 
-| Unit               | Responsibility                                                          |
-| ------------------ | ----------------------------------------------------------------------- |
-| `inkfinite-core`   | Document model and engine plus CRDT, file, protocol, rendering, and IPC |
-| `inkfinite-cli`    | `clap`, formatting, exit codes, and calls into shared Rust code         |
-| `editor-runtime`   | Framework-neutral tools, camera, selection, and previews                |
-| `renderer-canvas`  | Svelte-independent Canvas 2D renderer                                   |
-| `input-dom`        | Browser input normalization                                             |
-| `bindings`         | Generated TypeScript records; never hand-edited                         |
-| `inkfinite-ui`     | Shared Svelte components, themes, fonts, icons, stories, and UI tests   |
+| Unit                    | Responsibility                                                          |
+| ----------------------- | ----------------------------------------------------------------------- |
+| `inkfinite-core`        | Document model and engine plus CRDT, file, protocol, rendering, and IPC |
+| `inkfinite-cli`         | `clap`, formatting, exit codes, and calls into shared Rust code         |
+| `@inkfinite/runtime`    | Framework-neutral tools, camera, selection, and previews                |
+| `@inkfinite/renderer`   | Svelte-independent Canvas 2D renderer                                   |
+| `@inkfinite/input-dom`  | Browser input normalization                                             |
+| `@inkfinite/bindings`   | Generated TypeScript records; never hand-edited                         |
+| `@inkfinite/ui`         | Shared Svelte components, themes, fonts, icons, stories, and UI tests   |
 
 Business logic must not depend on Tauri, Svelte, CLI parsing, or a transport.
 
@@ -285,7 +285,7 @@ optional transaction preview. DOM overlays remain limited to active text and
 Markdown editing, menus, tooltips, accessibility controls, and proposal review.
 
 `apps/desktop` packages the `apps/web` SvelteKit build. Milestone 3 must update
-that shared frontend to consume `inkfinite-ui`; it must not introduce a second
+that shared frontend to consume `@inkfinite/ui`; it must not introduce a second
 desktop component tree or duplicate theme. Desktop-only behavior belongs in
 Tauri commands and thin frontend adapters around shared components.
 
@@ -387,13 +387,13 @@ pointer normalization, patch reconciliation, Canvas hit testing, and SVG output.
 Current commands, before the Cargo workspace exists:
 
 ```sh
-pnpm --filter inkfinite-core test --run
-pnpm --filter inkfinite-renderer test --run
-pnpm --filter inkfinite-web test
-pnpm --filter inkfinite-core typecheck
-pnpm --filter inkfinite-renderer typecheck
-pnpm --filter inkfinite-web check
-pnpm --filter inkfinite-web lint
+pnpm --filter @inkfinite/core test --run
+pnpm --filter @inkfinite/renderer test --run
+pnpm --filter @inkfinite/web test
+pnpm --filter @inkfinite/core typecheck
+pnpm --filter @inkfinite/renderer typecheck
+pnpm --filter @inkfinite/web check
+pnpm --filter @inkfinite/web lint
 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 ```
 
@@ -411,7 +411,7 @@ recovery prompts, and release migrations.
    transactions, validation, migrations, schemas, and generated bindings. Exit
    with convergent Rust tests and lossless v1 imports.
 3. **Desktop vertical slice:** make Rust own open, edit, undo, save, recovery, and
-   the frontend mirror. Update `apps/web` to use `inkfinite-ui`, and package that
+   the frontend mirror. Update `apps/web` to use `@inkfinite/ui`, and package that
    same frontend through `apps/desktop`. Exit with an end-to-end drag, reopen,
    and undo test against the shared UI.
 4. **Editor structure and scale:** extract the editor runtime, fix resize cursor
@@ -435,7 +435,7 @@ recovery prompts, and release migrations.
 - Adapt the standalone browser runtime and Dexie persistence to the v2 Rust/CRDT
   authority after the desktop contracts and file format stabilize. Its migration
   must backfill every existing board with a default layer and preserve shape
-  order. Shared `apps/web` components and `inkfinite-ui` adoption remain part of
+  order. Shared `apps/web` components and `@inkfinite/ui` adoption remain part of
   milestone 3; keep the browser build green while desktop behavior changes.
 - Add hosted sync relay, identity, invitations, permissions, and ephemeral
   presence after local peer sync is correct and threat-modeled.

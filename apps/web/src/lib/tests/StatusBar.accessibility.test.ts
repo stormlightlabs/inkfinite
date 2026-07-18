@@ -1,4 +1,4 @@
-import { CursorStore, Store } from "inkfinite-core";
+import { CursorStore, Store } from "@inkfinite/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { cleanup, render } from "vitest-browser-svelte";
 import StatusBar from "../components/StatusBar.svelte";

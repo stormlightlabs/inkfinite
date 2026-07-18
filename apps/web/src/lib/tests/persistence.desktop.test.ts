@@ -5,7 +5,7 @@ import {
   type FileHandle,
   PageRecord,
   serializeDesktopFile,
-} from "inkfinite-core";
+} from "@inkfinite/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import desktopFixture from "../../../../../fixtures/v1/desktop/all-features.inkfinite.json";
 import { createDesktopDocRepo } from "../persistence/desktop";

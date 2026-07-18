@@ -6,7 +6,7 @@ import {
   PointerButtons,
   type Vec2,
   type Viewport,
-} from "inkfinite-core";
+} from "@inkfinite/core";
 
 /**
  * Pointer state tracked by the input adapter

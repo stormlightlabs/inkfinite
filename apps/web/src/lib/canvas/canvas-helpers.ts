@@ -1,4 +1,4 @@
-import type { Action, CommandKind, EditorState } from "inkfinite-core";
+import type { Action, CommandKind, EditorState } from "@inkfinite/core";
 
 export const handleCursorMap: Record<string, string> = {
   n: "ns-resize",

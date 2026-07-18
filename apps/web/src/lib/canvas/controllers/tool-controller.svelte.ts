@@ -1,4 +1,4 @@
-import { switchTool, type Store, type Tool, type ToolId } from "inkfinite-core";
+import { switchTool, type Store, type Tool, type ToolId } from "@inkfinite/core";
 
 export class ToolController {
   currentToolId = $state<ToolId>("select");

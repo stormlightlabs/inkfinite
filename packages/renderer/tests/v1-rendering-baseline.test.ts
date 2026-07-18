@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Store, type EditorState } from "inkfinite-core";
+import { Store, type EditorState } from "@inkfinite/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRenderer } from "../src";
 

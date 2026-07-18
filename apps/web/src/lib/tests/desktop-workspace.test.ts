@@ -3,7 +3,7 @@
  */
 
 import { createDesktopDocRepo } from "$lib/persistence/desktop";
-import type { DesktopFileOps, DirectoryEntry } from "inkfinite-core";
+import type { DesktopFileOps, DirectoryEntry } from "@inkfinite/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("Desktop workspace mode", () => {

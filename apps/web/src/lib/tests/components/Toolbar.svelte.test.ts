@@ -1,5 +1,5 @@
-import type { ToolId } from "inkfinite-core";
-import { Store } from "inkfinite-core";
+import type { ToolId } from "@inkfinite/core";
+import { Store } from "@inkfinite/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render } from "vitest-browser-svelte";
 import Toolbar from "../../components/Toolbar.svelte";

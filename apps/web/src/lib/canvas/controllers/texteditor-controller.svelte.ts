@@ -1,4 +1,4 @@
-import { Camera, EditorState, SnapshotCommand, type Store, type Viewport } from "inkfinite-core";
+import { Camera, EditorState, SnapshotCommand, type Store, type Viewport } from "@inkfinite/core";
 
 export class TextEditorController {
   current = $state<{ shapeId: string; value: string } | null>(null);
