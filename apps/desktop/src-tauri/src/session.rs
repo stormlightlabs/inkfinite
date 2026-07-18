@@ -1,6 +1,6 @@
-//! Typed Tauri commands for Rust-owned document sessions.
+//! Tauri commands for document sessions.
 
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use inkfinite_core::proto::{DocumentPath, ProtocolError, Query, QueryResult, SessionId, TransactionDraft};
 use inkfinite_core::session::{
@@ -9,18 +9,26 @@ use inkfinite_core::session::{
 use inkfinite_core::{ActorId, ChangeHash, DocumentId};
 use tauri::State;
 
-/// Tauri-managed owner of every open document session in this app process.
+type Result<T> = std::result::Result<T, ProtocolError>;
+
+/// Owner of every open document session in this app process.
 pub struct DesktopState {
-    service: Mutex<SessionService>,
+    service: Arc<Mutex<SessionService>>,
 }
 
 impl Default for DesktopState {
     fn default() -> Self {
-        Self { service: Mutex::new(SessionService::new()) }
+        Self { service: Arc::new(Mutex::new(SessionService::new())) }
     }
 }
 
-fn lock_service(state: &DesktopState) -> Result<MutexGuard<'_, SessionService>, ProtocolError> {
+impl DesktopState {
+    pub fn service_handle(&self) -> Arc<Mutex<SessionService>> {
+        Arc::clone(&self.service)
+    }
+}
+
+fn lock_service(state: &DesktopState) -> Result<MutexGuard<'_, SessionService>> {
     state.service.lock().map_err(|_| ProtocolError {
         code: "session_service_unavailable".into(),
         message: "the desktop session service lock is poisoned".into(),
@@ -29,35 +37,14 @@ fn lock_service(state: &DesktopState) -> Result<MutexGuard<'_, SessionService>, 
 }
 
 fn to_protocol_error(error: SessionError) -> ProtocolError {
-    let code = match &error {
-        SessionError::NotFound(_) => "session_not_found",
-        SessionError::ActorMismatch { .. } => "actor_mismatch",
-        SessionError::StaleHeads => "stale_heads",
-        SessionError::AlreadyOpen { .. } => "document_already_open",
-        SessionError::File(file_error) => match file_error {
-            inkfinite_core::file::FileError::Locked { .. } => "document_locked",
-            inkfinite_core::file::FileError::AlreadyExists { .. } => "document_already_exists",
-            inkfinite_core::file::FileError::InvalidV1(_)
-            | inkfinite_core::file::FileError::Json(_)
-            | inkfinite_core::file::FileError::UnsupportedFormat { .. }
-            | inkfinite_core::file::FileError::UnsupportedShapeKind { .. }
-            | inkfinite_core::file::FileError::SamePath { .. }
-            | inkfinite_core::file::FileError::RecoveryNotFound { .. }
-            | inkfinite_core::file::FileError::InvalidRecovery(_)
-            | inkfinite_core::file::FileError::RecoveryAhead { .. }
-            | inkfinite_core::file::FileError::Engine(_)
-            | inkfinite_core::file::FileError::Io { .. } => "document_file_error",
-        },
-        SessionError::Engine(_) => "document_engine_error",
-    };
-    ProtocolError { code: code.into(), message: error.to_string(), details: None }
+    inkfinite_core::ipc::session_protocol_error(&error)
 }
 
 /// Creates a new canonical `.inkfinite` file and opens its session.
 #[tauri::command]
 pub fn create_document(
     state: State<'_, DesktopState>, path: String, document_id: String, actor_id: String, page_name: Option<String>,
-) -> Result<SessionOpened, ProtocolError> {
+) -> Result<SessionOpened> {
     lock_service(&state)?
         .create(
             path,
@@ -70,9 +57,7 @@ pub fn create_document(
 
 /// Opens a canonical document or imports a selected frozen v1 JSON file.
 #[tauri::command]
-pub fn open_document(
-    state: State<'_, DesktopState>, path: String, actor_id: String,
-) -> Result<SessionOpened, ProtocolError> {
+pub fn open_document(state: State<'_, DesktopState>, path: String, actor_id: String) -> Result<SessionOpened> {
     lock_service(&state)?
         .open(path, ActorId::new(actor_id))
         .map_err(to_protocol_error)
@@ -80,7 +65,7 @@ pub fn open_document(
 
 /// Returns the current snapshot and session state.
 #[tauri::command]
-pub fn snapshot(state: State<'_, DesktopState>, session_id: String) -> Result<SessionStatus, ProtocolError> {
+pub fn snapshot(state: State<'_, DesktopState>, session_id: String) -> Result<SessionStatus> {
     lock_service(&state)?
         .status(&SessionId(session_id))
         .map_err(to_protocol_error)
@@ -90,7 +75,7 @@ pub fn snapshot(state: State<'_, DesktopState>, session_id: String) -> Result<Se
 #[tauri::command]
 pub fn commit(
     state: State<'_, DesktopState>, session_id: String, transaction: TransactionDraft,
-) -> Result<SessionCommit, ProtocolError> {
+) -> Result<SessionCommit> {
     lock_service(&state)?
         .commit(&SessionId(session_id), transaction)
         .map_err(to_protocol_error)
@@ -98,9 +83,7 @@ pub fn commit(
 
 /// Compensates the latest transaction for the session actor.
 #[tauri::command]
-pub fn undo(
-    state: State<'_, DesktopState>, session_id: String, actor_id: String,
-) -> Result<SessionCommit, ProtocolError> {
+pub fn undo(state: State<'_, DesktopState>, session_id: String, actor_id: String) -> Result<SessionCommit> {
     let session_id = SessionId(session_id);
     let actor_id = ActorId::new(actor_id);
     lock_service(&state)?
@@ -110,9 +93,7 @@ pub fn undo(
 
 /// Reapplies the latest compensated transaction for the session actor.
 #[tauri::command]
-pub fn redo(
-    state: State<'_, DesktopState>, session_id: String, actor_id: String,
-) -> Result<SessionCommit, ProtocolError> {
+pub fn redo(state: State<'_, DesktopState>, session_id: String, actor_id: String) -> Result<SessionCommit> {
     let session_id = SessionId(session_id);
     let actor_id = ActorId::new(actor_id);
     lock_service(&state)?
@@ -124,7 +105,7 @@ pub fn redo(
 #[tauri::command]
 pub fn save(
     state: State<'_, DesktopState>, session_id: String, expected_heads: Vec<ChangeHash>,
-) -> Result<SessionSaved, ProtocolError> {
+) -> Result<SessionSaved> {
     lock_service(&state)?
         .save(&SessionId(session_id), &expected_heads)
         .map_err(to_protocol_error)
@@ -134,7 +115,7 @@ pub fn save(
 #[tauri::command]
 pub fn save_as(
     state: State<'_, DesktopState>, session_id: String, path: DocumentPath, expected_heads: Vec<ChangeHash>,
-) -> Result<SessionSaved, ProtocolError> {
+) -> Result<SessionSaved> {
     lock_service(&state)?
         .save_as(&SessionId(session_id), path.0, &expected_heads)
         .map_err(to_protocol_error)
@@ -142,7 +123,7 @@ pub fn save_as(
 
 /// Queries records through the shared deterministic query implementation.
 #[tauri::command]
-pub fn query(state: State<'_, DesktopState>, session_id: String, query: Query) -> Result<QueryResult, ProtocolError> {
+pub fn query(state: State<'_, DesktopState>, session_id: String, query: Query) -> Result<QueryResult> {
     lock_service(&state)?
         .query(&SessionId(session_id), &query)
         .map_err(to_protocol_error)
@@ -150,7 +131,7 @@ pub fn query(state: State<'_, DesktopState>, session_id: String, query: Query) -
 
 /// Validates the current session without changing it.
 #[tauri::command]
-pub fn validate(state: State<'_, DesktopState>, session_id: String) -> Result<SessionStatus, ProtocolError> {
+pub fn validate(state: State<'_, DesktopState>, session_id: String) -> Result<SessionStatus> {
     lock_service(&state)?
         .validate(&SessionId(session_id))
         .map_err(to_protocol_error)
@@ -158,7 +139,7 @@ pub fn validate(state: State<'_, DesktopState>, session_id: String) -> Result<Se
 
 /// Closes a session and releases its advisory file lock.
 #[tauri::command]
-pub fn close(state: State<'_, DesktopState>, session_id: String) -> Result<(), ProtocolError> {
+pub fn close(state: State<'_, DesktopState>, session_id: String) -> Result<()> {
     lock_service(&state)?
         .close(&SessionId(session_id))
         .map_err(to_protocol_error)

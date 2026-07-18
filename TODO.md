@@ -90,53 +90,10 @@ opacity without regressing existing stencils.
 Shipped ordered layers with visibility, locking, active-layer state, opacity,
 and a complete Svelte panel.
 
-Blocked by: V2-07, V2-09, V2-11
-
-Acceptance criteria:
-
-- [x] New and imported pages always have a default layer; migration preserves
-      exact shape order and is idempotent.
-- [x] Rendering follows page layer order and child order, skips hidden layers,
-      and composites layer opacity without leaking canvas state.
-- [x] Hit testing, marquee, selection UI, editing, and agent transactions ignore
-      hidden shapes and reject locked-layer changes.
-- [x] New shapes use the active layer. Moving and reordering layers or shapes is
-      one undoable transaction and converges under concurrent edits.
-- [x] The panel lists, selects, creates, renames, reorders, hides, locks, deletes,
-      and changes opacity with accessible controls.
-- [x] Deleting a non-empty layer requires an explicit move destination or an
-      explicit content deletion; the last layer cannot disappear.
-
-Verification:
-
-- Run model/engine, renderer, web component, migration, undo, and two-replica
-  layer tests.
-
 ### V2-13: Add shape opacity and finish active-layer stencils
 
 Exposed fill and stroke opacity, completed the curated built-in stencil set, and
 made stencil insertion obey active-layer rules.
-
-Blocked by: V2-12
-
-Acceptance criteria:
-
-- [x] Applicable shapes have validated fill and stroke opacity in `0..=1`, with
-      accessible inspector controls and deterministic Canvas output.
-- [x] Existing files default to their current opaque appearance; stroke opacity
-      already present on freehand shapes migrates without drift.
-- [x] The built-in library covers the intended flowchart, UI, and developer
-      diagram set without adding sharing or community-library infrastructure.
-- [x] Palette click and drag insertion place every stencil shape in the active
-      layer, preserve grouping, snap when enabled, select the result, and create
-      one undoable transaction.
-- [x] Built-in stencil fixtures pass in visible, hidden, locked, and translucent
-      layers.
-
-Verification:
-
-- Run focused model, Canvas renderer, stencil, inspector, migration, and undo
-  tests. V2-14 adds the matching headless SVG coverage.
 
 ## Milestone 6: CLI and headless rendering
 
@@ -145,26 +102,8 @@ closed document without desktop code.
 
 ### V2-14: Render deterministic SVG
 
-Added headless SVG rendering for all built-in shapes, layers,
-bindings, transforms, opacity, text, and Markdown.
-
-Blocked by: V2-04, V2-06, V2-13
-
-Acceptance criteria:
-
-- [x] Output is deterministic for a snapshot and supports page, layer, selection,
-      and region filtering.
-- [x] Hidden and locked semantics, ordering, opacity, arrow routing/labels,
-      Markdown, text wrapping, and freehand strokes match Canvas fixtures.
-- [x] Missing fonts or assets produce explicit warnings and deterministic
-      fallbacks.
-- [x] Snapshot tests cover every built-in shape and a representative full board.
-
-Verification:
-
-```sh
-cargo test -p inkfinite-core render::
-```
+Added headless SVG rendering for all built-in shapes, layers, bindings, transforms,
+opacity, text, and Markdown.
 
 ### V2-15: Ship read-only and schema CLI commands
 
@@ -172,63 +111,10 @@ Implemented `new`, `inspect`, `query`, `validate`, `schema`, and `capabilities`
 in file mode with stable human and machine output, global output controls, and
 task-oriented help.
 
-Blocked by: V2-06, V2-07
-
-Acceptance criteria:
-
-- [x] Commands work while the desktop app is closed and contain no business
-      logic outside shared crates.
-- [x] `--json` never prompts, writes only machine data to stdout, sends
-      diagnostics to stderr, and returns documented stable exit codes. It works
-      before or after a subcommand.
-- [x] Inspect/query report document heads and support semantic, hierarchy, layer,
-      kind, and bounds filters.
-- [x] Schema and capability output matches generated artifacts and is snapshot
-      tested on Unix and Windows path conventions.
-- [x] Top-level help includes common examples, version discovery, documentation
-      and issue links, and typo suggestions. Each subcommand has realistic
-      examples and clear value names. Running without a subcommand prints
-      concise help and returns the usage exit code.
-- [x] `capabilities --json` reports the global `--json` and
-      `--non-interactive` options alongside commands, schemas, filters, format,
-      protocol, and exit codes.
-
-Verification:
-
-```sh
-cargo test -p inkfinite-cli
-```
-
 ### V2-16: Ship mutating CLI commands and SVG output
 
-What to build: Add generic apply plus structured shape, connection, layout, and
+Added generic apply plus structured shape, connection, layout, and
 render commands, all through the transaction engine.
-
-Blocked by: V2-05, V2-14, V2-15
-
-Acceptance criteria:
-
-- [x] `apply` accepts a transaction from a file or stdin and supports dry-run,
-      inspected heads, record preconditions, and deterministic JSON results.
-- [x] `shape create/patch/delete`, `connect`, and `layout` build ordinary
-      transactions and honor layers, locks, permissions, and semantic selectors.
-- [x] Failed validation, stale preconditions, file locks, or write errors leave
-      the original byte-for-byte unchanged.
-- [x] Results report previous/current heads, transaction ID, created/updated/
-      deleted IDs, repairs, and warnings.
-- [x] `render` writes deterministic SVG without opening the desktop app.
-- [x] New subcommands preserve the global `--json` and `--non-interactive`
-      options, stdout/stderr separation, stable exit codes, unambiguous names,
-      descriptive long flags, built-in examples, and project support links.
-- [x] Help, `capabilities --json`, README.md, TODO.md, ROADMAP.md, and CLI
-      integration tests describe the same shipped interface.
-
-Verification:
-
-- Run CLI workflow tests for inspect → dry-run → apply → validate → reopen →
-  render, including every failure path. Cover top-level and subcommand help,
-  both placements of global options, version output, and the capability
-  contract.
 
 ## Milestone 7: Live control and CRDT sync
 
@@ -237,19 +123,19 @@ offline app replicas converge after reconnecting.
 
 ### V2-17: Add authenticated local IPC
 
-What to build: Host a versioned local-socket server in Tauri and connect the CLI
+Implemented: Host a versioned local-socket server in Tauri and connect the CLI
 for status, inspect, query, and focus.
 
 Blocked by: V2-08, V2-15
 
 Acceptance criteria:
 
-- [ ] Unix-domain sockets and Windows named pipes use per-user names, a protected
+- [x] Unix-domain sockets and Windows named pipes use per-user names, a protected
       per-install/session token, length-prefix framing, versions, and size limits.
-- [ ] The server exposes no TCP/HTTP listener and stops with the Tauri process.
-- [ ] Read-only app commands return the same protocol records and query results as
+- [x] The server exposes no TCP/HTTP listener and stops with the Tauri process.
+- [x] Read-only app commands return the same protocol records and query results as
       file mode; focus emits a small frontend notification.
-- [ ] Tests reject wrong tokens, oversized/truncated frames, unsupported versions,
+- [x] Tests reject wrong tokens, oversized/truncated frames, unsupported versions,
       malformed JSON, replayed request IDs, and unavailable app sessions.
 
 Verification:
@@ -431,5 +317,4 @@ Verification:
 
 ## Frontier
 
-V2-17 is the current frontier. Add authenticated local IPC for read-only live
-status, inspection, queries, and focus.
+V2-18 is the current frontier. Add reviewable live proposals and explicit apply.

@@ -34,6 +34,8 @@ const PROTOCOL_REQUEST_SCHEMA: &str = include_str!("../../../../schemas/protocol
 const PROTOCOL_RESPONSE_SCHEMA: &str = include_str!("../../../../schemas/protocol-response.schema.json");
 const PROTOCOL_ERROR_SCHEMA: &str = include_str!("../../../../schemas/protocol-error.schema.json");
 
+pub type Result<T> = std::result::Result<T, CliError>;
+
 #[derive(Debug)]
 pub struct CliError {
     exit_code: i32,
@@ -54,6 +56,7 @@ impl CliError {
     }
 }
 
+mod app;
 mod apply;
 mod args;
 mod connect;
@@ -73,11 +76,12 @@ use support::parse_bounds;
 
 pub use args::{Cli, Command};
 
-pub fn run(command: Command, json_output: bool, stdout: &mut dyn Write) -> Result<(), CliError> {
+pub fn run(command: Command, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
     match command {
         Command::New(args) => document::create_document(args, json_output, stdout),
         Command::Inspect(args) => document::inspect_document(&args, json_output, stdout),
         Command::Query(args) => document::query_document(args, json_output, stdout),
+        Command::App(command) => app::run_app_command(command, json_output, stdout),
         Command::Validate(args) => document::validate_file(&args, json_output, stdout),
         Command::Apply(args) => apply::apply_transaction(&args, json_output, stdout),
         Command::Shape(command) => shape::run_shape_command(command, json_output, stdout),

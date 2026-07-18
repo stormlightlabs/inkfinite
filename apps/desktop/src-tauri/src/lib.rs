@@ -1,13 +1,22 @@
 mod files;
+mod ipc;
 mod session;
+
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .manage(session::DesktopState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .setup(|app| {
+            let service = app.state::<session::DesktopState>().service_handle();
+            let server = tauri::async_runtime::block_on(ipc::start(app.handle().clone(), service))?;
+            app.manage(server);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             session::create_document,
             session::open_document,
@@ -24,7 +33,16 @@ pub fn run() {
             files::rename_file,
             files::delete_file,
             files::pick_workspace_directory
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        ]);
+    let app = builder
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|app_handle, event| {
+        if matches!(event, tauri::RunEvent::Exit) {
+            if let Some(server) = app_handle.try_state::<ipc::IpcServerHandle>() {
+                server.stop();
+            }
+        }
+    });
 }

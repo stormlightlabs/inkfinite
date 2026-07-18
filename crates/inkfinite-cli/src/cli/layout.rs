@@ -2,9 +2,7 @@ use super::mutation::{commit_mutation, select_layout_shapes, structured_transact
 use super::support::open_document;
 use super::{AlignmentArg, AxisArg, BTreeMap, CliError, LayoutAxis, LayoutCommand, Operation, ShapeAlignment, Write};
 
-pub fn run_layout_command(
-    command: LayoutCommand, json_output: bool, stdout: &mut dyn Write,
-) -> Result<(), CliError> {
+pub fn run_layout_command(command: LayoutCommand, json_output: bool, stdout: &mut dyn Write) -> Result<(), CliError> {
     match command {
         LayoutCommand::Align(args) => {
             let mut file = open_document(&args.path)?;

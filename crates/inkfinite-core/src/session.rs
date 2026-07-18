@@ -1,8 +1,10 @@
-//! Rust-owned document sessions used by desktop and local adapters.
+//! Document sessions used by desktop and local adapters.
 //!
-//! A session keeps the durable file boundary, the materialized snapshot, and
-//! actor-scoped history together. Adapters can expose this service over Tauri,
-//! local IPC, or a CLI without moving document bytes into the frontend.
+//! A session keeps the file, the materialized snapshot, and actor-scoped
+//! history together.
+//!
+//! Adapters can expose this service over Tauri, local IPC, or a CLI without
+//! moving document bytes into the frontend.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -82,6 +84,12 @@ pub enum SessionError {
     /// No open session has the requested identifier.
     #[error("session not found: {0:?}")]
     NotFound(SessionId),
+    /// A live command omitted its session while zero or multiple sessions exist.
+    #[error("session selection required; {open_sessions} sessions are open")]
+    SessionSelectionRequired {
+        /// Number of sessions currently available for selection.
+        open_sessions: usize,
+    },
     /// The actor does not own the session's local mutation stream.
     #[error("actor {actual} does not own session actor {expected}")]
     ActorMismatch {
@@ -177,6 +185,42 @@ impl SessionService {
     pub fn status(&mut self, session_id: &SessionId) -> Result<SessionStatus, SessionError> {
         let session = self.session_mut(session_id)?;
         session.status(session_id)
+    }
+
+    /// Returns current state for every open session in stable identifier order.
+    ///
+    /// # Errors
+    ///
+    /// Returns a snapshot or recovery error from any open session.
+    pub fn statuses(&mut self) -> Result<Vec<SessionStatus>, SessionError> {
+        self.sessions
+            .iter_mut()
+            .map(|(session_id, session)| session.status(session_id))
+            .collect()
+    }
+
+    /// Resolves an explicit session, or the only open session when omitted.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when no session is open or more than one session
+    /// requires the caller to choose explicitly.
+    pub fn resolve_session_id(&self, requested: Option<&SessionId>) -> Result<SessionId, SessionError> {
+        if let Some(session_id) = requested {
+            if self.sessions.contains_key(session_id) {
+                return Ok(session_id.clone());
+            }
+            return Err(SessionError::NotFound(session_id.clone()));
+        }
+        match self.sessions.len() {
+            1 => self
+                .sessions
+                .keys()
+                .next()
+                .cloned()
+                .ok_or(SessionError::SessionSelectionRequired { open_sessions: 0 }),
+            _ => Err(SessionError::SessionSelectionRequired { open_sessions: self.sessions.len() }),
+        }
     }
 
     /// Commits one actor-owned transaction and returns its materialized patch.

@@ -3,10 +3,10 @@ use super::support::{
 };
 use super::{
     ACTOR_ID, ActorId, CliError, DocumentFile, DocumentId, EXIT_INVALID, FileOutputArgs, LayerId, NewArgs, PageId,
-    Query, QueryArgs, RecordId, Write, anyhow, blank_document, json, validate_document,
+    Query, QueryArgs, RecordId, Result, Write, anyhow, blank_document, json, validate_document,
 };
 
-pub fn create_document(args: NewArgs, json_output: bool, stdout: &mut dyn Write) -> Result<(), CliError> {
+pub fn create_document(args: NewArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
     let document_id = DocumentId::from(args.document_id.unwrap_or_else(|| default_document_id(&args.path)));
     if document_id.as_str().trim().is_empty() {
         return Err(CliError::new(EXIT_INVALID, anyhow!("document ID must not be empty")));
@@ -33,7 +33,7 @@ pub fn create_document(args: NewArgs, json_output: bool, stdout: &mut dyn Write)
     }
 }
 
-pub fn inspect_document(args: &FileOutputArgs, json_output: bool, stdout: &mut dyn Write) -> Result<(), CliError> {
+pub fn inspect_document(args: &FileOutputArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
     let mut file = open_document(&args.path)?;
     let snapshot = file.snapshot().map_err(map_file_error)?;
     if json_output {
@@ -50,7 +50,7 @@ pub fn inspect_document(args: &FileOutputArgs, json_output: bool, stdout: &mut d
     writeln!(stdout, "Assets: {}", snapshot.document.assets.len()).map_err(map_output_error)
 }
 
-pub fn query_document(args: QueryArgs, json_output: bool, stdout: &mut dyn Write) -> Result<(), CliError> {
+pub fn query_document(args: QueryArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
     let mut file = open_document(&args.path)?;
     let query = Query {
         id: args.id,
@@ -97,7 +97,7 @@ pub fn query_document(args: QueryArgs, json_output: bool, stdout: &mut dyn Write
     Ok(())
 }
 
-pub fn validate_file(args: &FileOutputArgs, json_output: bool, stdout: &mut dyn Write) -> Result<(), CliError> {
+pub fn validate_file(args: &FileOutputArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
     let mut file = open_document(&args.path)?;
     let snapshot = file.snapshot().map_err(map_file_error)?;
     validate_document(&snapshot.document)

@@ -3,9 +3,15 @@ use std::fs;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
+#[cfg(unix)]
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
+#[cfg(unix)]
+use std::thread;
 
 use inkfinite_core::file::DocumentFile;
+#[cfg(unix)]
+use inkfinite_core::ipc::{self, AppRequest, AppResponse, DiscoveryRecord, RequestEnvelope, ResponseEnvelope};
 use inkfinite_core::proto::{Operation, TransactionDraft, TransactionId};
 use inkfinite_core::{
     ActorId, DocumentId, Opacity, Origin, Provenance, RecordVersion, SemanticMetadata, ShapeId, ShapeKind, ShapeParent,
@@ -14,6 +20,8 @@ use inkfinite_core::{
 use serde_json::Value;
 
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+#[cfg(unix)]
+static IPC_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 #[test]
 fn help_makes_common_tasks_and_support_paths_discoverable() {
@@ -30,6 +38,12 @@ fn help_makes_common_tasks_and_support_paths_discoverable() {
     let query_help = String::from_utf8(query_help.stdout).unwrap();
     assert!(query_help.contains("--bounds <X,Y,WIDTH,HEIGHT>"));
     assert!(query_help.contains("inkfinite query architecture.inkfinite --role architecture.service --json"));
+
+    let app_query_help = run(["help", "app", "query"]);
+    assert_success(&app_query_help);
+    let app_query_help = String::from_utf8(app_query_help.stdout).unwrap();
+    assert!(app_query_help.contains("inkfinite app query --role architecture.service --json"));
+    assert!(app_query_help.contains("--session-id <SESSION_ID>"));
 
     let version = run(["--version"]);
     assert_success(&version);
@@ -200,6 +214,17 @@ fn schemas_and_capabilities_match_checked_in_contracts() {
     assert_eq!(capabilities_json["path_format"], "forward_slashes");
     assert_eq!(capabilities_json["format"]["id"], "inkfinite.document");
     assert_eq!(capabilities_json["protocol"]["id"], "inkfinite.protocol");
+    assert!(
+        capabilities_json["commands"]
+            .as_array()
+            .unwrap()
+            .contains(&Value::String("app".into()))
+    );
+    assert_eq!(
+        capabilities_json["live_mode"]["transport"],
+        "authenticated_local_socket"
+    );
+    assert_eq!(capabilities_json["live_mode"]["tcp_or_http"], false);
     assert_eq!(capabilities_json["mutation_commands"]["shape"][0], "create");
     assert!(
         capabilities_json["commands"]
@@ -535,6 +560,107 @@ fn json_failures_keep_stdout_clean_and_use_stable_exit_codes() {
     let usage = run(["query", path(&document), "--bounds", "1,2,3", "--json"]);
     assert_eq!(usage.status.code(), Some(2));
     assert!(usage.stdout.is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn live_commands_read_shared_records_from_the_authenticated_local_server() {
+    use std::os::unix::fs::FileTypeExt;
+    use std::os::unix::net::{UnixListener, UnixStream};
+
+    use inkfinite_core::proto::QueryResult;
+
+    let _guard = IPC_TEST_LOCK.lock().unwrap();
+    ipc::ensure_ipc_directory().unwrap();
+    let endpoint = ipc::endpoint_name();
+    let endpoint_path = Path::new(&endpoint);
+    if UnixStream::connect(endpoint_path).is_ok() {
+        return;
+    }
+    if let Ok(metadata) = fs::symlink_metadata(endpoint_path) {
+        if !metadata.file_type().is_socket() {
+            return;
+        }
+        fs::remove_file(endpoint_path).unwrap();
+    }
+
+    let temporary = TestDirectory::new("live-ipc");
+    let document_path = temporary.path.join("live.inkfinite");
+    let document_id = DocumentId::from("document:live-ipc");
+    let document = blank_document(&document_id, Some("Live"));
+    let mut file = DocumentFile::create(&document_path, document_id, ActorId::from("actor:test"), document).unwrap();
+    let snapshot = file.snapshot().unwrap();
+    drop(file);
+
+    let previous_discovery = ipc::read_discovery(&ipc::discovery_path()).ok();
+    let discovery = DiscoveryRecord {
+        protocol_id: inkfinite_core::proto::PROTOCOL_ID.into(),
+        version: inkfinite_core::proto::PROTOCOL_VERSION,
+        endpoint: endpoint.clone(),
+        token: "cli-ipc-test-token".into(),
+    };
+    let listener = UnixListener::bind(endpoint_path).unwrap();
+    listener.set_nonblocking(true).unwrap();
+    ipc::write_discovery(&ipc::discovery_path(), &discovery).unwrap();
+
+    let server_snapshot = snapshot.clone();
+    let server_token = discovery.token.clone();
+    let server = thread::spawn(move || {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async move {
+            let listener = tokio::net::UnixListener::from_std(listener).unwrap();
+            for _ in 0..4 {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let request = ipc::read_frame::<RequestEnvelope>(&mut stream).await.unwrap();
+                assert_eq!(request.token, server_token);
+                let request_id = request.request_id;
+                let response = match request.request {
+                    AppRequest::Status => AppResponse::Status(Vec::new()),
+                    AppRequest::Inspect { .. } => AppResponse::Snapshot(server_snapshot.clone()),
+                    AppRequest::Query { .. } => AppResponse::QueryResult(QueryResult {
+                        heads: server_snapshot.heads.clone(),
+                        records: Vec::new(),
+                        bounds: BTreeMap::new(),
+                    }),
+                    AppRequest::Focus => AppResponse::Focused,
+                };
+                ipc::write_frame(&mut stream, &ResponseEnvelope { request_id, result: Ok(response) })
+                    .await
+                    .unwrap();
+            }
+        });
+    });
+
+    let status = run(["app", "status", "--json"]);
+    let inspected = run(["app", "inspect", "--json"]);
+    let queried = run(["app", "query", "--json"]);
+    let focused = run(["app", "focus"]);
+    server.join().unwrap();
+
+    let _ = ipc::remove_discovery(&ipc::discovery_path(), &discovery);
+    let _ = fs::remove_file(endpoint_path);
+    if let Some(previous) = previous_discovery {
+        ipc::write_discovery(&ipc::discovery_path(), &previous).unwrap();
+    }
+
+    assert_success(&status);
+    assert_eq!(parse_stdout(&status), Value::Array(Vec::new()));
+    assert_success(&inspected);
+    assert_eq!(
+        parse_stdout(&inspected),
+        serde_json::to_value(snapshot.clone()).unwrap()
+    );
+    assert_success(&queried);
+    assert_eq!(
+        parse_stdout(&queried)["heads"],
+        serde_json::to_value(snapshot.heads).unwrap()
+    );
+    assert_success(&focused);
+    assert!(
+        String::from_utf8(focused.stdout)
+            .unwrap()
+            .contains("Desktop focus requested")
+    );
 }
 
 fn run<const N: usize>(args: [&str; N]) -> Output {

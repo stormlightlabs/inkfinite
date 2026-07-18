@@ -1,8 +1,8 @@
 use super::mutation::commit_mutation;
 use super::support::{open_document, portable_path};
-use super::{ApplyArgs, CliError, EXIT_INPUT, EXIT_INVALID, Path, Read, TransactionDraft, Write, fs, io};
+use super::{ApplyArgs, CliError, EXIT_INPUT, EXIT_INVALID, Path, Read, Result, TransactionDraft, Write, fs, io};
 
-pub fn apply_transaction(args: &ApplyArgs, json_output: bool, stdout: &mut dyn Write) -> Result<(), CliError> {
+pub fn apply_transaction(args: &ApplyArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
     let transaction_json = if args.transaction == Path::new("-") {
         let mut input = String::new();
         io::stdin()

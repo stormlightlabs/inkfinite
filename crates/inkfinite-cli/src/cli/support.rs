@@ -1,9 +1,9 @@
 use super::{
     ACTOR_ID, ActorId, Bounds, CliError, DocumentFile, EXIT_CONFLICT, EXIT_INPUT, EXIT_INVALID, EngineError, FileError,
-    Path, Write, io,
+    Path, Result, Write, io,
 };
 
-pub fn open_document(path: &Path) -> Result<DocumentFile, CliError> {
+pub fn open_document(path: &Path) -> Result<DocumentFile> {
     DocumentFile::open(path, ActorId::from(ACTOR_ID))
         .map_err(map_file_error)
         .map_err(|error| error.context(format!("could not open {}", portable_path(path))))
@@ -31,12 +31,12 @@ pub fn portable_path(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
 }
 
-pub fn parse_bounds(value: &str) -> Result<Bounds, String> {
+pub fn parse_bounds(value: &str) -> std::result::Result<Bounds, String> {
     let values = value
         .split(',')
         .map(str::trim)
         .map(str::parse::<f64>)
-        .collect::<Result<Vec<_>, _>>()
+        .collect::<std::result::Result<Vec<_>, _>>()
         .map_err(|_| "bounds must contain four numbers: x,y,width,height".to_owned())?;
     let [x, y, width, height] = values.as_slice() else {
         return Err("bounds must contain four numbers: x,y,width,height".into());
@@ -47,7 +47,7 @@ pub fn parse_bounds(value: &str) -> Result<Bounds, String> {
     Ok(Bounds { x: *x, y: *y, width: *width, height: *height })
 }
 
-pub fn write_heads(stdout: &mut dyn Write, heads: &[inkfinite_core::ChangeHash]) -> Result<(), CliError> {
+pub fn write_heads(stdout: &mut dyn Write, heads: &[inkfinite_core::ChangeHash]) -> Result<()> {
     writeln!(
         stdout,
         "Heads: {}",
@@ -60,7 +60,7 @@ pub fn write_heads(stdout: &mut dyn Write, heads: &[inkfinite_core::ChangeHash])
     .map_err(map_output_error)
 }
 
-pub fn write_json(stdout: &mut dyn Write, value: &impl serde::Serialize) -> Result<(), CliError> {
+pub fn write_json(stdout: &mut dyn Write, value: &impl serde::Serialize) -> Result<()> {
     serde_json::to_writer_pretty(&mut *stdout, value).map_err(map_json_error)?;
     writeln!(stdout).map_err(map_output_error)
 }

@@ -2,12 +2,12 @@ use super::mutation::{commit_mutation, read_json_argument, select_unique_shape, 
 use super::support::open_document;
 use super::{
     ACTOR_ID, ActorId, BTreeMap, CliError, EXIT_INVALID, LayerId, Opacity, Operation, Origin, Provenance,
-    RecordVersion, SemanticMetadata, ShapeCommand, ShapeCreateArgs, ShapeDeleteArgs, ShapeId, ShapeKind, ShapeParent,
-    ShapePatch, ShapePatchArgs, ShapeRecord, ShapeStyle, SiblingAnchor, Timestamp, Transform, Value, Vec2, Write,
-    anyhow, builtin_shape_kinds,
+    RecordVersion, Result, SemanticMetadata, ShapeCommand, ShapeCreateArgs, ShapeDeleteArgs, ShapeId, ShapeKind,
+    ShapeParent, ShapePatch, ShapePatchArgs, ShapeRecord, ShapeStyle, SiblingAnchor, Timestamp, Transform, Value, Vec2,
+    Write, anyhow, builtin_shape_kinds,
 };
 
-pub fn run_shape_command(command: ShapeCommand, json_output: bool, stdout: &mut dyn Write) -> Result<(), CliError> {
+pub fn run_shape_command(command: ShapeCommand, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
     match command {
         ShapeCommand::Create(args) => create_shape(args, json_output, stdout),
         ShapeCommand::Patch(args) => patch_shape(args, json_output, stdout),
@@ -15,7 +15,7 @@ pub fn run_shape_command(command: ShapeCommand, json_output: bool, stdout: &mut 
     }
 }
 
-fn create_shape(args: ShapeCreateArgs, json_output: bool, stdout: &mut dyn Write) -> Result<(), CliError> {
+fn create_shape(args: ShapeCreateArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
     if !args.x.is_finite() || !args.y.is_finite() || !args.rotation.is_finite() {
         return Err(CliError::new(
             EXIT_INVALID,
@@ -81,7 +81,7 @@ fn create_shape(args: ShapeCreateArgs, json_output: bool, stdout: &mut dyn Write
     commit_mutation(&mut file, transaction, args.mutation.dry_run, json_output, stdout)
 }
 
-fn patch_shape(args: ShapePatchArgs, json_output: bool, stdout: &mut dyn Write) -> Result<(), CliError> {
+fn patch_shape(args: ShapePatchArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
     let patch_json = read_json_argument(&args.patch, "shape patch")?;
     let patch: ShapePatch = serde_json::from_str(&patch_json)
         .map_err(|error| CliError::new(EXIT_INVALID, error).context("could not parse ShapePatch JSON"))?;
@@ -102,7 +102,7 @@ fn patch_shape(args: ShapePatchArgs, json_output: bool, stdout: &mut dyn Write) 
     commit_mutation(&mut file, transaction, args.mutation.dry_run, json_output, stdout)
 }
 
-fn delete_shape(args: ShapeDeleteArgs, json_output: bool, stdout: &mut dyn Write) -> Result<(), CliError> {
+fn delete_shape(args: ShapeDeleteArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
     let mut file = open_document(&args.path)?;
     let shape_id = select_unique_shape(
         &mut file,

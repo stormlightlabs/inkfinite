@@ -1,7 +1,7 @@
 use super::support::{map_file_error, map_output_error, portable_path, write_heads, write_json};
 use super::{
     ACTOR_ID, ActorId, BTreeSet, CliError, DocumentFile, EXIT_INPUT, EXIT_INVALID, LayoutSelectionArgs, Operation,
-    Origin, Path, RecordId, Serialize, ShapeId, Timestamp, TransactionDraft, TransactionId, Write, anyhow, fs,
+    Origin, Path, RecordId, Result, Serialize, ShapeId, Timestamp, TransactionDraft, TransactionId, Write, anyhow, fs,
 };
 
 #[derive(Serialize)]
@@ -19,8 +19,8 @@ struct MutationResult {
 
 pub fn structured_transaction(
     file: &mut DocumentFile, transaction_id: Option<String>, mut default_id: String, description: String,
-    operations: Vec<Operation>,
-) -> Result<TransactionDraft, CliError> {
+    ops: Vec<Operation>,
+) -> Result<TransactionDraft> {
     let base_heads = file.heads().map_err(map_file_error)?;
     let transaction_id = transaction_id.unwrap_or_else(|| {
         let head_suffix = base_heads
@@ -38,14 +38,14 @@ pub fn structured_transaction(
         origin: Origin::Agent,
         base_heads,
         description,
-        operations,
+        operations: ops,
         timestamp: Timestamp(0),
     })
 }
 
 pub fn commit_mutation(
     file: &mut DocumentFile, transaction: TransactionDraft, dry_run: bool, json_output: bool, stdout: &mut dyn Write,
-) -> Result<(), CliError> {
+) -> Result<()> {
     let previous_heads = file.heads().map_err(map_file_error)?;
     let commit = file.commit(transaction).map_err(map_file_error)?;
     if !dry_run {
@@ -76,7 +76,7 @@ pub fn commit_mutation(
 
 pub fn select_unique_shape(
     file: &mut DocumentFile, shape_id: Option<&str>, name: Option<&str>, role: Option<&str>,
-) -> Result<ShapeId, CliError> {
+) -> Result<ShapeId> {
     let snapshot = file.snapshot().map_err(map_file_error)?;
     let matches: Vec<ShapeId> = snapshot
         .document
@@ -102,9 +102,7 @@ pub fn select_unique_shape(
     }
 }
 
-pub fn select_layout_shapes(
-    file: &mut DocumentFile, selection: LayoutSelectionArgs,
-) -> Result<Vec<ShapeId>, CliError> {
+pub fn select_layout_shapes(file: &mut DocumentFile, selection: LayoutSelectionArgs) -> Result<Vec<ShapeId>> {
     let snapshot = file.snapshot().map_err(map_file_error)?;
     let mut selected: BTreeSet<ShapeId> = selection.shape_ids.into_iter().map(ShapeId::from).collect();
     if let Some(role) = selection.role {
@@ -131,7 +129,7 @@ pub fn select_layout_shapes(
     Ok(selected.into_iter().collect())
 }
 
-pub fn read_json_argument(argument: &str, description: &str) -> Result<String, CliError> {
+pub fn read_json_argument(argument: &str, description: &str) -> Result<String> {
     let Some(path) = argument.strip_prefix('@') else {
         return Ok(argument.to_owned());
     };

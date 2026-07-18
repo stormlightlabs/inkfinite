@@ -883,6 +883,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
  "tauri-plugin-store",
+ "tokio",
 ]
 
 [[package]]
@@ -1937,6 +1938,7 @@ dependencies = [
  "schemars 1.2.1",
  "serde",
  "serde_json",
+ "tokio",
  "ts-rs",
 ]
 
@@ -1945,12 +1947,14 @@ name = "inkfinite-core"
 version = "0.0.0"
 dependencies = [
  "automerge",
+ "getrandom 0.4.3",
  "perfect_freehand",
  "proptest",
  "schemars 1.2.1",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+ "tokio",
  "ts-rs",
 ]
 

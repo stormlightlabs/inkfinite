@@ -1,9 +1,11 @@
 use super::support::{map_json_error, map_output_error, write_json};
+use super::{CliError, SchemaKind, Value, Write};
 use super::{
-    CliError, DOCUMENT_SCHEMA, EXIT_CONFLICT, EXIT_INPUT, EXIT_INVALID, INKFINITE_FORMAT_ID, INKFINITE_FORMAT_VERSION,
+    DOCUMENT_SCHEMA, EXIT_CONFLICT, EXIT_INPUT, EXIT_INVALID, INKFINITE_FORMAT_ID, INKFINITE_FORMAT_VERSION,
     PROTOCOL_ERROR_SCHEMA, PROTOCOL_ID, PROTOCOL_REQUEST_SCHEMA, PROTOCOL_RESPONSE_SCHEMA, PROTOCOL_VERSION,
-    SchemaKind, TRANSACTION_SCHEMA, Value, Write, builtin_shape_kinds, json,
+    TRANSACTION_SCHEMA,
 };
+use super::{builtin_shape_kinds, json};
 
 pub fn print_schema(kind: SchemaKind, stdout: &mut dyn Write) -> Result<(), CliError> {
     match kind {
@@ -34,7 +36,7 @@ pub fn print_schema(kind: SchemaKind, stdout: &mut dyn Write) -> Result<(), CliE
 
 pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(), CliError> {
     let capabilities = json!({
-        "commands": ["new", "inspect", "query", "validate", "apply", "shape", "connect", "layout", "render", "schema", "capabilities"],
+        "commands": ["new", "inspect", "query", "app", "validate", "apply", "shape", "connect", "layout", "render", "schema", "capabilities"],
         "exit_codes": {
             "conflict": EXIT_CONFLICT,
             "input": EXIT_INPUT,
@@ -46,6 +48,11 @@ pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(
         "format": { "id": INKFINITE_FORMAT_ID, "version": INKFINITE_FORMAT_VERSION },
         "global_options": ["--json", "--non-interactive"],
         "json_stdout_is_machine_only": true,
+        "live_mode": {
+            "commands": ["status", "inspect", "query", "focus"],
+            "transport": "authenticated_local_socket",
+            "tcp_or_http": false
+        },
         "mutation_commands": {
             "apply": ["--transaction", "--dry-run"],
             "connect": ["--binding-id", "--source", "--source-role", "--target", "--target-role", "--dry-run"],
@@ -71,9 +78,10 @@ pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(
     .map_err(map_output_error)?;
     writeln!(
         stdout,
-        "Commands: new, inspect, query, validate, apply, shape, connect, layout, render, schema, capabilities"
+        "Commands: new, inspect, query, app, validate, apply, shape, connect, layout, render, schema, capabilities"
     )
     .map_err(map_output_error)?;
+    writeln!(stdout, "Live mode: app status, app inspect, app query, app focus").map_err(map_output_error)?;
     writeln!(stdout, "Global options: --json, --non-interactive").map_err(map_output_error)?;
     writeln!(stdout, "Schemas: document, transaction, protocol").map_err(map_output_error)?;
     writeln!(stdout, "JSON: machine data on stdout; diagnostics on stderr").map_err(map_output_error)

@@ -42,6 +42,7 @@ pnpm tauri dev
 ## CLI
 
 The `inkfinite` CLI works on `.inkfinite` files while the desktop app is closed.
+It can also inspect a running desktop app through authenticated local IPC.
 
 Run it through Cargo during development:
 
@@ -111,6 +112,22 @@ cargo run -p inkfinite-cli --bin inkfinite -- capabilities --json
 ```
 
 Run `inkfinite --help` for examples and the complete command reference.
+
+### Live desktop control
+
+With the desktop app running, use `app status`, `app inspect`, and `app query` to
+read its open sessions. `app focus` asks the frontend to bring its window forward:
+
+```sh
+inkfinite app status --json
+inkfinite app inspect --json
+inkfinite app query --role architecture.service --json
+inkfinite app focus
+```
+
+The desktop publishes a per-user Unix-domain socket on Unix-like systems or a
+per-user named pipe on Windows. A protected discovery file carries a random
+process token, and requests use versioned length-prefixed frames.
 
 ## Inkfinite files
 

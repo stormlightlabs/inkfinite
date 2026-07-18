@@ -1,6 +1,6 @@
 # Inkfinite vNext / Version 2
 
-Status: implementation in progress; V2-01 through V2-15 are complete
+Status: implementation in progress; V2-01 through V2-17 are complete
 
 This is the product and architecture contract for vNext. [TODO.md](TODO.md) is
 the implementation queue.
@@ -60,8 +60,11 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
   the locked atomic file boundary. The CLI also exposes generated schemas,
   global `--json` and `--non-interactive` options, task-oriented help, and a
   machine-readable capability contract.
-- [TODO.md](TODO.md) starts the remaining work at V2-17: authenticated local
-  control, followed by sync, agent packaging, release verification, and v1
+- The desktop owns an authenticated, versioned local IPC server. The CLI can
+  inspect open sessions, query the same materialized records as file mode, and
+  request frontend focus without a TCP listener or background daemon.
+- [TODO.md](TODO.md) starts the remaining work at V2-18: reviewable live
+  proposals, followed by sync, agent packaging, release verification, and v1
   compatibility removal.
 
 ## Architecture
@@ -284,6 +287,7 @@ inkfinite query architecture.inkfinite --role architecture.service --json
 inkfinite validate architecture.inkfinite
 inkfinite schema document
 inkfinite capabilities --json
+inkfinite app status --json
 ```
 
 V2-16 added mutating and rendering commands:
@@ -324,8 +328,8 @@ never edit document bytes manually.
 
 ## Live control and collaboration
 
-The CLI may connect to the running desktop app for `app status`, `inspect`,
-`query`, `propose`, `apply`, and `focus`.
+The CLI connects to the running desktop app for `app status`, `app inspect`,
+`app query`, and `app focus`. V2-18 will add proposals and explicit apply.
 
 `app propose` is the default agent path. Rust validates it and the UI shows a
 ghost preview plus created, changed, and deleted IDs. Rejection changes nothing.
@@ -333,10 +337,11 @@ Partial acceptance creates a new transaction from the selected operations and
 revalidates it against current heads. `app apply` requires explicit user
 authorization.
 
-Use a per-user Unix-domain socket or Windows named pipe, a per-install or
+V2-17 uses a per-user Unix-domain socket or Windows named pipe, a protected
 per-session token, protocol versions, length-prefixed messages, and strict size
-limits. Do not expose public TCP or local HTTP. The Tauri process hosts the
-server; vNext has no background daemon.
+limits. It does not expose public TCP or local HTTP. The Tauri process owns the
+server and removes its discovery record when it exits; vNext has no background
+daemon.
 
 Automerge sync between trusted peers is a vNext deliverable. The sync layer must
 be transport-independent and prove offline concurrent edits between two app
@@ -410,8 +415,9 @@ deterministic SVG, and the mutating file-mode CLI all passed.
 - **Milestone 5, layers and styles:** complete.
 - **Milestone 6, CLI and SVG:** complete. The file-mode CLI exposes the SVG
   renderer and validated, atomic mutation commands.
-- **Milestone 7, live control and sync:** add authenticated local IPC, reviewable
-  proposals, explicit apply, and two-replica offline convergence.
+- **Milestone 7, live control and sync:** authenticated local IPC is complete;
+  reviewable proposals, explicit apply, and two-replica offline convergence
+  remain.
 - **Milestone 8, agent and release readiness:** bundle the agent skill, record
   release evidence, replace useful v1 coverage with v2-native fixtures, remove
   the unreleased v1 compatibility surface, and rerun the release matrix.

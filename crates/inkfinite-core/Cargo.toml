@@ -12,6 +12,8 @@ perfect_freehand.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+getrandom.workspace = true
+tokio.workspace = true
 ts-rs.workspace = true
 thiserror.workspace = true
 

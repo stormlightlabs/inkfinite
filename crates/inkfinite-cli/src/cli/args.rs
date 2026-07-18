@@ -5,13 +5,14 @@ use super::{ArgGroup, Args, Bounds, Parser, PathBuf, Subcommand, ValueEnum, pars
     name = "inkfinite",
     version,
     about = "Work with Inkfinite documents from the command line",
-    long_about = "Create, inspect, query, edit, validate, and render canonical Inkfinite documents while the desktop app is closed."
+    long_about = "Create, inspect, query, edit, validate, and render canonical Inkfinite documents, or inspect a running desktop app."
 )]
 #[command(after_help = "Examples:
   inkfinite new architecture.inkfinite
   inkfinite inspect architecture.inkfinite --json
   inkfinite apply architecture.inkfinite --transaction transaction.json --dry-run
   inkfinite render architecture.inkfinite --output architecture.svg
+  inkfinite app status --json
 
 Documentation: https://github.com/stormlightlabs/inkfinite#file-mode-cli
 Report issues: https://github.com/stormlightlabs/inkfinite/issues
@@ -60,6 +61,9 @@ pub enum Command {
     inkfinite query architecture.inkfinite --kind rect --bounds 0,0,1920,1080
 ")]
     Query(QueryArgs),
+    /// Inspect or focus a running desktop app over authenticated local IPC.
+    #[command(subcommand)]
+    App(AppCommand),
     /// Load and validate a canonical document.
     #[command(after_help = "Examples:
 
@@ -404,6 +408,78 @@ pub struct QueryArgs {
     #[arg(value_name = "FILE")]
     pub path: PathBuf,
 
+    /// Match an exact record ID.
+    #[arg(long)]
+    pub id: Option<String>,
+    /// Match an exact display name.
+    #[arg(long)]
+    pub name: Option<String>,
+    /// Match an exact semantic role.
+    #[arg(long)]
+    pub role: Option<String>,
+    /// Match one exact semantic tag.
+    #[arg(long)]
+    pub tag: Option<String>,
+    /// Match an exact shape registry key.
+    #[arg(long = "kind")]
+    pub shape_kind: Option<String>,
+    /// Restrict results to a page.
+    #[arg(long)]
+    pub page: Option<String>,
+    /// Restrict results to a layer.
+    #[arg(long)]
+    pub layer: Option<String>,
+    /// Restrict shapes to one direct parent.
+    #[arg(long)]
+    pub parent: Option<String>,
+    /// Restrict shapes to bounds formatted as x,y,width,height.
+    #[arg(long, value_name = "X,Y,WIDTH,HEIGHT", value_parser = parse_bounds)]
+    pub bounds: Option<Bounds>,
+}
+
+#[derive(Debug, Subcommand)]
+#[allow(clippy::large_enum_variant)]
+pub enum AppCommand {
+    /// List the sessions currently open in the desktop app.
+    #[command(after_help = "Example:
+
+    inkfinite app status --json
+")]
+    Status,
+    /// Print the current snapshot from the desktop app.
+    #[command(after_help = "Examples:
+
+    inkfinite app inspect --json
+    inkfinite app inspect --session-id session:1 --json
+")]
+    Inspect(AppInspectArgs),
+    /// Query the current desktop session using shared semantic filters.
+    #[command(after_help = "Examples:
+
+    inkfinite app query --role architecture.service --json
+    inkfinite app query --session-id session:1 --kind rect
+")]
+    Query(AppQueryArgs),
+    /// Ask the desktop frontend to focus its main window.
+    #[command(after_help = "Example:
+
+    inkfinite app focus
+")]
+    Focus,
+}
+
+#[derive(Debug, Args)]
+pub struct AppInspectArgs {
+    /// Inspect this session, or the only open session when omitted.
+    #[arg(long, value_name = "SESSION_ID")]
+    pub session_id: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct AppQueryArgs {
+    /// Query this session, or the only open session when omitted.
+    #[arg(long, value_name = "SESSION_ID")]
+    pub session_id: Option<String>,
     /// Match an exact record ID.
     #[arg(long)]
     pub id: Option<String>,
