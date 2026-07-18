@@ -208,19 +208,19 @@ Blocked by: V2-05, V2-14, V2-15
 
 Acceptance criteria:
 
-- [ ] `apply` accepts a transaction from a file or stdin and supports dry-run,
+- [x] `apply` accepts a transaction from a file or stdin and supports dry-run,
       inspected heads, record preconditions, and deterministic JSON results.
-- [ ] `shape create/patch/delete`, `connect`, and `layout` build ordinary
+- [x] `shape create/patch/delete`, `connect`, and `layout` build ordinary
       transactions and honor layers, locks, permissions, and semantic selectors.
-- [ ] Failed validation, stale preconditions, file locks, or write errors leave
+- [x] Failed validation, stale preconditions, file locks, or write errors leave
       the original byte-for-byte unchanged.
-- [ ] Results report previous/current heads, transaction ID, created/updated/
+- [x] Results report previous/current heads, transaction ID, created/updated/
       deleted IDs, repairs, and warnings.
-- [ ] `render` writes deterministic SVG without opening the desktop app.
-- [ ] New subcommands preserve the global `--json` and `--non-interactive`
+- [x] `render` writes deterministic SVG without opening the desktop app.
+- [x] New subcommands preserve the global `--json` and `--non-interactive`
       options, stdout/stderr separation, stable exit codes, unambiguous names,
       descriptive long flags, built-in examples, and project support links.
-- [ ] Help, `capabilities --json`, README.md, TODO.md, ROADMAP.md, and CLI
+- [x] Help, `capabilities --json`, README.md, TODO.md, ROADMAP.md, and CLI
       integration tests describe the same shipped interface.
 
 Verification:
@@ -431,5 +431,5 @@ Verification:
 
 ## Frontier
 
-V2-16 is the current frontier. Add mutating CLI commands and expose the existing
-SVG renderer through the CLI.
+V2-17 is the current frontier. Add authenticated local IPC for read-only live
+status, inspection, queries, and focus.

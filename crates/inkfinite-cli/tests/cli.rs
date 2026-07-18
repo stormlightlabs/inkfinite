@@ -1,13 +1,15 @@
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use inkfinite_core::file::DocumentFile;
+use inkfinite_core::proto::{Operation, TransactionDraft, TransactionId};
 use inkfinite_core::{
     ActorId, DocumentId, Opacity, Origin, Provenance, RecordVersion, SemanticMetadata, ShapeId, ShapeKind, ShapeParent,
-    ShapeRecord, ShapeStyle, Timestamp, Transform, Vec2, blank_document,
+    ShapeRecord, ShapeStyle, SiblingAnchor, Timestamp, Transform, Vec2, blank_document,
 };
 use serde_json::Value;
 
@@ -67,6 +69,7 @@ fn closed_file_workflow_has_stable_human_and_json_output() {
         "--json",
     ]);
     assert_success(&queried);
+
     let queried_json = parse_stdout(&queried);
     assert_eq!(queried_json["heads"], created_json["heads"]);
     assert_eq!(queried_json["records"][0]["kind"], "page");
@@ -197,6 +200,318 @@ fn schemas_and_capabilities_match_checked_in_contracts() {
     assert_eq!(capabilities_json["path_format"], "forward_slashes");
     assert_eq!(capabilities_json["format"]["id"], "inkfinite.document");
     assert_eq!(capabilities_json["protocol"]["id"], "inkfinite.protocol");
+    assert_eq!(capabilities_json["mutation_commands"]["shape"][0], "create");
+    assert!(
+        capabilities_json["commands"]
+            .as_array()
+            .unwrap()
+            .contains(&Value::String("render".into()))
+    );
+}
+
+#[test]
+fn apply_dry_run_then_save_validate_reopen_and_render_is_atomic() {
+    let temporary = TestDirectory::new("apply-render");
+    let document_path = temporary.path.join("workflow.inkfinite");
+    let transaction_path = temporary.path.join("transaction.json");
+    assert_success(&run(["new", path(&document_path), "--json"]));
+    let inspected = parse_stdout(&run(["inspect", path(&document_path), "--json"]));
+    let original = fs::read(&document_path).unwrap();
+    let transaction = TransactionDraft {
+        id: TransactionId("transaction:add-service".into()),
+        actor_id: ActorId::from("actor:inkfinite-cli"),
+        origin: Origin::Agent,
+        base_heads: serde_json::from_value(inspected["heads"].clone()).unwrap(),
+        description: "add service".into(),
+        operations: vec![Operation::CreateShape {
+            shape: ShapeRecord {
+                id: ShapeId::from("shape:service"),
+                kind: ShapeKind::from("rect"),
+                parent: ShapeParent::Layer("layer:document:workflow:1".into()),
+                transform: Transform {
+                    translation: Vec2 { x: 10.0, y: 10.0 },
+                    rotation: 0.0,
+                    scale_x: 1.0,
+                    scale_y: 1.0,
+                },
+                child_ids: Vec::new(),
+                layout: None,
+                properties: BTreeMap::from([("width".into(), 40.0.into()), ("height".into(), 30.0.into())]),
+                metadata: SemanticMetadata {
+                    name: None,
+                    role: Some("architecture.service".into()),
+                    description: None,
+                    tags: Vec::new(),
+                    locked: false,
+                    agent_editable: true,
+                    provenance: Provenance {
+                        actor_id: ActorId::from("actor:inkfinite-cli"),
+                        origin: Origin::Agent,
+                        timestamp: Timestamp(0),
+                        source: None,
+                    },
+                },
+                style: ShapeStyle { opacity: Opacity::OPAQUE, fill_opacity: None, stroke_opacity: None },
+                version: RecordVersion(1),
+            },
+            anchor: SiblingAnchor::Last,
+        }],
+        timestamp: Timestamp(0),
+    };
+    let transaction_json = serde_json::to_vec_pretty(&transaction).unwrap();
+    fs::write(&transaction_path, &transaction_json).unwrap();
+
+    let mut child = Command::new(env!("CARGO_BIN_EXE_inkfinite"))
+        .args([
+            "apply",
+            path(&document_path),
+            "--transaction",
+            "-",
+            "--dry-run",
+            "--json",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.as_mut().unwrap().write_all(&transaction_json).unwrap();
+    let dry_run = child.wait_with_output().unwrap();
+    assert_success(&dry_run);
+    let dry_run = parse_stdout(&dry_run);
+    assert_eq!(dry_run["dry_run"], true);
+    assert_eq!(dry_run["transaction_id"], "transaction:add-service");
+    assert_eq!(dry_run["created"][0]["kind"], "shape");
+    assert_eq!(fs::read(&document_path).unwrap(), original);
+
+    let applied = run([
+        "--json",
+        "apply",
+        path(&document_path),
+        "--transaction",
+        path(&transaction_path),
+    ]);
+    assert_success(&applied);
+    let applied = parse_stdout(&applied);
+    assert_eq!(applied["previous_heads"], inspected["heads"]);
+    assert_ne!(applied["current_heads"], inspected["heads"]);
+
+    let saved = fs::read(&document_path).unwrap();
+    let stale = run([
+        "apply",
+        path(&document_path),
+        "--transaction",
+        path(&transaction_path),
+        "--json",
+    ]);
+    assert_eq!(stale.status.code(), Some(5));
+    assert!(stale.stdout.is_empty());
+    assert_eq!(fs::read(&document_path).unwrap(), saved);
+}
+
+#[test]
+fn structured_create_can_be_validated_reopened_and_rendered() {
+    let temporary = TestDirectory::new("render");
+    let document_path = temporary.path.join("render.inkfinite");
+    let svg_path = temporary.path.join("render.svg");
+    assert_success(&run(["new", path(&document_path), "--json"]));
+    assert_success(&run([
+        "shape",
+        "create",
+        path(&document_path),
+        "--shape-id",
+        "shape:service",
+        "--kind",
+        "rect",
+        "--layer",
+        "layer:document:render:1",
+        "--properties",
+        "{\"width\":40,\"height\":30}",
+        "--role",
+        "architecture.service",
+        "--json",
+    ]));
+    assert_success(&run(["validate", path(&document_path), "--json"]));
+    let reopened = parse_stdout(&run([
+        "query",
+        path(&document_path),
+        "--role",
+        "architecture.service",
+        "--json",
+    ]));
+    assert_eq!(reopened["records"][0]["id"], "shape:service");
+
+    let rendered = run([
+        "render",
+        path(&document_path),
+        "--output",
+        path(&svg_path),
+        "--role",
+        "architecture.service",
+        "--json",
+    ]);
+    assert_success(&rendered);
+    assert_eq!(
+        parse_stdout(&rendered)["output"],
+        svg_path.to_string_lossy().replace('\\', "/")
+    );
+    let svg = fs::read_to_string(&svg_path).unwrap();
+    assert!(svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\""));
+    assert!(svg.contains("data-shape-id=\"shape:service\""));
+
+    let canonical = fs::read(&document_path).unwrap();
+    let same_path = run([
+        "render",
+        path(&document_path),
+        "--output",
+        path(&document_path),
+        "--json",
+    ]);
+    assert_eq!(same_path.status.code(), Some(5));
+    assert!(same_path.stdout.is_empty());
+    assert_eq!(fs::read(&document_path).unwrap(), canonical);
+}
+
+#[test]
+fn structured_commands_use_semantic_selectors_for_layout_and_connections() {
+    let temporary = TestDirectory::new("structured");
+    let document_path = temporary.path.join("structured.inkfinite");
+    assert_success(&run(["new", path(&document_path), "--json"]));
+    let layer_id = "layer:document:structured:1";
+
+    for (id, role, x) in [
+        ("shape:one", "architecture.service", "0"),
+        ("shape:two", "architecture.service", "100"),
+        ("shape:three", "architecture.service", "240"),
+        ("shape:arrow", "architecture.connector", "20"),
+    ] {
+        let created = run([
+            "shape",
+            "create",
+            path(&document_path),
+            "--shape-id",
+            id,
+            "--kind",
+            if id == "shape:arrow" { "arrow" } else { "rect" },
+            "--layer",
+            layer_id,
+            "--x",
+            x,
+            "--properties",
+            "{\"width\":40,\"height\":30}",
+            "--role",
+            role,
+            "--json",
+        ]);
+        assert_success(&created);
+    }
+
+    let aligned = run([
+        "layout",
+        "align",
+        path(&document_path),
+        "--role",
+        "architecture.service",
+        "--alignment",
+        "top",
+        "--json",
+    ]);
+    assert_success(&aligned);
+    assert_eq!(parse_stdout(&aligned)["updated"].as_array().unwrap().len(), 3);
+
+    let distributed = run([
+        "layout",
+        "distribute",
+        path(&document_path),
+        "--role",
+        "architecture.service",
+        "--axis",
+        "horizontal",
+        "--json",
+    ]);
+    assert_success(&distributed);
+
+    let connected = run([
+        "connect",
+        path(&document_path),
+        "--binding-id",
+        "binding:arrow-target",
+        "--source-role",
+        "architecture.connector",
+        "--target",
+        "shape:one",
+        "--json",
+    ]);
+    assert_success(&connected);
+    assert_eq!(parse_stdout(&connected)["created"][0]["kind"], "binding");
+}
+
+#[test]
+fn failed_validation_permissions_and_locks_leave_canonical_bytes_unchanged() {
+    let temporary = TestDirectory::new("mutation-failures");
+    let document_path = temporary.path.join("failures.inkfinite");
+    assert_success(&run(["new", path(&document_path), "--json"]));
+    let layer_id = "layer:document:failures:1";
+    let original = fs::read(&document_path).unwrap();
+    let invalid = run([
+        "shape",
+        "create",
+        path(&document_path),
+        "--shape-id",
+        "shape:invalid",
+        "--kind",
+        "rect",
+        "--layer",
+        layer_id,
+        "--properties",
+        "{\"width\":-1,\"height\":30}",
+        "--json",
+    ]);
+    assert_eq!(invalid.status.code(), Some(4));
+    assert!(invalid.stdout.is_empty());
+    assert_eq!(fs::read(&document_path).unwrap(), original);
+
+    assert_success(&run([
+        "shape",
+        "create",
+        path(&document_path),
+        "--shape-id",
+        "shape:locked",
+        "--kind",
+        "rect",
+        "--layer",
+        layer_id,
+        "--properties",
+        "{\"width\":40,\"height\":30}",
+        "--name",
+        "Locked",
+        "--locked",
+        "--json",
+    ]));
+
+    let before_rejection = fs::read(&document_path).unwrap();
+    let rejected = run(["shape", "delete", path(&document_path), "--name", "Locked", "--json"]);
+    assert_eq!(rejected.status.code(), Some(5));
+    assert!(rejected.stdout.is_empty());
+    assert_eq!(fs::read(&document_path).unwrap(), before_rejection);
+
+    let held = DocumentFile::open(&document_path, ActorId::from("actor:lock-holder")).unwrap();
+    let locked = run([
+        "shape",
+        "create",
+        path(&document_path),
+        "--shape-id",
+        "shape:blocked-by-file-lock",
+        "--kind",
+        "rect",
+        "--layer",
+        layer_id,
+        "--json",
+    ]);
+    assert_eq!(locked.status.code(), Some(5));
+    assert!(locked.stdout.is_empty());
+    drop(held);
+    assert_eq!(fs::read(&document_path).unwrap(), before_rejection);
 }
 
 #[test]

@@ -54,12 +54,15 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
 - Rust produces deterministic headless SVG for built-in shapes, layers,
   bindings, nested transforms, text, Markdown, and filtered views. Missing
   fonts and assets use stable fallbacks with explicit warnings.
-- The file-mode CLI creates, inspects, queries, and validates closed documents.
-  It also exposes generated schemas, global `--json` and `--non-interactive`
-  options, task-oriented help, and a machine-readable capability contract.
-- [TODO.md](TODO.md) starts the remaining work at V2-16: mutating CLI commands
-  and CLI access to the SVG renderer, followed by live control, sync, agent
-  packaging, release verification, and v1 compatibility removal.
+- The file-mode CLI creates, inspects, queries, edits, validates, and renders
+  closed documents. Generic and structured mutations pass through the
+  transaction engine, support dry runs and semantic selectors, and save through
+  the locked atomic file boundary. The CLI also exposes generated schemas,
+  global `--json` and `--non-interactive` options, task-oriented help, and a
+  machine-readable capability contract.
+- [TODO.md](TODO.md) starts the remaining work at V2-17: authenticated local
+  control, followed by sync, agent packaging, release verification, and v1
+  compatibility removal.
 
 ## Architecture
 
@@ -153,8 +156,8 @@ as an import source so the architecture and release baselines remain
 reproducible. V2-22 removes that unreleased compatibility surface before vNext
 ships. [docs/v2-file-format.md](docs/v2-file-format.md) defines the current file
 behavior. The CLI supplies JSON inspection for repositories and CI. The Rust
-core already produces deterministic SVG; V2-16 exposes that renderer through
-the CLI.
+core produces deterministic SVG, and V2-16 exposed that renderer through the
+CLI.
 
 ## Document contract
 
@@ -283,15 +286,15 @@ inkfinite schema document
 inkfinite capabilities --json
 ```
 
-V2-16 adds mutating and rendering commands:
+V2-16 added mutating and rendering commands:
 
 ```sh
 inkfinite apply architecture.inkfinite --transaction transaction.json --dry-run
 inkfinite render architecture.inkfinite --output architecture.svg
 ```
 
-Structured `shape create/patch/delete`, `connect`, and `layout` commands will
-build ordinary transactions and never bypass the engine. `schema document`,
+Structured `shape create/patch/delete`, `connect`, and `layout` commands build
+ordinary transactions and never bypass the engine. `schema document`,
 `schema transaction`, `schema protocol`, and `capabilities --json` expose the
 contracts.
 
@@ -399,15 +402,14 @@ stencils, render parity, proposal UX, recovery prompts, and permission failures.
 
 ## Milestones
 
-Milestones 1 through 5 are complete: the architecture gate, Rust authority,
-desktop vertical slice, editor scale work, layers, opacity, and stencils all
-passed. Milestone 6 has deterministic SVG in the Rust core and the initial
-file-mode CLI; V2-16 is the remaining mutating and render-command work.
+Milestones 1 through 6 are complete: the architecture gate, Rust authority,
+desktop vertical slice, editor scale work, layers, opacity, stencils,
+deterministic SVG, and the mutating file-mode CLI all passed.
 [TODO.md](TODO.md) owns ticket-level status and acceptance criteria.
 
 - **Milestone 5, layers and styles:** complete.
-- **Milestone 6, CLI and SVG:** expose the existing SVG renderer and ship
-  mutating file-mode commands.
+- **Milestone 6, CLI and SVG:** complete. The file-mode CLI exposes the SVG
+  renderer and validated, atomic mutation commands.
 - **Milestone 7, live control and sync:** add authenticated local IPC, reviewable
   proposals, explicit apply, and two-replica offline convergence.
 - **Milestone 8, agent and release readiness:** bundle the agent skill, record
