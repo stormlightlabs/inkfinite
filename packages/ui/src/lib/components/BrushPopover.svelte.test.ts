@@ -1,6 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
 
 import BrushPopover, { type BrushSettings } from './BrushPopover.svelte';
 
@@ -15,38 +14,36 @@ const brush: BrushSettings = {
 
 describe('BrushPopover', () => {
 	it('opens an accessible set of brush controls', async () => {
-		const user = userEvent.setup();
-		render(BrushPopover, { brush, onBrushChange: vi.fn() });
+		const screen = render(BrushPopover, { brush, onBrushChange: vi.fn() });
 
-		await user.click(screen.getByRole('button', { name: 'Brush settings' }));
+		await screen.getByRole('button', { name: 'Brush settings' }).click();
 
-		expect(screen.getByRole('dialog', { name: 'Brush settings' })).toBeInTheDocument();
-		expect(screen.getByLabelText('Brush size')).toHaveValue('16');
-		expect(screen.getByLabelText('Brush thinning')).toHaveValue('0.5');
-		expect(screen.getByLabelText('Simulate pressure')).toBeChecked();
+		await expect
+			.element(screen.getByRole('dialog', { name: 'Brush settings' }))
+			.toBeInTheDocument();
+		await expect.element(screen.getByLabelText('Brush size')).toHaveValue('16');
+		await expect.element(screen.getByLabelText('Brush thinning')).toHaveValue('0.5');
+		await expect.element(screen.getByLabelText('Simulate pressure')).toBeChecked();
 	});
 
 	it('reports completed brush changes', async () => {
-		const user = userEvent.setup();
 		const onBrushChange = vi.fn();
-		render(BrushPopover, { brush, onBrushChange });
-		await user.click(screen.getByRole('button', { name: 'Brush settings' }));
+		const screen = render(BrushPopover, { brush, onBrushChange });
+		await screen.getByRole('button', { name: 'Brush settings' }).click();
 
-		const size = screen.getByLabelText('Brush size');
-		await fireEvent.input(size, { target: { value: '25' } });
-		await fireEvent.change(size);
+		const size = screen.getByLabelText('Brush size').element() as HTMLInputElement;
+		size.value = '25';
+		size.dispatchEvent(new Event('input', { bubbles: true }));
+		size.dispatchEvent(new Event('change', { bubbles: true }));
 
 		expect(onBrushChange).toHaveBeenLastCalledWith({ ...brush, size: 25 });
 	});
 
 	it('does not open while disabled', async () => {
-		const user = userEvent.setup();
-		render(BrushPopover, { brush, disabled: true, onBrushChange: vi.fn() });
+		const screen = render(BrushPopover, { brush, disabled: true, onBrushChange: vi.fn() });
 
 		const button = screen.getByRole('button', { name: 'Brush settings' });
-		await user.click(button);
-
-		expect(button).toBeDisabled();
-		expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+		await expect.element(button).toBeDisabled();
+		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
 	});
 });

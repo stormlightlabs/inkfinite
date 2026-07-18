@@ -1,12 +1,12 @@
-import type { Meta, StoryObj } from "@storybook/sveltekit";
+import type { Meta, StoryObj } from '@storybook/sveltekit';
 
-import IconButton from "./IconButton.svelte";
+import IconButton from './IconButton.svelte';
 
 const meta = {
-  title: "Controls/Icon button",
-  component: IconButton,
-  tags: ["autodocs"],
-  args: { label: "Draw", name: "draw" },
+	title: 'Controls/Icon button',
+	component: IconButton,
+	tags: ['autodocs'],
+	args: { label: 'Draw', name: 'draw' }
 } satisfies Meta<typeof IconButton>;
 
 export default meta;

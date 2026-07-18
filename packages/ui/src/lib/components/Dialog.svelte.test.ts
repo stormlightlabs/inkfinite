@@ -1,38 +1,37 @@
-import { render, screen } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
+import { render } from 'vitest-browser-svelte';
 
 import Dialog from './Dialog.svelte';
 
 describe('Dialog', () => {
-	it('renders an accessible modal only while open', () => {
-		const { rerender } = render(Dialog, { open: false, title: 'About Inkfinite' });
-		expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+	it('renders an accessible modal only while open', async () => {
+		const screen = render(Dialog, { open: false, title: 'About Inkfinite' });
+		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
 
-		rerender({ open: true, title: 'About Inkfinite' });
+		await screen.rerender({ open: true, title: 'About Inkfinite' });
 
 		const dialog = screen.getByRole('dialog', { name: 'About Inkfinite' });
-		expect(dialog).toHaveAttribute('aria-modal', 'true');
-		expect(dialog).toHaveFocus();
+		await expect.element(dialog).toHaveAttribute('aria-modal', 'true');
+		await expect.element(dialog).toHaveFocus();
 	});
 
 	it('closes from the backdrop and Escape key when enabled', async () => {
-		const user = userEvent.setup();
 		const onClose = vi.fn();
-		render(Dialog, { open: true, onClose, title: 'Test dialog' });
+		let screen = render(Dialog, { open: true, onClose, title: 'Test dialog' });
 
-		await user.click(screen.getByRole('presentation'));
+		await screen.getByRole('presentation').click();
 		expect(onClose).toHaveBeenCalledOnce();
 
-		render(Dialog, { open: true, onClose, title: 'Second dialog' });
-		await user.keyboard('{Escape}');
+		screen = render(Dialog, { open: true, onClose, title: 'Second dialog' });
+		await expect.element(screen.getByRole('dialog')).toHaveFocus();
+		await userEvent.keyboard('{Escape}');
 		expect(onClose).toHaveBeenCalledTimes(2);
 	});
 
 	it('keeps the dialog open when dismissal is disabled', async () => {
-		const user = userEvent.setup();
 		const onClose = vi.fn();
-		render(Dialog, {
+		const screen = render(Dialog, {
 			closeOnBackdrop: false,
 			closeOnEscape: false,
 			onClose,
@@ -40,10 +39,10 @@ describe('Dialog', () => {
 			title: 'Persistent dialog'
 		});
 
-		await user.click(screen.getByRole('presentation'));
-		await user.keyboard('{Escape}');
+		await screen.getByRole('presentation').click();
+		await userEvent.keyboard('{Escape}');
 
 		expect(onClose).not.toHaveBeenCalled();
-		expect(screen.getByRole('dialog')).toBeInTheDocument();
+		await expect.element(screen.getByRole('dialog')).toBeInTheDocument();
 	});
 });

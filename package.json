@@ -1,28 +1,33 @@
 {
-    "name": "@inkfinite/monorepo",
-    "version": "1.0.0",
-    "private": true,
-    "type": "module",
-    "workspaces": [
-        "packages/*",
-        "apps/*"
-    ],
-    "scripts": {
-        "tauri": "pnpm --filter @inkfinite/desktop tauri",
-        "dev:ui": "pnpm --filter @inkfinite/ui storybook",
-        "fixtures:v1": "node scripts/generate-v1-fixtures.mjs",
-        "baseline:v1": "node scripts/capture-v1-performance.mjs --output fixtures/v1/performance/baseline.json",
-        "bindings:generate": "cargo run -p inkfinite-cli --bin generate-bindings",
-        "bindings:check": "cargo run -p inkfinite-cli --bin generate-bindings -- --check",
-        "bindings:test": "pnpm --filter @inkfinite/bindings test"
-    },
-    "devDependencies": {
-        "dprint": "^0.50.2",
-        "typescript": "^5.9.3"
-    },
-    "engines": {
-        "node": ">=18.0.0",
-        "pnpm": ">=8.0.0"
-    },
-    "packageManager": "pnpm@11.13.1"
+	"name": "@inkfinite/monorepo",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"workspaces": [
+		"packages/*",
+		"apps/*"
+	],
+	"scripts": {
+		"tauri": "pnpm --filter @inkfinite/desktop tauri",
+		"dev:desktop": "pnpm --filter @inkfinite/desktop dev",
+		"dev:ui": "pnpm --filter @inkfinite/ui storybook",
+		"dev:web": "pnpm --filter @inkfinite/web dev",
+		"format": "prettier --write .",
+		"format:check": "prettier --check .",
+		"fixtures:v1": "node scripts/generate-v1-fixtures.mjs",
+		"baseline:v1": "node scripts/capture-v1-performance.mjs --output fixtures/v1/performance/baseline.json",
+		"bindings:generate": "cargo run -p inkfinite-cli --bin generate-bindings",
+		"bindings:check": "cargo run -p inkfinite-cli --bin generate-bindings -- --check",
+		"bindings:test": "pnpm --filter @inkfinite/bindings test"
+	},
+	"devDependencies": {
+		"prettier": "^3.7.4",
+		"prettier-plugin-svelte": "^3.4.0",
+		"typescript": "^5.9.3"
+	},
+	"engines": {
+		"node": ">=18.0.0",
+		"pnpm": ">=8.0.0"
+	},
+	"packageManager": "pnpm@11.13.1"
 }

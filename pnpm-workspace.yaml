@@ -1,11 +1,9 @@
 packages:
-  - packages/*
-  - apps/*
+    - packages/*
+    - apps/*
 
 allowBuilds:
-  dprint: true
-  esbuild: true
+    esbuild: true
 
 onlyBuiltDependencies:
-  - dprint
-  - esbuild
+    - esbuild

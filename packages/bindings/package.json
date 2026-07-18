@@ -1,14 +1,14 @@
 {
-  "name": "@inkfinite/bindings",
-  "version": "0.0.0",
-  "private": true,
-  "type": "module",
-  "exports": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "test": "pnpm run build && node ../../scripts/check-bindings.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "dprint check src/index.ts"
-  }
+	"name": "@inkfinite/bindings",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"test": "pnpm run build && node ../../scripts/check-bindings.mjs",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"lint": "prettier --check src/index.ts"
+	}
 }

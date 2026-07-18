@@ -42,8 +42,10 @@
 		<div class="history-header">
 			<h2>History</h2>
 			<div class="history-actions">
-				<button onclick={handleUndo} disabled={!store.canUndo()}>Undo</button>
-				<button onclick={handleRedo} disabled={!store.canRedo()}>Redo</button>
+				<button onclick={handleUndo} disabled={history.undoStack.length === 0}
+					>Undo</button>
+				<button onclick={handleRedo} disabled={history.redoStack.length === 0}
+					>Redo</button>
 			</div>
 		</div>
 

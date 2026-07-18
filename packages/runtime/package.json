@@ -1,17 +1,17 @@
 {
-  "name": "@inkfinite/runtime",
-  "version": "0.0.0",
-  "private": true,
-  "type": "module",
-  "exports": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "dprint check src/index.ts"
-  },
-  "dependencies": {
-    "@inkfinite/bindings": "workspace:*",
-    "@inkfinite/core": "workspace:*"
-  }
+	"name": "@inkfinite/runtime",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"lint": "prettier --check src/index.ts"
+	},
+	"dependencies": {
+		"@inkfinite/bindings": "workspace:*",
+		"@inkfinite/core": "workspace:*"
+	}
 }
