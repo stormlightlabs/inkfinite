@@ -1,42 +1,38 @@
-import { browser } from "$app/environment";
+import { browser } from '$app/environment';
 
-export type Theme = "light" | "dark";
+/** Explicit color themes supported by the web editor. */
+export type Theme = 'light' | 'dark';
 
-export function createThemeStore() {
-  const stored = browser ? localStorage.getItem("theme") : null;
-  const initialTheme: Theme = stored === "light" || stored === "dark" ? stored : "dark";
-  let theme = $state<Theme>(initialTheme);
+/** Reactive light and dark theme state shared by the web editor. */
+export class ThemeStore {
+	#theme = $state<Theme>('dark');
+	/** Currently active theme, derived from the store's private mutable state. */
+	readonly current = $derived(this.#theme);
 
-  if (browser) {
-    if (stored !== "light" && stored !== "dark") {
-      localStorage.setItem("theme", "dark");
-    }
-    document.documentElement.setAttribute("data-theme", initialTheme);
-  }
+	constructor() {
+		const stored = browser ? localStorage.getItem('theme') : null;
+		this.#theme = stored === 'light' || stored === 'dark' ? stored : 'dark';
+		this.#syncTheme();
+	}
 
-  function toggle() {
-    theme = theme === "dark" ? "light" : "dark";
-    if (browser) {
-      localStorage.setItem("theme", theme);
-      document.documentElement.setAttribute("data-theme", theme);
-    }
-  }
+	/** Switches between the light and dark themes. */
+	toggle() {
+		this.set(this.#theme === 'dark' ? 'light' : 'dark');
+	}
 
-  function set(newTheme: Theme) {
-    theme = newTheme;
-    if (browser) {
-      localStorage.setItem("theme", theme);
-      document.documentElement.setAttribute("data-theme", theme);
-    }
-  }
+	/** Applies and persists an explicit theme. */
+	set(theme: Theme) {
+		this.#theme = theme;
+		this.#syncTheme();
+	}
 
-  return {
-    get current() {
-      return theme;
-    },
-    toggle,
-    set,
-  };
+	#syncTheme() {
+		if (!browser) return;
+
+		localStorage.setItem('theme', this.#theme);
+		document.documentElement.setAttribute('data-theme', this.#theme);
+		document.documentElement.setAttribute('data-ink-theme', this.#theme);
+	}
 }
 
-export const themeStore = createThemeStore();
+export const themeStore = new ThemeStore();

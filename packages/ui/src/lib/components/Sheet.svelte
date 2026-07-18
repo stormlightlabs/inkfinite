@@ -1,21 +1,24 @@
-<script lang="ts">
+<script module lang="ts">
 	import type { Snippet } from 'svelte';
 
-	/** Which side the sheet slides in from */
-	type Side = 'left' | 'right' | 'top' | 'bottom';
+	/** Side of the viewport from which a sheet enters. */
+	export type SheetSide = 'left' | 'right' | 'top' | 'bottom';
 
-	type Props = {
+	/** Props for the shared modal sheet surface. */
+	export interface SheetProps {
 		open: boolean;
 		onClose?: () => void;
 		title?: string;
-		side?: Side;
+		side?: SheetSide;
 		closeOnBackdrop?: boolean;
 		closeOnEscape?: boolean;
 		class?: string;
 		backdropClass?: string;
 		children?: Snippet;
-	};
+	}
+</script>
 
+<script lang="ts">
 	let {
 		open = $bindable(false),
 		onClose,
@@ -26,7 +29,7 @@
 		closeOnEscape = true,
 		class: className = '',
 		backdropClass = ''
-	}: Props = $props();
+	}: SheetProps = $props();
 
 	let sheetElement = $state<HTMLDivElement>();
 
@@ -50,9 +53,8 @@
 
 	$effect(() => {
 		if (open && sheetElement) {
-			sheetElement.focus();
-
 			const previouslyFocused = document.activeElement as HTMLElement;
+			sheetElement.focus();
 
 			return () => {
 				previouslyFocused?.focus();
@@ -86,18 +88,17 @@
 		left: 0;
 		width: 100vw;
 		height: 100vh;
-		background-color: rgba(0, 0, 0, 0.5);
+		background-color: color-mix(in srgb, var(--ink-shadow-color) 52%, transparent);
 		display: flex;
 		z-index: 1000;
 		animation: fadeIn 0.15s ease-out;
 	}
 
 	.sheet__content {
-		background-color: var(--surface);
-		color: var(--text);
-		box-shadow:
-			0 10px 25px rgba(0, 0, 0, 0.1),
-			0 4px 10px rgba(0, 0, 0, 0.08);
+		background-color: var(--ink-surface-raised);
+		color: var(--ink-text);
+		border: var(--ink-line-width) solid var(--ink-border-strong);
+		box-shadow: var(--ink-shadow-panel);
 		overflow: auto;
 		outline: none;
 	}

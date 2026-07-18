@@ -2,6 +2,11 @@
 
 Shared Svelte 5 components and design tokens for Inkfinite's web app and Tauri desktop shell.
 
+The package exports buttons, icon buttons, semantic icons, panels, toolbars,
+dialogs, sheets, and brush settings. Application components should compose these
+controls while keeping document, runtime, persistence, and Tauri dependencies in
+the consuming app.
+
 The light theme uses Eldritch Dusk. The dark theme uses the restrained Eldritch Abyss palette. IBM Plex Sans Variable is the body face; Playpen Sans Variable is reserved for display text and handwritten accents. UnoCSS generates a small, fixed Iconify bundle from Phosphor, Tabler, and Bootstrap Icons.
 
 ## Use the library

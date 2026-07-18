@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from '$lib/components/Icon.svelte';
+	import { BrushPopover, Dialog, Icon } from '@inkfinite/ui';
 	import {
 		DEFAULT_FILL_COLOR,
 		DEFAULT_STROKE_COLOR,
@@ -36,8 +36,6 @@
 	import { fade } from 'svelte/transition';
 	import icon from '../assets/favicon.svg';
 	import ArrowPopover from './ArrowPopover.svelte';
-	import BrushPopover from './BrushPopover.svelte';
-	import Dialog from './Dialog.svelte';
 
 	type Viewport = { width: number; height: number };
 
@@ -90,7 +88,9 @@
 	let fillDisabled = $state(true);
 	let strokeDisabled = $state(true);
 	let brush = $derived<BrushSettings>(brushStore.get());
-	let hasArrowSelection = $derived(getSelectedShapes(editorState).some((s) => s.type === 'arrow'));
+	let hasArrowSelection = $derived(
+		getSelectedShapes(editorState).some((s) => s.type === 'arrow')
+	);
 	let infoOpen = $state(false);
 
 	$effect(() => {
@@ -116,7 +116,11 @@
 		strokeDisabled = strokable.length === 0;
 		if (fillable.length > 0) {
 			const shared = getSharedColor(fillable, (shape) =>
-				shape.type === 'text' ? shape.props.color : 'fill' in shape.props ? shape.props.fill : null
+				shape.type === 'text'
+					? shape.props.color
+					: 'fill' in shape.props
+						? shape.props.fill
+						: null
 			);
 			if (shared) {
 				fillColorValue = shared;
@@ -135,7 +139,9 @@
 	let showColorControls = $derived(
 		toolSupportsStyles(currentTool) ||
 			toolSupportsFill(currentTool) ||
-			getSelectedShapes(editorState).some((s) => shapeSupportsFill(s) || shapeSupportsStroke(s))
+			getSelectedShapes(editorState).some(
+				(s) => shapeSupportsFill(s) || shapeSupportsStroke(s)
+			)
 	);
 
 	let position = $state({ x: 20, y: 20 });
@@ -235,7 +241,10 @@
 		const scaleX = (viewport.width - margin) / width;
 		const scaleY = (viewport.height - margin) / height;
 		const zoom = Math.max(Math.min(scaleX, scaleY), 0.05);
-		const center = { x: (bounds.min.x + bounds.max.x) / 2, y: (bounds.min.y + bounds.max.y) / 2 };
+		const center = {
+			x: (bounds.min.x + bounds.max.x) / 2,
+			y: (bounds.min.y + bounds.max.y) / 2
+		};
 		store.setState((state) => ({ ...state, camera: { x: center.x, y: center.y, zoom } }));
 		zoomMenuOpen = false;
 	}
@@ -252,8 +261,14 @@
 				return shapeBox;
 			}
 			return {
-				min: { x: Math.min(acc.min.x, shapeBox.min.x), y: Math.min(acc.min.y, shapeBox.min.y) },
-				max: { x: Math.max(acc.max.x, shapeBox.max.x), y: Math.max(acc.max.y, shapeBox.max.y) }
+				min: {
+					x: Math.min(acc.min.x, shapeBox.min.x),
+					y: Math.min(acc.min.y, shapeBox.min.y)
+				},
+				max: {
+					x: Math.max(acc.max.x, shapeBox.max.x),
+					y: Math.max(acc.max.y, shapeBox.max.y)
+				}
 			};
 		}, null);
 
@@ -275,8 +290,14 @@
 				return shapeBox;
 			}
 			return {
-				min: { x: Math.min(acc.min.x, shapeBox.min.x), y: Math.min(acc.min.y, shapeBox.min.y) },
-				max: { x: Math.max(acc.max.x, shapeBox.max.x), y: Math.max(acc.max.y, shapeBox.max.y) }
+				min: {
+					x: Math.min(acc.min.x, shapeBox.min.x),
+					y: Math.min(acc.min.y, shapeBox.min.y)
+				},
+				max: {
+					x: Math.max(acc.max.x, shapeBox.max.x),
+					y: Math.max(acc.max.y, shapeBox.max.y)
+				}
 			};
 		}, null);
 
@@ -390,7 +411,12 @@
 			}
 		}
 		const after = { ...state, doc: { ...state.doc, shapes: newShapes } };
-		const command = new SnapshotCommand('Set fill color', 'doc', before, EditorState.clone(after));
+		const command = new SnapshotCommand(
+			'Set fill color',
+			'doc',
+			before,
+			EditorState.clone(after)
+		);
 		store.executeCommand(command);
 	}
 
@@ -405,17 +431,26 @@
 		for (const shape of targets) {
 			switch (shape.type) {
 				case 'rect': {
-					const updated: RectShape = { ...shape, props: { ...shape.props, stroke: color } };
+					const updated: RectShape = {
+						...shape,
+						props: { ...shape.props, stroke: color }
+					};
 					newShapes[shape.id] = updated;
 					break;
 				}
 				case 'ellipse': {
-					const updated: EllipseShape = { ...shape, props: { ...shape.props, stroke: color } };
+					const updated: EllipseShape = {
+						...shape,
+						props: { ...shape.props, stroke: color }
+					};
 					newShapes[shape.id] = updated;
 					break;
 				}
 				case 'line': {
-					const updated: LineShape = { ...shape, props: { ...shape.props, stroke: color } };
+					const updated: LineShape = {
+						...shape,
+						props: { ...shape.props, stroke: color }
+					};
 					newShapes[shape.id] = updated;
 					break;
 				}
@@ -574,7 +609,10 @@
 	{/each}
 
 	{#if showColorControls}
-		<div class="toolbar__colors" aria-label="Color controls" transition:fade={{ duration: 150 }}>
+		<div
+			class="toolbar__colors"
+			aria-label="Color controls"
+			transition:fade={{ duration: 150 }}>
 			{#if toolSupportsFill(currentTool) || getSelectedShapes(editorState).some(shapeSupportsFill)}
 				<label class="toolbar__color-control">
 					<span>Fill</span>
@@ -616,7 +654,11 @@
 		</button>
 
 		{#if zoomMenuOpen}
-			<div class="toolbar__zoom-menu" bind:this={zoomMenuEl} role="menu" aria-label="Zoom options">
+			<div
+				class="toolbar__zoom-menu"
+				bind:this={zoomMenuEl}
+				role="menu"
+				aria-label="Zoom options">
 				{#each ZOOM_PRESETS as preset (`${preset.label}:${preset.value}`)}
 					<button
 						class="toolbar__menu-item"
@@ -694,7 +736,8 @@
 			aria-label="Toggle Dark Mode"
 			title="Toggle Dark Mode">
 			<Icon name={themeStore.current === 'dark' ? 'sun' : 'moon'} size={16} />
-			<span class="toolbar__info-label">{themeStore.current === 'dark' ? 'Light' : 'Dark'}</span>
+			<span class="toolbar__info-label"
+				>{themeStore.current === 'dark' ? 'Light' : 'Dark'}</span>
 		</button>
 		{#if platform === 'web' && onOpenBrowser}
 			<button class="toolbar__info" onclick={onOpenBrowser} aria-label="Browse boards">
@@ -726,8 +769,8 @@
 	<section class="about">
 		<h1>About Inkfinite</h1>
 		<p>
-			Inkfinite is an infinite canvas prototype. The goal is to build a cross-platform editor with
-			a framework-agnostic core so the same engine powers both the web and desktop apps.
+			Inkfinite is an infinite canvas prototype. The goal is to build a cross-platform editor
+			with a framework-agnostic core so the same engine powers both the web and desktop apps.
 		</p>
 
 		<div class="about__section">
@@ -745,7 +788,10 @@
 				{#each HELP_LINKS as link (link.href)}
 					<li>
 						<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-						<a href={link.href} target={link.external ? '_blank' : undefined} rel="noreferrer">
+						<a
+							href={link.href}
+							target={link.external ? '_blank' : undefined}
+							rel="noreferrer">
 							{link.label}
 						</a>
 					</li>

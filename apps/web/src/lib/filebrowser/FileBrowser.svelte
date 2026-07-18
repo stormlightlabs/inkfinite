@@ -1,7 +1,5 @@
 <script lang="ts">
-	import Icon from '$lib/components/Icon.svelte';
-	import Sheet from '$lib/components/Sheet.svelte';
-	import { Button } from '@inkfinite/ui';
+	import { Button, Icon, Sheet } from '@inkfinite/ui';
 	import type { DesktopDocRepo } from '$lib/persistence/desktop';
 	import type {
 		BoardInspectorData,

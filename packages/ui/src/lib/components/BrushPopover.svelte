@@ -1,13 +1,24 @@
-<script lang="ts">
-	import type { BrushSettings } from '$lib/status';
+<script module lang="ts">
+	/** Visual brush settings edited by the shared brush popover. */
+	export interface BrushSettings {
+		color: string;
+		simulatePressure: boolean;
+		size: number;
+		smoothing: number;
+		streamline: number;
+		thinning: number;
+	}
 
-	type Props = {
+	/** Props for the shared brush settings control. */
+	export interface BrushPopoverProps {
 		brush: BrushSettings;
 		onBrushChange: (brush: BrushSettings) => void;
 		disabled?: boolean;
-	};
+	}
+</script>
 
-	let { brush, onBrushChange, disabled = false }: Props = $props();
+<script lang="ts">
+	let { brush, onBrushChange, disabled = false }: BrushPopoverProps = $props();
 
 	let isOpen = $state(false);
 	let popoverEl = $state<HTMLDivElement | null>(null);
@@ -227,9 +238,9 @@
 	}
 
 	.brush-popover__button {
-		border: 1px solid var(--border);
-		background: var(--surface);
-		color: var(--text);
+		border: var(--ink-line-width) solid var(--ink-border-strong);
+		background: var(--ink-surface-raised);
+		color: var(--ink-text);
 		padding: 0.5rem 0.75rem;
 		border-radius: 0.25rem;
 		cursor: pointer;
@@ -238,11 +249,11 @@
 	}
 
 	.brush-popover__button:hover:not(:disabled) {
-		background: var(--surface-elevated);
+		background: var(--ink-surface-hover);
 	}
 
 	.brush-popover__button:focus {
-		outline: 2px solid var(--accent);
+		outline: 3px solid var(--ink-focus);
 		outline-offset: 2px;
 	}
 
@@ -255,11 +266,11 @@
 		position: absolute;
 		top: calc(100% + 4px);
 		left: 0;
-		background: var(--surface);
-		color: var(--text);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+		background: var(--ink-surface-raised);
+		color: var(--ink-text);
+		border: var(--ink-line-width) solid var(--ink-border-strong);
+		border-radius: var(--ink-radius-panel-small);
+		box-shadow: var(--ink-shadow-toolbar);
 		padding: 0.75rem;
 		display: flex;
 		flex-direction: column;
@@ -279,7 +290,7 @@
 		justify-content: space-between;
 		align-items: center;
 		font-size: 0.75rem;
-		color: var(--text);
+		color: var(--ink-text);
 	}
 
 	.brush-popover__label {
@@ -287,7 +298,7 @@
 	}
 
 	.brush-popover__value {
-		color: var(--text-muted);
+		color: var(--ink-text-muted);
 		font-variant-numeric: tabular-nums;
 	}
 
@@ -295,7 +306,7 @@
 		width: 100%;
 		height: 0.25rem;
 		border-radius: 2px;
-		background: var(--border);
+		background: var(--ink-border);
 		outline: none;
 		-webkit-appearance: none;
 		appearance: none;
@@ -307,7 +318,7 @@
 		width: 14px;
 		height: 14px;
 		border-radius: 50%;
-		background: var(--accent);
+		background: var(--ink-accent);
 		cursor: pointer;
 	}
 
@@ -315,18 +326,18 @@
 		width: 14px;
 		height: 14px;
 		border-radius: 50%;
-		background: var(--accent);
+		background: var(--ink-accent);
 		cursor: pointer;
 		border: none;
 	}
 
 	.brush-popover__control input[type='range']:focus::-webkit-slider-thumb {
-		outline: 2px solid var(--accent);
+		outline: 2px solid var(--ink-focus);
 		outline-offset: 2px;
 	}
 
 	.brush-popover__control input[type='range']:focus::-moz-range-thumb {
-		outline: 2px solid var(--accent);
+		outline: 2px solid var(--ink-focus);
 		outline-offset: 2px;
 	}
 
@@ -337,10 +348,10 @@
 
 	.brush-popover__control--color input[type='color'] {
 		width: 100%;
-		border: 1px solid var(--border);
+		border: 1px solid var(--ink-border);
 		border-radius: 0.25rem;
 		height: 32px;
-		background: var(--surface);
+		background: var(--ink-surface-raised);
 		cursor: pointer;
 	}
 
@@ -348,6 +359,6 @@
 		width: 16px;
 		height: 16px;
 		cursor: pointer;
-		accent-color: var(--accent);
+		accent-color: var(--ink-accent);
 	}
 </style>

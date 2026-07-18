@@ -1,22 +1,25 @@
-<script lang="ts">
+<script module lang="ts">
 	import type { Snippet } from 'svelte';
 
-	type Props = {
-		/** Whether the dialog is open */
+	/** Props for the shared modal dialog surface. */
+	export interface DialogProps {
+		/** Whether the dialog is visible. */
 		open: boolean;
-		/** Callback when dialog should close */
+		/** Called after the dialog requests to close. */
 		onClose?: () => void;
-		/** Dialog title (for accessibility) */
+		/** Accessible name announced for the dialog. */
 		title?: string;
-		/** Whether clicking backdrop closes dialog (default: true) */
+		/** Whether a backdrop click closes the dialog. */
 		closeOnBackdrop?: boolean;
-		/** Whether escape key closes dialog (default: true) */
+		/** Whether Escape closes the dialog. */
 		closeOnEscape?: boolean;
-		/** Custom class for the dialog content */
+		/** Class applied to the dialog surface. */
 		class?: string;
 		children?: Snippet;
-	};
+	}
+</script>
 
+<script lang="ts">
 	let {
 		open = $bindable(false),
 		onClose,
@@ -25,7 +28,7 @@
 		closeOnBackdrop = true,
 		closeOnEscape = true,
 		class: className = ''
-	}: Props = $props();
+	}: DialogProps = $props();
 
 	let dialogElement: HTMLDivElement | undefined = $state();
 
@@ -49,9 +52,8 @@
 
 	$effect(() => {
 		if (open && dialogElement) {
-			dialogElement.focus();
-
 			const previouslyFocused = document.activeElement as HTMLElement;
+			dialogElement.focus();
 
 			return () => {
 				previouslyFocused?.focus();
@@ -85,7 +87,7 @@
 		left: 0;
 		width: 100vw;
 		height: 100vh;
-		background-color: rgba(0, 0, 0, 0.5);
+		background-color: color-mix(in srgb, var(--ink-shadow-color) 52%, transparent);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -94,12 +96,11 @@
 	}
 
 	.dialog__content {
-		background-color: var(--surface);
-		color: var(--text);
-		border-radius: 8px;
-		box-shadow:
-			0 10px 25px rgba(0, 0, 0, 0.1),
-			0 4px 10px rgba(0, 0, 0, 0.08);
+		background-color: var(--ink-surface-raised);
+		color: var(--ink-text);
+		border: var(--ink-line-width) solid var(--ink-border-strong);
+		border-radius: var(--ink-radius-panel);
+		box-shadow: var(--ink-shadow-panel);
 		max-width: 90vw;
 		max-height: 90vh;
 		overflow: auto;

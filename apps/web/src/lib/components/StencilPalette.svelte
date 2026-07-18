@@ -2,9 +2,8 @@
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { stencils } from '@inkfinite/core';
+	import { Icon, Sheet } from '@inkfinite/ui';
 	import { startDrag, endDrag, draggingStencil } from '../dnd.svelte';
-	import Sheet from '$lib/components/Sheet.svelte';
-	import Icon from '$lib/components/Icon.svelte';
 
 	type Stencil = stencils.Stencil;
 	const { registry, registerBuiltinStencils } = stencils;

@@ -7,7 +7,7 @@
 	 */
 
 	import type { Store } from '@inkfinite/core';
-	import Sheet from './Sheet.svelte';
+	import { Sheet } from '@inkfinite/ui';
 
 	type Props = { store: Store; open: boolean; onClose: () => void };
 

@@ -37,8 +37,9 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
 - The pnpm monorepo contains a TypeScript core, Canvas 2D renderer, SvelteKit web
   UI, and Tauri 2 wrapper.
 - `@inkfinite/ui` provides shared Svelte components, theme tokens, fonts, and
-  icons for the browser and the Tauri-hosted frontend. `apps/web` imports the
-  shared stylesheet once and uses shared controls in its desktop vertical slice.
+  icons for the browser and the Tauri-hosted frontend. Shared buttons, icons,
+  panels, toolbars, dialogs, sheets, and brush controls have package-owned tests
+  and Storybook stories. `apps/web` keeps document-aware panels and adapters.
 - TypeScript currently owns a flat page/shape model, snapshot undo/redo, tools,
   and browser persistence. Web documents use Dexie; desktop documents use a
   thin adapter over Rust-owned sessions and typed Tauri commands.
@@ -191,7 +192,10 @@ that boundary into one history command, and the desktop session adapter builds
 one Rust transaction before replacing its mirror from the returned snapshot.
 `@inkfinite/input-dom` owns browser listener and coordinate normalization. A
 browser integration test covers drag, simulated Rust commit, patch-driven
-redraw, and undo back to the original document.
+redraw, and undo back to the original document. The final UI boundary moved the
+dependency-free dialog, sheet, brush popover, and remaining semantic icons into
+`@inkfinite/ui`, along with their tests and Storybook stories. Document-aware
+panels remain in `apps/web` and compose those shared controls.
 
 One Inkfinite transaction maps to one Automerge change. Causal heads, rather
 than a scalar revision, are the concurrency token. A local sequence number may
@@ -455,8 +459,7 @@ recovery prompts, and release migrations.
 - Adapt the standalone browser runtime and Dexie persistence to the v2 Rust/CRDT
   authority after the desktop contracts and file format stabilize. Its migration
   must backfill every existing board with a default layer and preserve shape
-  order. Shared `apps/web` components and `@inkfinite/ui` adoption remain part of
-  milestone 3; keep the browser build green while desktop behavior changes.
+  order. Keep the shared browser build green while desktop behavior changes.
 - Add hosted sync relay, identity, invitations, permissions, and ephemeral
   presence after local peer sync is correct and threat-modeled.
 - Consider WebGL, OffscreenCanvas, third-party shape plugins, Figma import,

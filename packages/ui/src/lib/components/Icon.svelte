@@ -5,16 +5,18 @@
 
 	/** Props for the shared Iconify-backed icon primitive. */
 	export interface IconProps extends Omit<HTMLAttributes<HTMLSpanElement>, 'children'> {
+		color?: string;
 		label?: string;
 		name: IconName;
-		size?: string;
+		size?: number | string;
 	}
 </script>
 
 <script lang="ts">
 	import { ICONS } from '../icons';
 
-	let { class: className = '', label, name, size = '1em', ...rest }: IconProps = $props();
+	let { class: className = '', color, label, name, size = '1em', ...rest }: IconProps = $props();
+	let resolvedSize = $derived(typeof size === 'number' ? `${size}px` : size);
 </script>
 
 <span
@@ -23,7 +25,8 @@
 	aria-label={label}
 	class={['ink-icon', ICONS[name], className]}
 	role={label ? 'img' : undefined}
-	style:--ink-icon-size={size}></span>
+	style:--ink-icon-size={resolvedSize}
+	style:color></span>
 
 <style>
 	.ink-icon {
