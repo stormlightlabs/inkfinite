@@ -3,15 +3,11 @@
 use std::collections::BTreeMap;
 
 use crate::crdt::{AutomergeDocument, CrdtDocument};
-use crate::proto::{
-    Bounds, LayerPatch, Operation, Query, ShapeAlignment, ShapePatch, TransactionDraft,
-    TransactionId,
-};
+use crate::proto::{Bounds, LayerPatch, Operation, Query, ShapeAlignment, ShapePatch, TransactionDraft, TransactionId};
 use crate::{
-    ActorId, BindingAnchor, BindingId, BindingKind, BindingRecord, Document, DocumentId, LayerId,
-    LayerRecord, Opacity, Origin, PageId, PageRecord, Provenance, RecordVersion, SemanticMetadata,
-    ShapeId, ShapeKind, ShapeParent, ShapeProperties, ShapeRecord, ShapeStyle, SiblingAnchor,
-    Timestamp, Transform, Vec2,
+    ActorId, BindingAnchor, BindingId, BindingKind, BindingRecord, Document, DocumentId, LayerId, LayerRecord, Opacity,
+    Origin, PageId, PageRecord, Provenance, RecordVersion, SemanticMetadata, ShapeId, ShapeKind, ShapeParent,
+    ShapeProperties, ShapeRecord, ShapeStyle, SiblingAnchor, Timestamp, Transform, Vec2,
 };
 use proptest::prelude::*;
 use serde_json::json;
@@ -40,12 +36,7 @@ fn shape(id: &str, x: f64) -> ShapeRecord {
         id: ShapeId::from(id),
         kind: ShapeKind::from("rect"),
         parent: ShapeParent::Layer(LayerId::from("layer:one")),
-        transform: Transform {
-            translation: Vec2 { x, y: 20.0 },
-            rotation: 0.0,
-            scale_x: 1.0,
-            scale_y: 1.0,
-        },
+        transform: Transform { translation: Vec2 { x, y: 20.0 }, rotation: 0.0, scale_x: 1.0, scale_y: 1.0 },
         child_ids: Vec::new(),
         layout: None,
         properties: ShapeProperties::from([
@@ -54,11 +45,7 @@ fn shape(id: &str, x: f64) -> ShapeRecord {
             ("content".into(), json!(format!("text for {id}"))),
         ]),
         metadata: metadata("actor:seed", id),
-        style: ShapeStyle {
-            opacity: Opacity::OPAQUE,
-            fill_opacity: None,
-            stroke_opacity: None,
-        },
+        style: ShapeStyle { opacity: Opacity::OPAQUE, fill_opacity: None, stroke_opacity: None },
         version: RecordVersion(1),
     }
 }
@@ -112,12 +99,7 @@ fn engine() -> TransactionEngine {
     .unwrap()
 }
 
-fn transaction(
-    engine: &mut TransactionEngine,
-    actor: &str,
-    id: &str,
-    operations: Vec<Operation>,
-) -> TransactionDraft {
+fn transaction(engine: &mut TransactionEngine, actor: &str, id: &str, operations: Vec<Operation>) -> TransactionDraft {
     TransactionDraft {
         id: TransactionId(id.into()),
         actor_id: ActorId::from(actor),
@@ -228,46 +210,19 @@ fn actor_undo_and_redo_preserve_an_intervening_actor_edit() {
 
     engine.undo(&ActorId::from("actor:a")).unwrap();
     let undone = engine.snapshot().unwrap().document;
-    assert_eq!(
-        undone.shapes[&ShapeId::from("shape:a")]
-            .transform
-            .translation
-            .x,
-        0.0
-    );
-    assert_eq!(
-        undone.shapes[&ShapeId::from("shape:a")]
-            .transform
-            .translation
-            .y,
-        45.0
-    );
+    assert_eq!(undone.shapes[&ShapeId::from("shape:a")].transform.translation.x, 0.0);
+    assert_eq!(undone.shapes[&ShapeId::from("shape:a")].transform.translation.y, 45.0);
 
     engine.redo(&ActorId::from("actor:a")).unwrap();
     let redone = engine.snapshot().unwrap().document;
-    assert_eq!(
-        redone.shapes[&ShapeId::from("shape:a")]
-            .transform
-            .translation
-            .x,
-        10.0
-    );
-    assert_eq!(
-        redone.shapes[&ShapeId::from("shape:a")]
-            .transform
-            .translation
-            .y,
-        45.0
-    );
+    assert_eq!(redone.shapes[&ShapeId::from("shape:a")].transform.translation.x, 10.0);
+    assert_eq!(redone.shapes[&ShapeId::from("shape:a")].transform.translation.y, 45.0);
 }
 
 #[test]
 fn actor_undo_rejects_an_intervening_edit_to_the_same_field() {
     let mut engine = engine();
-    for (actor, x, version) in [
-        ("actor:a", 10.0, RecordVersion(1)),
-        ("actor:b", 20.0, RecordVersion(2)),
-    ] {
+    for (actor, x, version) in [("actor:a", 10.0, RecordVersion(1)), ("actor:b", 20.0, RecordVersion(2))] {
         let draft = transaction(
             &mut engine,
             actor,
@@ -308,10 +263,7 @@ fn delete_restore_and_redo_refresh_multi_record_preconditions() {
         &mut engine,
         "actor:a",
         "delete shape",
-        vec![Operation::DeleteShape {
-            shape_id: ShapeId::from("shape:a"),
-            expected_version: Some(RecordVersion(1)),
-        }],
+        vec![Operation::DeleteShape { shape_id: ShapeId::from("shape:a"), expected_version: Some(RecordVersion(1)) }],
     );
     engine.commit(delete).unwrap();
     assert!(
@@ -351,10 +303,7 @@ fn layer_visual_changes_return_regions_and_deletes_honor_locked_descendants() {
         "hide layer",
         vec![Operation::PatchLayer {
             layer_id: LayerId::from("layer:one"),
-            patch: LayerPatch {
-                visible: Some(false),
-                ..LayerPatch::default()
-            },
+            patch: LayerPatch { visible: Some(false), ..LayerPatch::default() },
             expected_version: Some(RecordVersion(1)),
         }],
     );
@@ -399,27 +348,18 @@ fn permissions_preconditions_and_final_invariants_reject_without_mutation() {
         "bad version",
         vec![Operation::PatchLayer {
             layer_id: LayerId::from("layer:one"),
-            patch: LayerPatch {
-                name: Some("Changed".into()),
-                ..LayerPatch::default()
-            },
+            patch: LayerPatch { name: Some("Changed".into()), ..LayerPatch::default() },
             expected_version: Some(RecordVersion(99)),
         }],
     );
-    assert!(matches!(
-        engine.commit(bad_version),
-        Err(EngineError::Precondition(_))
-    ));
+    assert!(matches!(engine.commit(bad_version), Err(EngineError::Precondition(_))));
     assert_eq!(engine.snapshot().unwrap(), before);
 
     let delete_only_page = transaction(
         &mut engine,
         "actor:a",
         "delete only page",
-        vec![Operation::DeletePage {
-            page_id: PageId::from("page:one"),
-            expected_version: Some(RecordVersion(1)),
-        }],
+        vec![Operation::DeletePage { page_id: PageId::from("page:one"), expected_version: Some(RecordVersion(1)) }],
     );
     assert!(matches!(
         engine.commit(delete_only_page),
@@ -437,12 +377,7 @@ fn queries_bounds_alignment_and_distribution_share_the_transaction_engine() {
         shape_kind: Some("rect".into()),
         page_id: Some(PageId::from("page:one")),
         layer_id: Some(LayerId::from("layer:one")),
-        bounds: Some(Bounds {
-            x: -1.0,
-            y: 0.0,
-            width: 20.0,
-            height: 30.0,
-        }),
+        bounds: Some(Bounds { x: -1.0, y: 0.0, width: 20.0, height: 30.0 }),
         ..Query::default()
     };
     let result = engine.query(&query).unwrap();
@@ -489,11 +424,8 @@ fn remote_changes_are_repaired_on_a_fork_before_adoption() {
         .layer_ids
         .clear();
     invalid.layers.clear();
-    invalid
-        .shapes
-        .get_mut(&ShapeId::from("shape:a"))
-        .unwrap()
-        .parent = ShapeParent::Layer(LayerId::from("layer:missing"));
+    invalid.shapes.get_mut(&ShapeId::from("shape:a")).unwrap().parent =
+        ShapeParent::Layer(LayerId::from("layer:missing"));
     invalid.bindings.insert(
         BindingId::from("binding:dangling"),
         BindingRecord {
@@ -506,9 +438,7 @@ fn remote_changes_are_repaired_on_a_fork_before_adoption() {
             version: RecordVersion(1),
         },
     );
-    remote
-        .commit_document(&invalid, "invalid remote hierarchy")
-        .unwrap();
+    remote.commit_document(&invalid, "invalid remote hierarchy").unwrap();
     let changes = remote.changes_since(&base_heads).unwrap();
     let warnings = engine.merge_changes(&changes).unwrap();
     assert!(!warnings.is_empty());
@@ -542,10 +472,7 @@ fn two_offline_replicas_converge_independent_of_change_order() {
         "right edit",
         vec![Operation::PatchShape {
             shape_id: ShapeId::from("shape:c"),
-            patch: ShapePatch {
-                metadata: Some(metadata("actor:right", "Changed")),
-                ..ShapePatch::default()
-            },
+            patch: ShapePatch { metadata: Some(metadata("actor:right", "Changed")), ..ShapePatch::default() },
             expected_version: Some(RecordVersion(1)),
         }],
     );
@@ -554,20 +481,13 @@ fn two_offline_replicas_converge_independent_of_change_order() {
     let right_changes = right.changes_since(&base).unwrap();
     left.merge_changes(&right_changes).unwrap();
     right.merge_changes(&left_changes).unwrap();
-    assert_eq!(
-        left.snapshot().unwrap().document,
-        right.snapshot().unwrap().document
-    );
+    assert_eq!(left.snapshot().unwrap().document, right.snapshot().unwrap().document);
 }
 
 #[test]
 fn offline_list_text_delete_and_reparent_edits_converge() {
     let mut base_document = document();
-    base_document
-        .shapes
-        .get_mut(&ShapeId::from("shape:a"))
-        .unwrap()
-        .kind = ShapeKind::from("container");
+    base_document.shapes.get_mut(&ShapeId::from("shape:a")).unwrap().kind = ShapeKind::from("container");
     base_document.bindings.insert(
         BindingId::from("binding:one"),
         BindingRecord {
@@ -602,16 +522,10 @@ fn offline_list_text_delete_and_reparent_edits_converge() {
         vec![
             Operation::PatchShape {
                 shape_id: ShapeId::from("shape:a"),
-                patch: ShapePatch {
-                    properties: Some(text_properties),
-                    ..ShapePatch::default()
-                },
+                patch: ShapePatch { properties: Some(text_properties), ..ShapePatch::default() },
                 expected_version: Some(RecordVersion(1)),
             },
-            Operation::CreateShape {
-                shape: shape("shape:d", 120.0),
-                anchor: SiblingAnchor::Last,
-            },
+            Operation::CreateShape { shape: shape("shape:d", 120.0), anchor: SiblingAnchor::Last },
             Operation::DeleteBinding {
                 binding_id: BindingId::from("binding:one"),
                 expected_version: Some(RecordVersion(1)),

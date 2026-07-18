@@ -11,8 +11,7 @@ use crate::{
 use automerge::sync::{State as AutomergeSyncState, SyncDoc};
 use automerge::transaction::{CommitOptions, Transactable};
 use automerge::{
-    ActorId as AutomergeActorId, AutoCommit, AutoSerde, Change, ObjId, ObjType, ROOT, ReadDoc,
-    ScalarValue,
+    ActorId as AutomergeActorId, AutoCommit, AutoSerde, Change, ObjId, ObjType, ROOT, ReadDoc, ScalarValue,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -99,10 +98,7 @@ pub struct AutomergeDocument {
 
 impl Clone for AutomergeDocument {
     fn clone(&self) -> Self {
-        Self {
-            document: self.document.clone(),
-            actor_id: self.actor_id.clone(),
-        }
+        Self { document: self.document.clone(), actor_id: self.actor_id.clone() }
     }
 }
 
@@ -125,11 +121,7 @@ impl AutomergeDocument {
     ///
     /// Returns an error when the document cannot be projected or Automerge
     /// rejects the change.
-    pub fn commit_document(
-        &mut self,
-        document: &Document,
-        message: &str,
-    ) -> Result<ChangeOutcome, CrdtError> {
+    pub fn commit_document(&mut self, document: &Document, message: &str) -> Result<ChangeOutcome, CrdtError> {
         let current = self.stored_snapshot()?;
         let stored = StoredSnapshot {
             format: current.format,
@@ -170,11 +162,7 @@ pub trait CrdtDocument: Clone + Sized {
     /// # Errors
     ///
     /// Returns an implementation error when the document cannot be encoded.
-    fn create(
-        document_id: DocumentId,
-        actor_id: ActorId,
-        document: Document,
-    ) -> Result<Self, Self::Error>;
+    fn create(document_id: DocumentId, actor_id: ActorId, document: Document) -> Result<Self, Self::Error>;
 
     /// Loads compact CRDT state and assigns the actor for future local changes.
     ///
@@ -227,11 +215,7 @@ pub trait CrdtDocument: Clone + Sized {
 impl CrdtDocument for AutomergeDocument {
     type Error = CrdtError;
 
-    fn create(
-        document_id: DocumentId,
-        actor_id: ActorId,
-        document: Document,
-    ) -> Result<Self, Self::Error> {
+    fn create(document_id: DocumentId, actor_id: ActorId, document: Document) -> Result<Self, Self::Error> {
         let mut automerge = AutoCommit::new().with_actor(automerge_actor(&actor_id));
         let stored = StoredSnapshot {
             format: FormatId::new(INKFINITE_FORMAT_ID),
@@ -242,10 +226,7 @@ impl CrdtDocument for AutomergeDocument {
         insert_root(&mut automerge, &serde_json::to_value(stored)?)?;
         automerge.commit_with(CommitOptions::default().with_message("create document"));
         automerge.update_diff_cursor();
-        Ok(Self {
-            document: automerge,
-            actor_id,
-        })
+        Ok(Self { document: automerge, actor_id })
     }
 
     fn load(bytes: &[u8], actor_id: ActorId) -> Result<Self, Self::Error> {
@@ -301,10 +282,7 @@ impl CrdtDocument for AutomergeDocument {
             .collect();
         self.document.apply_changes(decoded)?;
         let heads = self.heads();
-        Ok(MergeOutcome {
-            heads,
-            adopted_changes,
-        })
+        Ok(MergeOutcome { heads, adopted_changes })
     }
 
     fn compact(&mut self) -> Result<Vec<u8>, Self::Error> {
@@ -343,9 +321,7 @@ impl AutomergeSyncSession {
     /// Creates empty synchronization state for one peer.
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            state: AutomergeSyncState::new(),
-        }
+        Self { state: AutomergeSyncState::new() }
     }
 }
 
@@ -358,10 +334,7 @@ impl Default for AutomergeSyncSession {
 impl SyncSession<AutomergeDocument> for AutomergeSyncSession {
     type Error = CrdtError;
 
-    fn generate_message(
-        &mut self,
-        document: &mut AutomergeDocument,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn generate_message(&mut self, document: &mut AutomergeDocument) -> Result<Option<Vec<u8>>, Self::Error> {
         Ok(document
             .document
             .sync()
@@ -369,13 +342,9 @@ impl SyncSession<AutomergeDocument> for AutomergeSyncSession {
             .map(automerge::sync::Message::encode))
     }
 
-    fn receive_message(
-        &mut self,
-        document: &mut AutomergeDocument,
-        message: &[u8],
-    ) -> Result<(), Self::Error> {
-        let message = automerge::sync::Message::decode(message)
-            .map_err(|error| CrdtError::InvalidPayload(error.to_string()))?;
+    fn receive_message(&mut self, document: &mut AutomergeDocument, message: &[u8]) -> Result<(), Self::Error> {
+        let message =
+            automerge::sync::Message::decode(message).map_err(|error| CrdtError::InvalidPayload(error.to_string()))?;
         document
             .document
             .sync()
@@ -399,8 +368,7 @@ fn parse_heads(values: &[ChangeHash]) -> Result<Vec<automerge::ChangeHash>, Crdt
     values
         .iter()
         .map(|value| {
-            automerge::ChangeHash::from_str(value.as_str())
-                .map_err(|_| CrdtError::InvalidHead(value.to_string()))
+            automerge::ChangeHash::from_str(value.as_str()).map_err(|_| CrdtError::InvalidHead(value.to_string()))
         })
         .collect()
 }
@@ -412,11 +380,7 @@ fn reconcile_root(document: &mut AutoCommit, value: &Value) -> Result<(), CrdtEr
     reconcile_map(document, &ROOT, values)
 }
 
-fn reconcile_map(
-    document: &mut AutoCommit,
-    parent: &ObjId,
-    values: &Map<String, Value>,
-) -> Result<(), CrdtError> {
+fn reconcile_map(document: &mut AutoCommit, parent: &ObjId, values: &Map<String, Value>) -> Result<(), CrdtError> {
     let existing: Vec<String> = document.keys(parent).collect();
     for key in existing {
         if !values.contains_key(&key) {
@@ -429,26 +393,14 @@ fn reconcile_map(
     Ok(())
 }
 
-fn reconcile_map_value(
-    document: &mut AutoCommit,
-    parent: &ObjId,
-    key: &str,
-    value: &Value,
-) -> Result<(), CrdtError> {
+fn reconcile_map_value(document: &mut AutoCommit, parent: &ObjId, key: &str, value: &Value) -> Result<(), CrdtError> {
     let existing = document.get(parent, key)?;
     let existing_object = if let Some((value, object)) = existing.as_ref() {
-        if value.is_object() {
-            Some((object.clone(), document.object_type(object)?))
-        } else {
-            None
-        }
+        if value.is_object() { Some((object.clone(), document.object_type(object)?)) } else { None }
     } else {
         None
     };
-    let existing_scalar = existing
-        .as_ref()
-        .and_then(|(value, _)| value.to_scalar())
-        .cloned();
+    let existing_scalar = existing.as_ref().and_then(|(value, _)| value.to_scalar()).cloned();
     match value {
         Value::Object(values) => {
             let child = object_or_replace(document, parent, key, existing_object, ObjType::Map)?;
@@ -462,9 +414,8 @@ fn reconcile_map_value(
             let child = object_or_replace(document, parent, key, existing_object, ObjType::Text)?;
             let current = document.text(&child)?;
             if current != *text {
-                let length = isize::try_from(current.chars().count()).map_err(|_| {
-                    CrdtError::InvalidPayload("text is too large to reconcile".into())
-                })?;
+                let length = isize::try_from(current.chars().count())
+                    .map_err(|_| CrdtError::InvalidPayload("text is too large to reconcile".into()))?;
                 document.splice_text(&child, 0, length, text)?;
             }
         }
@@ -480,11 +431,7 @@ fn reconcile_map_value(
 }
 
 fn object_or_replace(
-    document: &mut AutoCommit,
-    parent: &ObjId,
-    key: &str,
-    existing: Option<(ObjId, ObjType)>,
-    expected: ObjType,
+    document: &mut AutoCommit, parent: &ObjId, key: &str, existing: Option<(ObjId, ObjType)>, expected: ObjType,
 ) -> Result<ObjId, CrdtError> {
     if let Some((object, object_type)) = existing {
         if object_type == expected {
@@ -495,11 +442,7 @@ fn object_or_replace(
     Ok(document.put_object(parent, key, expected)?)
 }
 
-fn reconcile_list(
-    document: &mut AutoCommit,
-    parent: &ObjId,
-    values: &[Value],
-) -> Result<(), CrdtError> {
+fn reconcile_list(document: &mut AutoCommit, parent: &ObjId, values: &[Value]) -> Result<(), CrdtError> {
     let current: Vec<Value> = (0..document.length(parent))
         .map(|index| value_at_index(document, parent, index))
         .collect::<Result<_, _>>()?;
@@ -537,14 +480,15 @@ fn object_to_json(document: &AutoCommit, object: &ObjId) -> Result<Value, CrdtEr
                 let Some((value, child)) = document.get(object, key.as_str())? else {
                     continue;
                 };
-                let value =
-                    if value.is_object() {
-                        object_to_json(document, &child)?
-                    } else {
-                        scalar_to_json(value.to_scalar().ok_or_else(|| {
-                            CrdtError::InvalidPayload("invalid map scalar".into())
-                        })?)?
-                    };
+                let value = if value.is_object() {
+                    object_to_json(document, &child)?
+                } else {
+                    scalar_to_json(
+                        value
+                            .to_scalar()
+                            .ok_or_else(|| CrdtError::InvalidPayload("invalid map scalar".into()))?,
+                    )?
+                };
                 result.insert(key, value);
             }
             Ok(Value::Object(result))
@@ -568,10 +512,7 @@ fn insert_root(document: &mut AutoCommit, value: &Value) -> Result<(), CrdtError
 }
 
 fn insert_map_value<T: Transactable>(
-    document: &mut T,
-    parent: &ObjId,
-    key: &str,
-    value: &Value,
+    document: &mut T, parent: &ObjId, key: &str, value: &Value,
 ) -> Result<(), CrdtError> {
     match value {
         Value::Object(values) => {
@@ -596,10 +537,7 @@ fn insert_map_value<T: Transactable>(
 }
 
 fn insert_list_value<T: Transactable>(
-    document: &mut T,
-    parent: &ObjId,
-    index: usize,
-    value: &Value,
+    document: &mut T, parent: &ObjId, index: usize, value: &Value,
 ) -> Result<(), CrdtError> {
     match value {
         Value::Object(values) => {
@@ -630,9 +568,7 @@ fn scalar(value: &Value) -> Result<ScalarValue, CrdtError> {
             .or_else(|| value.as_f64().map(ScalarValue::F64))
             .ok_or_else(|| CrdtError::InvalidPayload("number is outside CRDT range".into())),
         Value::String(value) => Ok(ScalarValue::Str(value.clone().into())),
-        Value::Array(_) | Value::Object(_) => {
-            Err(CrdtError::InvalidPayload("expected a JSON scalar".into()))
-        }
+        Value::Array(_) | Value::Object(_) => Err(CrdtError::InvalidPayload("expected a JSON scalar".into())),
     }
 }
 
@@ -644,9 +580,7 @@ fn scalar_to_json(value: &ScalarValue) -> Result<Value, CrdtError> {
         ScalarValue::Uint(value) => Ok(Value::from(*value)),
         ScalarValue::F64(value) => Ok(Value::from(*value)),
         ScalarValue::Str(value) => Ok(Value::String(value.to_string())),
-        _ => Err(CrdtError::InvalidPayload(
-            "document contains a non-JSON scalar".into(),
-        )),
+        _ => Err(CrdtError::InvalidPayload("document contains a non-JSON scalar".into())),
     }
 }
 

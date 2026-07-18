@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Icon from '$lib/components/Icon.svelte';
 	import Sheet from '$lib/components/Sheet.svelte';
+	import { Button } from '@inkfinite/ui';
 	import type { DesktopDocRepo } from '$lib/persistence/desktop';
 	import type {
 		BoardInspectorData,
@@ -111,7 +112,9 @@
 	}
 
 	async function handleDeleteBoard(boardId: string) {
-		if (!confirm('Are you sure you want to delete this board? This action cannot be undone.')) {
+		if (
+			!confirm('Are you sure you want to delete this board? This action cannot be undone.')
+		) {
 			return;
 		}
 		try {
@@ -139,7 +142,8 @@
 		try {
 			inspectorData = await fetchInspectorData(board.id, null);
 		} catch (error) {
-			inspectorError = error instanceof Error ? error.message : 'Failed to load inspector data';
+			inspectorError =
+				error instanceof Error ? error.message : 'Failed to load inspector data';
 			inspectorData = null;
 		} finally {
 			inspectorLoading = false;
@@ -262,17 +266,23 @@
 					aria-label="New board name"
 					autofocus />
 				<div class="filebrowser__create-actions">
-					<button class="filebrowser__btn filebrowser__btn--primary" onclick={handleCreateBoard}>
+					<Button
+						class="filebrowser__btn filebrowser__btn--primary"
+						variant="primary"
+						size="small"
+						onclick={handleCreateBoard}>
 						Create
-					</button>
-					<button
+					</Button>
+					<Button
 						class="filebrowser__btn filebrowser__btn--secondary"
+						variant="secondary"
+						size="small"
 						onclick={() => {
 							isCreating = false;
 							newBoardName = '';
 						}}>
 						Cancel
-					</button>
+					</Button>
 				</div>
 			</div>
 		{/if}
@@ -309,7 +319,9 @@
 						{:else}
 							<!-- svelte-ignore a11y_click_events_have_key_events -->
 							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<div class="filebrowser__board-info" onclick={() => handleOpenBoard(board.id)}>
+							<div
+								class="filebrowser__board-info"
+								onclick={() => handleOpenBoard(board.id)}>
 								<div class="filebrowser__board-name">{board.name}</div>
 								<div class="filebrowser__board-meta">
 									Updated: {formatTimestamp(board.updatedAt)}
@@ -383,11 +395,13 @@
 					<h4 class="inspector__section-title">Schema</h4>
 					<div class="inspector__item">
 						<span class="inspector__label">Declared Version:</span>
-						<span class="inspector__value">{inspectorData.schema.declaredVersion}</span>
+						<span class="inspector__value"
+							>{inspectorData.schema.declaredVersion}</span>
 					</div>
 					<div class="inspector__item">
 						<span class="inspector__label">Installed Version:</span>
-						<span class="inspector__value">{inspectorData.schema.installedVersion}</span>
+						<span class="inspector__value"
+							>{inspectorData.schema.installedVersion}</span>
 					</div>
 				</section>
 

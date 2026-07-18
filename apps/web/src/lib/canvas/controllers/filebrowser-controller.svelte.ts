@@ -7,6 +7,7 @@ import {
   type FileBrowserViewModel,
   type PersistentDocRepo,
 } from "@inkfinite/core";
+import type { LoadedDoc } from "@inkfinite/core";
 
 export class FileBrowserController {
   open = $state(false);
@@ -14,6 +15,7 @@ export class FileBrowserController {
 
   constructor(
     private getRepo: () => PersistentDocRepo | null,
+    private onLoadDoc?: (boardId: string, doc: LoadedDoc) => void,
   ) {}
 
   handleOpen = () => {
@@ -40,7 +42,7 @@ export class FileBrowserController {
       if (this.vm) {
         this.vm = FileBrowserVM.setBoards(this.vm, boards);
       } else if (repo) {
-        this.vm = FileBrowserVM.create({ repo, boards });
+        this.vm = FileBrowserVM.create({ repo: this.createBrowserRepo(repo), boards });
       }
     } catch (error) {
       console.error("Failed to list boards", error);
@@ -53,4 +55,16 @@ export class FileBrowserController {
     }
     return getBoardInspectorData(webDb, boardId, KNOWN_MIGRATION_IDS);
   };
+
+  private createBrowserRepo(repo: PersistentDocRepo): PersistentDocRepo {
+    const onLoadDoc = this.onLoadDoc;
+    return {
+      ...repo,
+      async openBoard(boardId) {
+        await repo.openBoard(boardId);
+        const doc = await repo.loadDoc(boardId);
+        onLoadDoc?.(boardId, doc);
+      },
+    };
+  }
 }

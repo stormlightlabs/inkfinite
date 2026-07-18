@@ -69,8 +69,8 @@ pub use crate::crdt::CrdtDocument;
 pub use crate::engine::{CommitResult, TransactionDraft, TransactionEngine};
 pub use migration::{ImportedV1, import_v1_json, parse_v1_json};
 pub use persistence::{
-    DocumentFile, PersistenceOptions, SaveResult, export_snapshot_json, import_v1_file,
-    import_v1_file_with_options, read_v1_file, recovery_path_for, write_snapshot_json,
+    DocumentFile, PersistenceOptions, SaveResult, export_snapshot_json, import_v1_file, import_v1_file_with_options,
+    read_v1_file, recovery_path_for, write_snapshot_json,
 };
 
 #[cfg(test)]

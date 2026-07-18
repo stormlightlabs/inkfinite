@@ -7,14 +7,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::crdt::{AutomergeDocument, CrdtError, EncodedChange};
 use crate::proto::{
-    AffectedRegion, AssetPatch, Bounds, DocumentPatch, InverseMetadata, LayerContentsDisposition,
-    LayerPatch, LayoutAxis, Operation, Query, QueryResult, RecordId, ShapeAlignment, ShapePatch,
-    TransactionId, Warning,
+    AffectedRegion, AssetPatch, Bounds, DocumentPatch, InverseMetadata, LayerContentsDisposition, LayerPatch,
+    LayoutAxis, Operation, Query, QueryResult, RecordId, ShapeAlignment, ShapePatch, TransactionId, Warning,
 };
 use crate::{
-    ActorId, AssetId, BindingId, ChangeHash, ContainerLayout, Document, DocumentId, LayerId,
-    Origin, PageId, RecordVersion, ShapeId, ShapeParent, ShapeProperties, ShapeRecord,
-    SiblingAnchor,
+    ActorId, AssetId, BindingId, ChangeHash, ContainerLayout, Document, DocumentId, LayerId, Origin, PageId,
+    RecordVersion, ShapeId, ShapeParent, ShapeProperties, ShapeRecord, SiblingAnchor,
 };
 use thiserror::Error;
 
@@ -83,11 +81,7 @@ impl TransactionEngine {
     ///
     /// Returns an error when the initial document violates an invariant or
     /// cannot be encoded by the CRDT adapter.
-    pub fn create(
-        document_id: DocumentId,
-        actor_id: ActorId,
-        document: Document,
-    ) -> Result<Self, EngineError> {
+    pub fn create(document_id: DocumentId, actor_id: ActorId, document: Document) -> Result<Self, EngineError> {
         validate_document(&document)?;
         Ok(Self {
             crdt: AutomergeDocument::create(document_id, actor_id, document)?,
@@ -105,12 +99,7 @@ impl TransactionEngine {
     pub fn load(bytes: &[u8], actor_id: ActorId) -> Result<Self, EngineError> {
         let mut crdt = AutomergeDocument::load(bytes, actor_id)?;
         validate_document(&crdt.snapshot()?.document)?;
-        Ok(Self {
-            crdt,
-            undo: BTreeMap::new(),
-            redo: BTreeMap::new(),
-            history_sequence: 0,
-        })
+        Ok(Self { crdt, undo: BTreeMap::new(), redo: BTreeMap::new(), history_sequence: 0 })
     }
 
     /// Returns the current materialized snapshot.
@@ -129,6 +118,19 @@ impl TransactionEngine {
     /// Returns an error when Automerge cannot serialize the document.
     pub fn save(&mut self) -> Result<Vec<u8>, EngineError> {
         Ok(self.crdt.save()?)
+    }
+
+    /// Reports whether `actor_id` has a transaction that can be undone.
+    #[must_use]
+    pub fn can_undo(&self, actor_id: &ActorId) -> bool {
+        self.undo.get(actor_id).is_some_and(|entries| !entries.is_empty())
+    }
+
+    /// Reports whether `actor_id` has a compensated transaction that can be
+    /// redone.
+    #[must_use]
+    pub fn can_redo(&self, actor_id: &ActorId) -> bool {
+        self.redo.get(actor_id).is_some_and(|entries| !entries.is_empty())
     }
 
     /// Applies one transaction atomically as one CRDT change.
@@ -158,10 +160,7 @@ impl TransactionEngine {
             .undo
             .get_mut(actor_id)
             .and_then(Vec::pop)
-            .ok_or_else(|| EngineError::EmptyHistory {
-                action: "undo",
-                actor_id: actor_id.clone(),
-            })?;
+            .ok_or_else(|| EngineError::EmptyHistory { action: "undo", actor_id: actor_id.clone() })?;
         let operations = match self
             .crdt
             .snapshot()
@@ -177,16 +176,10 @@ impl TransactionEngine {
         let transaction = self.history_transaction(actor_id, "undo", operations);
         match self.commit_internal(transaction, false) {
             Ok(result) => {
-                self.redo
-                    .entry(actor_id.clone())
-                    .or_default()
-                    .push(HistoryEntry {
-                        operations: result.inverse.operations.clone(),
-                        expected: capture_expected_records(
-                            &result.inverse.operations,
-                            &self.crdt.snapshot()?.document,
-                        ),
-                    });
+                self.redo.entry(actor_id.clone()).or_default().push(HistoryEntry {
+                    operations: result.inverse.operations.clone(),
+                    expected: capture_expected_records(&result.inverse.operations, &self.crdt.snapshot()?.document),
+                });
                 Ok(result)
             }
             Err(error) => {
@@ -207,10 +200,7 @@ impl TransactionEngine {
             .redo
             .get_mut(actor_id)
             .and_then(Vec::pop)
-            .ok_or_else(|| EngineError::EmptyHistory {
-                action: "redo",
-                actor_id: actor_id.clone(),
-            })?;
+            .ok_or_else(|| EngineError::EmptyHistory { action: "redo", actor_id: actor_id.clone() })?;
         let operations = match self
             .crdt
             .snapshot()
@@ -226,16 +216,10 @@ impl TransactionEngine {
         let transaction = self.history_transaction(actor_id, "redo", operations);
         match self.commit_internal(transaction, false) {
             Ok(result) => {
-                self.undo
-                    .entry(actor_id.clone())
-                    .or_default()
-                    .push(HistoryEntry {
-                        operations: result.inverse.operations.clone(),
-                        expected: capture_expected_records(
-                            &result.inverse.operations,
-                            &self.crdt.snapshot()?.document,
-                        ),
-                    });
+                self.undo.entry(actor_id.clone()).or_default().push(HistoryEntry {
+                    operations: result.inverse.operations.clone(),
+                    expected: capture_expected_records(&result.inverse.operations, &self.crdt.snapshot()?.document),
+                });
                 Ok(result)
             }
             Err(error) => {
@@ -252,10 +236,7 @@ impl TransactionEngine {
     ///
     /// Returns an error when changes are malformed or the merged candidate
     /// cannot be repaired and validated.
-    pub fn merge_changes(
-        &mut self,
-        changes: &[EncodedChange],
-    ) -> Result<Vec<Warning>, EngineError> {
+    pub fn merge_changes(&mut self, changes: &[EncodedChange]) -> Result<Vec<Warning>, EngineError> {
         let mut candidate = self.crdt.clone();
         candidate.apply_changes(changes)?;
         let mut snapshot = candidate.snapshot()?;
@@ -286,10 +267,7 @@ impl TransactionEngine {
     /// # Errors
     ///
     /// Returns an error when a supplied head is malformed or unknown.
-    pub fn changes_since(
-        &mut self,
-        heads: &[ChangeHash],
-    ) -> Result<Vec<EncodedChange>, EngineError> {
+    pub fn changes_since(&mut self, heads: &[ChangeHash]) -> Result<Vec<EncodedChange>, EngineError> {
         Ok(self.crdt.changes_since(heads)?)
     }
 
@@ -304,9 +282,7 @@ impl TransactionEngine {
     }
 
     fn commit_internal(
-        &mut self,
-        transaction: TransactionDraft,
-        track_history: bool,
+        &mut self, transaction: TransactionDraft, track_history: bool,
     ) -> Result<CommitResult, EngineError> {
         validate_transaction_schema(&transaction)?;
         let current_heads = self.crdt.heads();
@@ -327,9 +303,7 @@ impl TransactionEngine {
 
         let (patch, affected_ids) = diff_documents(&before, &candidate);
         if affected_ids.is_empty() {
-            return Err(EngineError::Schema(
-                "transaction must produce a durable change".into(),
-            ));
+            return Err(EngineError::Schema("transaction must produce a durable change".into()));
         }
         let affected_regions = affected_regions(&before, &candidate, &affected_ids);
         let mut fork = self.crdt.clone();
@@ -338,10 +312,7 @@ impl TransactionEngine {
         validate_document(&fork.snapshot()?.document)?;
         self.crdt = fork;
 
-        let inverse_metadata = InverseMetadata {
-            actor_id: transaction.actor_id.clone(),
-            operations: inverse,
-        };
+        let inverse_metadata = InverseMetadata { actor_id: transaction.actor_id.clone(), operations: inverse };
         if track_history {
             self.undo
                 .entry(transaction.actor_id.clone())
@@ -365,10 +336,7 @@ impl TransactionEngine {
     }
 
     fn history_transaction(
-        &mut self,
-        actor_id: &ActorId,
-        action: &str,
-        operations: Vec<Operation>,
+        &mut self, actor_id: &ActorId, action: &str, operations: Vec<Operation>,
     ) -> TransactionDraft {
         self.history_sequence += 1;
         TransactionDraft {
@@ -403,11 +371,7 @@ fn validate_transaction_schema(transaction: &TransactionDraft) -> Result<(), Eng
     Ok(())
 }
 
-fn validate_permissions(
-    document: &Document,
-    operation: &Operation,
-    origin: &Origin,
-) -> Result<(), EngineError> {
+fn validate_permissions(document: &Document, operation: &Operation, origin: &Origin) -> Result<(), EngineError> {
     let mut shape_ids = operation_shape_ids(operation);
     match operation {
         Operation::DeletePage { page_id, .. } => {
@@ -434,9 +398,7 @@ fn validate_permissions(
             continue;
         };
         if shape.metadata.locked {
-            return Err(EngineError::Permission(format!(
-                "shape {shape_id} is locked"
-            )));
+            return Err(EngineError::Permission(format!("shape {shape_id} is locked")));
         }
         if matches!(origin, Origin::Agent) && !shape.metadata.agent_editable {
             return Err(EngineError::Permission(format!(
@@ -446,21 +408,13 @@ fn validate_permissions(
         if let Some(layer) = containing_layer(document, shape)
             && layer.locked
         {
-            return Err(EngineError::Permission(format!(
-                "layer {} is locked",
-                layer.id
-            )));
+            return Err(EngineError::Permission(format!("layer {} is locked", layer.id)));
         }
     }
     if let Some(layer_id) = operation_layer_id(operation)
-        && document
-            .layers
-            .get(&layer_id)
-            .is_some_and(|layer| layer.locked)
+        && document.layers.get(&layer_id).is_some_and(|layer| layer.locked)
     {
-        return Err(EngineError::Permission(format!(
-            "layer {layer_id} is locked"
-        )));
+        return Err(EngineError::Permission(format!("layer {layer_id} is locked")));
     }
     Ok(())
 }
@@ -468,72 +422,29 @@ fn validate_permissions(
 fn refresh_inverse_preconditions(operations: &mut [Operation], document: &Document) {
     for operation in operations {
         match operation {
-            Operation::RenamePage {
-                page_id,
-                expected_version,
-                ..
+            Operation::RenamePage { page_id, expected_version, .. }
+            | Operation::DeletePage { page_id, expected_version } => {
+                *expected_version = document.pages.get(page_id).map(|record| record.version)
             }
-            | Operation::DeletePage {
-                page_id,
-                expected_version,
-            } => *expected_version = document.pages.get(page_id).map(|record| record.version),
-            Operation::PatchLayer {
-                layer_id,
-                expected_version,
-                ..
+            Operation::PatchLayer { layer_id, expected_version, .. }
+            | Operation::ReorderLayer { layer_id, expected_version, .. }
+            | Operation::DeleteLayer { layer_id, expected_version, .. } => {
+                *expected_version = document.layers.get(layer_id).map(|record| record.version)
             }
-            | Operation::ReorderLayer {
-                layer_id,
-                expected_version,
-                ..
+            Operation::PatchShape { shape_id, expected_version, .. }
+            | Operation::ReparentShape { shape_id, expected_version, .. }
+            | Operation::DeleteShape { shape_id, expected_version } => {
+                *expected_version = document.shapes.get(shape_id).map(|record| record.version)
             }
-            | Operation::DeleteLayer {
-                layer_id,
-                expected_version,
-                ..
-            } => *expected_version = document.layers.get(layer_id).map(|record| record.version),
-            Operation::PatchShape {
-                shape_id,
-                expected_version,
-                ..
+            Operation::DeleteBinding { binding_id, expected_version } => {
+                *expected_version = document.bindings.get(binding_id).map(|record| record.version);
             }
-            | Operation::ReparentShape {
-                shape_id,
-                expected_version,
-                ..
+            Operation::PatchAsset { asset_id, expected_version, .. }
+            | Operation::DeleteAsset { asset_id, expected_version } => {
+                *expected_version = document.assets.get(asset_id).map(|record| record.version)
             }
-            | Operation::DeleteShape {
-                shape_id,
-                expected_version,
-            } => *expected_version = document.shapes.get(shape_id).map(|record| record.version),
-            Operation::DeleteBinding {
-                binding_id,
-                expected_version,
-            } => {
-                *expected_version = document
-                    .bindings
-                    .get(binding_id)
-                    .map(|record| record.version);
-            }
-            Operation::PatchAsset {
-                asset_id,
-                expected_version,
-                ..
-            }
-            | Operation::DeleteAsset {
-                asset_id,
-                expected_version,
-            } => *expected_version = document.assets.get(asset_id).map(|record| record.version),
-            Operation::AlignShapes {
-                shape_ids,
-                expected_versions,
-                ..
-            }
-            | Operation::DistributeShapes {
-                shape_ids,
-                expected_versions,
-                ..
-            } => {
+            Operation::AlignShapes { shape_ids, expected_versions, .. }
+            | Operation::DistributeShapes { shape_ids, expected_versions, .. } => {
                 expected_versions.clear();
                 expected_versions.extend(shape_ids.iter().filter_map(|shape_id| {
                     document
@@ -584,8 +495,7 @@ fn capture_expected_records(operations: &[Operation], document: &Document) -> Ex
                     expected.assets.insert(asset_id.clone(), record.clone());
                 }
             }
-            Operation::AlignShapes { shape_ids, .. }
-            | Operation::DistributeShapes { shape_ids, .. } => {
+            Operation::AlignShapes { shape_ids, .. } | Operation::DistributeShapes { shape_ids, .. } => {
                 for shape_id in shape_ids {
                     if let Some(record) = document.shapes.get(shape_id) {
                         expected.shapes.insert(shape_id.clone(), record.clone());
@@ -603,38 +513,32 @@ fn capture_expected_records(operations: &[Operation], document: &Document) -> Ex
 }
 
 #[allow(clippy::too_many_lines)]
-fn prepare_compensation(
-    entry: &HistoryEntry,
-    current: &Document,
-) -> Result<Vec<Operation>, EngineError> {
+fn prepare_compensation(entry: &HistoryEntry, current: &Document) -> Result<Vec<Operation>, EngineError> {
     let mut operations = entry.operations.clone();
     for operation in &mut operations {
         match operation {
-            Operation::RenamePage {
-                page_id,
-                name,
-                expected_version,
-            } => {
-                let expected = entry.expected.pages.get(page_id).ok_or_else(|| {
-                    history_conflict(format!("page {page_id} no longer has the expected state"))
-                })?;
-                let current = current.pages.get(page_id).ok_or_else(|| {
-                    history_conflict(format!("page {page_id} was removed concurrently"))
-                })?;
+            Operation::RenamePage { page_id, name, expected_version } => {
+                let expected = entry
+                    .expected
+                    .pages
+                    .get(page_id)
+                    .ok_or_else(|| history_conflict(format!("page {page_id} no longer has the expected state")))?;
+                let current = current
+                    .pages
+                    .get(page_id)
+                    .ok_or_else(|| history_conflict(format!("page {page_id} was removed concurrently")))?;
                 *name = merge_history_value(name, &expected.name, &current.name, "page name")?;
                 *expected_version = None;
             }
-            Operation::PatchLayer {
-                layer_id,
-                patch,
-                expected_version,
-            } => {
-                let expected = entry.expected.layers.get(layer_id).ok_or_else(|| {
-                    history_conflict(format!("layer {layer_id} no longer has the expected state"))
-                })?;
-                let current = current.layers.get(layer_id).ok_or_else(|| {
-                    history_conflict(format!("layer {layer_id} was removed concurrently"))
-                })?;
+            Operation::PatchLayer { layer_id, patch, expected_version } => {
+                let expected =
+                    entry.expected.layers.get(layer_id).ok_or_else(|| {
+                        history_conflict(format!("layer {layer_id} no longer has the expected state"))
+                    })?;
+                let current = current
+                    .layers
+                    .get(layer_id)
+                    .ok_or_else(|| history_conflict(format!("layer {layer_id} was removed concurrently")))?;
                 if let Some(before) = &patch.name {
                     patch.name = Some(merge_history_value(
                         before,
@@ -669,47 +573,39 @@ fn prepare_compensation(
                 }
                 *expected_version = None;
             }
-            Operation::PatchShape {
-                shape_id,
-                patch,
-                expected_version,
-            } => {
-                let expected = entry.expected.shapes.get(shape_id).ok_or_else(|| {
-                    history_conflict(format!("shape {shape_id} no longer has the expected state"))
-                })?;
-                let current = current.shapes.get(shape_id).ok_or_else(|| {
-                    history_conflict(format!("shape {shape_id} was removed concurrently"))
-                })?;
+            Operation::PatchShape { shape_id, patch, expected_version } => {
+                let expected =
+                    entry.expected.shapes.get(shape_id).ok_or_else(|| {
+                        history_conflict(format!("shape {shape_id} no longer has the expected state"))
+                    })?;
+                let current = current
+                    .shapes
+                    .get(shape_id)
+                    .ok_or_else(|| history_conflict(format!("shape {shape_id} was removed concurrently")))?;
                 merge_shape_compensation(patch, expected, current)?;
                 *expected_version = None;
             }
-            Operation::ReparentShape {
-                shape_id,
-                parent,
-                expected_version,
-                ..
-            } => {
-                let expected = entry.expected.shapes.get(shape_id).ok_or_else(|| {
-                    history_conflict(format!("shape {shape_id} no longer has the expected state"))
-                })?;
-                let current = current.shapes.get(shape_id).ok_or_else(|| {
-                    history_conflict(format!("shape {shape_id} was removed concurrently"))
-                })?;
-                *parent =
-                    merge_history_value(parent, &expected.parent, &current.parent, "shape parent")?;
+            Operation::ReparentShape { shape_id, parent, expected_version, .. } => {
+                let expected =
+                    entry.expected.shapes.get(shape_id).ok_or_else(|| {
+                        history_conflict(format!("shape {shape_id} no longer has the expected state"))
+                    })?;
+                let current = current
+                    .shapes
+                    .get(shape_id)
+                    .ok_or_else(|| history_conflict(format!("shape {shape_id} was removed concurrently")))?;
+                *parent = merge_history_value(parent, &expected.parent, &current.parent, "shape parent")?;
                 *expected_version = None;
             }
-            Operation::PatchAsset {
-                asset_id,
-                patch,
-                expected_version,
-            } => {
-                let expected = entry.expected.assets.get(asset_id).ok_or_else(|| {
-                    history_conflict(format!("asset {asset_id} no longer has the expected state"))
-                })?;
-                let current = current.assets.get(asset_id).ok_or_else(|| {
-                    history_conflict(format!("asset {asset_id} was removed concurrently"))
-                })?;
+            Operation::PatchAsset { asset_id, patch, expected_version } => {
+                let expected =
+                    entry.expected.assets.get(asset_id).ok_or_else(|| {
+                        history_conflict(format!("asset {asset_id} no longer has the expected state"))
+                    })?;
+                let current = current
+                    .assets
+                    .get(asset_id)
+                    .ok_or_else(|| history_conflict(format!("asset {asset_id} was removed concurrently")))?;
                 if let Some(before) = &patch.name {
                     patch.name = Some(merge_history_value(
                         before,
@@ -728,10 +624,7 @@ fn prepare_compensation(
                 }
                 *expected_version = None;
             }
-            Operation::DeletePage {
-                page_id,
-                expected_version,
-            } => {
+            Operation::DeletePage { page_id, expected_version } => {
                 guard_existing_record(
                     entry.expected.pages.get(page_id),
                     current.pages.get(page_id),
@@ -740,16 +633,8 @@ fn prepare_compensation(
                 )?;
                 *expected_version = None;
             }
-            Operation::DeleteLayer {
-                layer_id,
-                expected_version,
-                ..
-            }
-            | Operation::ReorderLayer {
-                layer_id,
-                expected_version,
-                ..
-            } => {
+            Operation::DeleteLayer { layer_id, expected_version, .. }
+            | Operation::ReorderLayer { layer_id, expected_version, .. } => {
                 guard_existing_record(
                     entry.expected.layers.get(layer_id),
                     current.layers.get(layer_id),
@@ -758,10 +643,7 @@ fn prepare_compensation(
                 )?;
                 *expected_version = None;
             }
-            Operation::DeleteShape {
-                shape_id,
-                expected_version,
-            } => {
+            Operation::DeleteShape { shape_id, expected_version } => {
                 guard_existing_record(
                     entry.expected.shapes.get(shape_id),
                     current.shapes.get(shape_id),
@@ -770,10 +652,7 @@ fn prepare_compensation(
                 )?;
                 *expected_version = None;
             }
-            Operation::DeleteBinding {
-                binding_id,
-                expected_version,
-            } => {
+            Operation::DeleteBinding { binding_id, expected_version } => {
                 guard_existing_record(
                     entry.expected.bindings.get(binding_id),
                     current.bindings.get(binding_id),
@@ -782,10 +661,7 @@ fn prepare_compensation(
                 )?;
                 *expected_version = None;
             }
-            Operation::DeleteAsset {
-                asset_id,
-                expected_version,
-            } => {
+            Operation::DeleteAsset { asset_id, expected_version } => {
                 guard_existing_record(
                     entry.expected.assets.get(asset_id),
                     current.assets.get(asset_id),
@@ -804,12 +680,7 @@ fn prepare_compensation(
                 guard_absent_record(&entry.expected.shapes, &current.shapes, &shape.id, "shape")?;
             }
             Operation::CreateBinding { binding } => {
-                guard_absent_record(
-                    &entry.expected.bindings,
-                    &current.bindings,
-                    &binding.id,
-                    "binding",
-                )?;
+                guard_absent_record(&entry.expected.bindings, &current.bindings, &binding.id, "binding")?;
             }
             Operation::CreateAsset { asset } => {
                 guard_absent_record(&entry.expected.assets, &current.assets, &asset.id, "asset")?;
@@ -826,9 +697,7 @@ fn prepare_compensation(
 
 #[allow(clippy::too_many_lines)]
 fn merge_shape_compensation(
-    patch: &mut ShapePatch,
-    expected: &ShapeRecord,
-    current: &ShapeRecord,
+    patch: &mut ShapePatch, expected: &ShapeRecord, current: &ShapeRecord,
 ) -> Result<(), EngineError> {
     if let Some(before) = patch.transform {
         patch.transform = Some(crate::Transform {
@@ -954,10 +823,7 @@ fn merge_shape_compensation(
 }
 
 fn merge_history_map(
-    before: &ShapeProperties,
-    expected: &ShapeProperties,
-    current: &ShapeProperties,
-    label: &str,
+    before: &ShapeProperties, expected: &ShapeProperties, current: &ShapeProperties, label: &str,
 ) -> Result<ShapeProperties, EngineError> {
     let keys: BTreeSet<_> = before
         .keys()
@@ -971,9 +837,7 @@ fn merge_history_map(
             continue;
         }
         if current.get(&key) != expected.get(&key) {
-            return Err(history_conflict(format!(
-                "{label} {key} changed concurrently"
-            )));
+            return Err(history_conflict(format!("{label} {key} changed concurrently")));
         }
         if let Some(value) = before.get(&key) {
             merged.insert(key, value.clone());
@@ -985,10 +849,7 @@ fn merge_history_map(
 }
 
 fn merge_history_value<T: Clone + PartialEq>(
-    before: &T,
-    expected: &T,
-    current: &T,
-    label: &str,
+    before: &T, expected: &T, current: &T, label: &str,
 ) -> Result<T, EngineError> {
     if before == expected {
         return Ok(current.clone());
@@ -1000,32 +861,22 @@ fn merge_history_value<T: Clone + PartialEq>(
 }
 
 fn guard_existing_record<T: PartialEq, Id: std::fmt::Display>(
-    expected: Option<&T>,
-    current: Option<&T>,
-    kind: &str,
-    id: &Id,
+    expected: Option<&T>, current: Option<&T>, kind: &str, id: &Id,
 ) -> Result<(), EngineError> {
     if expected.is_some() && expected == current {
         Ok(())
     } else {
-        Err(history_conflict(format!(
-            "{kind} {id} changed concurrently"
-        )))
+        Err(history_conflict(format!("{kind} {id} changed concurrently")))
     }
 }
 
 fn guard_absent_record<Id: Ord + std::fmt::Display, T>(
-    expected: &BTreeMap<Id, T>,
-    current: &BTreeMap<Id, T>,
-    id: &Id,
-    kind: &str,
+    expected: &BTreeMap<Id, T>, current: &BTreeMap<Id, T>, id: &Id, kind: &str,
 ) -> Result<(), EngineError> {
     if !expected.contains_key(id) && !current.contains_key(id) {
         Ok(())
     } else {
-        Err(history_conflict(format!(
-            "{kind} {id} was recreated concurrently"
-        )))
+        Err(history_conflict(format!("{kind} {id} was recreated concurrently")))
     }
 }
 
@@ -1034,10 +885,7 @@ fn history_conflict(message: impl Into<String>) -> EngineError {
 }
 
 #[allow(clippy::too_many_lines)]
-fn apply_operation(
-    document: &mut Document,
-    operation: &Operation,
-) -> Result<Vec<Operation>, EngineError> {
+fn apply_operation(document: &mut Document, operation: &Operation) -> Result<Vec<Operation>, EngineError> {
     match operation {
         Operation::CreatePage { page, anchor } => {
             ensure_absent(document.pages.contains_key(&page.id), "page", &page.id)?;
@@ -1054,11 +902,7 @@ fn apply_operation(
                 expected_version: Some(page.version),
             }])
         }
-        Operation::RenamePage {
-            page_id,
-            name,
-            expected_version,
-        } => {
+        Operation::RenamePage { page_id, name, expected_version } => {
             if name.trim().is_empty() {
                 return Err(EngineError::Schema("page name is empty".into()));
             }
@@ -1072,17 +916,13 @@ fn apply_operation(
                 expected_version: Some(page.version),
             }])
         }
-        Operation::DeletePage {
-            page_id,
-            expected_version,
-        } => delete_page(document, page_id, *expected_version),
+        Operation::DeletePage { page_id, expected_version } => delete_page(document, page_id, *expected_version),
         Operation::CreateLayer { layer, anchor } => {
             ensure_absent(document.layers.contains_key(&layer.id), "layer", &layer.id)?;
             ensure_version_one(layer.version, "new layer")?;
             if !layer.shape_ids.is_empty() {
                 return Err(EngineError::Schema(
-                    "new layer shape_ids must be empty; create or reparent shapes separately"
-                        .into(),
+                    "new layer shape_ids must be empty; create or reparent shapes separately".into(),
                 ));
             }
             let page = page_mut(document, &layer.page_id, None)?;
@@ -1095,21 +935,15 @@ fn apply_operation(
                 expected_version: Some(layer.version),
             }])
         }
-        Operation::PatchLayer {
-            layer_id,
-            patch,
-            expected_version,
-        } => patch_layer(document, layer_id, patch, *expected_version),
-        Operation::ReorderLayer {
-            layer_id,
-            anchor,
-            expected_version,
-        } => reorder_layer(document, layer_id, anchor, *expected_version),
-        Operation::DeleteLayer {
-            layer_id,
-            contents,
-            expected_version,
-        } => delete_layer(document, layer_id, contents, *expected_version),
+        Operation::PatchLayer { layer_id, patch, expected_version } => {
+            patch_layer(document, layer_id, patch, *expected_version)
+        }
+        Operation::ReorderLayer { layer_id, anchor, expected_version } => {
+            reorder_layer(document, layer_id, anchor, *expected_version)
+        }
+        Operation::DeleteLayer { layer_id, contents, expected_version } => {
+            delete_layer(document, layer_id, contents, *expected_version)
+        }
         Operation::CreateShape { shape, anchor } => {
             ensure_absent(document.shapes.contains_key(&shape.id), "shape", &shape.id)?;
             ensure_version_one(shape.version, "new shape")?;
@@ -1125,41 +959,24 @@ fn apply_operation(
                 expected_version: Some(shape.version),
             }])
         }
-        Operation::PatchShape {
-            shape_id,
-            patch,
-            expected_version,
-        } => patch_shape(document, shape_id, patch, *expected_version),
-        Operation::ReparentShape {
-            shape_id,
-            parent,
-            anchor,
-            expected_version,
-        } => reparent_shape(document, shape_id, parent, anchor, *expected_version),
-        Operation::DeleteShape {
-            shape_id,
-            expected_version,
-        } => delete_shape(document, shape_id, *expected_version),
+        Operation::PatchShape { shape_id, patch, expected_version } => {
+            patch_shape(document, shape_id, patch, *expected_version)
+        }
+        Operation::ReparentShape { shape_id, parent, anchor, expected_version } => {
+            reparent_shape(document, shape_id, parent, anchor, *expected_version)
+        }
+        Operation::DeleteShape { shape_id, expected_version } => delete_shape(document, shape_id, *expected_version),
         Operation::CreateBinding { binding } => {
-            ensure_absent(
-                document.bindings.contains_key(&binding.id),
-                "binding",
-                &binding.id,
-            )?;
+            ensure_absent(document.bindings.contains_key(&binding.id), "binding", &binding.id)?;
             ensure_version_one(binding.version, "new binding")?;
             ensure_binding_endpoints(document, binding)?;
-            document
-                .bindings
-                .insert(binding.id.clone(), binding.clone());
+            document.bindings.insert(binding.id.clone(), binding.clone());
             Ok(vec![Operation::DeleteBinding {
                 binding_id: binding.id.clone(),
                 expected_version: Some(binding.version),
             }])
         }
-        Operation::DeleteBinding {
-            binding_id,
-            expected_version,
-        } => {
+        Operation::DeleteBinding { binding_id, expected_version } => {
             let binding = crate::BindingRecord {
                 version: RecordVersion(1),
                 ..binding(document, binding_id, *expected_version)?.clone()
@@ -1176,45 +993,31 @@ fn apply_operation(
                 expected_version: Some(asset.version),
             }])
         }
-        Operation::PatchAsset {
-            asset_id,
-            patch,
-            expected_version,
-        } => patch_asset(document, asset_id, patch, *expected_version),
-        Operation::DeleteAsset {
-            asset_id,
-            expected_version,
-        } => {
+        Operation::PatchAsset { asset_id, patch, expected_version } => {
+            patch_asset(document, asset_id, patch, *expected_version)
+        }
+        Operation::DeleteAsset { asset_id, expected_version } => {
             let asset = crate::AssetRecord {
                 version: RecordVersion(1),
                 ..asset(document, asset_id, *expected_version)?.clone()
             };
             if asset_is_referenced(document, asset_id) {
-                return Err(EngineError::Invariant(format!(
-                    "asset {asset_id} is still referenced"
-                )));
+                return Err(EngineError::Invariant(format!("asset {asset_id} is still referenced")));
             }
             document.assets.remove(asset_id);
             Ok(vec![Operation::CreateAsset { asset }])
         }
-        Operation::AlignShapes {
-            shape_ids,
-            alignment,
-            expected_versions,
-        } => align_shapes(document, shape_ids, *alignment, expected_versions),
-        Operation::DistributeShapes {
-            shape_ids,
-            axis,
-            expected_versions,
-        } => distribute_shapes(document, shape_ids, *axis, expected_versions),
+        Operation::AlignShapes { shape_ids, alignment, expected_versions } => {
+            align_shapes(document, shape_ids, *alignment, expected_versions)
+        }
+        Operation::DistributeShapes { shape_ids, axis, expected_versions } => {
+            distribute_shapes(document, shape_ids, *axis, expected_versions)
+        }
     }
 }
 
 fn patch_layer(
-    document: &mut Document,
-    layer_id: &LayerId,
-    patch: &LayerPatch,
-    expected: Option<RecordVersion>,
+    document: &mut Document, layer_id: &LayerId, patch: &LayerPatch, expected: Option<RecordVersion>,
 ) -> Result<Vec<Operation>, EngineError> {
     let layer = layer_mut(document, layer_id, expected)?;
     let inverse = LayerPatch {
@@ -1247,10 +1050,7 @@ fn patch_layer(
 }
 
 fn patch_shape(
-    document: &mut Document,
-    shape_id: &ShapeId,
-    patch: &ShapePatch,
-    expected: Option<RecordVersion>,
+    document: &mut Document, shape_id: &ShapeId, patch: &ShapePatch, expected: Option<RecordVersion>,
 ) -> Result<Vec<Operation>, EngineError> {
     let shape = shape_mut(document, shape_id, expected)?;
     let inverse = ShapePatch {
@@ -1284,10 +1084,7 @@ fn patch_shape(
 }
 
 fn patch_asset(
-    document: &mut Document,
-    asset_id: &AssetId,
-    patch: &AssetPatch,
-    expected: Option<RecordVersion>,
+    document: &mut Document, asset_id: &AssetId, patch: &AssetPatch, expected: Option<RecordVersion>,
 ) -> Result<Vec<Operation>, EngineError> {
     let asset = asset_mut(document, asset_id, expected)?;
     let inverse = AssetPatch {
@@ -1315,10 +1112,7 @@ fn patch_asset(
 }
 
 fn reorder_layer(
-    document: &mut Document,
-    layer_id: &LayerId,
-    anchor: &SiblingAnchor<LayerId>,
-    expected: Option<RecordVersion>,
+    document: &mut Document, layer_id: &LayerId, anchor: &SiblingAnchor<LayerId>, expected: Option<RecordVersion>,
 ) -> Result<Vec<Operation>, EngineError> {
     let layer = layer(document, layer_id, expected)?.clone();
     let page = document
@@ -1328,9 +1122,10 @@ fn reorder_layer(
     let old_anchor = anchor_for(&page.layer_ids, layer_id)?;
     move_anchored(&mut page.layer_ids, layer_id, anchor)?;
     page.version = next_version(page.version)?;
-    let layer = document.layers.get_mut(layer_id).ok_or_else(|| {
-        EngineError::Invariant(format!("layer {layer_id} disappeared during reorder"))
-    })?;
+    let layer = document
+        .layers
+        .get_mut(layer_id)
+        .ok_or_else(|| EngineError::Invariant(format!("layer {layer_id} disappeared during reorder")))?;
     layer.version = next_version(layer.version)?;
     Ok(vec![Operation::ReorderLayer {
         layer_id: layer_id.clone(),
@@ -1340,15 +1135,11 @@ fn reorder_layer(
 }
 
 fn reparent_shape(
-    document: &mut Document,
-    shape_id: &ShapeId,
-    parent: &ShapeParent,
-    anchor: &SiblingAnchor<ShapeId>,
+    document: &mut Document, shape_id: &ShapeId, parent: &ShapeParent, anchor: &SiblingAnchor<ShapeId>,
     expected: Option<RecordVersion>,
 ) -> Result<Vec<Operation>, EngineError> {
     let shape = shape(document, shape_id, expected)?.clone();
-    if parent == &ShapeParent::Shape(shape_id.clone()) || is_descendant(document, shape_id, parent)
-    {
+    if parent == &ShapeParent::Shape(shape_id.clone()) || is_descendant(document, shape_id, parent) {
         return Err(EngineError::Invariant(format!(
             "reparenting {shape_id} would create a cycle"
         )));
@@ -1357,9 +1148,10 @@ fn reparent_shape(
     let old_anchor = anchor_for(old_siblings, shape_id)?;
     remove_shape_child(document, &shape.parent, shape_id)?;
     insert_shape_child(document, parent, shape_id.clone(), anchor)?;
-    let changed = document.shapes.get_mut(shape_id).ok_or_else(|| {
-        EngineError::Invariant(format!("shape {shape_id} disappeared during reparent"))
-    })?;
+    let changed = document
+        .shapes
+        .get_mut(shape_id)
+        .ok_or_else(|| EngineError::Invariant(format!("shape {shape_id} disappeared during reparent")))?;
     changed.parent = parent.clone();
     changed.version = next_version(changed.version)?;
     Ok(vec![Operation::ReparentShape {
@@ -1371,9 +1163,7 @@ fn reparent_shape(
 }
 
 fn delete_page(
-    document: &mut Document,
-    page_id: &PageId,
-    expected: Option<RecordVersion>,
+    document: &mut Document, page_id: &PageId, expected: Option<RecordVersion>,
 ) -> Result<Vec<Operation>, EngineError> {
     let page = page(document, page_id, expected)?.clone();
     let anchor = anchor_for(&document.page_ids, page_id)?;
@@ -1383,23 +1173,18 @@ fn delete_page(
         .flat_map(|layer_id| descendant_ids_for_layer(document, layer_id))
         .collect();
     let mut inverse = vec![Operation::CreatePage {
-        page: crate::PageRecord {
-            layer_ids: Vec::new(),
-            version: RecordVersion(1),
-            ..page.clone()
-        },
+        page: crate::PageRecord { layer_ids: Vec::new(), version: RecordVersion(1), ..page.clone() },
         anchor,
     }];
     for layer_id in &layer_ids {
-        let mut layer = document.layers.get(layer_id).cloned().ok_or_else(|| {
-            EngineError::Invariant(format!("page {page_id} owns missing layer {layer_id}"))
-        })?;
+        let mut layer = document
+            .layers
+            .get(layer_id)
+            .cloned()
+            .ok_or_else(|| EngineError::Invariant(format!("page {page_id} owns missing layer {layer_id}")))?;
         layer.shape_ids.clear();
         layer.version = RecordVersion(1);
-        inverse.push(Operation::CreateLayer {
-            layer,
-            anchor: SiblingAnchor::Last,
-        });
+        inverse.push(Operation::CreateLayer { layer, anchor: SiblingAnchor::Last });
     }
     append_shape_restoration(document, &shape_ids, &mut inverse);
     append_binding_restoration(document, &shape_ids, &mut inverse);
@@ -1418,18 +1203,13 @@ fn delete_page(
 }
 
 fn delete_layer(
-    document: &mut Document,
-    layer_id: &LayerId,
-    contents: &LayerContentsDisposition,
-    expected: Option<RecordVersion>,
+    document: &mut Document, layer_id: &LayerId, contents: &LayerContentsDisposition, expected: Option<RecordVersion>,
 ) -> Result<Vec<Operation>, EngineError> {
     let layer = layer(document, layer_id, expected)?.clone();
-    let page = document.pages.get(&layer.page_id).ok_or_else(|| {
-        EngineError::Invariant(format!(
-            "layer {layer_id} owns missing page {}",
-            layer.page_id
-        ))
-    })?;
+    let page = document
+        .pages
+        .get(&layer.page_id)
+        .ok_or_else(|| EngineError::Invariant(format!("layer {layer_id} owns missing page {}", layer.page_id)))?;
     let anchor = anchor_for(&page.layer_ids, layer_id)?;
     let shape_ids: BTreeSet<_> = descendant_ids_for_layer(document, layer_id).collect();
     match contents {
@@ -1439,9 +1219,10 @@ fn delete_layer(
                     "layer contents destination is the deleted layer".into(),
                 ));
             }
-            let destination_layer = document.layers.get(destination).ok_or_else(|| {
-                EngineError::Precondition(format!("destination layer {destination} is missing"))
-            })?;
+            let destination_layer = document
+                .layers
+                .get(destination)
+                .ok_or_else(|| EngineError::Precondition(format!("destination layer {destination} is missing")))?;
             if destination_layer.page_id != layer.page_id {
                 return Err(EngineError::Invariant(
                     "layer contents must stay on the same page".into(),
@@ -1449,11 +1230,7 @@ fn delete_layer(
             }
             let root_ids = layer.shape_ids.clone();
             let mut inverse = vec![Operation::CreateLayer {
-                layer: crate::LayerRecord {
-                    shape_ids: Vec::new(),
-                    version: RecordVersion(1),
-                    ..layer.clone()
-                },
+                layer: crate::LayerRecord { shape_ids: Vec::new(), version: RecordVersion(1), ..layer.clone() },
                 anchor,
             }];
             for shape_id in &root_ids {
@@ -1471,9 +1248,10 @@ fn delete_layer(
                     shape_id.clone(),
                     &SiblingAnchor::Last,
                 )?;
-                let shape = document.shapes.get_mut(&shape_id).ok_or_else(|| {
-                    EngineError::Invariant(format!("missing root shape {shape_id}"))
-                })?;
+                let shape = document
+                    .shapes
+                    .get_mut(&shape_id)
+                    .ok_or_else(|| EngineError::Invariant(format!("missing root shape {shape_id}")))?;
                 shape.parent = ShapeParent::Layer(destination.clone());
                 shape.version = next_version(shape.version)?;
             }
@@ -1482,11 +1260,7 @@ fn delete_layer(
         }
         LayerContentsDisposition::Delete => {
             let mut inverse = vec![Operation::CreateLayer {
-                layer: crate::LayerRecord {
-                    shape_ids: Vec::new(),
-                    version: RecordVersion(1),
-                    ..layer.clone()
-                },
+                layer: crate::LayerRecord { shape_ids: Vec::new(), version: RecordVersion(1), ..layer.clone() },
                 anchor,
             }];
             append_shape_restoration(document, &shape_ids, &mut inverse);
@@ -1503,10 +1277,7 @@ fn delete_layer(
     }
 }
 
-fn remove_layer_record(
-    document: &mut Document,
-    layer: &crate::LayerRecord,
-) -> Result<(), EngineError> {
+fn remove_layer_record(document: &mut Document, layer: &crate::LayerRecord) -> Result<(), EngineError> {
     let page = document
         .pages
         .get_mut(&layer.page_id)
@@ -1518,9 +1289,7 @@ fn remove_layer_record(
 }
 
 fn delete_shape(
-    document: &mut Document,
-    shape_id: &ShapeId,
-    expected: Option<RecordVersion>,
+    document: &mut Document, shape_id: &ShapeId, expected: Option<RecordVersion>,
 ) -> Result<Vec<Operation>, EngineError> {
     let root = shape(document, shape_id, expected)?.clone();
     let shape_ids: BTreeSet<_> = std::iter::once(shape_id.clone())
@@ -1539,23 +1308,16 @@ fn delete_shape(
     Ok(inverse)
 }
 
-fn append_shape_restoration(
-    document: &Document,
-    shape_ids: &BTreeSet<ShapeId>,
-    operations: &mut Vec<Operation>,
-) {
+fn append_shape_restoration(document: &Document, shape_ids: &BTreeSet<ShapeId>, operations: &mut Vec<Operation>) {
     let mut remaining = shape_ids.clone();
     while !remaining.is_empty() {
         let ready: Vec<_> = remaining
             .iter()
             .filter(|id| {
-                document
-                    .shapes
-                    .get(*id)
-                    .is_some_and(|shape| match &shape.parent {
-                        ShapeParent::Layer(_) => true,
-                        ShapeParent::Shape(parent_id) => !remaining.contains(parent_id),
-                    })
+                document.shapes.get(*id).is_some_and(|shape| match &shape.parent {
+                    ShapeParent::Layer(_) => true,
+                    ShapeParent::Shape(parent_id) => !remaining.contains(parent_id),
+                })
             })
             .cloned()
             .collect();
@@ -1567,39 +1329,25 @@ fn append_shape_restoration(
                 let mut shape = shape.clone();
                 shape.child_ids.clear();
                 shape.version = RecordVersion(1);
-                operations.push(Operation::CreateShape {
-                    shape,
-                    anchor: SiblingAnchor::Last,
-                });
+                operations.push(Operation::CreateShape { shape, anchor: SiblingAnchor::Last });
             }
             remaining.remove(&id);
         }
     }
 }
 
-fn append_binding_restoration(
-    document: &Document,
-    shape_ids: &BTreeSet<ShapeId>,
-    operations: &mut Vec<Operation>,
-) {
+fn append_binding_restoration(document: &Document, shape_ids: &BTreeSet<ShapeId>, operations: &mut Vec<Operation>) {
     for binding in document.bindings.values() {
-        if shape_ids.contains(&binding.source_shape_id)
-            || shape_ids.contains(&binding.target_shape_id)
-        {
+        if shape_ids.contains(&binding.source_shape_id) || shape_ids.contains(&binding.target_shape_id) {
             operations.push(Operation::CreateBinding {
-                binding: crate::BindingRecord {
-                    version: RecordVersion(1),
-                    ..binding.clone()
-                },
+                binding: crate::BindingRecord { version: RecordVersion(1), ..binding.clone() },
             });
         }
     }
 }
 
 fn align_shapes(
-    document: &mut Document,
-    shape_ids: &[ShapeId],
-    alignment: ShapeAlignment,
+    document: &mut Document, shape_ids: &[ShapeId], alignment: ShapeAlignment,
     expected_versions: &BTreeMap<ShapeId, RecordVersion>,
 ) -> Result<Vec<Operation>, EngineError> {
     require_distinct_shapes(document, shape_ids, 2, expected_versions)?;
@@ -1615,21 +1363,11 @@ fn align_shapes(
         })
         .collect::<Result<_, _>>()?;
     let target = match alignment {
-        ShapeAlignment::Left => bounds
-            .iter()
-            .map(|bounds| bounds.x)
-            .fold(f64::INFINITY, f64::min),
-        ShapeAlignment::Center => {
-            bounds.iter().map(center_x).sum::<f64>() / count_as_f64(bounds.len())?
-        }
+        ShapeAlignment::Left => bounds.iter().map(|bounds| bounds.x).fold(f64::INFINITY, f64::min),
+        ShapeAlignment::Center => bounds.iter().map(center_x).sum::<f64>() / count_as_f64(bounds.len())?,
         ShapeAlignment::Right => bounds.iter().map(right).fold(f64::NEG_INFINITY, f64::max),
-        ShapeAlignment::Top => bounds
-            .iter()
-            .map(|bounds| bounds.y)
-            .fold(f64::INFINITY, f64::min),
-        ShapeAlignment::Middle => {
-            bounds.iter().map(center_y).sum::<f64>() / count_as_f64(bounds.len())?
-        }
+        ShapeAlignment::Top => bounds.iter().map(|bounds| bounds.y).fold(f64::INFINITY, f64::min),
+        ShapeAlignment::Middle => bounds.iter().map(center_y).sum::<f64>() / count_as_f64(bounds.len())?,
         ShapeAlignment::Bottom => bounds.iter().map(bottom).fold(f64::NEG_INFINITY, f64::max),
     };
     let deltas = shape_ids
@@ -1651,9 +1389,7 @@ fn align_shapes(
 }
 
 fn distribute_shapes(
-    document: &mut Document,
-    shape_ids: &[ShapeId],
-    axis: LayoutAxis,
+    document: &mut Document, shape_ids: &[ShapeId], axis: LayoutAxis,
     expected_versions: &BTreeMap<ShapeId, RecordVersion>,
 ) -> Result<Vec<Operation>, EngineError> {
     require_distinct_shapes(document, shape_ids, 3, expected_versions)?;
@@ -1727,9 +1463,7 @@ fn distribute_shapes(
 }
 
 fn apply_layout_translations(
-    document: &mut Document,
-    shape_ids: &[ShapeId],
-    deltas: &BTreeMap<ShapeId, (f64, f64)>,
+    document: &mut Document, shape_ids: &[ShapeId], deltas: &BTreeMap<ShapeId, (f64, f64)>,
 ) -> Result<Vec<Operation>, EngineError> {
     let mut inverse = Vec::new();
     for shape_id in shape_ids {
@@ -1738,18 +1472,16 @@ fn apply_layout_translations(
             .get_mut(shape_id)
             .ok_or_else(|| EngineError::Precondition(format!("shape {shape_id} is missing")))?;
         let old_transform = shape.transform;
-        let (x, y) = deltas.get(shape_id).copied().ok_or_else(|| {
-            EngineError::Invariant(format!("shape {shape_id} has no layout delta"))
-        })?;
+        let (x, y) = deltas
+            .get(shape_id)
+            .copied()
+            .ok_or_else(|| EngineError::Invariant(format!("shape {shape_id} has no layout delta")))?;
         shape.transform.translation.x += x;
         shape.transform.translation.y += y;
         shape.version = next_version(shape.version)?;
         inverse.push(Operation::PatchShape {
             shape_id: shape_id.clone(),
-            patch: ShapePatch {
-                transform: Some(old_transform),
-                ..ShapePatch::default()
-            },
+            patch: ShapePatch { transform: Some(old_transform), ..ShapePatch::default() },
             expected_version: Some(shape.version),
         });
     }
@@ -1757,10 +1489,7 @@ fn apply_layout_translations(
 }
 
 fn require_distinct_shapes(
-    document: &Document,
-    shape_ids: &[ShapeId],
-    minimum: usize,
-    expected_versions: &BTreeMap<ShapeId, RecordVersion>,
+    document: &Document, shape_ids: &[ShapeId], minimum: usize, expected_versions: &BTreeMap<ShapeId, RecordVersion>,
 ) -> Result<(), EngineError> {
     let unique: BTreeSet<_> = shape_ids.iter().collect();
     if unique.len() != shape_ids.len() || shape_ids.len() < minimum {
@@ -1806,9 +1535,7 @@ fn require_common_parent(document: &Document, shape_ids: &[ShapeId]) -> Result<(
 /// invalid ownership, reference, geometry, or layout condition.
 pub fn validate_document(document: &Document) -> Result<(), EngineError> {
     if document.pages.is_empty() || document.page_ids.is_empty() {
-        return Err(EngineError::Invariant(
-            "document must contain at least one page".into(),
-        ));
+        return Err(EngineError::Invariant("document must contain at least one page".into()));
     }
     ensure_unique_and_complete(&document.page_ids, document.pages.keys().cloned(), "page")?;
     let mut listed_layers = BTreeSet::new();
@@ -1826,10 +1553,7 @@ pub fn validate_document(document: &Document) -> Result<(), EngineError> {
                 )));
             }
             let layer = document.layers.get(layer_id).ok_or_else(|| {
-                EngineError::Invariant(format!(
-                    "page {} refers to missing layer {layer_id}",
-                    page.id
-                ))
+                EngineError::Invariant(format!("page {} refers to missing layer {layer_id}", page.id))
             })?;
             if layer.page_id != page.id {
                 return Err(EngineError::Invariant(format!(
@@ -1839,17 +1563,12 @@ pub fn validate_document(document: &Document) -> Result<(), EngineError> {
         }
     }
     if listed_layers.len() != document.layers.len() {
-        return Err(EngineError::Invariant(
-            "one or more layers are unlisted".into(),
-        ));
+        return Err(EngineError::Invariant("one or more layers are unlisted".into()));
     }
     let mut listed_shapes = BTreeSet::new();
     for layer in document.layers.values() {
         if layer.name.trim().is_empty() {
-            return Err(EngineError::Invariant(format!(
-                "layer {} has an empty name",
-                layer.id
-            )));
+            return Err(EngineError::Invariant(format!("layer {} has an empty name", layer.id)));
         }
         for shape_id in &layer.shape_ids {
             validate_child(
@@ -1873,9 +1592,7 @@ pub fn validate_document(document: &Document) -> Result<(), EngineError> {
         ensure_acyclic(document, &shape.id)?;
     }
     if listed_shapes.len() != document.shapes.len() {
-        return Err(EngineError::Invariant(
-            "one or more shapes are unlisted".into(),
-        ));
+        return Err(EngineError::Invariant("one or more shapes are unlisted".into()));
     }
     for binding in document.bindings.values() {
         ensure_binding_endpoints(document, binding)?;
@@ -1886,9 +1603,7 @@ pub fn validate_document(document: &Document) -> Result<(), EngineError> {
 fn validate_shape_schema(shape: &ShapeRecord) -> Result<(), EngineError> {
     crate::validate_shape_properties(shape.kind.as_str(), &shape.properties)
         .map_err(|error| EngineError::Schema(format!("shape {}: {error}", shape.id)))?;
-    if shape.kind.as_str() != crate::CONTAINER_KIND
-        && (!shape.child_ids.is_empty() || shape.layout.is_some())
-    {
+    if shape.kind.as_str() != crate::CONTAINER_KIND && (!shape.child_ids.is_empty() || shape.layout.is_some()) {
         return Err(EngineError::Schema(format!(
             "non-container shape {} owns children or layout",
             shape.id
@@ -1918,25 +1633,13 @@ fn validate_shape_schema(shape: &ShapeRecord) -> Result<(), EngineError> {
             ContainerLayout::Stack { gap, padding, .. } => {
                 validate_layout_numbers(shape, *gap, padding)?;
             }
-            ContainerLayout::Grid {
-                columns,
-                column_gap,
-                row_gap,
-                padding,
-                ..
-            } => {
+            ContainerLayout::Grid { columns, column_gap, row_gap, padding, .. } => {
                 if *columns == 0 {
-                    return Err(EngineError::Schema(format!(
-                        "shape {} grid has no columns",
-                        shape.id
-                    )));
+                    return Err(EngineError::Schema(format!("shape {} grid has no columns", shape.id)));
                 }
                 validate_layout_numbers(shape, *column_gap, padding)?;
                 if !row_gap.is_finite() || *row_gap < 0.0 {
-                    return Err(EngineError::Schema(format!(
-                        "shape {} has invalid row gap",
-                        shape.id
-                    )));
+                    return Err(EngineError::Schema(format!("shape {} has invalid row gap", shape.id)));
                 }
             }
         }
@@ -1944,20 +1647,10 @@ fn validate_shape_schema(shape: &ShapeRecord) -> Result<(), EngineError> {
     Ok(())
 }
 
-fn validate_layout_numbers(
-    shape: &ShapeRecord,
-    gap: f64,
-    padding: &crate::Insets,
-) -> Result<(), EngineError> {
-    if ![
-        gap,
-        padding.top,
-        padding.right,
-        padding.bottom,
-        padding.left,
-    ]
-    .into_iter()
-    .all(|value| value.is_finite() && value >= 0.0)
+fn validate_layout_numbers(shape: &ShapeRecord, gap: f64, padding: &crate::Insets) -> Result<(), EngineError> {
+    if ![gap, padding.top, padding.right, padding.bottom, padding.left]
+        .into_iter()
+        .all(|value| value.is_finite() && value >= 0.0)
     {
         return Err(EngineError::Schema(format!(
             "shape {} has invalid layout spacing",
@@ -1978,13 +1671,9 @@ pub fn repair_document(document: &mut Document) -> Result<Vec<Warning>, EngineEr
     let original = document.clone();
     let mut warnings = Vec::new();
     if document.pages.is_empty() {
-        return Err(EngineError::Invariant(
-            "cannot repair a document with no pages".into(),
-        ));
+        return Err(EngineError::Invariant("cannot repair a document with no pages".into()));
     }
-    document
-        .page_ids
-        .retain(|id| document.pages.contains_key(id));
+    document.page_ids.retain(|id| document.pages.contains_key(id));
     document.page_ids.sort();
     document.page_ids.dedup();
     for page_id in document.pages.keys() {
@@ -2084,15 +1773,17 @@ pub fn repair_document(document: &mut Document) -> Result<Vec<Warning>, EngineEr
     for (shape_id, parent) in parents {
         match parent {
             ShapeParent::Layer(layer_id) => {
-                let layer = document.layers.get_mut(&layer_id).ok_or_else(|| {
-                    EngineError::Invariant(format!("repair lost parent layer {layer_id}"))
-                })?;
+                let layer = document
+                    .layers
+                    .get_mut(&layer_id)
+                    .ok_or_else(|| EngineError::Invariant(format!("repair lost parent layer {layer_id}")))?;
                 layer.shape_ids.push(shape_id);
             }
             ShapeParent::Shape(parent_id) => {
-                let shape = document.shapes.get_mut(&parent_id).ok_or_else(|| {
-                    EngineError::Invariant(format!("repair lost parent shape {parent_id}"))
-                })?;
+                let shape = document
+                    .shapes
+                    .get_mut(&parent_id)
+                    .ok_or_else(|| EngineError::Invariant(format!("repair lost parent shape {parent_id}")))?;
                 shape.child_ids.push(shape_id);
             }
         }
@@ -2107,8 +1798,7 @@ pub fn repair_document(document: &mut Document) -> Result<Vec<Warning>, EngineEr
     }
     let before_bindings = document.bindings.len();
     document.bindings.retain(|_, binding| {
-        valid_shapes.contains(&binding.source_shape_id)
-            && valid_shapes.contains(&binding.target_shape_id)
+        valid_shapes.contains(&binding.source_shape_id) && valid_shapes.contains(&binding.target_shape_id)
     });
     if document.bindings.len() != before_bindings {
         warnings.push(warning(
@@ -2225,22 +1915,10 @@ fn query_document(snapshot: &DocumentSnapshot, query: &Query) -> QueryResult {
                 .role
                 .as_ref()
                 .is_none_or(|role| shape.metadata.role.as_ref() == Some(role))
-            && query
-                .tag
-                .as_ref()
-                .is_none_or(|tag| shape.metadata.tags.contains(tag))
-            && query
-                .shape_kind
-                .as_ref()
-                .is_none_or(|kind| shape.kind.as_str() == kind)
-            && query
-                .page_id
-                .as_ref()
-                .is_none_or(|id| page.as_ref() == Some(id))
-            && query
-                .layer_id
-                .as_ref()
-                .is_none_or(|id| layer.as_ref() == Some(id))
+            && query.tag.as_ref().is_none_or(|tag| shape.metadata.tags.contains(tag))
+            && query.shape_kind.as_ref().is_none_or(|kind| shape.kind.as_str() == kind)
+            && query.page_id.as_ref().is_none_or(|id| page.as_ref() == Some(id))
+            && query.layer_id.as_ref().is_none_or(|id| layer.as_ref() == Some(id))
             && query.parent_id.as_ref().is_none_or(|id| parent == id)
             && query
                 .bounds
@@ -2278,11 +1956,7 @@ fn query_document(snapshot: &DocumentSnapshot, query: &Query) -> QueryResult {
         }
     }
     records.sort_by(record_id_order);
-    QueryResult {
-        heads: snapshot.heads.clone(),
-        records,
-        bounds,
-    }
+    QueryResult { heads: snapshot.heads.clone(), records, bounds }
 }
 
 fn matches_common(query: &Query, id: &str, name: Option<&String>) -> bool {
@@ -2358,22 +2032,11 @@ fn diff_documents(before: &Document, after: &Document) -> (DocumentPatch, Vec<Re
         .cloned()
         .collect::<Vec<_>>();
     affected.sort_by(record_id_order);
-    (
-        DocumentPatch {
-            created,
-            changed,
-            deleted,
-        },
-        affected,
-    )
+    (DocumentPatch { created, changed, deleted }, affected)
 }
 
 fn diff_map<K, V, F>(
-    before: &BTreeMap<K, V>,
-    after: &BTreeMap<K, V>,
-    wrap: F,
-    created: &mut Vec<RecordId>,
-    changed: &mut Vec<RecordId>,
+    before: &BTreeMap<K, V>, after: &BTreeMap<K, V>, wrap: F, created: &mut Vec<RecordId>, changed: &mut Vec<RecordId>,
     deleted: &mut Vec<RecordId>,
 ) where
     K: Ord + Clone,
@@ -2404,9 +2067,7 @@ fn affected_regions(before: &Document, after: &Document, ids: &[RecordId]) -> Ve
                 let Some(shape) = document.shapes.get(&shape_id) else {
                     continue;
                 };
-                let Some(page_id) =
-                    containing_layer(document, shape).map(|layer| layer.page_id.clone())
-                else {
+                let Some(page_id) = containing_layer(document, shape).map(|layer| layer.page_id.clone()) else {
                     continue;
                 };
                 let bounds = world_shape_bounds(document, &shape_id);
@@ -2443,12 +2104,7 @@ fn visual_shape_ids(document: &Document, id: &RecordId) -> BTreeSet<ShapeId> {
             .bindings
             .get(binding_id)
             .into_iter()
-            .flat_map(|binding| {
-                [
-                    binding.source_shape_id.clone(),
-                    binding.target_shape_id.clone(),
-                ]
-            })
+            .flat_map(|binding| [binding.source_shape_id.clone(), binding.target_shape_id.clone()])
             .collect(),
         RecordId::Asset(_) => BTreeSet::new(),
     }
@@ -2462,12 +2118,7 @@ fn local_shape_bounds(shape: &ShapeRecord) -> Bounds {
 
 fn world_shape_bounds(document: &Document, shape_id: &ShapeId) -> Bounds {
     let Some(shape) = document.shapes.get(shape_id) else {
-        return Bounds {
-            x: 0.0,
-            y: 0.0,
-            width: 0.0,
-            height: 0.0,
-        };
+        return Bounds { x: 0.0, y: 0.0, width: 0.0, height: 0.0 };
     };
     let mut bounds = local_shape_bounds(shape);
     let mut parent = shape.parent.clone();
@@ -2497,12 +2148,7 @@ fn transformed_bounds(width: f64, height: f64, transform: crate::Transform) -> B
     let max_x = points.iter().map(|p| p.0).fold(f64::NEG_INFINITY, f64::max);
     let min_y = points.iter().map(|p| p.1).fold(f64::INFINITY, f64::min);
     let max_y = points.iter().map(|p| p.1).fold(f64::NEG_INFINITY, f64::max);
-    Bounds {
-        x: min_x,
-        y: min_y,
-        width: max_x - min_x,
-        height: max_y - min_y,
-    }
+    Bounds { x: min_x, y: min_y, width: max_x - min_x, height: max_y - min_y }
 }
 
 fn numeric_property(shape: &ShapeRecord, name: &str) -> Option<f64> {
@@ -2513,8 +2159,7 @@ fn numeric_property(shape: &ShapeRecord, name: &str) -> Option<f64> {
         .filter(|value| value.is_finite())
 }
 fn count_as_f64(count: usize) -> Result<f64, EngineError> {
-    let count = u32::try_from(count)
-        .map_err(|_| EngineError::Invariant("layout selection is too large".into()))?;
+    let count = u32::try_from(count).map_err(|_| EngineError::Invariant("layout selection is too large".into()))?;
     Ok(f64::from(count))
 }
 fn center_x(bounds: &Bounds) -> f64 {
@@ -2546,20 +2191,14 @@ fn union(left: Bounds, right_bounds: Bounds) -> Bounds {
     }
 }
 
-fn ensure_unique_and_complete<'a, I>(
-    listed: &[I::Item],
-    keys: I,
-    name: &str,
-) -> Result<(), EngineError>
+fn ensure_unique_and_complete<'a, I>(listed: &[I::Item], keys: I, name: &str) -> Result<(), EngineError>
 where
     I: Iterator,
     I::Item: Ord + Clone + std::fmt::Display + 'a,
 {
     let listed_set: BTreeSet<_> = listed.iter().cloned().collect();
     if listed_set.len() != listed.len() {
-        return Err(EngineError::Invariant(format!(
-            "duplicate {name} ordering entry"
-        )));
+        return Err(EngineError::Invariant(format!("duplicate {name} ordering entry")));
     }
     let keys_set: BTreeSet<_> = keys.collect();
     if listed_set != keys_set {
@@ -2571,10 +2210,7 @@ where
 }
 
 fn validate_child(
-    document: &Document,
-    seen: &mut BTreeSet<ShapeId>,
-    child_id: &ShapeId,
-    expected_parent: &ShapeParent,
+    document: &Document, seen: &mut BTreeSet<ShapeId>, child_id: &ShapeId, expected_parent: &ShapeParent,
 ) -> Result<(), EngineError> {
     if !seen.insert(child_id.clone()) {
         return Err(EngineError::Invariant(format!(
@@ -2610,10 +2246,7 @@ fn ensure_acyclic(document: &Document, start: &ShapeId) -> Result<(), EngineErro
     Ok(())
 }
 
-fn ensure_binding_endpoints(
-    document: &Document,
-    binding: &crate::BindingRecord,
-) -> Result<(), EngineError> {
+fn ensure_binding_endpoints(document: &Document, binding: &crate::BindingRecord) -> Result<(), EngineError> {
     if !document.shapes.contains_key(&binding.source_shape_id)
         || !document.shapes.contains_key(&binding.target_shape_id)
     {
@@ -2625,26 +2258,14 @@ fn ensure_binding_endpoints(
     Ok(())
 }
 
-fn ensure_absent<Id: std::fmt::Display>(
-    exists: bool,
-    name: &str,
-    id: &Id,
-) -> Result<(), EngineError> {
-    if exists {
-        Err(EngineError::Precondition(format!(
-            "{name} {id} already exists"
-        )))
-    } else {
-        Ok(())
-    }
+fn ensure_absent<Id: std::fmt::Display>(exists: bool, name: &str, id: &Id) -> Result<(), EngineError> {
+    if exists { Err(EngineError::Precondition(format!("{name} {id} already exists"))) } else { Ok(()) }
 }
 fn ensure_version_one(version: RecordVersion, context: &str) -> Result<(), EngineError> {
     if version == RecordVersion(1) {
         Ok(())
     } else {
-        Err(EngineError::Schema(format!(
-            "{context} must start at record version 1"
-        )))
+        Err(EngineError::Schema(format!("{context} must start at record version 1")))
     }
 }
 fn next_version(version: RecordVersion) -> Result<RecordVersion, EngineError> {
@@ -2654,24 +2275,16 @@ fn next_version(version: RecordVersion) -> Result<RecordVersion, EngineError> {
         .map(RecordVersion)
         .ok_or_else(|| EngineError::Invariant("record version overflow".into()))
 }
-fn check_version(
-    actual: RecordVersion,
-    expected: Option<RecordVersion>,
-    name: &str,
-) -> Result<(), EngineError> {
+fn check_version(actual: RecordVersion, expected: Option<RecordVersion>, name: &str) -> Result<(), EngineError> {
     if expected.is_some_and(|value| value != actual) {
-        Err(EngineError::Precondition(format!(
-            "{name} version is stale"
-        )))
+        Err(EngineError::Precondition(format!("{name} version is stale")))
     } else {
         Ok(())
     }
 }
 
 fn page<'a>(
-    document: &'a Document,
-    id: &PageId,
-    expected: Option<RecordVersion>,
+    document: &'a Document, id: &PageId, expected: Option<RecordVersion>,
 ) -> Result<&'a crate::PageRecord, EngineError> {
     let value = document
         .pages
@@ -2681,9 +2294,7 @@ fn page<'a>(
     Ok(value)
 }
 fn page_mut<'a>(
-    document: &'a mut Document,
-    id: &PageId,
-    expected: Option<RecordVersion>,
+    document: &'a mut Document, id: &PageId, expected: Option<RecordVersion>,
 ) -> Result<&'a mut crate::PageRecord, EngineError> {
     let value = document
         .pages
@@ -2693,9 +2304,7 @@ fn page_mut<'a>(
     Ok(value)
 }
 fn layer<'a>(
-    document: &'a Document,
-    id: &LayerId,
-    expected: Option<RecordVersion>,
+    document: &'a Document, id: &LayerId, expected: Option<RecordVersion>,
 ) -> Result<&'a crate::LayerRecord, EngineError> {
     let value = document
         .layers
@@ -2705,9 +2314,7 @@ fn layer<'a>(
     Ok(value)
 }
 fn layer_mut<'a>(
-    document: &'a mut Document,
-    id: &LayerId,
-    expected: Option<RecordVersion>,
+    document: &'a mut Document, id: &LayerId, expected: Option<RecordVersion>,
 ) -> Result<&'a mut crate::LayerRecord, EngineError> {
     let value = document
         .layers
@@ -2717,9 +2324,7 @@ fn layer_mut<'a>(
     Ok(value)
 }
 fn shape<'a>(
-    document: &'a Document,
-    id: &ShapeId,
-    expected: Option<RecordVersion>,
+    document: &'a Document, id: &ShapeId, expected: Option<RecordVersion>,
 ) -> Result<&'a ShapeRecord, EngineError> {
     let value = document
         .shapes
@@ -2729,9 +2334,7 @@ fn shape<'a>(
     Ok(value)
 }
 fn shape_mut<'a>(
-    document: &'a mut Document,
-    id: &ShapeId,
-    expected: Option<RecordVersion>,
+    document: &'a mut Document, id: &ShapeId, expected: Option<RecordVersion>,
 ) -> Result<&'a mut ShapeRecord, EngineError> {
     let value = document
         .shapes
@@ -2741,9 +2344,7 @@ fn shape_mut<'a>(
     Ok(value)
 }
 fn binding<'a>(
-    document: &'a Document,
-    id: &BindingId,
-    expected: Option<RecordVersion>,
+    document: &'a Document, id: &BindingId, expected: Option<RecordVersion>,
 ) -> Result<&'a crate::BindingRecord, EngineError> {
     let value = document
         .bindings
@@ -2753,9 +2354,7 @@ fn binding<'a>(
     Ok(value)
 }
 fn asset<'a>(
-    document: &'a Document,
-    id: &AssetId,
-    expected: Option<RecordVersion>,
+    document: &'a Document, id: &AssetId, expected: Option<RecordVersion>,
 ) -> Result<&'a crate::AssetRecord, EngineError> {
     let value = document
         .assets
@@ -2765,9 +2364,7 @@ fn asset<'a>(
     Ok(value)
 }
 fn asset_mut<'a>(
-    document: &'a mut Document,
-    id: &AssetId,
-    expected: Option<RecordVersion>,
+    document: &'a mut Document, id: &AssetId, expected: Option<RecordVersion>,
 ) -> Result<&'a mut crate::AssetRecord, EngineError> {
     let value = document
         .assets
@@ -2778,23 +2375,17 @@ fn asset_mut<'a>(
 }
 
 fn insert_anchored<Id: Clone + Eq + std::fmt::Display>(
-    items: &mut Vec<Id>,
-    id: Id,
-    anchor: &SiblingAnchor<Id>,
+    items: &mut Vec<Id>, id: Id, anchor: &SiblingAnchor<Id>,
 ) -> Result<(), EngineError> {
     if items.contains(&id) {
-        return Err(EngineError::Precondition(format!(
-            "ordered item {id} already exists"
-        )));
+        return Err(EngineError::Precondition(format!("ordered item {id} already exists")));
     }
     let index = anchor_index(items, anchor)?;
     items.insert(index, id);
     Ok(())
 }
 fn move_anchored<Id: Clone + Eq + std::fmt::Display>(
-    items: &mut Vec<Id>,
-    id: &Id,
-    anchor: &SiblingAnchor<Id>,
+    items: &mut Vec<Id>, id: &Id, anchor: &SiblingAnchor<Id>,
 ) -> Result<(), EngineError> {
     let position = items
         .iter()
@@ -2805,10 +2396,7 @@ fn move_anchored<Id: Clone + Eq + std::fmt::Display>(
     items.insert(index, item);
     Ok(())
 }
-fn anchor_index<Id: Eq + std::fmt::Display>(
-    items: &[Id],
-    anchor: &SiblingAnchor<Id>,
-) -> Result<usize, EngineError> {
+fn anchor_index<Id: Eq + std::fmt::Display>(items: &[Id], anchor: &SiblingAnchor<Id>) -> Result<usize, EngineError> {
     match anchor {
         SiblingAnchor::First => Ok(0),
         SiblingAnchor::Last => Ok(items.len()),
@@ -2823,25 +2411,15 @@ fn anchor_index<Id: Eq + std::fmt::Display>(
             .ok_or_else(|| EngineError::Precondition(format!("anchor sibling {id} is missing"))),
     }
 }
-fn anchor_for<Id: Clone + Eq + std::fmt::Display>(
-    items: &[Id],
-    id: &Id,
-) -> Result<SiblingAnchor<Id>, EngineError> {
+fn anchor_for<Id: Clone + Eq + std::fmt::Display>(items: &[Id], id: &Id) -> Result<SiblingAnchor<Id>, EngineError> {
     let index = items
         .iter()
         .position(|item| item == id)
         .ok_or_else(|| EngineError::Invariant(format!("ordered item {id} is missing")))?;
-    Ok(if index == 0 {
-        SiblingAnchor::First
-    } else {
-        SiblingAnchor::After(items[index - 1].clone())
-    })
+    Ok(if index == 0 { SiblingAnchor::First } else { SiblingAnchor::After(items[index - 1].clone()) })
 }
 
-fn shape_siblings<'a>(
-    document: &'a Document,
-    parent: &ShapeParent,
-) -> Result<&'a Vec<ShapeId>, EngineError> {
+fn shape_siblings<'a>(document: &'a Document, parent: &ShapeParent) -> Result<&'a Vec<ShapeId>, EngineError> {
     match parent {
         ShapeParent::Layer(id) => document
             .layers
@@ -2856,46 +2434,43 @@ fn shape_siblings<'a>(
     }
 }
 fn insert_shape_child(
-    document: &mut Document,
-    parent: &ShapeParent,
-    id: ShapeId,
-    anchor: &SiblingAnchor<ShapeId>,
+    document: &mut Document, parent: &ShapeParent, id: ShapeId, anchor: &SiblingAnchor<ShapeId>,
 ) -> Result<(), EngineError> {
     match parent {
         ShapeParent::Layer(parent_id) => {
-            let layer = document.layers.get_mut(parent_id).ok_or_else(|| {
-                EngineError::Precondition(format!("parent layer {parent_id} is missing"))
-            })?;
+            let layer = document
+                .layers
+                .get_mut(parent_id)
+                .ok_or_else(|| EngineError::Precondition(format!("parent layer {parent_id} is missing")))?;
             insert_anchored(&mut layer.shape_ids, id, anchor)?;
             layer.version = next_version(layer.version)?;
         }
         ShapeParent::Shape(parent_id) => {
-            let shape = document.shapes.get_mut(parent_id).ok_or_else(|| {
-                EngineError::Precondition(format!("parent shape {parent_id} is missing"))
-            })?;
+            let shape = document
+                .shapes
+                .get_mut(parent_id)
+                .ok_or_else(|| EngineError::Precondition(format!("parent shape {parent_id} is missing")))?;
             insert_anchored(&mut shape.child_ids, id, anchor)?;
             shape.version = next_version(shape.version)?;
         }
     }
     Ok(())
 }
-fn remove_shape_child(
-    document: &mut Document,
-    parent: &ShapeParent,
-    id: &ShapeId,
-) -> Result<(), EngineError> {
+fn remove_shape_child(document: &mut Document, parent: &ShapeParent, id: &ShapeId) -> Result<(), EngineError> {
     match parent {
         ShapeParent::Layer(parent_id) => {
-            let layer = document.layers.get_mut(parent_id).ok_or_else(|| {
-                EngineError::Invariant(format!("parent layer {parent_id} is missing"))
-            })?;
+            let layer = document
+                .layers
+                .get_mut(parent_id)
+                .ok_or_else(|| EngineError::Invariant(format!("parent layer {parent_id} is missing")))?;
             layer.shape_ids.retain(|child| child != id);
             layer.version = next_version(layer.version)?;
         }
         ShapeParent::Shape(parent_id) => {
-            let shape = document.shapes.get_mut(parent_id).ok_or_else(|| {
-                EngineError::Invariant(format!("parent shape {parent_id} is missing"))
-            })?;
+            let shape = document
+                .shapes
+                .get_mut(parent_id)
+                .ok_or_else(|| EngineError::Invariant(format!("parent shape {parent_id} is missing")))?;
             shape.child_ids.retain(|child| child != id);
             shape.version = next_version(shape.version)?;
         }
@@ -2903,10 +2478,7 @@ fn remove_shape_child(
     Ok(())
 }
 
-fn containing_layer<'a>(
-    document: &'a Document,
-    shape: &ShapeRecord,
-) -> Option<&'a crate::LayerRecord> {
+fn containing_layer<'a>(document: &'a Document, shape: &ShapeRecord) -> Option<&'a crate::LayerRecord> {
     let mut parent = shape.parent.clone();
     loop {
         match parent {
@@ -2932,10 +2504,7 @@ fn is_descendant(document: &Document, shape_id: &ShapeId, parent: &ShapeParent) 
         }
     }
 }
-fn descendant_ids_for_layer<'a>(
-    document: &'a Document,
-    layer_id: &'a LayerId,
-) -> impl Iterator<Item = ShapeId> + 'a {
+fn descendant_ids_for_layer<'a>(document: &'a Document, layer_id: &'a LayerId) -> impl Iterator<Item = ShapeId> + 'a {
     document
         .layers
         .get(layer_id)
@@ -2944,8 +2513,7 @@ fn descendant_ids_for_layer<'a>(
         .flat_map(|id| std::iter::once(id.clone()).chain(descendant_ids_for_shape(document, id)))
 }
 fn descendant_ids_for_shape<'a>(
-    document: &'a Document,
-    shape_id: &'a ShapeId,
+    document: &'a Document, shape_id: &'a ShapeId,
 ) -> Box<dyn Iterator<Item = ShapeId> + 'a> {
     Box::new(
         document
@@ -2953,18 +2521,14 @@ fn descendant_ids_for_shape<'a>(
             .get(shape_id)
             .into_iter()
             .flat_map(|shape| shape.child_ids.iter())
-            .flat_map(|id| {
-                std::iter::once(id.clone()).chain(descendant_ids_for_shape(document, id))
-            }),
+            .flat_map(|id| std::iter::once(id.clone()).chain(descendant_ids_for_shape(document, id))),
     )
 }
 fn bindings_touching(document: &Document, shapes: &BTreeSet<ShapeId>) -> Vec<BindingId> {
     document
         .bindings
         .values()
-        .filter(|binding| {
-            shapes.contains(&binding.source_shape_id) || shapes.contains(&binding.target_shape_id)
-        })
+        .filter(|binding| shapes.contains(&binding.source_shape_id) || shapes.contains(&binding.target_shape_id))
         .map(|binding| binding.id.clone())
         .collect()
 }
@@ -2982,12 +2546,8 @@ fn operation_shape_ids(operation: &Operation) -> Vec<ShapeId> {
         Operation::PatchShape { shape_id, .. }
         | Operation::ReparentShape { shape_id, .. }
         | Operation::DeleteShape { shape_id, .. } => vec![shape_id.clone()],
-        Operation::CreateBinding { binding } => vec![
-            binding.source_shape_id.clone(),
-            binding.target_shape_id.clone(),
-        ],
-        Operation::AlignShapes { shape_ids, .. }
-        | Operation::DistributeShapes { shape_ids, .. } => shape_ids.clone(),
+        Operation::CreateBinding { binding } => vec![binding.source_shape_id.clone(), binding.target_shape_id.clone()],
+        Operation::AlignShapes { shape_ids, .. } | Operation::DistributeShapes { shape_ids, .. } => shape_ids.clone(),
         _ => Vec::new(),
     }
 }
@@ -3000,10 +2560,7 @@ fn operation_layer_id(operation: &Operation) -> Option<LayerId> {
             ShapeParent::Layer(id) => Some(id.clone()),
             ShapeParent::Shape(_) => None,
         },
-        Operation::ReparentShape {
-            parent: ShapeParent::Layer(id),
-            ..
-        } => Some(id.clone()),
+        Operation::ReparentShape { parent: ShapeParent::Layer(id), .. } => Some(id.clone()),
         _ => None,
     }
 }
@@ -3011,11 +2568,7 @@ fn canonical_heads(heads: &[ChangeHash]) -> BTreeSet<ChangeHash> {
     heads.iter().cloned().collect()
 }
 fn warning(code: &str, message: String, record_ids: Vec<RecordId>) -> Warning {
-    Warning {
-        code: code.into(),
-        message,
-        record_ids,
-    }
+    Warning { code: code.into(), message, record_ids }
 }
 
 #[cfg(test)]

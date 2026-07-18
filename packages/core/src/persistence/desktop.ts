@@ -19,7 +19,10 @@ export type DirectoryEntry = { path: string; name: string; isDir: boolean };
 
 /**
  * Desktop-specific operations interface.
- * Implementation lives in apps/desktop using @tauri-apps/plugin-* APIs.
+ *
+ * Document contents are intentionally absent. The Rust session service owns
+ * all document reads and writes; this interface is limited to dialogs,
+ * metadata, and workspace navigation needed by the shared frontend.
  */
 export interface DesktopFileOps {
   /**
@@ -31,16 +34,6 @@ export interface DesktopFileOps {
    * Show save dialog and return selected file path
    */
   showSaveDialog(defaultName?: string): Promise<string | null>;
-
-  /**
-   * Read a file from disk
-   */
-  readFile(path: string): Promise<string>;
-
-  /**
-   * Write a file to disk
-   */
-  writeFile(path: string, content: string): Promise<void>;
 
   /**
    * Get recent files list

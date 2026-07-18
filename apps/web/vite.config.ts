@@ -7,8 +7,11 @@ export default defineConfig({
   plugins: [sveltekit(), devtoolsJson()],
   resolve: {
     alias: {
+      "@inkfinite/bindings": new URL("../../packages/bindings/src/index.ts", import.meta.url).pathname,
       "@inkfinite/core": new URL("../../packages/core/src/index.ts", import.meta.url).pathname,
       "@inkfinite/renderer": new URL("../../packages/renderer/src/index.ts", import.meta.url).pathname,
+      "@inkfinite/ui/styles.css": new URL("../../packages/ui/src/lib/styles/index.css", import.meta.url).pathname,
+      "@inkfinite/ui": new URL("../../packages/ui/src/lib/index.ts", import.meta.url).pathname,
     },
   },
   test: {

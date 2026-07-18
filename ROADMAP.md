@@ -37,12 +37,11 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
 - The pnpm monorepo contains a TypeScript core, Canvas 2D renderer, SvelteKit web
   UI, and Tauri 2 wrapper.
 - `@inkfinite/ui` provides shared Svelte components, theme tokens, fonts, and
-  icons for the browser and the Tauri-hosted frontend. Application-specific
-  components still live under `apps/web` and must move to the package as their
-  dependencies are separated.
+  icons for the browser and the Tauri-hosted frontend. `apps/web` imports the
+  shared stylesheet once and uses shared controls in its desktop vertical slice.
 - TypeScript currently owns a flat page/shape model, snapshot undo/redo, tools,
-  and persistence. Web documents use Dexie; desktop persistence is called from
-  the frontend. The Rust backend only exposes file-management helpers.
+  and browser persistence. Web documents use Dexie; desktop documents use a
+  thin adapter over Rust-owned sessions and typed Tauri commands.
 - `createCanvasController` combines tools, persistence, overlays, rendering, and
   input. The renderer walks every shape on the page and resizes its backing
   canvas on each draw.
@@ -172,6 +171,15 @@ canonical Automerge files through same-directory temporary files, flushes before
 replacement, holds advisory locks, and retains bounded recovery snapshots plus
 encoded change journals across failed writes. JSON export is deterministic and
 history-free, as documented in [docs/v2-file-format.md](docs/v2-file-format.md).
+
+V2-08 completed on July 17, 2026. `inkfinite-core::session::SessionService`
+owns desktop paths, Automerge state, materialized snapshots, actor-scoped
+undo/redo, dirty state, advisory locks, recovery visibility, and an explicit
+disabled sync state. Tauri exposes typed create/open/snapshot/commit/history/
+save/query/validate/close commands, while `apps/web` keeps an in-memory editing
+mirror and a thin metadata/dialog adapter. Desktop document bytes no longer
+cross the frontend file APIs. Recovery and failure-path tests cover stale heads,
+failed validation, interrupted writes, and save-as path replacement.
 
 One Inkfinite transaction maps to one Automerge change. Causal heads, rather
 than a scalar revision, are the concurrency token. A local sequence number may

@@ -231,19 +231,19 @@ Blocked by: V2-05, V2-06, V2-07
 
 Acceptance criteria:
 
-- [ ] Sessions track path, CRDT state, materialized snapshot, actor undo/redo,
+- [x] Sessions track path, CRDT state, materialized snapshot, actor undo/redo,
       dirty state, locks, recovery, and sync state.
-- [ ] Create/open/snapshot/commit/undo/redo/save/save-as/query/validate/close
+- [x] Create/open/snapshot/commit/undo/redo/save/save-as/query/validate/close
       commands call shared crates and return typed errors and patches.
-- [ ] File I/O leaves the frontend and plugin capabilities are reduced to the
+- [x] File I/O leaves the frontend and plugin capabilities are reduced to the
       minimum still required.
-- [ ] `apps/web` imports `@inkfinite/ui/styles.css` once and uses shared package
+- [x] `apps/web` imports `@inkfinite/ui/styles.css` once and uses shared package
       components for the desktop vertical slice instead of adding new local
       copies under `apps/web/src/lib/components`.
-- [ ] `apps/desktop` builds and packages the same `apps/web` frontend. Desktop-only
+- [x] `apps/desktop` builds and packages the same `apps/web` frontend. Desktop-only
       behavior stays in Tauri commands or thin adapters, while components,
       themes, fonts, and icons come from `@inkfinite/ui`.
-- [ ] Integration tests cover open, edit, save, reopen, undo, failed validation,
+- [x] Integration tests cover open, edit, save, reopen, undo, failed validation,
       stale heads, and a simulated write failure.
 
 Verification:

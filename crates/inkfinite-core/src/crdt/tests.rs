@@ -23,9 +23,7 @@ fn nested_properties_heads_actor_save_load_and_compaction_round_trip() {
     properties.insert("nested".into(), json!({"items": [1, 2], "text": "hello"}));
     let mut nested_shape = crate_test_shape(0);
     nested_shape.properties = properties.clone();
-    document
-        .shapes
-        .insert(nested_shape.id.clone(), nested_shape);
+    document.shapes.insert(nested_shape.id.clone(), nested_shape);
     let mut crdt = AutomergeDocument::create(
         DocumentId::from("document:test"),
         ActorId::from("actor:a"),
@@ -90,10 +88,9 @@ fn changes_and_transport_independent_sync_converge() {
 fn ten_thousand_shape_projection_round_trips() {
     let mut document = empty_document();
     for index in 0_u32..10_000 {
-        document.shapes.insert(
-            ShapeId::new(format!("shape:{index:05}")),
-            crate_test_shape(index),
-        );
+        document
+            .shapes
+            .insert(ShapeId::new(format!("shape:{index:05}")), crate_test_shape(index));
     }
     let mut crdt = AutomergeDocument::create(
         DocumentId::from("document:large"),
@@ -108,28 +105,22 @@ fn ten_thousand_shape_projection_round_trips() {
 
 fn crate_test_shape(index: u32) -> crate::ShapeRecord {
     use crate::{
-        LayerId, Opacity, Origin, Provenance, RecordVersion, SemanticMetadata, ShapeKind,
-        ShapeParent, ShapeStyle, Timestamp, Transform, Vec2,
+        LayerId, Opacity, Origin, Provenance, RecordVersion, SemanticMetadata, ShapeKind, ShapeParent, ShapeStyle,
+        Timestamp, Transform, Vec2,
     };
     crate::ShapeRecord {
         id: ShapeId::new(format!("shape:{index:05}")),
         kind: ShapeKind::from("rect"),
         parent: ShapeParent::Layer(LayerId::from("layer:one")),
         transform: Transform {
-            translation: Vec2 {
-                x: f64::from(index),
-                y: 0.0,
-            },
+            translation: Vec2 { x: f64::from(index), y: 0.0 },
             rotation: 0.0,
             scale_x: 1.0,
             scale_y: 1.0,
         },
         child_ids: Vec::new(),
         layout: None,
-        properties: BTreeMap::from([
-            ("width".into(), json!(10.0)),
-            ("height".into(), json!(10.0)),
-        ]),
+        properties: BTreeMap::from([("width".into(), json!(10.0)), ("height".into(), json!(10.0))]),
         metadata: SemanticMetadata {
             name: None,
             role: None,
@@ -144,11 +135,7 @@ fn crate_test_shape(index: u32) -> crate::ShapeRecord {
                 source: None,
             },
         },
-        style: ShapeStyle {
-            opacity: Opacity::OPAQUE,
-            fill_opacity: None,
-            stroke_opacity: None,
-        },
+        style: ShapeStyle { opacity: Opacity::OPAQUE, fill_opacity: None, stroke_opacity: None },
         version: RecordVersion(1),
     }
 }

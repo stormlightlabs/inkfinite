@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { load } from "@tauri-apps/plugin-store";
 import type { DesktopFileOps, DirectoryEntry, FileHandle } from "@inkfinite/core";
 
@@ -30,7 +29,7 @@ export function createDesktopFileOps(): DesktopFileOps {
     const result = await open({
       multiple: false,
       directory: false,
-      filters: [{ name: "Inkfinite Files", extensions: ["inkfinite.json", "json"] }],
+      filters: [{ name: "Inkfinite Files", extensions: ["inkfinite", "inkfinite.json", "json"] }],
     });
 
     return result;
@@ -39,18 +38,10 @@ export function createDesktopFileOps(): DesktopFileOps {
   async function showSaveDialog(defaultName?: string): Promise<string | null> {
     const result = await save({
       defaultPath: defaultName || "Untitled.inkfinite.json",
-      filters: [{ name: "Inkfinite Files", extensions: ["inkfinite.json"] }],
+      filters: [{ name: "Inkfinite Files", extensions: ["inkfinite", "inkfinite.json"] }],
     });
 
     return result;
-  }
-
-  async function readFile(path: string): Promise<string> {
-    return readTextFile(path);
-  }
-
-  async function writeFile(path: string, content: string): Promise<void> {
-    await writeTextFile(path, content);
   }
 
   async function getRecentFiles(): Promise<FileHandle[]> {
@@ -119,8 +110,6 @@ export function createDesktopFileOps(): DesktopFileOps {
   return {
     showOpenDialog,
     showSaveDialog,
-    readFile,
-    writeFile,
     getRecentFiles,
     addRecentFile,
     removeRecentFile,

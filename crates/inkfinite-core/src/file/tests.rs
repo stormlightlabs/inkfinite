@@ -6,15 +6,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crate::engine::TransactionDraft;
 use crate::proto::{Operation, TransactionId};
 use crate::{
-    ActorId, Document, DocumentId, LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord,
-    RecordVersion, Timestamp,
+    ActorId, Document, DocumentId, LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord, RecordVersion, Timestamp,
 };
 use serde_json::Value;
 
-use super::{
-    DocumentFile, FileError, PersistenceOptions, export_snapshot_json, import_v1_file,
-    import_v1_json,
-};
+use super::{DocumentFile, FileError, PersistenceOptions, export_snapshot_json, import_v1_file, import_v1_json};
 
 static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -32,11 +28,7 @@ fn imports_all_valid_v1_features_into_normalized_v2_records() {
         .map(|id| id.as_str().expect("page ID"))
         .collect::<Vec<_>>();
     assert_eq!(
-        document
-            .page_ids
-            .iter()
-            .map(crate::PageId::as_str)
-            .collect::<Vec<_>>(),
+        document.page_ids.iter().map(crate::PageId::as_str).collect::<Vec<_>>(),
         expected_page_ids
     );
     assert_eq!(document.pages.len(), 2);
@@ -55,11 +47,7 @@ fn imports_all_valid_v1_features_into_normalized_v2_records() {
         assert_eq!(flattened, expected);
     }
 
-    assert!(
-        document
-            .shapes
-            .contains_key(&"shape:stencil-process".into())
-    );
+    assert!(document.shapes.contains_key(&"shape:stencil-process".into()));
     assert!(document.shapes.contains_key(&"shape:arrow".into()));
     assert!(document.shapes.contains_key(&"shape:markdown".into()));
     assert_eq!(document.shapes.len(), 16);
@@ -84,10 +72,7 @@ fn imports_all_valid_v1_features_into_normalized_v2_records() {
     let card_group = &document.shapes[&"group:card".into()];
     assert_eq!(
         card_group.child_ids,
-        vec![
-            "shape:stencil-card".into(),
-            "shape:stencil-card-divider".into()
-        ]
+        vec!["shape:stencil-card".into(), "shape:stencil-card-divider".into()]
     );
     assert!(matches!(
         document.bindings[&"binding:arrow-start".into()].anchor,
@@ -107,19 +92,14 @@ fn imports_web_and_performance_v1_fixtures() {
     assert_eq!(imported.document.layers.len(), 2);
     assert_eq!(imported.document.shapes.len(), 16);
 
-    let performance =
-        include_str!("../../../../fixtures/v1/performance/board-10000.inkfinite.json");
-    let imported = import_v1_json(performance, ActorId::from("actor:performance"))
-        .expect("large fixture imports");
+    let performance = include_str!("../../../../fixtures/v1/performance/board-10000.inkfinite.json");
+    let imported = import_v1_json(performance, ActorId::from("actor:performance")).expect("large fixture imports");
     assert_eq!(imported.document.page_ids, vec![PageId::from("page:10000")]);
     assert_eq!(imported.document.shapes.len(), 10_000);
     let page = &imported.document.pages[&PageId::from("page:10000")];
     let layer = &imported.document.layers[&page.layer_ids[0]];
     assert_eq!(layer.shape_ids.len(), 10_000);
-    assert_eq!(
-        flatten_shape_order(&imported.document, &layer.shape_ids).len(),
-        10_000
-    );
+    assert_eq!(flatten_shape_order(&imported.document, &layer.shape_ids).len(), 10_000);
 }
 
 #[test]
@@ -141,10 +121,7 @@ fn rejects_invalid_and_newer_inputs_before_persistence() {
         );
     }
     assert!(matches!(
-        import_v1_json(
-            r#"{"format":"inkfinite.document","format_version":3}"#,
-            actor.clone()
-        ),
+        import_v1_json(r#"{"format":"inkfinite.document","format_version":3}"#, actor.clone()),
         Err(FileError::UnsupportedFormat { version: 3, .. })
     ));
 
@@ -159,10 +136,7 @@ fn rejects_invalid_and_newer_inputs_before_persistence() {
     fs::write(&destination, b"keep this file").expect("write destination");
     let result = import_v1_file(&source, &destination, actor);
     assert!(matches!(result, Err(FileError::InvalidV1(_))));
-    assert_eq!(
-        fs::read(&destination).expect("read destination"),
-        b"keep this file"
-    );
+    assert_eq!(fs::read(&destination).expect("read destination"), b"keep this file");
 }
 
 #[test]
@@ -186,9 +160,7 @@ fn canonical_sessions_lock_save_reopen_and_export_deterministically() {
     let first_json = session.export_json().expect("export JSON");
     assert_eq!(first_json, session.export_json().expect("repeat export"));
     assert!(first_json.contains("\"format\": \"inkfinite.document\""));
-    session
-        .export_json_to(&snapshot_json)
-        .expect("write snapshot JSON");
+    session.export_json_to(&snapshot_json).expect("write snapshot JSON");
     assert!(matches!(
         session.export_json_to(&canonical),
         Err(FileError::SamePath { .. })
@@ -202,17 +174,12 @@ fn canonical_sessions_lock_save_reopen_and_export_deterministically() {
     let canonical_bytes = fs::read(&canonical).expect("canonical bytes");
     assert!(serde_json::from_slice::<Value>(&canonical_bytes).is_err());
     let exported: crate::DocumentSnapshot =
-        serde_json::from_str(&fs::read_to_string(&snapshot_json).expect("snapshot JSON"))
-            .expect("snapshot parses");
+        serde_json::from_str(&fs::read_to_string(&snapshot_json).expect("snapshot JSON")).expect("snapshot parses");
     assert_eq!(exported.document, expected_document);
 
-    let mut reopened =
-        DocumentFile::open_with_options(&canonical, ActorId::from("actor:reopen"), options)
-            .expect("reopen canonical document");
-    assert_eq!(
-        reopened.snapshot().expect("snapshot").document,
-        expected_document
-    );
+    let mut reopened = DocumentFile::open_with_options(&canonical, ActorId::from("actor:reopen"), options)
+        .expect("reopen canonical document");
+    assert_eq!(reopened.snapshot().expect("snapshot").document, expected_document);
     assert_eq!(
         export_snapshot_json(&reopened.snapshot().expect("snapshot")).expect("export"),
         first_json
@@ -262,27 +229,17 @@ fn recovery_restores_journal_after_canonical_replace_failure() {
     assert!(matches!(result, Err(FileError::Io { .. })));
     assert!(recovery_path.exists());
     let recovery: Value =
-        serde_json::from_slice(&fs::read(&recovery_path).expect("recovery bytes"))
-            .expect("recovery JSON");
-    assert!(
-        recovery["snapshot"]
-            .as_array()
-            .is_some_and(|bytes| !bytes.is_empty())
-    );
+        serde_json::from_slice(&fs::read(&recovery_path).expect("recovery bytes")).expect("recovery JSON");
+    assert!(recovery["snapshot"].as_array().is_some_and(|bytes| !bytes.is_empty()));
     assert_eq!(recovery["journal"].as_array().expect("journal").len(), 1);
     drop(session);
 
     fs::remove_dir(&canonical).expect("remove failure directory");
     fs::rename(&backup, &canonical).expect("restore old canonical");
-    let mut recovered = DocumentFile::recover(&canonical, ActorId::from("actor:recovery"), options)
-        .expect("recover interrupted save");
+    let mut recovered =
+        DocumentFile::recover(&canonical, ActorId::from("actor:recovery"), options).expect("recover interrupted save");
     assert_eq!(
-        recovered
-            .snapshot()
-            .expect("recovered snapshot")
-            .document
-            .pages[&PageId::from("page:one")]
-            .name,
+        recovered.snapshot().expect("recovered snapshot").document.pages[&PageId::from("page:one")].name,
         "Recovered"
     );
     let save = recovered.save().expect("save recovered document");
@@ -290,8 +247,7 @@ fn recovery_restores_journal_after_canonical_replace_failure() {
     assert!(!recovery_path.exists());
     drop(recovered);
 
-    let mut reopened =
-        DocumentFile::open(&canonical, ActorId::from("actor:verify")).expect("reopen recovered");
+    let mut reopened = DocumentFile::open(&canonical, ActorId::from("actor:verify")).expect("reopen recovered");
     assert_eq!(
         reopened.snapshot().expect("snapshot").document.pages[&PageId::from("page:one")].name,
         "Recovered"

@@ -779,12 +779,12 @@ dependencies = [
 name = "desktop"
 version = "0.1.0"
 dependencies = [
+ "inkfinite-core",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
- "tauri-plugin-fs",
  "tauri-plugin-opener",
  "tauri-plugin-store",
 ]

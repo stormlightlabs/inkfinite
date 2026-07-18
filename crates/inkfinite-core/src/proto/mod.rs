@@ -3,10 +3,9 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    ActorId, AssetId, AssetRecord, BindingId, BindingRecord, ChangeHash, ContainerLayout,
-    DocumentId, DocumentSnapshot, LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord,
-    RecordVersion, SemanticMetadata, ShapeId, ShapeParent, ShapeProperties, ShapeRecord,
-    ShapeStyle, SiblingAnchor, Timestamp, Transform,
+    ActorId, AssetId, AssetRecord, BindingId, BindingRecord, ChangeHash, ContainerLayout, DocumentId, DocumentSnapshot,
+    LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord, RecordVersion, SemanticMetadata, ShapeId, ShapeParent,
+    ShapeProperties, ShapeRecord, ShapeStyle, SiblingAnchor, Timestamp, Transform,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -19,23 +18,17 @@ pub const PROTOCOL_ID: &str = "inkfinite.protocol";
 pub const PROTOCOL_VERSION: u32 = 1;
 
 /// Stable identifier for a transaction.
-#[derive(
-    Clone, Debug, Eq, Hash, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS,
-)]
+#[derive(Clone, Debug, Eq, Hash, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS)]
 #[serde(transparent)]
 pub struct TransactionId(pub String);
 
 /// Stable identifier for an open document session.
-#[derive(
-    Clone, Debug, Eq, Hash, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS,
-)]
+#[derive(Clone, Debug, Eq, Hash, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS)]
 #[serde(transparent)]
 pub struct SessionId(pub String);
 
 /// Stable identifier for a transaction proposal awaiting user review.
-#[derive(
-    Clone, Debug, Eq, Hash, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS,
-)]
+#[derive(Clone, Debug, Eq, Hash, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS)]
 #[serde(transparent)]
 pub struct ProposalId(pub String);
 
@@ -65,11 +58,7 @@ pub struct TransactionDraft {
 
 /// Policy for children of a deleted non-empty layer.
 #[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
-#[serde(
-    rename_all = "snake_case",
-    tag = "kind",
-    content = "destination_layer_id"
-)]
+#[serde(rename_all = "snake_case", tag = "kind", content = "destination_layer_id")]
 pub enum LayerContentsDisposition {
     /// Move root shapes to the specified layer while preserving their order.
     MoveTo(LayerId),
@@ -608,8 +597,7 @@ mod tests {
         };
 
         let json = serde_json::to_string(&transaction).expect("transaction should serialize");
-        let decoded: TransactionDraft =
-            serde_json::from_str(&json).expect("transaction should deserialize");
+        let decoded: TransactionDraft = serde_json::from_str(&json).expect("transaction should deserialize");
         assert_eq!(decoded, transaction);
     }
 }

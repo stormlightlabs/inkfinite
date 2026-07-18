@@ -4,10 +4,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::engine::{TransactionEngine, validate_document};
 use crate::{
-    ActorId, BindingAnchor, BindingId, BindingKind, BindingRecord, Document, DocumentId, LayerId,
-    LayerRecord, Opacity, Origin, PageId, PageRecord, Provenance, RecordVersion, SemanticMetadata,
-    ShapeId, ShapeKind, ShapeParent, ShapeProperties, ShapeRecord, ShapeStyle, Timestamp,
-    Transform, Vec2, builtin_shape_kinds, validate_shape_properties,
+    ActorId, BindingAnchor, BindingId, BindingKind, BindingRecord, Document, DocumentId, LayerId, LayerRecord, Opacity,
+    Origin, PageId, PageRecord, Provenance, RecordVersion, SemanticMetadata, ShapeId, ShapeKind, ShapeParent,
+    ShapeProperties, ShapeRecord, ShapeStyle, Timestamp, Transform, Vec2, builtin_shape_kinds,
+    validate_shape_properties,
 };
 use serde::Deserialize;
 use serde_json::{Map, Value};
@@ -46,11 +46,7 @@ impl ImportedV1 {
         if actor_id.as_str().trim().is_empty() {
             return Err(invalid_v1("import actor ID must not be empty"));
         }
-        Ok(TransactionEngine::create(
-            self.document_id,
-            actor_id,
-            self.document,
-        )?)
+        Ok(TransactionEngine::create(self.document_id, actor_id, self.document)?)
     }
 }
 
@@ -72,8 +68,8 @@ pub fn import_v1_json(input: &str, actor_id: ActorId) -> Result<ImportedV1, File
     }
     let value: Value = serde_json::from_str(input)?;
     reject_newer_format(&value)?;
-    let envelope: LegacyEnvelope = serde_json::from_value(value)
-        .map_err(|error| invalid_v1(format!("invalid envelope: {error}")))?;
+    let envelope: LegacyEnvelope =
+        serde_json::from_value(value).map_err(|error| invalid_v1(format!("invalid envelope: {error}")))?;
     migrate(envelope, &actor_id)
 }
 
@@ -197,9 +193,10 @@ fn migrate(envelope: LegacyEnvelope, actor_id: &ActorId) -> Result<ImportedV1, F
                     "shape {shape_id} appears more than once in persisted order"
                 )));
             }
-            let legacy_shape = doc.shapes.get(shape_id).ok_or_else(|| {
-                invalid_v1(format!("page {page_id} refers to missing shape {shape_id}"))
-            })?;
+            let legacy_shape = doc
+                .shapes
+                .get(shape_id)
+                .ok_or_else(|| invalid_v1(format!("page {page_id} refers to missing shape {shape_id}")))?;
             if legacy_shape.page_id != page_id.as_str() {
                 return Err(invalid_v1(format!(
                     "shape {shape_id} belongs to page {}, not {page_id}",
@@ -210,13 +207,11 @@ fn migrate(envelope: LegacyEnvelope, actor_id: &ActorId) -> Result<ImportedV1, F
                 if group_id.trim().is_empty() {
                     return Err(invalid_v1(format!("shape {shape_id} has an empty groupId")));
                 }
-                let group = groups
-                    .entry(group_id.to_owned())
-                    .or_insert_with(|| GroupInfo {
-                        page_id: page_id.clone(),
-                        shape_ids: Vec::new(),
-                        positions: Vec::new(),
-                    });
+                let group = groups.entry(group_id.to_owned()).or_insert_with(|| GroupInfo {
+                    page_id: page_id.clone(),
+                    shape_ids: Vec::new(),
+                    positions: Vec::new(),
+                });
                 if group.page_id != *page_id {
                     return Err(invalid_v1(format!("group {group_id} spans multiple pages")));
                 }
@@ -238,9 +233,7 @@ fn migrate(envelope: LegacyEnvelope, actor_id: &ActorId) -> Result<ImportedV1, F
     }
     for group_id in groups.keys() {
         if doc.shapes.contains_key(group_id) {
-            return Err(invalid_v1(format!(
-                "group ID {group_id} collides with a shape ID"
-            )));
+            return Err(invalid_v1(format!("group ID {group_id} collides with a shape ID")));
         }
     }
 
@@ -264,10 +257,7 @@ fn migrate(envelope: LegacyEnvelope, actor_id: &ActorId) -> Result<ImportedV1, F
         let mut layer_shape_ids = Vec::new();
         let mut added_groups = BTreeSet::new();
         for shape_id in shape_ids {
-            let group_id = doc
-                .shapes
-                .get(shape_id)
-                .and_then(|shape| shape.group_id.as_deref());
+            let group_id = doc.shapes.get(shape_id).and_then(|shape| shape.group_id.as_deref());
             if let Some(group_id) = group_id
                 && container_groups.contains(group_id)
             {
@@ -309,9 +299,10 @@ fn migrate(envelope: LegacyEnvelope, actor_id: &ActorId) -> Result<ImportedV1, F
             .get(page_id)
             .ok_or_else(|| invalid_v1(format!("missing order for page {page_id}")))?
         {
-            let legacy_shape = doc.shapes.get(shape_id).ok_or_else(|| {
-                invalid_v1(format!("page {page_id} refers to missing shape {shape_id}"))
-            })?;
+            let legacy_shape = doc
+                .shapes
+                .get(shape_id)
+                .ok_or_else(|| invalid_v1(format!("page {page_id} refers to missing shape {shape_id}")))?;
             let kind = checked_shape_kind(legacy_shape)?;
             let group_parent = legacy_shape
                 .group_id
@@ -335,10 +326,7 @@ fn migrate(envelope: LegacyEnvelope, actor_id: &ActorId) -> Result<ImportedV1, F
                 kind: ShapeKind::from(kind),
                 parent: group_parent,
                 transform: Transform {
-                    translation: Vec2 {
-                        x: legacy_shape.x,
-                        y: legacy_shape.y,
-                    },
+                    translation: Vec2 { x: legacy_shape.x, y: legacy_shape.y },
                     rotation: legacy_shape.rot,
                     scale_x: 1.0,
                     scale_y: 1.0,
@@ -371,11 +359,7 @@ fn migrate(envelope: LegacyEnvelope, actor_id: &ActorId) -> Result<ImportedV1, F
                 layout: Some(crate::ContainerLayout::Free),
                 properties: ShapeProperties::new(),
                 metadata: imported_metadata(actor_id, timestamp, Some(group_id.clone())),
-                style: ShapeStyle {
-                    opacity: Opacity::OPAQUE,
-                    fill_opacity: None,
-                    stroke_opacity: None,
-                },
+                style: ShapeStyle { opacity: Opacity::OPAQUE, fill_opacity: None, stroke_opacity: None },
                 version: RecordVersion(1),
             },
         );
@@ -395,21 +379,13 @@ fn migrate(envelope: LegacyEnvelope, actor_id: &ActorId) -> Result<ImportedV1, F
             || legacy_binding.to_shape_id.trim().is_empty()
             || legacy_binding.handle.trim().is_empty()
         {
-            return Err(invalid_v1(format!(
-                "binding {binding_key} has an empty field"
-            )));
+            return Err(invalid_v1(format!("binding {binding_key} has an empty field")));
         }
         let anchor = match &legacy_binding.anchor {
             LegacyAnchor::Center => BindingAnchor::Center,
             LegacyAnchor::Edge { nx, ny } => {
-                if !nx.is_finite()
-                    || !ny.is_finite()
-                    || !(-1.0..=1.0).contains(nx)
-                    || !(-1.0..=1.0).contains(ny)
-                {
-                    return Err(invalid_v1(format!(
-                        "binding {binding_key} has an invalid edge anchor"
-                    )));
+                if !nx.is_finite() || !ny.is_finite() || !(-1.0..=1.0).contains(nx) || !(-1.0..=1.0).contains(ny) {
+                    return Err(invalid_v1(format!("binding {binding_key} has an invalid edge anchor")));
                 }
                 BindingAnchor::Edge { x: *nx, y: *ny }
             }
@@ -448,14 +424,7 @@ fn migrate(envelope: LegacyEnvelope, actor_id: &ActorId) -> Result<ImportedV1, F
         );
     }
 
-    let document = Document {
-        pages,
-        page_ids,
-        layers,
-        shapes,
-        bindings,
-        assets: BTreeMap::new(),
-    };
+    let document = Document { pages, page_ids, layers, shapes, bindings, assets: BTreeMap::new() };
     validate_document(&document)?;
     Ok(ImportedV1 {
         document_id,
@@ -466,31 +435,15 @@ fn migrate(envelope: LegacyEnvelope, actor_id: &ActorId) -> Result<ImportedV1, F
     })
 }
 
-fn validate_page_order(
-    pages: &BTreeMap<String, LegacyPage>,
-    order: &LegacyOrder,
-) -> Result<Vec<PageId>, FileError> {
-    let page_ids: Vec<PageId> = order
-        .page_ids
-        .iter()
-        .map(|id| PageId::from(id.clone()))
-        .collect();
+fn validate_page_order(pages: &BTreeMap<String, LegacyPage>, order: &LegacyOrder) -> Result<Vec<PageId>, FileError> {
+    let page_ids: Vec<PageId> = order.page_ids.iter().map(|id| PageId::from(id.clone())).collect();
     ensure_unique(&page_ids, "page")?;
-    if page_ids.len() != pages.len()
-        || page_ids
-            .iter()
-            .any(|page_id| !pages.contains_key(page_id.as_str()))
-    {
-        return Err(invalid_v1(
-            "order.pageIds must contain every page exactly once",
-        ));
+    if page_ids.len() != pages.len() || page_ids.iter().any(|page_id| !pages.contains_key(page_id.as_str())) {
+        return Err(invalid_v1("order.pageIds must contain every page exactly once"));
     }
     for (key, page) in pages {
         if key != &page.id {
-            return Err(invalid_v1(format!(
-                "page map key {key} does not match id {}",
-                page.id
-            )));
+            return Err(invalid_v1(format!("page map key {key} does not match id {}", page.id)));
         }
         if page.id.trim().is_empty() {
             return Err(invalid_v1("page IDs must not be empty"));
@@ -499,9 +452,7 @@ fn validate_page_order(
     if let Some(shape_order) = &order.shape_order {
         for page_id in shape_order.keys() {
             if !pages.contains_key(page_id) {
-                return Err(invalid_v1(format!(
-                    "shapeOrder contains unknown page {page_id}"
-                )));
+                return Err(invalid_v1(format!("shapeOrder contains unknown page {page_id}")));
             }
         }
     }
@@ -509,9 +460,7 @@ fn validate_page_order(
 }
 
 fn validate_shape_order(
-    document: &LegacyDocument,
-    order: &LegacyOrder,
-    page_ids: &[PageId],
+    document: &LegacyDocument, order: &LegacyOrder, page_ids: &[PageId],
 ) -> Result<BTreeMap<PageId, Vec<String>>, FileError> {
     let mut result = BTreeMap::new();
     for page_id in page_ids {
@@ -552,9 +501,7 @@ fn validate_shape_keys(shapes: &BTreeMap<String, LegacyShape>) -> Result<(), Fil
             return Err(invalid_v1(format!("shape {key} has an empty ID or pageId")));
         }
         if !shape.x.is_finite() || !shape.y.is_finite() || !shape.rot.is_finite() {
-            return Err(invalid_v1(format!(
-                "shape {key} has a non-finite transform"
-            )));
+            return Err(invalid_v1(format!("shape {key} has a non-finite transform")));
         }
     }
     Ok(())
@@ -574,18 +521,12 @@ fn validate_binding_keys(bindings: &BTreeMap<String, LegacyBinding>) -> Result<(
 
 fn checked_shape_kind(shape: &LegacyShape) -> Result<String, FileError> {
     if !builtin_shape_kinds().contains(&shape.shape_type.as_str()) {
-        return Err(FileError::UnsupportedShapeKind {
-            kind: shape.shape_type.clone(),
-            shape_id: shape.id.clone(),
-        });
+        return Err(FileError::UnsupportedShapeKind { kind: shape.shape_type.clone(), shape_id: shape.id.clone() });
     }
     Ok(shape.shape_type.clone())
 }
 
-fn migrate_properties(
-    kind: &str,
-    properties: &Map<String, Value>,
-) -> Result<ShapeProperties, FileError> {
+fn migrate_properties(kind: &str, properties: &Map<String, Value>) -> Result<ShapeProperties, FileError> {
     let mut result: ShapeProperties = properties.clone().into_iter().collect();
     for (legacy_name, v2_name) in [("w", "width"), ("h", "height")] {
         if let Some(value) = result.remove(legacy_name) {
@@ -602,42 +543,28 @@ fn migrate_properties(
     Ok(result)
 }
 
-fn migrate_style(
-    kind: &str,
-    properties: &Map<String, Value>,
-    shape_id: &str,
-) -> Result<ShapeStyle, FileError> {
-    let mut style = ShapeStyle {
-        opacity: Opacity::OPAQUE,
-        fill_opacity: None,
-        stroke_opacity: None,
-    };
+fn migrate_style(kind: &str, properties: &Map<String, Value>, shape_id: &str) -> Result<ShapeStyle, FileError> {
+    let mut style = ShapeStyle { opacity: Opacity::OPAQUE, fill_opacity: None, stroke_opacity: None };
     if kind == "stroke"
         && let Some(opacity) = properties
             .get("style")
             .and_then(Value::as_object)
             .and_then(|style| style.get("opacity"))
     {
-        let value = opacity.as_f64().ok_or_else(|| {
-            invalid_v1(format!("stroke {shape_id} style.opacity must be a number"))
-        })?;
+        let value = opacity
+            .as_f64()
+            .ok_or_else(|| invalid_v1(format!("stroke {shape_id} style.opacity must be a number")))?;
         let value = value
             .to_string()
             .parse::<f32>()
             .map_err(|_| invalid_v1(format!("stroke {shape_id} style.opacity is out of range")))?;
         style.stroke_opacity =
-            Some(Opacity::new(value).map_err(|error| {
-                invalid_v1(format!("stroke {shape_id} style.opacity: {error}"))
-            })?);
+            Some(Opacity::new(value).map_err(|error| invalid_v1(format!("stroke {shape_id} style.opacity: {error}")))?);
     }
     Ok(style)
 }
 
-fn imported_metadata(
-    actor_id: &ActorId,
-    timestamp: Timestamp,
-    name: Option<String>,
-) -> SemanticMetadata {
+fn imported_metadata(actor_id: &ActorId, timestamp: Timestamp, name: Option<String>) -> SemanticMetadata {
     SemanticMetadata {
         name,
         role: None,
@@ -655,12 +582,7 @@ fn imported_metadata(
 }
 
 fn identity_transform() -> Transform {
-    Transform {
-        translation: Vec2 { x: 0.0, y: 0.0 },
-        rotation: 0.0,
-        scale_x: 1.0,
-        scale_y: 1.0,
-    }
+    Transform { translation: Vec2 { x: 0.0, y: 0.0 }, rotation: 0.0, scale_x: 1.0, scale_y: 1.0 }
 }
 
 fn default_layer_id(page_id: &PageId) -> LayerId {
@@ -711,9 +633,7 @@ fn reject_newer_format(value: &Value) -> Result<(), FileError> {
     let Some(format) = object.get("format") else {
         return Ok(());
     };
-    let format = format
-        .as_str()
-        .ok_or_else(|| invalid_v1("format must be a string"))?;
+    let format = format.as_str().ok_or_else(|| invalid_v1("format must be a string"))?;
     let version_value = object
         .get("format_version")
         .or_else(|| object.get("formatVersion"))
@@ -722,10 +642,7 @@ fn reject_newer_format(value: &Value) -> Result<(), FileError> {
         .and_then(Value::as_u64)
         .and_then(|value| u32::try_from(value).ok())
         .unwrap_or(0);
-    Err(FileError::UnsupportedFormat {
-        format: format.to_owned(),
-        version,
-    })
+    Err(FileError::UnsupportedFormat { format: format.to_owned(), version })
 }
 
 fn invalid_v1(message: impl Into<String>) -> FileError {

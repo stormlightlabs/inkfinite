@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "org.stormlightlabs.inkfinite",
   "build": {
-    "beforeDevCommand": "cd ../../web && pnpm dev",
+    "beforeDevCommand": "cd ../web && pnpm dev",
     "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "cd ../../web && pnpm build",
+    "beforeBuildCommand": "cd ../web && pnpm build",
     "frontendDist": "../../web/build"
   },
   "app": {

@@ -1,7 +1,7 @@
 import type { PersistentDocRepo } from "@inkfinite/core";
 import { createWebDocRepo, InkfiniteDB } from "@inkfinite/core";
 import { createDesktopFileOps } from "./fileops";
-import { createDesktopDocRepo, type DesktopDocRepo } from "./persistence/desktop";
+import { createDesktopSessionRepo, type DesktopSessionRepo } from "./persistence/desktop-session";
 
 export type Platform = "web" | "desktop";
 
@@ -16,7 +16,7 @@ export type PlatformRepoResult = {
   repo: PersistentDocRepo;
   platform: Platform;
   db?: InkfiniteDB;
-  desktop?: DesktopDocRepo;
+  desktop?: DesktopSessionRepo;
 };
 
 /**
@@ -27,7 +27,7 @@ export async function createPlatformRepo(): Promise<PlatformRepoResult> {
 
   if (platform === "desktop") {
     const fileOps = createDesktopFileOps();
-    const repo = createDesktopDocRepo(fileOps);
+    const repo = createDesktopSessionRepo(fileOps);
     return { repo, platform, desktop: repo };
   } else {
     const db = new InkfiniteDB();

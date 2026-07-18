@@ -1,6 +1,6 @@
 import { createInputAdapter } from "$lib/input";
 import type { InputAdapter } from "$lib/input";
-import type { DesktopDocRepo } from "$lib/persistence/desktop";
+import { createDesktopPersistenceSink, type DesktopSessionRepo } from "$lib/persistence/desktop-session";
 import { createPlatformRepo, detectPlatform } from "$lib/platform";
 import { createBrushStore, createPersistenceManager, createSnapStore, createStatusStore } from "$lib/status";
 import type { BrushStore, SnapStore, StatusStore } from "$lib/status";
@@ -63,7 +63,7 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
   });
   let persistenceStatusStore = $state<StatusStore>(fallbackStatusStore);
   let activeBoardId: string | null = null;
-  let desktopRepo: DesktopDocRepo | null = null;
+  let desktopRepo: DesktopSessionRepo | null = null;
   let removeBeforeUnload: (() => void) | null = null;
   let stencilPaletteOpen = $state(false);
   const handleResize = () => {
@@ -197,7 +197,10 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     setActiveBoardId(boardId);
     applyLoadedDoc(doc);
   });
-  const fileBrowser = new FileBrowserController(() => repo);
+  const fileBrowser = new FileBrowserController(() => repo, (boardId, doc) => {
+    setActiveBoardId(boardId);
+    applyLoadedDoc(doc);
+  });
 
   function setHandleHover(handle: string | null) {
     if (handleState.hover === handle) {
@@ -607,10 +610,19 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
   onMount(async () => {
     if (platform === "desktop") {
       const desktopPlatformRepo = await createPlatformRepo();
-      if (desktopPlatformRepo && "type" in desktopPlatformRepo && desktopPlatformRepo.type === "desktop") {
-        desktopRepo = desktopPlatformRepo.repo as DesktopDocRepo;
+      if (desktopPlatformRepo.desktop) {
+        desktopRepo = desktopPlatformRepo.desktop;
         repo = desktopRepo;
-        await desktop.refreshBoards();
+        sink = createDesktopPersistenceSink(desktopRepo);
+        persistenceStatusStore = fallbackStatusStore;
+
+        const boards = await desktop.refreshBoards();
+        if (boards.length > 0) {
+          const boardId = boards[0].id;
+          const doc = await desktopRepo.loadDoc(boardId);
+          setActiveBoardId(boardId);
+          applyLoadedDoc(doc);
+        }
       }
     } else {
       webDb = new InkfiniteDB();
@@ -649,12 +661,21 @@ export function createCanvasController(bindings: CanvasControllerBindings) {
     renderer?.dispose();
     inputAdapter?.dispose();
     persistenceManager?.dispose();
+    if (platform === "desktop") {
+      void sink?.flush()
+        .then(() => desktopRepo?.closeSession())
+        .catch((error) => console.error("Failed to close desktop session", error));
+    }
     unsubscribeMarqueeCamera();
     removeBeforeUnload?.();
     if (typeof window !== "undefined") {
       window.removeEventListener("resize", handleResize);
     }
-    fallbackStatusStore.update(() => ({ backend: "indexeddb", state: "saved", pendingWrites: 0 }));
+    fallbackStatusStore.update(() => ({
+      backend: platform === "desktop" ? "filesystem" : "indexeddb",
+      state: "saved",
+      pendingWrites: 0,
+    }));
     persistenceStatusStore = fallbackStatusStore;
   });
 
