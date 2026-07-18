@@ -1846,6 +1846,7 @@ name = "inkfinite-core"
 version = "0.0.0"
 dependencies = [
  "automerge",
+ "perfect_freehand",
  "proptest",
  "schemars 1.2.1",
  "serde",
@@ -2525,6 +2526,12 @@ name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
+
+[[package]]
+name = "perfect_freehand"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9fa6a5c34a2260773ed097c04182ceb594bb46178200d07b46cd16ac3ca4b0d"
 
 [[package]]
 name = "phf"

@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-20 -20 840 780" width="840" height="780">
+  <g data-layer-id="layer:page:fixtures:default" opacity="1">
+    <g data-shape-id="shape:stencil-sticky" opacity="1">
+      <rect transform="matrix(1 0 0 1 560 40)" width="200" height="200" rx="0" fill="#fff740" fill-opacity="1" stroke="transparent" stroke-opacity="1" stroke-width="2"/>
+    </g>
+    <g data-shape-id="shape:stencil-process" opacity="1">
+      <rect transform="matrix(1 0 0 1 40 40)" width="120" height="80" rx="0" fill="#ffffff" fill-opacity="1" stroke="#000000" stroke-opacity="1" stroke-width="2"/>
+    </g>
+    <g data-shape-id="shape:stencil-decision" opacity="1">
+      <rect transform="matrix(0.707107 0.707107 -0.707107 0.707107 220 40)" width="80" height="80" rx="0" fill="#ffffff" fill-opacity="1" stroke="#000000" stroke-opacity="1" stroke-width="2"/>
+    </g>
+    <g data-shape-id="shape:stencil-terminator" opacity="1">
+      <rect transform="matrix(1 0 0 1 380 40)" width="120" height="60" rx="30" fill="#ffffff" fill-opacity="1" stroke="#000000" stroke-opacity="1" stroke-width="2"/>
+    </g>
+    <g data-shape-id="group:card" opacity="1">
+    <g data-shape-id="shape:stencil-card" opacity="1">
+      <rect transform="matrix(1 0 0 1 40 220)" width="300" height="200" rx="8" fill="#ffffff" fill-opacity="1" stroke="#333333" stroke-opacity="1" stroke-width="2"/>
+    </g>
+    <g data-shape-id="shape:stencil-card-divider" opacity="1">
+      <line transform="matrix(1 0 0 1 40 270)" x1="0" y1="0" x2="300" y2="0" fill="none" stroke="#333333" stroke-opacity="1" stroke-width="1"/>
+    </g>
+    </g>
+    <g data-shape-id="shape:ellipse" opacity="1">
+      <ellipse transform="matrix(1 0 0 1 400 280)" cx="75" cy="50" rx="75" ry="50" fill="#dbeafe" fill-opacity="1" stroke="#1d4ed8" stroke-opacity="1" stroke-width="2"/>
+    </g>
+    <g data-shape-id="shape:line" opacity="1">
+      <line transform="matrix(1 0 0 1 400 430)" x1="0" y1="0" x2="180" y2="60" fill="none" stroke="#334155" stroke-opacity="1" stroke-width="3"/>
+    </g>
+    <g data-shape-id="shape:arrow" opacity="1">
+      <path transform="matrix(1 0 0 1 0 0)" d="M 162 80 L 318.5 80 L 318.5 330 L 475 330" fill="none" stroke="#7c3aed" stroke-opacity="1" stroke-width="2" stroke-dasharray="8 4"/>
+      <path transform="matrix(1 0 0 1 0 0)" d="M 475 330 L 462.009619 337.5 M 475 330 L 462.009619 322.5" fill="none" stroke="#7c3aed" stroke-opacity="1" stroke-width="2"/>
+      <path transform="matrix(1 0 0 1 0 0)" d="M 162 80 L 174.990381 72.5 M 162 80 L 174.990381 87.5" fill="none" stroke="#7c3aed" stroke-opacity="1" stroke-width="2"/>
+      <g transform="matrix(1 0 0 1 0 0)" fill-opacity="1"><rect x="270.19" y="194" width="96.62" height="18" fill="#ffffff" fill-opacity="0.9" stroke="#cccccc"/><text x="318.5" y="210" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#000000">bound route</text></g>
+    </g>
+    <g data-shape-id="shape:text" opacity="1">
+      <text transform="matrix(1 0 0 1 620 300)" font-family="sans-serif" font-size="18" fill="#111827" fill-opacity="1" dominant-baseline="text-before-edge">
+        <tspan x="0" y="0">Inkfinite v1</tspan>
+        <tspan x="0" y="21.6">fixture</tspan>
+      </text>
+    </g>
+    <g data-shape-id="shape:stroke" opacity="1">
+      <path transform="matrix(1 0 0 1 0 0)" d="M 622.329741 386.505389 L 639.829568 395.752172 L 667.404834 389.577813 L 706.22533 410.968083 L 707.783437 412.12632 L 708.890138 413.721444 L 709.429562 415.586445 L 709.345232 417.526058 L 708.645975 419.337204 L 707.405005 420.830256 L 705.752252 421.848891 L 703.860759 422.286457 L 701.928566 422.097141 L 700.157975 421.300765 L 698.734366 419.98071 L 697.806791 418.275185 L 697.472369 416.362759 L 697.766113 414.443664 L 698.657269 412.718831 L 700.052531 411.368848 L 701.805815 410.53506 L 703.733553 410.304765 L 705.63391 410.702074 L 707.307917 411.685389 L 708.580306 413.151758 L 709.317857 414.947649 L 709.443349 416.885035 L 708.943642 418.761068 L 707.871056 420.379329 L 706.337891 421.570385 L 704.50467 422.209533 L 702.563331 422.229852 L 700.718733 421.630042 L 667.757666 405.947187 L 634.670432 407.247828 L 617.670259 393.494611 L 616.90162 392.835497 L 616.313059 392.011583 L 615.938783 391.070756 L 615.800546 390.067697 L 615.90638 389.060703 L 616.250136 388.108301 L 616.811835 387.265845 L 617.55883 386.582298 L 618.447705 386.097388 L 619.4268 385.839298 L 620.43921 385.823028 L 621.426092 386.049524 L 622.33009 386.505622 Z" fill="#dc2626" fill-opacity="0.75" stroke="none"/>
+    </g>
+    <g data-shape-id="shape:markdown" opacity="1">
+      <g transform="matrix(1 0 0 1 40 500)">
+        <rect width="360" height="240" fill="#f8fafc" fill-opacity="1" stroke="#94a3b8" stroke-opacity="1"/>
+        <text x="8" y="8" font-family="sans-serif" font-size="29.6" font-weight="bold" fill="#0f172a" fill-opacity="1" dominant-baseline="text-before-edge"><tspan>Frozen Markdown</tspan></text>
+        <text x="8" y="49.44" font-family="sans-serif" font-size="16" font-weight="normal" fill="#0f172a" fill-opacity="1" dominant-baseline="text-before-edge"></text>
+        <text x="8" y="71.84" font-family="sans-serif" font-size="16" font-weight="normal" fill="#0f172a" fill-opacity="1" dominant-baseline="text-before-edge"><tspan>• </tspan><tspan font-weight="bold">bold</tspan><tspan> item</tspan></text>
+        <text x="8" y="94.24" font-family="sans-serif" font-size="16" font-weight="normal" fill="#0f172a" fill-opacity="1" dominant-baseline="text-before-edge"><tspan>• </tspan><tspan font-family="monospace">code</tspan><tspan> item</tspan></text>
+        <text x="8" y="116.64" font-family="sans-serif" font-size="16" font-weight="normal" fill="#0f172a" fill-opacity="1" dominant-baseline="text-before-edge"></text>
+        <text x="8" y="139.04" font-family="monospace" font-size="16" font-weight="normal" fill="#0f172a" fill-opacity="1" dominant-baseline="text-before-edge">const version = 1;</text>
+      </g>
+    </g>
+  </g>
+</svg>

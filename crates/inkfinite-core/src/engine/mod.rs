@@ -22,7 +22,7 @@ pub use crate::proto::{CommitResult, TransactionDraft};
 
 mod diff;
 mod error;
-mod geometry;
+pub mod geometry;
 mod hierarchy;
 mod history;
 mod operations;

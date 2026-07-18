@@ -145,20 +145,20 @@ closed document without desktop code.
 
 ### V2-14: Render deterministic SVG
 
-What to build: Add headless SVG rendering for all built-in shapes, layers,
+Added headless SVG rendering for all built-in shapes, layers,
 bindings, transforms, opacity, text, and Markdown.
 
 Blocked by: V2-04, V2-06, V2-13
 
 Acceptance criteria:
 
-- [ ] Output is deterministic for a snapshot and supports page, layer, selection,
+- [x] Output is deterministic for a snapshot and supports page, layer, selection,
       and region filtering.
-- [ ] Hidden and locked semantics, ordering, opacity, arrow routing/labels,
+- [x] Hidden and locked semantics, ordering, opacity, arrow routing/labels,
       Markdown, text wrapping, and freehand strokes match Canvas fixtures.
-- [ ] Missing fonts or assets produce explicit warnings and deterministic
+- [x] Missing fonts or assets produce explicit warnings and deterministic
       fallbacks.
-- [ ] Snapshot tests cover every built-in shape and a representative full board.
+- [x] Snapshot tests cover every built-in shape and a representative full board.
 
 Verification:
 
@@ -404,4 +404,4 @@ Verification:
 
 ## Frontier
 
-V2-14 is the current frontier. Add deterministic headless SVG rendering.
+V2-15 is the current frontier. Add read-only and schema CLI commands.

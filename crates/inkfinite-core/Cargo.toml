@@ -8,6 +8,7 @@ version.workspace = true
 
 [dependencies]
 automerge.workspace = true
+perfect_freehand.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true

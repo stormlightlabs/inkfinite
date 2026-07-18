@@ -1,6 +1,6 @@
 # Inkfinite vNext / Version 2
 
-Status: implementation in progress; V2-01 through V2-13 are complete
+Status: implementation in progress; V2-01 through V2-14 are complete
 
 This is the product and architecture contract for vNext. [TODO.md](TODO.md) is
 the implementation queue.
@@ -51,8 +51,11 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
   current-bound pointer mapping. Layers, fill and stroke opacity, the curated
   stencil library, and active-layer insertion work across model, rendering,
   interaction, web, and desktop boundaries.
-- [TODO.md](TODO.md) starts the remaining work at V2-14: SVG rendering, followed
-  by CLI, live control, sync, agent packaging, release verification, and v1
+- Rust produces deterministic headless SVG for built-in shapes, layers,
+  bindings, nested transforms, text, Markdown, and filtered views. Missing
+  fonts and assets use stable fallbacks with explicit warnings.
+- [TODO.md](TODO.md) starts the remaining work at V2-15: CLI commands, followed
+  by live control, sync, agent packaging, release verification, and v1
   compatibility removal.
 
 ## Architecture
