@@ -457,6 +457,7 @@ function drawShape(
 	markdownLayoutCache = new LruCache<string, MarkdownLine[]>(256)
 ) {
 	context.save();
+	context.globalAlpha *= shape.opacity ?? 1;
 
 	context.translate(shape.x, shape.y);
 	if (shape.rot !== 0) {
@@ -502,6 +503,7 @@ function drawShape(
  */
 function drawRect(context: CanvasRenderingContext2D, shape: RectShape) {
 	const { w, h, fill, stroke, radius } = shape.props;
+	const shapeAlpha = context.globalAlpha;
 
 	context.beginPath();
 	if (radius > 0) {
@@ -521,11 +523,13 @@ function drawRect(context: CanvasRenderingContext2D, shape: RectShape) {
 	}
 
 	if (fill) {
+		context.globalAlpha = shapeAlpha * (shape.fillOpacity ?? 1);
 		context.fillStyle = fill;
 		context.fill();
 	}
 
 	if (stroke) {
+		context.globalAlpha = shapeAlpha * (shape.strokeOpacity ?? 1);
 		context.strokeStyle = stroke;
 		context.lineWidth = 2;
 		context.stroke();
@@ -537,16 +541,19 @@ function drawRect(context: CanvasRenderingContext2D, shape: RectShape) {
  */
 function drawEllipse(context: CanvasRenderingContext2D, shape: EllipseShape) {
 	const { w, h, fill, stroke } = shape.props;
+	const shapeAlpha = context.globalAlpha;
 
 	context.beginPath();
 	context.ellipse(w / 2, h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
 
 	if (fill) {
+		context.globalAlpha = shapeAlpha * (shape.fillOpacity ?? 1);
 		context.fillStyle = fill;
 		context.fill();
 	}
 
 	if (stroke) {
+		context.globalAlpha = shapeAlpha * (shape.strokeOpacity ?? 1);
 		context.strokeStyle = stroke;
 		context.lineWidth = 2;
 		context.stroke();
@@ -563,6 +570,7 @@ function drawLine(context: CanvasRenderingContext2D, shape: LineShape) {
 	context.moveTo(a.x, a.y);
 	context.lineTo(b.x, b.y);
 
+	context.globalAlpha *= shape.strokeOpacity ?? 1;
 	context.strokeStyle = stroke;
 	context.lineWidth = width;
 	context.stroke();
@@ -573,6 +581,7 @@ function drawLine(context: CanvasRenderingContext2D, shape: LineShape) {
  */
 function drawArrow(context: CanvasRenderingContext2D, state: EditorState, shape: ArrowShape) {
 	const style = shape.props.style;
+	const shapeAlpha = context.globalAlpha;
 
 	const resolved = resolveArrowEndpoints(state, shape.id);
 	if (!resolved) return;
@@ -599,6 +608,7 @@ function drawArrow(context: CanvasRenderingContext2D, state: EditorState, shape:
 	}
 
 	context.strokeStyle = style.stroke;
+	context.globalAlpha = shapeAlpha * (shape.strokeOpacity ?? 1);
 	context.lineWidth = style.width;
 	if (style.dash) {
 		context.setLineDash(style.dash);
@@ -657,6 +667,7 @@ function drawArrow(context: CanvasRenderingContext2D, state: EditorState, shape:
 
 	const label = shape.props.label;
 	if (label) {
+		context.globalAlpha = shapeAlpha * (shape.fillOpacity ?? 1);
 		drawArrowLabel(context, state, points, label);
 	}
 }
@@ -718,6 +729,7 @@ function drawText(
 ) {
 	const { text, fontSize, fontFamily, color, w } = shape.props;
 
+	context.globalAlpha *= shape.fillOpacity ?? 1;
 	context.font = `${fontSize}px ${fontFamily}`;
 	context.fillStyle = color;
 	context.textBaseline = 'top';
@@ -803,16 +815,20 @@ function drawMarkdown(
 
 	const width = w;
 	const height = h ?? fontSize * 10;
+	const shapeAlpha = context.globalAlpha;
 
+	context.globalAlpha = shapeAlpha * (shape.fillOpacity ?? 1);
 	context.fillStyle = bg ?? '#ffffff';
 	context.fillRect(0, 0, width, height);
 
 	if (border) {
+		context.globalAlpha = shapeAlpha * (shape.strokeOpacity ?? 1);
 		context.strokeStyle = border;
 		context.lineWidth = 1;
 		context.strokeRect(0, 0, width, height);
 	}
 
+	context.globalAlpha = shapeAlpha * (shape.fillOpacity ?? 1);
 	context.fillStyle = color;
 	context.textBaseline = 'top';
 
@@ -996,7 +1012,7 @@ function drawStroke(context: CanvasRenderingContext2D, shape: StrokeShape) {
 		return;
 	}
 
-	context.globalAlpha = style.opacity;
+	context.globalAlpha *= shape.strokeOpacity ?? style.opacity;
 	context.fillStyle = style.color;
 	context.beginPath();
 	context.moveTo(outline[0].x, outline[0].y);
@@ -1007,7 +1023,6 @@ function drawStroke(context: CanvasRenderingContext2D, shape: StrokeShape) {
 
 	context.closePath();
 	context.fill();
-	context.globalAlpha = 1.0;
 }
 
 /**

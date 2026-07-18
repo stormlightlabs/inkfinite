@@ -525,6 +525,15 @@ function legacyShapeFromV2(shape: ShapeRecord, pageId: string, groupId?: string)
 		properties.h = properties.height;
 		delete properties.height;
 	}
+	if (shape.kind === 'stroke' && shape.style.stroke_opacity !== null) {
+		const strokeStyle = properties.style;
+		properties.style = {
+			...(typeof strokeStyle === 'object' && strokeStyle !== null && !Array.isArray(strokeStyle)
+				? strokeStyle
+				: {}),
+			opacity: shape.style.stroke_opacity
+		};
+	}
 	return {
 		id: shape.id,
 		type: shape.kind as LegacyShapeRecord['type'],
@@ -532,6 +541,9 @@ function legacyShapeFromV2(shape: ShapeRecord, pageId: string, groupId?: string)
 		x: shape.transform.translation.x,
 		y: shape.transform.translation.y,
 		rot: shape.transform.rotation,
+		opacity: shape.style.opacity,
+		...(shape.style.fill_opacity !== null ? { fillOpacity: shape.style.fill_opacity } : {}),
+		...(shape.style.stroke_opacity !== null ? { strokeOpacity: shape.style.stroke_opacity } : {}),
 		...(groupId ? { groupId } : {}),
 		props: properties as LegacyShapeRecord['props']
 	} as LegacyShapeRecord;
@@ -668,6 +680,12 @@ function shapeFromLegacy(
 		properties.height = properties.h;
 		delete properties.h;
 	}
+	const strokeStyle = shape.type === 'stroke' ? shape.props.style : undefined;
+	const strokeOpacity =
+		shape.strokeOpacity ??
+		(strokeStyle && typeof strokeStyle.opacity === 'number' ? strokeStyle.opacity : undefined) ??
+		existing?.style.stroke_opacity ??
+		null;
 	return {
 		id: shape.id,
 		kind: shape.type,
@@ -682,7 +700,11 @@ function shapeFromLegacy(
 		layout: null,
 		properties: properties as ShapeProperties,
 		metadata: existing?.metadata ?? defaultMetadata(actor),
-		style: existing?.style ?? defaultStyle(),
+		style: {
+			opacity: shape.opacity ?? existing?.style.opacity ?? 1,
+			fill_opacity: shape.fillOpacity ?? existing?.style.fill_opacity ?? null,
+			stroke_opacity: strokeOpacity
+		},
 		version: existing?.version ?? 1
 	};
 }

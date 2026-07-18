@@ -1,6 +1,6 @@
 # Inkfinite vNext / Version 2
 
-Status: ready for implementation
+Status: implementation in progress; V2-01 through V2-13 are complete
 
 This is the product and architecture contract for vNext. [TODO.md](TODO.md) is
 the implementation queue.
@@ -21,8 +21,12 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
   history, and queries. TypeScript owns low-latency interaction and rendering.
 - Every completed human or agent edit becomes one validated transaction and one
   Automerge change. Two offline replicas converge after exchanging changes.
-- Existing `.inkfinite.json` boards import without data loss. v2 files survive
-  interrupted writes and expose stable JSON and SVG projections for inspection.
+- V2 files survive interrupted writes and expose stable JSON and SVG projections
+  for inspection.
+- V1 compatibility remains temporary development scaffolding through the final
+  release-evidence run. Before vNext ships, remove its import paths, fixtures,
+  scripts, tests, and current documentation after converting any useful coverage
+  to v2-native fixtures.
 - The desktop app, file-mode CLI, and live CLI use the same engine. Stale or
   invalid mutations cannot partly modify a document.
 - Pages contain ordered layers. Hidden and locked layers affect rendering and
@@ -34,27 +38,22 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
 
 ## Current state
 
-- The pnpm monorepo contains a TypeScript core, Canvas 2D renderer, SvelteKit web
-  UI, and Tauri 2 wrapper.
-- `@inkfinite/ui` provides shared Svelte components, theme tokens, fonts, and
-  icons. Its `@inkfinite/ui/editor` subpath composes the Canvas, document-aware
-  panels, controllers, and platform contract used by both application roots.
-  `apps/web` owns the Dexie adapter. `apps/desktop` owns the Tauri adapter and
-  builds its own copy of the shared editor.
-- TypeScript currently owns a flat page/shape model, snapshot undo/redo, tools,
-  and browser persistence. Web documents use Dexie; desktop documents use a
-  thin adapter over Rust-owned sessions and typed Tauri commands.
-- `@inkfinite/runtime` owns framework-neutral camera, tool, selection, snapping,
-  shortcut, and gesture-preview state. `@inkfinite/input-dom` normalizes browser
-  events from current canvas bounds, owns pointer capture and release cleanup,
-  and keeps gesture coordinates independent of device-pixel ratio. The Svelte
-  canvas controller wires DOM overlays, rendering, and session persistence
-  around those packages. The renderer still walks every shape on the page and
-  resizes its backing canvas on each draw.
-- Built-in stencils, grid snapping, a dirty-frame loop, Markdown shapes, and
-  cursor coordinate mapping already exist. vNext must preserve them while adding
-  active-layer placement, measured rendering improvements, Markdown layout
-  caching, and headless SVG coverage.
+- The Cargo and pnpm workspaces contain the Rust core, generated TypeScript
+  bindings, Canvas 2D renderer, shared Svelte editor, web app, and Tauri desktop
+  app.
+- Rust owns the v2 model, Automerge-backed transaction engine, schemas, desktop
+  sessions, file persistence, recovery, and typed Tauri commands. The desktop
+  frontend keeps a read-only mirror; the web app retains its Dexie adapter.
+- `@inkfinite/runtime` and `@inkfinite/input-dom` own framework-neutral editor
+  state and normalized browser input. Both application roots compose the same
+  `@inkfinite/ui/editor` module through platform-specific adapters.
+- The renderer uses dirty frames, viewport culling, bounded layout caches, and
+  current-bound pointer mapping. Layers, fill and stroke opacity, the curated
+  stencil library, and active-layer insertion work across model, rendering,
+  interaction, web, and desktop boundaries.
+- [TODO.md](TODO.md) starts the remaining work at V2-14: SVG rendering, followed
+  by CLI, live control, sync, agent packaging, release verification, and v1
+  compatibility removal.
 
 ## Architecture
 
@@ -117,125 +116,21 @@ patch for the frontend's read-only document mirror.
 
 Business logic must not depend on Tauri, Svelte, CLI parsing, or a transport.
 
-## CRDT decision
+## CRDT and file decisions
 
-Automerge is part of vNext, rather than a later collaboration retrofit. Its core
-is Rust and the JavaScript package exposes that core through WebAssembly. It also
-provides a compact storage format and a transport-independent sync protocol.
-These properties fit the Rust-owned document service better than making a
-JavaScript CRDT authoritative. See the [Automerge repository][am-repo],
+Automerge is the v2 CRDT. The V2-02 architecture gate proved cross-language
+round trips, offline convergence, deterministic hierarchy repair, sync, undo,
+compaction, and the 10,000-shape workload. Production code depends on
+Inkfinite-owned document, patch, and sync interfaces rather than Automerge
+types, keeping its low-level API isolated. See the [Automerge repository][am-repo],
 [Rust API][am-rust], and [sync concepts][am-sync].
 
-Yjs with Yrs remains the fallback if the first architecture gate finds a release
-blocking problem. Yrs supports Yjs-compatible update formats, while Yjs offers a
-large provider ecosystem; see the [Yrs documentation][yrs] and [Yjs update
-API][yjs]. The rest of Inkfinite must depend on project-owned document, patch,
-and sync interfaces so this fallback does not change product contracts.
-
-The gate must prove Rust/JavaScript round trips, nested maps and ordered lists,
-collaborative text, incremental patches, actor-scoped undo, compaction, sync,
-merge-time invariant handling, and acceptable time and memory use with 10,000
-shapes. Record the benchmark hardware and dependency versions before locking the
-v2 format.
-
-V2-02 completed this gate on July 17, 2026. The proof exchanged compact files
-between Rust and JavaScript, converged offline edits independent of merge order,
-and validated deterministic hierarchy repair before adoption. Automerge passed,
-so Yjs/Yrs was not evaluated. V2-05 moved the reusable Rust coverage into
-`inkfinite-core::crdt` and the transaction engine, then removed the disposable
-proof. The measurements below preserve the architecture-gate evidence.
-
-On the V2-01 Apple M1 reference machine, the 3.98 MB, 10,000-shape JSON fixture
-produced a 211 KB compact Rust document. Rust import, load, and save took 1.76 s,
-1.82 s, and 495 ms, with a 98 MB resident-memory increase. The JavaScript proof
-used 651 KB of storage and added 422 MB of resident memory. These costs confirm
-the planned ownership boundary: Rust holds the CRDT, while TypeScript holds a
-materialized mirror. The V1 baseline's 9.69 ms open and 12.09 ms save parse plain
-JSON and are not equivalent to first-time CRDT import.
-
-V2-03 upgraded the workspace to Rust 1.89 and reran the fixed-seed proof twice
-with Automerge Rust 0.10.0 and `@automerge/automerge` 3.2.6. Both runs converged
-to identical snapshots, and the original semantic, repair, sync, and
-cross-language tests passed without changing the Inkfinite proof boundary.
-Production code depends on the Inkfinite-owned CRDT contracts rather than
-Automerge types, so changes to Automerge's low-level API remain isolated.
-
-V2-06 completed on July 17, 2026. `inkfinite-core`'s root model and `proto` module
-derive Schemars and `ts-rs` bindings from the Rust records. The binding
-generator writes document, transaction, and protocol schemas under `schemas/`
-and bindings under `packages/bindings/src/`. Its `--check` mode fails
-on stale output. The Rust and TypeScript registries share the built-in kind list,
-common dimension-property validation, serialization fixture, and transformed
-axis-aligned bounds conventions in `fixtures/v2/shape-registry.json`.
-
-The V2-11 reference budgets are an 8 ms median Canvas frame and a 1 ms median
-hit test for the frozen 10,000-shape board. The V1 medians are 0.61 ms and
-0.22 ms. V2-11 may add a spatial index only if its linear query path misses the
-1 ms budget.
-
-V2-11 completed on July 18, 2026. The Canvas 2D renderer now changes backing
-dimensions only when its CSS size or device pixel ratio changes, schedules no
-idle frames, culls against padded transformed world bounds, and keeps selected
-overlays and bound arrows outside the durable culling path. Per-renderer LRU
-caches bound text and Markdown layout data, while freehand outlines use
-shape-lifetime weak caching. The fixed-seed Apple M1 run recorded a 0.61 ms
-median frame and a 0.34 ms median linear hit test, both below their gates. The
-linear query path therefore remains simpler than an incrementally maintained
-spatial index. A second durable-scene bitmap also offered no useful benefit at
-this frame cost, so overlays remain on the single canvas. The complete machine,
-runtime, budget, and strategy record is in
-[`fixtures/v2/performance/v2-11.json`](fixtures/v2/performance/v2-11.json).
-
-V2-12 completed on July 18, 2026. The shared editor now migrates flat pages to
-one stable default layer without changing shape order, tracks the active layer,
-and persists ordered layer records through the web and desktop adapters. Canvas
-rendering follows layer and child order, isolates opacity with saved context
-state, and skips hidden layers. Selection, hit testing, marquee, and editing
-exclude hidden and locked content. The accessible Svelte panel creates,
-selects, renames, reorders, hides, locks, changes opacity, and deletes layers;
-non-empty deletion requires an explicit move or content-deletion choice. Rust
-queries omit hidden shapes, locked layers reject changes while still allowing
-an explicit unlock, and the existing Automerge two-replica tests continue to
-cover ordered-list convergence.
-
-V2-07 completed on July 17, 2026. `inkfinite-core::file` imports the frozen v1
-desktop and web envelopes into normalized pages, default layers, scene
-containers, bindings, styles, and deterministic draw order. It writes compact
-canonical Automerge files through same-directory temporary files, flushes before
-replacement, holds advisory locks, and retains bounded recovery snapshots plus
-encoded change journals across failed writes. JSON export is deterministic and
-history-free, as documented in [docs/v2-file-format.md](docs/v2-file-format.md).
-
-V2-08 completed on July 17, 2026. `inkfinite-core::session::SessionService`
-owns desktop paths, Automerge state, materialized snapshots, actor-scoped
-undo/redo, dirty state, advisory locks, recovery visibility, and an explicit
-disabled sync state. Tauri exposes typed create/open/snapshot/commit/history/
-save/query/validate/close commands, while `apps/web` keeps an in-memory editing
-mirror and a thin metadata/dialog adapter. Desktop document bytes no longer
-cross the frontend file APIs. Recovery and failure-path tests cover stale heads,
-failed validation, interrupted writes, and save-as path replacement.
-
-V2-09 completed on July 17, 2026. `@inkfinite/runtime` now owns normalized
-action routing, camera panning, selection shortcuts, grid snapping, and local
-gesture previews without importing Svelte, Tauri, or persistence code. Completed
-document gestures emit one runtime transaction draft; the Svelte adapter turns
-that boundary into one history command, and the desktop session adapter builds
-one Rust transaction before replacing its mirror from the returned snapshot.
-`@inkfinite/input-dom` owns browser listener and coordinate normalization. A
-browser integration test covers drag, simulated Rust commit, patch-driven
-redraw, and undo back to the original document. The final UI boundary first
-moved the dependency-free dialog, sheet, brush popover, and remaining semantic
-icons into `@inkfinite/ui`, along with their tests and Storybook stories. The
-product editor and its document-aware panels now live in the
-`@inkfinite/ui/editor` module. The application roots supply its web or desktop
-platform adapter.
-
-V2-10 completed on July 18, 2026. Pointer, wheel, hit-test, and drag coordinates
-now use the canvas's current CSS bounds and viewport for every event. Canvas
-resize invalidation recomputes marquee and positioned editor overlays. Pointer
-capture plus window-level release, cancellation, and lost-capture handling ends
-gestures outside the canvas without leaving a stuck drag or cursor. Browser
-regressions cover resized and scrolled bounds at device-pixel ratios 1 and 2.
+The recorded dependency baseline is Rust 1.89, Automerge Rust 0.10.0, and
+`@automerge/automerge` 3.2.6. On the Apple M1 reference machine, V2-11 measured a
+0.61 ms median Canvas frame and a 0.34 ms median linear hit test against budgets
+of 8 ms and 1 ms. The linear path remains; a spatial index and second durable
+scene bitmap did not justify their complexity. The complete performance record
+is in [`fixtures/v2/performance/v2-11.json`](fixtures/v2/performance/v2-11.json).
 
 One Inkfinite transaction maps to one Automerge change. Causal heads, rather
 than a scalar revision, are the concurrency token. A local sequence number may
@@ -244,9 +139,13 @@ Remote changes are merged into a fork, materialized, repaired by deterministic
 rules where specified, and validated before the session adopts them.
 
 The canonical v2 file is Automerge's compact binary form with the `.inkfinite`
-extension. `.inkfinite.json` remains a lossless v1 import and a stable snapshot
-export, not a CRDT round-trip format. The CLI supplies JSON inspection and SVG
-rendering for repositories and CI.
+extension. `.inkfinite.json` is a stable snapshot export, not a CRDT round-trip
+format. Through V2-21, the development build also accepts the frozen v1 envelope
+as an import source so the architecture and release baselines remain
+reproducible. V2-22 removes that unreleased compatibility surface before vNext
+ships. [docs/v2-file-format.md](docs/v2-file-format.md) defines the current file
+behavior. The CLI supplies JSON inspection and SVG rendering for repositories
+and CI.
 
 ## Document contract
 
@@ -354,21 +253,12 @@ The web root supplies the Dexie adapter; the desktop root supplies typed Tauri
 commands and desktop-only file capabilities. Neither root owns a second editor
 component tree or theme.
 
-Performance work is evidence-driven:
-
-- Resize the backing canvas only when CSS dimensions or device-pixel ratio
-  change, draw only while dirty, and batch related mirror updates.
-- Cull against visible world bounds and separate durable scene rendering from
-  ephemeral overlays.
-- Cache text metrics, freehand outlines, and Markdown layout by Markdown source,
-  width, and style.
-- Benchmark hit testing and rendering with a generated 10,000-shape fixture.
-  Add an incrementally maintained spatial index if the recorded query budget is
-  missed; keep the linear path if it meets the budget.
-- Recompute pointer mappings from current canvas bounds and viewport state. Tests
-  must cover resize, device-pixel-ratio changes, scrolling, and pointer capture.
-
-WebGL and OffscreenCanvas require benchmark evidence and are deferred.
+The renderer resizes its backing canvas only when CSS dimensions or device-pixel
+ratio change, draws only while dirty, culls against visible world bounds, and
+caches text, Markdown layout, and freehand outlines. Pointer mapping uses current
+canvas and viewport bounds through resize, scrolling, device-pixel-ratio changes,
+and pointer capture. The measured linear hit-test path stays simpler than a
+spatial index; WebGL and OffscreenCanvas remain deferred pending evidence.
 
 ## CLI and agent workflow
 
@@ -452,6 +342,8 @@ pointer normalization, patch reconciliation, Canvas hit testing, and SVG output.
 Current verification commands:
 
 ```sh
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
 pnpm --filter @inkfinite/core test --run
 pnpm --filter @inkfinite/renderer test --run
 pnpm --filter @inkfinite/web test
@@ -462,41 +354,28 @@ pnpm --filter @inkfinite/ui check
 pnpm --filter @inkfinite/web check
 pnpm --filter @inkfinite/desktop check
 pnpm --filter @inkfinite/web lint
-cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 ```
 
-The vNext workspace must add `cargo test --workspace`, `cargo clippy --workspace
---all-targets -- -D warnings`, generated-artifact checks, shared-fixture tests,
-CLI integration tests, the two-replica sync test, and the performance harness.
-Human review remains required for proposal UX, layers, visual render fixtures,
-recovery prompts, and release migrations.
+V2-21 extends this with generated-artifact, CLI, IPC, convergence, recovery,
+performance, accessibility, and visual checks. Human review remains required for
+stencils, render parity, proposal UX, recovery prompts, and permission failures.
 
 ## Milestones
 
-1. **Architecture gate:** freeze v1 fixtures and prove Automerge, performance,
-   merge repair, and the project-owned abstraction. Exit with a recorded decision.
-2. **Rust authority:** establish the workspace, v2 model, CRDT adapter,
-   transactions, validation, migrations, schemas, and generated bindings. Exit
-   with convergent Rust tests and lossless v1 imports.
-3. **Desktop vertical slice:** make Rust own open, edit, undo, save, recovery, and
-   the frontend mirror. Keep independent web and desktop composition roots over
-   the same `@inkfinite/ui/editor` module. Exit with an end-to-end drag, reopen,
-   and undo test against the shared editor.
-4. **Editor structure and scale:** extract the editor runtime, fix resize cursor
-   mapping, add culling/caches/benchmarks, and add a spatial index only if needed.
-   Exit with the recorded 10,000-shape budget passing.
-5. **Layers and styles:** ship layer migration, rendering, interaction, panel,
-   opacity controls, and active-layer stencil insertion. Exit with old and new
-   documents behaving consistently.
-6. **CLI and SVG:** ship inspect/query/validate/apply/schema/render followed by
-   structured editing, connections, and layout. Exit with stable JSON and
-   snapshot-tested SVG.
-7. **Live control and sync:** add authenticated local IPC, reviewable proposals,
-   explicit direct apply, and two-replica offline sync. Exit with adversarial IPC
-   and convergence tests.
-8. **Agent and release readiness:** bundle the skill, capabilities, examples, and
-   full migration/recovery/performance matrix. Exit only when every vNext success
-   criterion has evidence.
+Milestones 1 through 4 are complete: the architecture gate, Rust authority,
+desktop vertical slice, and editor scale work all passed. V2-12 also completed
+the layer foundation in milestone 5. [TODO.md](TODO.md) owns ticket-level status
+and acceptance criteria.
+
+- **Milestone 5, layers and styles:** finish shape opacity and active-layer
+  stencil insertion.
+- **Milestone 6, CLI and SVG:** ship deterministic SVG plus read-only and mutating
+  file-mode commands.
+- **Milestone 7, live control and sync:** add authenticated local IPC, reviewable
+  proposals, explicit apply, and two-replica offline convergence.
+- **Milestone 8, agent and release readiness:** bundle the agent skill, record
+  release evidence, replace useful v1 coverage with v2-native fixtures, remove
+  the unreleased v1 compatibility surface, and rerun the release matrix.
 
 ## Deferred milestones
 
@@ -513,8 +392,9 @@ recovery prompts, and release migrations.
 
 ## Boundaries
 
-- Follow existing patterns, preserve v1 fixtures, run affected tests, and keep
-  Git read-only unless repository instructions change.
+- Follow existing patterns, preserve v1 fixtures through V2-21, replace useful
+  coverage before V2-22 removes them, run affected tests, and keep Git read-only
+  unless repository instructions change.
 - Ask before adding production dependencies, changing a published format or
   protocol, broadening authentication or network exposure, or deleting user data.
 - Never expose a public control server, accept invalid partial writes, hand-edit
@@ -523,20 +403,17 @@ recovery prompts, and release migrations.
 
 ## Risks and open questions
 
-- Automerge's Rust API is lower-level than its JavaScript API. The architecture
-  gate must contain it inside `inkfinite-core::crdt`; Yjs/Yrs is the defined
-  fallback.
-- Concurrent hierarchy edits can violate referential invariants. Repair rules
-  need property-based convergence tests before the v2 schema is frozen.
 - CRDT history, freehand strokes, assets, and large boards may raise memory and
-  save costs. Benchmarks must set compaction and asset-storage limits.
+  save costs. The release matrix must enforce compaction and asset-storage
+  limits.
 - Actor-scoped undo and partially accepted proposals must be tested against
   intervening local and remote changes, not only linear histories.
-- The release checklist must settle reference hardware and numeric frame, query,
-  open, save, and sync budgets from the architecture-gate baseline.
+- Local IPC authentication and framing must remain safe under malformed,
+  oversized, replayed, and cross-user requests.
+- Removing v1 compatibility must not discard useful rendering, invalid-input,
+  persistence, recovery, or performance coverage; V2-22 replaces that coverage
+  before deleting its source fixtures.
 
 [am-repo]: https://github.com/automerge/automerge
 [am-rust]: https://docs.rs/automerge/latest/automerge/
 [am-sync]: https://automerge.org/docs/reference/concepts/
-[yrs]: https://docs.rs/yrs/latest/yrs/
-[yjs]: https://docs.yjs.dev/api/document-updates

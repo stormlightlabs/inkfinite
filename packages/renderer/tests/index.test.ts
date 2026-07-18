@@ -36,6 +36,7 @@ describe('Renderer', () => {
 			stroke: vi.fn(),
 			setLineDash: vi.fn(),
 			getLineDash: vi.fn(() => []),
+			globalAlpha: 1,
 			fillStyle: '',
 			strokeStyle: '',
 			lineWidth: 1,
@@ -180,6 +181,59 @@ describe('Renderer', () => {
 			expect(alphaWrites).toContain(0.4);
 			expect(context.fill).toHaveBeenCalledTimes(1);
 			expect(context.save).toHaveBeenCalledTimes(vi.mocked(context.restore).mock.calls.length);
+			renderer.dispose();
+		});
+
+		it('composes shape, fill, and stroke opacity deterministically', () => {
+			const scheduledFrames: FrameRequestCallback[] = [];
+			globalThis.requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+				scheduledFrames.push(callback);
+				return scheduledFrames.length;
+			});
+			let alpha = 1;
+			const alphaWrites: number[] = [];
+			Object.defineProperty(context, 'globalAlpha', {
+				configurable: true,
+				get: () => alpha,
+				set: (value: number) => {
+					alpha = value;
+					alphaWrites.push(value);
+				}
+			});
+			const strokeAlphas: number[] = [];
+			vi.mocked(context.stroke).mockImplementation(() => {
+				strokeAlphas.push(alpha);
+			});
+			const page = PageRecord.create('Page', 'page');
+			const shape = {
+				...ShapeRecord.createRect(
+					page.id,
+					0,
+					0,
+					{ w: 10, h: 10, fill: '#fff', stroke: '#000', radius: 0 },
+					'shape'
+				),
+				opacity: 0.8,
+				fillOpacity: 0.25,
+				strokeOpacity: 0.5
+			};
+			const store = new Store();
+			store.setState((state) => ({
+				...state,
+				doc: {
+					pages: { [page.id]: { ...page, shapeIds: [shape.id] } },
+					shapes: { [shape.id]: shape },
+					bindings: {}
+				},
+				ui: { ...state.ui, currentPageId: page.id }
+			}));
+
+			const renderer = createRenderer(canvas, store);
+			scheduledFrames.shift()?.(0);
+			expect(alphaWrites).toContain(0.2);
+			expect(alphaWrites).toContain(0.4);
+			expect(strokeAlphas).toContain(0.4);
+			expect(context.fill).toHaveBeenCalledOnce();
 			renderer.dispose();
 		});
 

@@ -126,6 +126,12 @@ struct LegacyShape {
     y: f64,
     rot: f64,
     #[serde(default)]
+    opacity: Option<f32>,
+    #[serde(default)]
+    fill_opacity: Option<f32>,
+    #[serde(default)]
+    stroke_opacity: Option<f32>,
+    #[serde(default)]
     group_id: Option<String>,
     props: Map<String, Value>,
 }
@@ -320,7 +326,7 @@ fn migrate(envelope: LegacyEnvelope, actor_id: &ActorId) -> Result<ImportedV1, F
             {
                 properties.insert("legacy_group_id".into(), Value::String(group_id.into()));
             }
-            let style = migrate_style(&kind, &legacy_shape.props, shape_id)?;
+            let style = migrate_style(legacy_shape, &kind, shape_id)?;
             let shape = ShapeRecord {
                 id: ShapeId::from(shape_id.as_str()),
                 kind: ShapeKind::from(kind),
@@ -543,10 +549,18 @@ fn migrate_properties(kind: &str, properties: &Map<String, Value>) -> Result<Sha
     Ok(result)
 }
 
-fn migrate_style(kind: &str, properties: &Map<String, Value>, shape_id: &str) -> Result<ShapeStyle, FileError> {
-    let mut style = ShapeStyle { opacity: Opacity::OPAQUE, fill_opacity: None, stroke_opacity: None };
+fn migrate_style(shape: &LegacyShape, kind: &str, shape_id: &str) -> Result<ShapeStyle, FileError> {
+    let opacity = migrate_opacity(shape.opacity, "opacity", shape_id)?.unwrap_or(Opacity::OPAQUE);
+    let fill_opacity = migrate_opacity(shape.fill_opacity, "fillOpacity", shape_id)?;
+    let mut style = ShapeStyle {
+        opacity,
+        fill_opacity,
+        stroke_opacity: migrate_opacity(shape.stroke_opacity, "strokeOpacity", shape_id)?,
+    };
     if kind == "stroke"
-        && let Some(opacity) = properties
+        && style.stroke_opacity.is_none()
+        && let Some(opacity) = shape
+            .props
             .get("style")
             .and_then(Value::as_object)
             .and_then(|style| style.get("opacity"))
@@ -562,6 +576,12 @@ fn migrate_style(kind: &str, properties: &Map<String, Value>, shape_id: &str) ->
             Some(Opacity::new(value).map_err(|error| invalid_v1(format!("stroke {shape_id} style.opacity: {error}")))?);
     }
     Ok(style)
+}
+
+fn migrate_opacity(value: Option<f32>, field: &str, shape_id: &str) -> Result<Option<Opacity>, FileError> {
+    value
+        .map(|value| Opacity::new(value).map_err(|error| invalid_v1(format!("shape {shape_id} {field}: {error}"))))
+        .transpose()
 }
 
 fn imported_metadata(actor_id: &ActorId, timestamp: Timestamp, name: Option<String>) -> SemanticMetadata {

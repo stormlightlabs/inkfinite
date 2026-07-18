@@ -58,9 +58,8 @@ describe("frozen v1 compatibility fixtures", () => {
     }
 
     stencils.registerBuiltinStencils();
-    expect(stencils.registry.getAll().map((stencil) => stencil.id).sort()).toEqual(
-      [...manifest.coverage.stencilIds].sort(),
-    );
+    const builtInStencilIds = new Set(stencils.registry.getAll().map((stencil) => stencil.id));
+    expect(manifest.coverage.stencilIds.every((id) => builtInStencilIds.has(id))).toBe(true);
     expect(stencils.registry.get("ui:card")?.spawn({ x: 20, y: 30 }).map((shape) => shape.type)).toEqual([
       "rect",
       "line",

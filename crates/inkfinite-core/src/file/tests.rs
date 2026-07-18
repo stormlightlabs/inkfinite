@@ -103,6 +103,31 @@ fn imports_web_and_performance_v1_fixtures() {
 }
 
 #[test]
+fn imports_optional_shape_opacity_without_changing_opaque_defaults() {
+    let mut source: Value = serde_json::from_str(include_str!(
+        "../../../../fixtures/v1/desktop/all-features.inkfinite.json"
+    ))
+    .expect("fixture JSON");
+    source["doc"]["shapes"]["shape:stencil-process"]["opacity"] = Value::from(0.8);
+    source["doc"]["shapes"]["shape:stencil-process"]["fillOpacity"] = Value::from(0.25);
+    source["doc"]["shapes"]["shape:stencil-process"]["strokeOpacity"] = Value::from(0.5);
+    let imported = import_v1_json(
+        &serde_json::to_string(&source).expect("fixture serializes"),
+        ActorId::from("actor:test"),
+    )
+    .expect("fixture imports");
+
+    let styled = &imported.document.shapes[&"shape:stencil-process".into()].style;
+    assert!((styled.opacity.get() - 0.8).abs() < f32::EPSILON);
+    assert_eq!(styled.fill_opacity.map(Opacity::get), Some(0.25));
+    assert_eq!(styled.stroke_opacity.map(Opacity::get), Some(0.5));
+    assert_eq!(
+        imported.document.shapes[&"shape:ellipse".into()].style.opacity,
+        Opacity::OPAQUE
+    );
+}
+
+#[test]
 fn rejects_invalid_and_newer_inputs_before_persistence() {
     let actor = ActorId::from("actor:test");
     let invalid_inputs = [

@@ -11,7 +11,6 @@ import { themeStore } from '../theme.svelte';
 import {
 	ArrowTool,
 	Camera,
-	createId,
 	createToolMap,
 	CursorStore,
 	diffDoc,
@@ -497,49 +496,8 @@ export function createCanvasController(
 	};
 
 	function insertStencil(stencil: Stencil, worldPos: { x: number; y: number }) {
-		const snap = snapStore.get();
-		let pos = { ...worldPos };
-		if (snap.snapEnabled && snap.gridEnabled) {
-			const gridSize = snap.gridSize;
-			pos = {
-				x: Math.round(pos.x / gridSize) * gridSize,
-				y: Math.round(pos.y / gridSize) * gridSize
-			};
-		}
-
 		const state = store.getState();
-		const pageId = state.ui.currentPageId;
-		if (!pageId) return;
-
-		const shapes = stencil.spawn(pos);
-		const groupId = shapes.length > 1 ? createId('group') : undefined;
-
-		const newShapes = { ...state.doc.shapes };
-		const page = state.doc.pages[pageId];
-		if (!page) return;
-
-		const newPageShapeIds = [...page.shapeIds];
-		const newSelection: string[] = [];
-
-		for (const shape of shapes) {
-			shape.pageId = pageId;
-			if (groupId) {
-				shape.groupId = groupId;
-			}
-			newShapes[shape.id] = shape;
-			newPageShapeIds.push(shape.id);
-			newSelection.push(shape.id);
-		}
-
-		const nextState = {
-			...state,
-			doc: {
-				...state.doc,
-				shapes: newShapes,
-				pages: { ...state.doc.pages, [pageId]: { ...page, shapeIds: newPageShapeIds } }
-			},
-			ui: { ...state.ui, selectionIds: newSelection }
-		};
+		const nextState = stencils.insertStencil(state, stencil, worldPos, snapStore.get());
 
 		runtime.commit(
 			state,

@@ -10,9 +10,11 @@
 		EditorState as EditorStateType,
 		EllipseShape,
 		LineShape,
+		MarkdownShape,
 		RectShape,
 		ShapeRecord,
 		Store,
+		StrokeShape,
 		TextShape,
 		ToolId
 	} from '@inkfinite/core';
@@ -72,6 +74,8 @@
 	let exportButtonEl = $state<HTMLButtonElement | null>(null);
 	let fillColorValue = $state(DEFAULT_FILL_COLOR);
 	let strokeColorValue = $state(DEFAULT_STROKE_COLOR);
+	let fillOpacityValue = $state(1);
+	let strokeOpacityValue = $state(1);
 	let fillDisabled = $state(true);
 	let strokeDisabled = $state(true);
 	let brush = $derived<BrushSettings>(brushStore.get());
@@ -98,6 +102,8 @@
 		const selection = getSelectedShapes(editorState);
 		const fillable = selection.filter(shapeSupportsFill);
 		const strokable = selection.filter(shapeSupportsStroke);
+		const fillOpacityTargets = selection.filter(shapeSupportsFillOpacity);
+		const strokeOpacityTargets = selection.filter(shapeSupportsStrokeOpacity);
 		fillDisabled = fillable.length === 0;
 		strokeDisabled = strokable.length === 0;
 		if (fillable.length > 0) {
@@ -120,13 +126,24 @@
 				strokeColorValue = shared;
 			}
 		}
+		fillOpacityValue = getSharedOpacity(fillOpacityTargets, (shape) => shape.fillOpacity) ?? 1;
+		strokeOpacityValue =
+			getSharedOpacity(strokeOpacityTargets, (shape) =>
+				shape.type === 'stroke'
+					? (shape.strokeOpacity ?? shape.props.style.opacity)
+					: shape.strokeOpacity
+			) ?? 1;
 	});
 
 	let showColorControls = $derived(
 		toolSupportsStyles(currentTool) ||
 			toolSupportsFill(currentTool) ||
 			getSelectedShapes(editorState).some(
-				(s) => shapeSupportsFill(s) || shapeSupportsStroke(s)
+				(s) =>
+					shapeSupportsFill(s) ||
+					shapeSupportsStroke(s) ||
+					shapeSupportsFillOpacity(s) ||
+					shapeSupportsStrokeOpacity(s)
 			)
 	);
 
@@ -348,6 +365,30 @@
 		);
 	}
 
+	function shapeSupportsFillOpacity(
+		shape: ShapeRecord
+	): shape is RectShape | EllipseShape | TextShape | MarkdownShape {
+		return (
+			shape.type === 'rect' ||
+			shape.type === 'ellipse' ||
+			shape.type === 'text' ||
+			shape.type === 'markdown'
+		);
+	}
+
+	function shapeSupportsStrokeOpacity(
+		shape: ShapeRecord
+	): shape is RectShape | EllipseShape | LineShape | ArrowShape | StrokeShape | MarkdownShape {
+		return (
+			shape.type === 'rect' ||
+			shape.type === 'ellipse' ||
+			shape.type === 'line' ||
+			shape.type === 'arrow' ||
+			shape.type === 'stroke' ||
+			shape.type === 'markdown'
+		);
+	}
+
 	function toolSupportsStyles(tool: ToolId): boolean {
 		return tool === 'rect' || tool === 'ellipse' || tool === 'line' || tool === 'arrow';
 	}
@@ -373,6 +414,15 @@
 			}
 		}
 		return first;
+	}
+
+	function getSharedOpacity<T extends ShapeRecord>(
+		shapes: T[],
+		extract: (shape: T) => number | undefined
+	): number | null {
+		if (shapes.length === 0) return null;
+		const first = extract(shapes[0]) ?? 1;
+		return shapes.every((shape) => (extract(shape) ?? 1) === first) ? first : null;
 	}
 
 	function applyFillColor(color: string) {
@@ -469,6 +519,37 @@
 		const input = event.currentTarget as HTMLInputElement;
 		strokeColorValue = input.value;
 		applyStrokeColor(input.value);
+	}
+
+	function applyOpacity(field: 'fillOpacity' | 'strokeOpacity', value: number) {
+		const state = store.getState();
+		const targets = getSelectedShapes(state).filter(
+			field === 'fillOpacity' ? shapeSupportsFillOpacity : shapeSupportsStrokeOpacity
+		);
+		if (targets.length === 0) return;
+		const opacity = Math.min(1, Math.max(0, value));
+		const before = EditorState.clone(state);
+		const shapes = { ...state.doc.shapes };
+		for (const shape of targets) {
+			shapes[shape.id] = { ...shape, [field]: opacity } as ShapeRecord;
+		}
+		const after = { ...state, doc: { ...state.doc, shapes } };
+		store.executeCommand(
+			new SnapshotCommand(
+				field === 'fillOpacity' ? 'Set fill opacity' : 'Set stroke opacity',
+				'doc',
+				before,
+				EditorState.clone(after)
+			)
+		);
+	}
+
+	function handleOpacityChange(event: Event, field: 'fillOpacity' | 'strokeOpacity') {
+		const value = (event.currentTarget as HTMLInputElement).valueAsNumber;
+		if (!Number.isFinite(value)) return;
+		if (field === 'fillOpacity') fillOpacityValue = value;
+		else strokeOpacityValue = value;
+		applyOpacity(field, value);
 	}
 
 	function handleBrushChange(newBrush: BrushSettings) {
@@ -626,6 +707,36 @@
 						onchange={handleStrokeChange}
 						disabled={strokeDisabled && !toolSupportsStyles(currentTool)}
 						aria-label="Stroke color" />
+				</label>
+			{/if}
+			{#if getSelectedShapes(editorState).some(shapeSupportsFillOpacity)}
+				<label class="toolbar__opacity-control">
+					<span>Fill opacity</span>
+					<input
+						type="range"
+						min="0"
+						max="1"
+						step="0.05"
+						value={fillOpacityValue}
+						onchange={(event) => handleOpacityChange(event, 'fillOpacity')}
+						aria-label="Fill opacity"
+						aria-valuetext={`${Math.round(fillOpacityValue * 100)}%`} />
+					<output>{Math.round(fillOpacityValue * 100)}%</output>
+				</label>
+			{/if}
+			{#if getSelectedShapes(editorState).some(shapeSupportsStrokeOpacity)}
+				<label class="toolbar__opacity-control">
+					<span>Stroke opacity</span>
+					<input
+						type="range"
+						min="0"
+						max="1"
+						step="0.05"
+						value={strokeOpacityValue}
+						onchange={(event) => handleOpacityChange(event, 'strokeOpacity')}
+						aria-label="Stroke opacity"
+						aria-valuetext={`${Math.round(strokeOpacityValue * 100)}%`} />
+					<output>{Math.round(strokeOpacityValue * 100)}%</output>
 				</label>
 			{/if}
 		</div>
@@ -1040,6 +1151,19 @@
 		display: grid;
 		grid-template-columns: repeat(2, 1fr);
 		gap: 4px;
+		text-align: right;
+	}
+
+	.toolbar__opacity-control {
+		display: grid;
+		grid-template-columns: minmax(6rem, auto) 7rem 3rem;
+		align-items: center;
+		gap: 6px;
+		font-size: 0.75rem;
+	}
+
+	.toolbar__opacity-control output {
+		font-variant-numeric: tabular-nums;
 		text-align: right;
 	}
 

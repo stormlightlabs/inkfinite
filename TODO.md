@@ -80,28 +80,6 @@ pointer-capture cleanup across resize, scrolling, and device-pixel-ratio changes
 
 Optimized measured rendering and hit testing while retaining a simple Canvas 2D design.
 
-Blocked by: V2-09, V2-10
-
-Acceptance criteria:
-
-- [x] Backing dimensions change only when CSS size or DPR changes; rendering is
-      scheduled only while dirty and related patches are batched.
-- [x] Shapes outside visible world bounds are culled without clipping selected
-      handles, bound arrows, shadows, or rotation extents.
-- [x] Durable scene and ephemeral overlays can redraw independently where the
-      benchmark shows a benefit.
-- [x] Text metrics and freehand outlines are cached with bounded invalidation;
-      Markdown layout is cached by source, width, and style.
-- [x] The V2-01 10,000-shape harness meets the numeric frame and query budgets
-      recorded after V2-02. Add an incrementally maintained spatial index only if
-      the linear query path misses its budget, and record the evidence either way.
-- [x] Visual fixtures and hit-test tests show no behavioral regressions.
-
-Verification:
-
-- Run renderer unit/visual tests and the fixed-seed benchmark on the recorded
-  reference machine; attach before/after results to the ticket.
-
 ## Milestone 5: Layers, styles, and stencils
 
 Exit when imported and new documents expose predictable layer behavior and
@@ -136,23 +114,23 @@ Verification:
 
 ### V2-13: Add shape opacity and finish active-layer stencils
 
-What to build: Expose fill/stroke opacity where applicable, complete the curated
-built-in stencil set, and make stencil insertion obey active-layer rules.
+Exposed fill and stroke opacity, completed the curated built-in stencil set, and
+made stencil insertion obey active-layer rules.
 
 Blocked by: V2-12
 
 Acceptance criteria:
 
-- [ ] Applicable shapes have validated fill and stroke opacity in `0..=1`, with
+- [x] Applicable shapes have validated fill and stroke opacity in `0..=1`, with
       accessible inspector controls and deterministic Canvas output.
-- [ ] Existing files default to their current opaque appearance; stroke opacity
+- [x] Existing files default to their current opaque appearance; stroke opacity
       already present on freehand shapes migrates without drift.
-- [ ] The built-in library covers the intended flowchart, UI, and developer
+- [x] The built-in library covers the intended flowchart, UI, and developer
       diagram set without adding sharing or community-library infrastructure.
-- [ ] Palette click and drag insertion place every stencil shape in the active
+- [x] Palette click and drag insertion place every stencil shape in the active
       layer, preserve grouping, snap when enabled, select the result, and create
       one undoable transaction.
-- [ ] Built-in stencil fixtures pass in visible, hidden, locked, and translucent
+- [x] Built-in stencil fixtures pass in visible, hidden, locked, and translucent
       layers.
 
 Verification:
@@ -317,8 +295,9 @@ Verification:
 
 ## Milestone 8: Agent and release readiness
 
-Exit when a clean installation can migrate real v1 documents and complete every
-human, CLI, proposal, recovery, and sync acceptance path.
+Exit when a clean installation completes every human, CLI, proposal, recovery,
+and sync acceptance path, useful predecessor coverage has native replacements,
+and no unreleased predecessor model remains in the product or codebase.
 
 ### V2-20: Bundle the Inkfinite agent skill
 
@@ -361,8 +340,9 @@ Acceptance criteria:
       backup restoration are rehearsed.
 - [ ] Human review signs off layers, proposal UX, render parity, recovery prompts,
       and permission failures on supported desktop platforms.
-- [ ] User-facing migration and file-format documentation is concise and matches
-      shipped behavior; deferred work remains listed in `ROADMAP.md`.
+- [ ] File-format documentation accurately describes the behavior under
+      evaluation; V2-22 collapses the temporary predecessor/current split before
+      release.
 
 Verification:
 
@@ -378,7 +358,50 @@ pnpm --filter @inkfinite/web check
 pnpm --filter @inkfinite/web lint
 ```
 
+### V2-22: Collapse to one native Inkfinite model
+
+What to build: Treat the current document model and file flow as Inkfinite's
+only model. The earlier implementation never shipped, so remove the temporary
+predecessor/current split in full: its files, import and migration paths,
+adapters, names, branches, scripts, package commands, tests, fixtures, and
+documentation. Keep explicit file, schema, and protocol version fields where
+they validate persisted or exchanged data or allow future evolution; they must
+not preserve an implementation of the unreleased predecessor.
+
+Blocked by: V2-21
+
+Acceptance criteria:
+
+- [ ] Remove the predecessor fixtures, generators, baseline tooling, imports,
+      migrations, adapters, compatibility-only tests, scripts, package commands,
+      and documentation.
+- [ ] Web, desktop, CLI, Rust, and shared TypeScript code expose one native model
+      and one supported file flow. There are no user-facing format choices or
+      internal branches for the unreleased implementation.
+- [ ] Remove predecessor-only types, fields, metadata, aliases, and terminology.
+      Rename retained code and fixtures by their current purpose instead of
+      preserving `v1`, `v2`, `legacy`, `compatibility`, `migration`, or similar
+      transition-oriented names.
+- [ ] Replace useful rendering, performance, invalid-input, persistence,
+      recovery, and import/export coverage with native fixtures before deleting
+      its predecessor source. The replacement tests must exercise the same
+      observable failure and recovery cases.
+- [ ] Update ROADMAP.md and current documentation to describe the native model
+      and supported file flow directly, without presenting the codebase as a
+      compatibility bridge between product generations.
+- [ ] Repository searches find no remaining code or first-party artifact tied to
+      the predecessor/current split. Third-party dependency metadata, historical
+      release notes, and intentional version fields are allowed only when they
+      do not retain predecessor behavior or terminology in Inkfinite-owned APIs.
+- [ ] The native release verification matrix passes after the cleanup.
+
+Verification:
+
+- Run the native release verification matrix after cleanup. Search tracked
+  source, tests, fixtures, scripts, package manifests, generated artifacts, and
+  current documentation for predecessor types and transition-oriented terms;
+  review every match rather than relying on a fixed list of file removals.
+
 ## Frontier
 
-V2-12 is the current frontier. Add ordered, visible, lockable layers with active
-layer state and opacity across the model, renderer, interaction, and Svelte UI.
+V2-14 is the current frontier. Add deterministic headless SVG rendering.

@@ -158,6 +158,12 @@ export type BaseShape = {
 	x: number;
 	y: number;
 	rot: number;
+	/** Opacity applied to the complete shape. Older documents default to `1`. */
+	opacity?: number;
+	/** Opacity applied only to fills. Older documents default to `1`. */
+	fillOpacity?: number;
+	/** Opacity applied only to strokes. Older documents default to `1`. */
+	strokeOpacity?: number;
 	groupId?: string;
 	/** Owning layer. Older documents are assigned to their page's default layer on load. */
 	layerId?: string;
@@ -442,6 +448,16 @@ export function validateDoc(document: Document): ValidationResult {
 			errors.push(`Shape '${shapeId}' not listed in page '${shape.pageId}' shapeIds`);
 		}
 
+		for (const [name, value] of [
+			['opacity', shape.opacity],
+			['fill opacity', shape.fillOpacity],
+			['stroke opacity', shape.strokeOpacity]
+		] as const) {
+			if (value !== undefined && (!Number.isFinite(value) || value < 0 || value > 1)) {
+				errors.push(`Shape '${shapeId}' has invalid ${name}`);
+			}
+		}
+
 		switch (shape.type) {
 			case 'rect': {
 				if (shape.props.w < 0) errors.push(`Rect shape '${shapeId}' has negative width`);
@@ -500,7 +516,11 @@ export function validateDoc(document: Document): ValidationResult {
 				if (shape.props.brush.size <= 0) {
 					errors.push(`Stroke shape '${shapeId}' has invalid brush size`);
 				}
-				if (shape.props.style.opacity < 0 || shape.props.style.opacity > 1) {
+				if (
+					!Number.isFinite(shape.props.style.opacity) ||
+					shape.props.style.opacity < 0 ||
+					shape.props.style.opacity > 1
+				) {
 					errors.push(`Stroke shape '${shapeId}' has invalid opacity`);
 				}
 
