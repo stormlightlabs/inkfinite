@@ -1884,23 +1884,8 @@ pub fn validate_document(document: &Document) -> Result<(), EngineError> {
 }
 
 fn validate_shape_schema(shape: &ShapeRecord) -> Result<(), EngineError> {
-    let known_kind = matches!(
-        shape.kind.as_str(),
-        inkfinite_model::RECTANGLE_KIND
-            | inkfinite_model::ELLIPSE_KIND
-            | inkfinite_model::LINE_KIND
-            | inkfinite_model::ARROW_KIND
-            | inkfinite_model::TEXT_KIND
-            | inkfinite_model::STROKE_KIND
-            | inkfinite_model::MARKDOWN_KIND
-            | inkfinite_model::CONTAINER_KIND
-    );
-    if !known_kind {
-        return Err(EngineError::Schema(format!(
-            "shape {} has unknown kind {}",
-            shape.id, shape.kind
-        )));
-    }
+    inkfinite_model::validate_shape_properties(shape.kind.as_str(), &shape.properties)
+        .map_err(|error| EngineError::Schema(format!("shape {}: {error}", shape.id)))?;
     if shape.kind.as_str() != inkfinite_model::CONTAINER_KIND
         && (!shape.child_ids.is_empty() || shape.layout.is_some())
     {

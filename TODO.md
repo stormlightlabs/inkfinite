@@ -85,7 +85,7 @@ Acceptance criteria:
 - [x] A root Cargo workspace contains the model, CRDT, engine, file, protocol,
       SVG, IPC, and CLI crates named in the roadmap.
 - [x] The pnpm workspace contains `editor-runtime`, `renderer-canvas`,
-      `input-dom`, and `generated-bindings`; the existing apps and packages keep
+      `input-dom`, and `bindings`; the existing apps and packages keep
       working in place during the scaffold step.
 - [x] New crates and packages contain only minimal compileable entry points,
       manifests, and dependency edges. This ticket moves no product behavior.
@@ -162,25 +162,32 @@ test ! -d spikes/crdt-automerge
 
 ### V2-06: Generate schemas and TypeScript bindings
 
-What to build: Generate document, transaction, and protocol contracts from Rust
+What to build: Generate document, transaction, and protocol bindings from Rust
 and prove the Rust and TypeScript shape registries agree.
 
 Blocked by: V2-04
 
 Acceptance criteria:
 
-- [ ] Schemars emits JSON Schemas and `ts-rs` emits TypeScript bindings from the
+- [x] Schemars emits JSON Schemas and `ts-rs` emits TypeScript bindings from the
       authoritative Rust records.
-- [ ] Shared fixtures verify kind names, property validation, serialization,
+- [x] Shared fixtures verify kind names, property validation, serialization,
       bounds, transforms, and geometry conventions in Rust and TypeScript.
-- [ ] A check command fails on stale generated output; generated files carry a
+- [x] A check command fails on stale generated output; generated files carry a
       clear do-not-edit header.
-- [ ] Schema changes require fixture and migration updates.
+- [x] Schema changes require fixture and migration updates.
 
 Verification:
 
-- Generate twice and confirm the second run has no file changes, then run the
-  Rust and TypeScript conformance suites.
+- `cargo run -p inkfinite-protocol --bin generate-bindings` generates the
+  schemas, bindings, and shared fixture. Running it again leaves the generated
+  files unchanged.
+- `cargo run -p inkfinite-protocol --bin generate-bindings -- --check` fails
+  when any generated artifact is stale.
+- `cargo test -p inkfinite-model -p inkfinite-protocol` runs the Rust registry
+  and shared-fixture conformance tests.
+- `pnpm --filter bindings test` typechecks the bindings and runs the
+  TypeScript fixture conformance test.
 
 ### V2-07: Import v1 and persist v2 safely
 
@@ -596,5 +603,5 @@ pnpm --filter inkfinite-web lint
 
 ## Frontier
 
-V2-03 is the current frontier. Work it in a fresh implementation context before
-starting tickets that depend on the production vNext workspace.
+V2-07 is the current frontier. Work it in a fresh implementation context before
+starting tickets that depend on safe v2 import and persistence.

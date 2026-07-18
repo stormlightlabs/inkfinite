@@ -106,7 +106,7 @@ patch for the frontend's read-only document mirror.
 | `editor-runtime`       | Framework-neutral tools, camera, selection, and previews                 |
 | `renderer-canvas`      | Svelte-independent Canvas 2D renderer                                    |
 | `input-dom`            | Browser input normalization                                              |
-| `generated-bindings`   | Generated TypeScript records; never hand-edited                          |
+| `bindings`            | Generated TypeScript records; never hand-edited                          |
 
 Business logic must not depend on Tauri, Svelte, CLI parsing, or a transport.
 
@@ -152,6 +152,14 @@ to identical snapshots, and the original semantic, repair, sync, and
 cross-language tests passed without changing the Inkfinite proof boundary.
 Production code depends on the Inkfinite-owned CRDT contracts rather than
 Automerge types, so changes to Automerge's low-level API remain isolated.
+
+V2-06 completed on July 17, 2026. `inkfinite-model` and `inkfinite-protocol`
+derive Schemars and `ts-rs` bindings from the Rust records. The binding
+generator writes document, transaction, and protocol schemas under `schemas/`
+and bindings under `packages/bindings/src/`. Its `--check` mode fails
+on stale output. The Rust and TypeScript registries share the built-in kind list,
+common dimension-property validation, serialization fixture, and transformed
+axis-aligned bounds conventions in `fixtures/v2/shape-registry.json`.
 
 The V2-11 reference budgets are an 8 ms median Canvas frame and a 1 ms median
 hit test for the frozen 10,000-shape board. The V1 medians are 0.61 ms and
@@ -336,7 +344,7 @@ be transport-independent and prove offline concurrent edits between two app
 instances. A hosted relay, accounts, sharing policy, and presence service are
 later milestones; CRDT storage and merge semantics are not deferred with them.
 
-## Persistence and generated contracts
+## Persistence and generated bindings
 
 All desktop file access passes through Rust. Saves validate current heads, write
 to a same-directory temporary file, flush, atomically replace where supported,
@@ -348,7 +356,9 @@ Automerge snapshot plus incremental changes. Clean saves compact the journal and
 retain a bounded recovery window; normal files do not grow without compaction.
 
 Rust records generate JSON Schema and TypeScript bindings for documents,
-transactions, and protocols. CI fails when generated artifacts are stale.
+transactions, and protocols. The `generate-bindings --check` command fails when
+generated artifacts are stale, and the shared Rust/TypeScript fixture covers the
+registry and geometry boundary.
 
 ## Verification
 

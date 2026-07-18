@@ -1,0 +1,121 @@
+use inkfinite_model::{
+    GEOMETRY_BOUNDS, GEOMETRY_COORDINATE_SYSTEM, GEOMETRY_ROTATION, ShapeProperties, ShapeRecord,
+    builtin_shape_kinds, validate_shape_properties,
+};
+use inkfinite_protocol::{Bounds, TransactionDraft};
+use serde_json::Value;
+
+#[test]
+fn shared_shape_fixture_matches_the_rust_registry_and_bindings() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../../fixtures/v2/shape-registry.json"))
+            .expect("shared fixture should be valid JSON");
+
+    let kind_names = fixture["kind_names"]
+        .as_array()
+        .expect("fixture kind names should be an array")
+        .iter()
+        .map(|kind| kind.as_str().expect("kind name should be a string"))
+        .collect::<Vec<_>>();
+    assert_eq!(kind_names, builtin_shape_kinds());
+    assert_eq!(fixture["geometry"]["bounds"], GEOMETRY_BOUNDS);
+    assert_eq!(
+        fixture["geometry"]["coordinate_system"],
+        GEOMETRY_COORDINATE_SYSTEM
+    );
+    assert_eq!(fixture["geometry"]["rotation"], GEOMETRY_ROTATION);
+
+    for case in fixture["property_cases"]
+        .as_array()
+        .expect("property cases should be an array")
+    {
+        let kind = case["kind"]
+            .as_str()
+            .expect("property kind should be a string");
+        let properties: ShapeProperties = serde_json::from_value(case["properties"].clone())
+            .expect("property case should be an object");
+        assert_eq!(
+            validate_shape_properties(kind, &properties).is_ok(),
+            case["valid"].as_bool().expect("valid should be a boolean"),
+            "property case for {kind}"
+        );
+    }
+
+    let shape: ShapeRecord = serde_json::from_value(fixture["serialization"]["shape"].clone())
+        .expect("shape serialization should decode through the Rust binding");
+    let transaction: TransactionDraft =
+        serde_json::from_value(fixture["serialization"]["transaction"].clone())
+            .expect("transaction serialization should decode through the Rust binding");
+    assert_eq!(
+        serde_json::to_value(&shape).expect("shape should reserialize"),
+        fixture["serialization"]["shape"]
+    );
+    assert_eq!(
+        serde_json::to_value(&transaction).expect("transaction should reserialize"),
+        fixture["serialization"]["transaction"]
+    );
+
+    let geometry_case = &fixture["geometry_cases"][0];
+    let expected: Bounds = serde_json::from_value(geometry_case["expected_bounds"].clone())
+        .expect("expected bounds should use the protocol binding");
+    let actual = transformed_bounds(
+        shape
+            .properties
+            .get("width")
+            .and_then(Value::as_f64)
+            .expect("fixture width"),
+        shape
+            .properties
+            .get("height")
+            .and_then(Value::as_f64)
+            .expect("fixture height"),
+        shape.transform,
+    );
+    assert_bounds_close(actual, expected);
+}
+
+fn transformed_bounds(width: f64, height: f64, transform: inkfinite_model::Transform) -> Bounds {
+    let cos = transform.rotation.cos();
+    let sin = transform.rotation.sin();
+    let points = [(0.0, 0.0), (width, 0.0), (0.0, height), (width, height)].map(|(x, y)| {
+        let x = x * transform.scale_x;
+        let y = y * transform.scale_y;
+        (
+            transform.translation.x + x * cos - y * sin,
+            transform.translation.y + x * sin + y * cos,
+        )
+    });
+    let min_x = points
+        .iter()
+        .map(|point| point.0)
+        .fold(f64::INFINITY, f64::min);
+    let max_x = points
+        .iter()
+        .map(|point| point.0)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let min_y = points
+        .iter()
+        .map(|point| point.1)
+        .fold(f64::INFINITY, f64::min);
+    let max_y = points
+        .iter()
+        .map(|point| point.1)
+        .fold(f64::NEG_INFINITY, f64::max);
+    Bounds {
+        x: min_x,
+        y: min_y,
+        width: max_x - min_x,
+        height: max_y - min_y,
+    }
+}
+
+fn assert_bounds_close(actual: Bounds, expected: Bounds) {
+    for (actual, expected) in [
+        (actual.x, expected.x),
+        (actual.y, expected.y),
+        (actual.width, expected.width),
+        (actual.height, expected.height),
+    ] {
+        assert!((actual - expected).abs() < 1e-9, "{actual} != {expected}");
+    }
+}

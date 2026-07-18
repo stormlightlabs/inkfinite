@@ -112,6 +112,8 @@ importers:
         specifier: ^2.0.1
         version: 2.0.1(svelte@5.46.0)(vitest@4.0.16)
 
+  packages/bindings: {}
+
   packages/core:
     dependencies:
       dexie:
@@ -163,11 +165,9 @@ importers:
 
   packages/editor-runtime:
     dependencies:
-      generated-bindings:
+      bindings:
         specifier: workspace:*
-        version: link:../generated-bindings
-
-  packages/generated-bindings: {}
+        version: link:../bindings
 
   packages/input-dom:
     dependencies:
@@ -232,12 +232,12 @@ importers:
 
   packages/renderer-canvas:
     dependencies:
+      bindings:
+        specifier: workspace:*
+        version: link:../bindings
       editor-runtime:
         specifier: workspace:*
         version: link:../editor-runtime
-      generated-bindings:
-        specifier: workspace:*
-        version: link:../generated-bindings
 
 packages:
 

@@ -6,7 +6,10 @@
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {
     "fixtures:v1": "node scripts/generate-v1-fixtures.mjs",
-    "baseline:v1": "node scripts/capture-v1-performance.mjs --output fixtures/v1/performance/baseline.json"
+    "baseline:v1": "node scripts/capture-v1-performance.mjs --output fixtures/v1/performance/baseline.json",
+    "bindings:generate": "cargo run -p inkfinite-protocol --bin generate-bindings",
+    "bindings:check": "cargo run -p inkfinite-protocol --bin generate-bindings -- --check",
+    "bindings:test": "pnpm --filter bindings test"
   },
   "devDependencies": { "dprint": "^0.50.2", "typescript": "^5.9.3" },
   "engines": { "node": ">=18.0.0", "pnpm": ">=8.0.0" },

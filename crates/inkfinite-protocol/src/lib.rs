@@ -8,7 +8,9 @@ use inkfinite_model::{
     RecordVersion, SemanticMetadata, ShapeId, ShapeParent, ShapeProperties, ShapeRecord,
     ShapeStyle, SiblingAnchor, Timestamp, Transform,
 };
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 /// Stable identifier for the Inkfinite protocol contract.
 pub const PROTOCOL_ID: &str = "inkfinite.protocol";
@@ -17,27 +19,33 @@ pub const PROTOCOL_ID: &str = "inkfinite.protocol";
 pub const PROTOCOL_VERSION: u32 = 1;
 
 /// Stable identifier for a transaction.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Clone, Debug, Eq, Hash, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS,
+)]
 #[serde(transparent)]
 pub struct TransactionId(pub String);
 
 /// Stable identifier for an open document session.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Clone, Debug, Eq, Hash, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS,
+)]
 #[serde(transparent)]
 pub struct SessionId(pub String);
 
 /// Stable identifier for a transaction proposal awaiting user review.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Clone, Debug, Eq, Hash, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS,
+)]
 #[serde(transparent)]
 pub struct ProposalId(pub String);
 
 /// Cross-platform serialized document path used at file-service boundaries.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(transparent)]
 pub struct DocumentPath(pub String);
 
 /// One durable edit submitted to the transaction engine.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct TransactionDraft {
     /// Stable transaction identifier.
     pub id: TransactionId,
@@ -56,7 +64,7 @@ pub struct TransactionDraft {
 }
 
 /// Policy for children of a deleted non-empty layer.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(
     rename_all = "snake_case",
     tag = "kind",
@@ -70,7 +78,7 @@ pub enum LayerContentsDisposition {
 }
 
 /// Mutable layer fields.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct LayerPatch {
     /// Replacement display name.
     pub name: Option<String>,
@@ -83,11 +91,12 @@ pub struct LayerPatch {
 }
 
 /// Mutable shape fields. `Some(None)` clears an optional field.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct ShapePatch {
     /// Replacement relative transform.
     pub transform: Option<Transform>,
     /// Replacement kind-specific properties.
+    #[ts(type = "ShapeProperties | null")]
     pub properties: Option<ShapeProperties>,
     /// Replacement semantic metadata.
     pub metadata: Option<SemanticMetadata>,
@@ -98,7 +107,7 @@ pub struct ShapePatch {
 }
 
 /// Mutable asset fields.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct AssetPatch {
     /// Replacement display name.
     pub name: Option<String>,
@@ -107,7 +116,7 @@ pub struct AssetPatch {
 }
 
 /// Axis used by alignment and distribution operations.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
 pub enum LayoutAxis {
     /// Horizontal document axis.
@@ -117,7 +126,7 @@ pub enum LayoutAxis {
 }
 
 /// Edge or center line used to align a group of shapes.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
 pub enum ShapeAlignment {
     /// Align left bounds.
@@ -135,7 +144,7 @@ pub enum ShapeAlignment {
 }
 
 /// Durable document operation. Ordered insertions use sibling anchors only.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum Operation {
     /// Insert a page into the document's ordered page list.
@@ -283,7 +292,7 @@ pub enum Operation {
 }
 
 /// Identifies a record touched by a commit or proposal.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case", tag = "kind", content = "id")]
 pub enum RecordId {
     /// Page record.
@@ -299,7 +308,7 @@ pub enum RecordId {
 }
 
 /// Materialized patch returned after a successful commit.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct DocumentPatch {
     /// Records created by the commit.
     pub created: Vec<RecordId>,
@@ -310,7 +319,7 @@ pub struct DocumentPatch {
 }
 
 /// Axis-aligned bounds in document coordinates.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct Bounds {
     /// Left edge.
     pub x: f64,
@@ -323,7 +332,7 @@ pub struct Bounds {
 }
 
 /// Region that a renderer should consider dirty after a transaction.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct AffectedRegion {
     /// Page containing the changed visual content.
     pub page_id: PageId,
@@ -332,7 +341,7 @@ pub struct AffectedRegion {
 }
 
 /// Operations needed to compensate a committed transaction.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct InverseMetadata {
     /// Actor whose history owns this inverse.
     pub actor_id: ActorId,
@@ -341,7 +350,7 @@ pub struct InverseMetadata {
 }
 
 /// Non-fatal repair or normalization performed during a commit or merge.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct Warning {
     /// Stable machine-readable warning code.
     pub code: String,
@@ -352,7 +361,7 @@ pub struct Warning {
 }
 
 /// Successful result from a durable transaction.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct CommitResult {
     /// Transaction that was committed.
     pub transaction_id: TransactionId,
@@ -371,7 +380,7 @@ pub struct CommitResult {
 }
 
 /// Optional semantic filters for a document query.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct Query {
     /// Match one exact record ID, regardless of record kind.
     pub id: Option<String>,
@@ -394,7 +403,7 @@ pub struct Query {
 }
 
 /// Materialized query result suitable for machine clients.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct QueryResult {
     /// Causal heads inspected by the query.
     pub heads: Vec<ChangeHash>,
@@ -405,7 +414,7 @@ pub struct QueryResult {
 }
 
 /// Result of saving an open document session.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct SaveResult {
     /// Path written by the file service.
     pub path: DocumentPath,
@@ -414,7 +423,7 @@ pub struct SaveResult {
 }
 
 /// Validated transaction held for explicit user review.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct Proposal {
     /// Stable proposal identifier.
     pub id: ProposalId,
@@ -427,7 +436,7 @@ pub struct Proposal {
 }
 
 /// Transport-independent request accepted by desktop commands, IPC, or CLI adapters.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum Request {
     /// Create a new document session.
@@ -529,7 +538,7 @@ pub enum Request {
 }
 
 /// Successful transport-independent response.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case", tag = "type", content = "value")]
 pub enum Response {
     /// A new session was opened.
@@ -553,13 +562,14 @@ pub enum Response {
 }
 
 /// Stable protocol error returned across all adapters.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct ProtocolError {
     /// Stable machine-readable error code.
     pub code: String,
     /// Human-readable error detail.
     pub message: String,
     /// Optional structured context for machine clients.
+    #[ts(type = "JsonValue | null")]
     pub details: Option<serde_json::Value>,
 }
 

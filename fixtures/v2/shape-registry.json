@@ -1,0 +1,158 @@
+{
+  "_do_not_edit": true,
+  "_generated_by": "cargo run -p inkfinite-protocol --bin generate-bindings",
+  "format": "inkfinite.shape-registry-fixture",
+  "geometry": {
+    "bounds": "axis_aligned_enclosing_bounds",
+    "coordinate_system": "local_origin_top_left_positive_x_right_positive_y_down",
+    "rotation": "clockwise_radians_about_local_origin"
+  },
+  "geometry_cases": [
+    {
+      "expected_bounds": {
+        "height": 64.68151994504743,
+        "width": 84.58937110935591,
+        "x": -4.38276615812609,
+        "y": 20.0
+      },
+      "kind": "rect",
+      "properties": {
+        "height": 20.0,
+        "width": 40.0
+      },
+      "transform": {
+        "rotation": 0.5,
+        "scale_x": 2.0,
+        "scale_y": 1.5,
+        "translation": {
+          "x": 10.0,
+          "y": 20.0
+        }
+      }
+    }
+  ],
+  "kind_names": [
+    "rect",
+    "ellipse",
+    "line",
+    "arrow",
+    "text",
+    "stroke",
+    "markdown",
+    "container"
+  ],
+  "property_cases": [
+    {
+      "kind": "rect",
+      "properties": {
+        "height": 20.0,
+        "width": 40.0
+      },
+      "valid": true
+    },
+    {
+      "kind": "rect",
+      "properties": {
+        "height": 20.0,
+        "width": -1.0
+      },
+      "valid": false
+    },
+    {
+      "kind": "rect",
+      "properties": {
+        "height": 20.0,
+        "width": "40"
+      },
+      "valid": false
+    },
+    {
+      "kind": "unknown",
+      "properties": {},
+      "valid": false
+    }
+  ],
+  "serialization": {
+    "shape": {
+      "child_ids": [],
+      "id": "shape:fixture",
+      "kind": "rect",
+      "layout": null,
+      "metadata": {
+        "agent_editable": true,
+        "description": null,
+        "locked": false,
+        "name": "Fixture rectangle",
+        "provenance": {
+          "actor_id": "actor:fixture",
+          "origin": "system",
+          "source": "v2-06",
+          "timestamp": 1700000000000
+        },
+        "role": "fixture.shape",
+        "tags": [
+          "fixture"
+        ]
+      },
+      "parent": {
+        "id": "layer:fixture",
+        "kind": "layer"
+      },
+      "properties": {
+        "height": 20.0,
+        "width": 40.0
+      },
+      "style": {
+        "fill_opacity": null,
+        "opacity": 1.0,
+        "stroke_opacity": null
+      },
+      "transform": {
+        "rotation": 0.5,
+        "scale_x": 2.0,
+        "scale_y": 1.5,
+        "translation": {
+          "x": 10.0,
+          "y": 20.0
+        }
+      },
+      "version": 1
+    },
+    "transaction": {
+      "actor_id": "actor:fixture",
+      "base_heads": [
+        "head:fixture"
+      ],
+      "description": "V2-06 shared binding fixture",
+      "id": "transaction:fixture",
+      "operations": [
+        {
+          "expected_version": 1,
+          "patch": {
+            "layout": null,
+            "metadata": null,
+            "properties": {
+              "height": 20.0,
+              "width": 40.0
+            },
+            "style": null,
+            "transform": {
+              "rotation": 0.5,
+              "scale_x": 2.0,
+              "scale_y": 1.5,
+              "translation": {
+                "x": 10.0,
+                "y": 20.0
+              }
+            }
+          },
+          "shape_id": "shape:fixture",
+          "type": "patch_shape"
+        }
+      ],
+      "origin": "system",
+      "timestamp": 1700000000000
+    }
+  },
+  "version": 1
+}

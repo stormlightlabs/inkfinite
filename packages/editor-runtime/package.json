@@ -10,5 +10,5 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "dprint check src/index.ts"
   },
-  "dependencies": { "generated-bindings": "workspace:*" }
+  "dependencies": { "bindings": "workspace:*" }
 }

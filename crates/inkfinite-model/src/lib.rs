@@ -3,8 +3,10 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use ts_rs::TS;
 
 /// Stable format identifier for an Inkfinite v2 document snapshot.
 pub const INKFINITE_FORMAT_ID: &str = "inkfinite.document";
@@ -29,11 +31,56 @@ pub const MARKDOWN_KIND: &str = "markdown";
 /// Built-in container shape kind.
 pub const CONTAINER_KIND: &str = "container";
 
+/// Stable order of the built-in shape kinds exposed to both registries.
+pub const BUILTIN_SHAPE_KINDS: &[&str] = &[
+    RECTANGLE_KIND,
+    ELLIPSE_KIND,
+    LINE_KIND,
+    ARROW_KIND,
+    TEXT_KIND,
+    STROKE_KIND,
+    MARKDOWN_KIND,
+    CONTAINER_KIND,
+];
+
+/// Coordinate convention used by shape geometry implementations.
+pub const GEOMETRY_COORDINATE_SYSTEM: &str =
+    "local_origin_top_left_positive_x_right_positive_y_down";
+/// Rotation convention used by shape geometry implementations.
+pub const GEOMETRY_ROTATION: &str = "clockwise_radians_about_local_origin";
+/// Bounds convention used by shape geometry implementations.
+pub const GEOMETRY_BOUNDS: &str = "axis_aligned_enclosing_bounds";
+
+/// Returns the built-in shape registry keys in their stable serialized order.
+#[must_use]
+pub const fn builtin_shape_kinds() -> &'static [&'static str] {
+    BUILTIN_SHAPE_KINDS
+}
+
+/// Returns whether `kind` is one of the built-in shape registry keys.
+#[must_use]
+pub fn is_builtin_shape_kind(kind: &str) -> bool {
+    BUILTIN_SHAPE_KINDS.contains(&kind)
+}
+
 macro_rules! string_id {
     ($name:ident, $doc:literal) => {
         #[doc = $doc]
-        #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+        #[derive(
+            Clone,
+            Debug,
+            Eq,
+            Hash,
+            JsonSchema,
+            Ord,
+            PartialEq,
+            PartialOrd,
+            Serialize,
+            Deserialize,
+            TS,
+        )]
         #[serde(transparent)]
+        #[ts(type = "string")]
         pub struct $name(String);
 
         impl $name {
@@ -92,19 +139,36 @@ string_id!(ShapeKind, "Registry key for a shape definition.");
 string_id!(BindingKind, "Registry key for a binding definition.");
 
 /// Milliseconds since the Unix epoch.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Eq, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS,
+)]
 #[serde(transparent)]
+#[ts(type = "number")]
 pub struct Timestamp(pub i64);
 
 /// Monotonic version of a durable record within the document history.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Eq, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS,
+)]
 #[serde(transparent)]
+#[ts(type = "number")]
 pub struct RecordVersion(pub u64);
 
 /// Opacity constrained to the inclusive range from zero to one.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(try_from = "f32", into = "f32")]
+#[schemars(schema_with = "opacity_schema")]
+#[ts(type = "number")]
 pub struct Opacity(f32);
+
+fn opacity_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    let mut schema = f32::json_schema(generator);
+    if let Some(object) = schema.as_object_mut() {
+        object.insert("minimum".into(), 0.0.into());
+        object.insert("maximum".into(), 1.0.into());
+    }
+    schema
+}
 
 impl Opacity {
     /// Fully transparent opacity.
@@ -164,7 +228,7 @@ impl fmt::Display for InvalidOpacity {
 impl std::error::Error for InvalidOpacity {}
 
 /// Anchor used to place an item in an ordered child list without numeric indexes.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case", tag = "position", content = "sibling_id")]
 pub enum SiblingAnchor<Id> {
     /// Place the item before every existing sibling.
@@ -178,7 +242,7 @@ pub enum SiblingAnchor<Id> {
 }
 
 /// Two-dimensional point or vector in document coordinates.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct Vec2 {
     /// Horizontal component.
     pub x: f64,
@@ -187,7 +251,7 @@ pub struct Vec2 {
 }
 
 /// Transform relative to a shape's parent container or layer.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct Transform {
     /// Translation in parent coordinates.
     pub translation: Vec2,
@@ -200,7 +264,7 @@ pub struct Transform {
 }
 
 /// Origin of a durable record or transaction.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
 pub enum Origin {
     /// Direct edit made by a person.
@@ -216,7 +280,7 @@ pub enum Origin {
 }
 
 /// Attribution retained with durable content.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct Provenance {
     /// Actor responsible for the record's current form.
     pub actor_id: ActorId,
@@ -229,7 +293,7 @@ pub struct Provenance {
 }
 
 /// Human- and agent-readable meaning attached to a shape.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct SemanticMetadata {
     /// Optional display name.
     pub name: Option<String>,
@@ -248,7 +312,7 @@ pub struct SemanticMetadata {
 }
 
 /// Common visual style shared by all shape kinds.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct ShapeStyle {
     /// Opacity applied to the complete shape.
     pub opacity: Opacity,
@@ -259,7 +323,7 @@ pub struct ShapeStyle {
 }
 
 /// Parent that owns a shape's sole draw-order entry.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case", tag = "kind", content = "id")]
 pub enum ShapeParent {
     /// The shape is a root child of a layer.
@@ -269,7 +333,7 @@ pub enum ShapeParent {
 }
 
 /// Stack direction for container layout.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
 pub enum StackDirection {
     /// Place children from left to right.
@@ -279,7 +343,7 @@ pub enum StackDirection {
 }
 
 /// Cross-axis alignment for laid-out children.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
 pub enum LayoutAlignment {
     /// Align children to the start edge.
@@ -293,7 +357,7 @@ pub enum LayoutAlignment {
 }
 
 /// Padding inside a layout container.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct Insets {
     /// Top inset.
     pub top: f64,
@@ -306,7 +370,7 @@ pub struct Insets {
 }
 
 /// Optional automatic layout applied by a container shape.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case", tag = "kind")]
 pub enum ContainerLayout {
     /// Children retain their explicit transforms.
@@ -340,8 +404,95 @@ pub enum ContainerLayout {
 /// Kind-specific shape properties owned by the shape registry.
 pub type ShapeProperties = BTreeMap<String, Value>;
 
+/// Error returned when a shape registry property violates a shared registry rule.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ShapePropertyError {
+    /// The shape kind is not part of the built-in registry.
+    UnknownKind { kind: String },
+    /// A dimension property was not a JSON number.
+    ExpectedNumber { kind: String, property: String },
+    /// A dimension property was non-finite.
+    NonFiniteNumber { kind: String, property: String },
+    /// A dimension property was negative.
+    NegativeNumber { kind: String, property: String },
+}
+
+impl fmt::Display for ShapePropertyError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnknownKind { kind } => write!(formatter, "unknown shape kind {kind}"),
+            Self::ExpectedNumber { kind, property } => {
+                write!(
+                    formatter,
+                    "shape kind {kind} property {property} must be a number"
+                )
+            }
+            Self::NonFiniteNumber { kind, property } => {
+                write!(
+                    formatter,
+                    "shape kind {kind} property {property} must be finite"
+                )
+            }
+            Self::NegativeNumber { kind, property } => {
+                write!(
+                    formatter,
+                    "shape kind {kind} property {property} must not be negative"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for ShapePropertyError {}
+
+/// Validates the property rules shared by the Rust and TypeScript registries.
+///
+/// Unknown properties remain available for shape-specific extensions. The
+/// registry currently gives common `width` and `height` properties their
+/// cross-language numeric and non-negative constraints.
+///
+/// # Errors
+///
+/// Returns [`ShapePropertyError`] when the kind is unknown or a supplied common
+/// dimension cannot be represented as a finite, non-negative number.
+pub fn validate_shape_properties(
+    kind: &str,
+    properties: &ShapeProperties,
+) -> Result<(), ShapePropertyError> {
+    if !is_builtin_shape_kind(kind) {
+        return Err(ShapePropertyError::UnknownKind {
+            kind: kind.to_owned(),
+        });
+    }
+
+    for property in ["width", "height"] {
+        let Some(value) = properties.get(property) else {
+            continue;
+        };
+        let Some(number) = value.as_f64() else {
+            return Err(ShapePropertyError::ExpectedNumber {
+                kind: kind.to_owned(),
+                property: property.to_owned(),
+            });
+        };
+        if !number.is_finite() {
+            return Err(ShapePropertyError::NonFiniteNumber {
+                kind: kind.to_owned(),
+                property: property.to_owned(),
+            });
+        }
+        if number < 0.0 {
+            return Err(ShapePropertyError::NegativeNumber {
+                kind: kind.to_owned(),
+                property: property.to_owned(),
+            });
+        }
+    }
+    Ok(())
+}
+
 /// Durable shape record shared by all built-in shape definitions.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct ShapeRecord {
     /// Stable record identifier.
     pub id: ShapeId,
@@ -356,6 +507,7 @@ pub struct ShapeRecord {
     /// Optional automatic layout for container shapes.
     pub layout: Option<ContainerLayout>,
     /// Kind-specific serialized properties validated by the registry.
+    #[ts(type = "ShapeProperties")]
     pub properties: ShapeProperties,
     /// Human- and agent-readable semantics and permissions.
     pub metadata: SemanticMetadata,
@@ -366,7 +518,7 @@ pub struct ShapeRecord {
 }
 
 /// Durable page record and its ordered layer list.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct PageRecord {
     /// Stable record identifier.
     pub id: PageId,
@@ -379,7 +531,7 @@ pub struct PageRecord {
 }
 
 /// Durable layer record and its ordered root-shape list.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct LayerRecord {
     /// Stable record identifier.
     pub id: LayerId,
@@ -400,7 +552,7 @@ pub struct LayerRecord {
 }
 
 /// Attachment point on a bound shape.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case", tag = "kind")]
 pub enum BindingAnchor {
     /// Attach to the calculated center.
@@ -415,7 +567,7 @@ pub enum BindingAnchor {
 }
 
 /// Durable relationship between two shapes.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct BindingRecord {
     /// Stable record identifier.
     pub id: BindingId,
@@ -434,7 +586,7 @@ pub struct BindingRecord {
 }
 
 /// Storage form for asset contents.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case", tag = "kind")]
 pub enum AssetSource {
     /// Bytes stored inside the canonical document.
@@ -450,7 +602,7 @@ pub enum AssetSource {
 }
 
 /// Durable image, font, or other binary asset.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct AssetRecord {
     /// Stable record identifier.
     pub id: AssetId,
@@ -469,7 +621,7 @@ pub struct AssetRecord {
 }
 
 /// Normalized, materialized Inkfinite document.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct Document {
     /// Pages indexed by their stable IDs.
     pub pages: BTreeMap<PageId, PageRecord>,
@@ -486,7 +638,7 @@ pub struct Document {
 }
 
 /// Materialized document plus its format and causal identity.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct DocumentSnapshot {
     /// Stable format identifier.
     pub format: FormatId,
@@ -525,5 +677,40 @@ mod tests {
 
         assert_eq!(value["position"], "after");
         assert_eq!(value["sibling_id"], "shape:first");
+    }
+
+    #[test]
+    fn builtin_registry_validates_shared_dimension_properties() {
+        assert_eq!(
+            builtin_shape_kinds(),
+            &[
+                RECTANGLE_KIND,
+                ELLIPSE_KIND,
+                LINE_KIND,
+                ARROW_KIND,
+                TEXT_KIND,
+                STROKE_KIND,
+                MARKDOWN_KIND,
+                CONTAINER_KIND,
+            ]
+        );
+        assert!(
+            validate_shape_properties(
+                RECTANGLE_KIND,
+                &BTreeMap::from([(String::from("width"), Value::from(10.0))])
+            )
+            .is_ok()
+        );
+        assert!(matches!(
+            validate_shape_properties(
+                RECTANGLE_KIND,
+                &BTreeMap::from([(String::from("height"), Value::from(-1.0))])
+            ),
+            Err(ShapePropertyError::NegativeNumber { .. })
+        ));
+        assert!(matches!(
+            validate_shape_properties("unknown", &BTreeMap::new()),
+            Err(ShapePropertyError::UnknownKind { .. })
+        ));
     }
 }
