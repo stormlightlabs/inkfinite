@@ -107,18 +107,18 @@ describe('Canvas component', () => {
 		expect(statusBar).toBeTruthy();
 	});
 
-	it('should render the header with info button', () => {
+	it('should render editor utilities in the status bar', () => {
 		const { container } = renderCanvas();
-		const titleBar = container.querySelector('.toolbar');
-		expect(titleBar).toBeTruthy();
-		expect(titleBar?.querySelector('.toolbar__info')).toBeTruthy();
+		const statusBar = container.querySelector('.status-bar');
+		expect(statusBar?.querySelector('[aria-label="About Inkfinite"]')).toBeTruthy();
+		expect(statusBar?.querySelector('[aria-label="History"]')).toBeTruthy();
 	});
 
 	it('should render all tool buttons in toolbar', () => {
 		const { container } = renderCanvas();
 		const toolButtons = container.querySelectorAll('.tool-button');
 
-		expect(toolButtons.length).toBe(10);
+		expect(toolButtons.length).toBe(9);
 
 		const toolIds = Array.from(toolButtons).map((btn) => btn.getAttribute('data-tool-id'));
 		const coreToolIds = toolIds.filter((id) => id && id !== 'history');
@@ -133,7 +133,7 @@ describe('Canvas component', () => {
 			'pen'
 		]);
 
-		const historyButton = container.querySelector('.tool-button.history-button');
+		const historyButton = container.querySelector('.status-bar__action[aria-label="History"]');
 		expect(historyButton).toBeTruthy();
 	});
 

@@ -5,13 +5,18 @@
 	const platform = createDexiePlatformAdapter();
 </script>
 
-<div class="editor">
-	<div class="canvas-wrapper">
-		<Editor {platform} />
-	</div>
-</div>
+<main class="web-editor">
+	<Editor {platform} />
+</main>
 
 <style>
+	.web-editor {
+		width: 100%;
+		height: 100%;
+		min-width: 0;
+		min-height: 0;
+	}
+
 	:global(body),
 	:global(html) {
 		margin: 0;

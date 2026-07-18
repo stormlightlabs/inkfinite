@@ -112,10 +112,8 @@
 			onSaveAs: () => c.desktop.handleSaveAs(null),
 			onSelectBoard: c.desktop.handleRecentSelect
 		}}
-		onOpenBrowser={c.fileBrowser.handleOpen}
 		currentTool={c.tools.currentToolId}
 		onToolChange={c.tools.handleChange}
-		onHistoryClick={c.history.handleClick}
 		onStencilsClick={handleStencilsClick}
 		store={c.store}
 		getViewport={c.getViewport}
@@ -215,7 +213,10 @@
 		store={c.store}
 		cursor={c.cursorStore}
 		persistence={persistenceStatusStore}
-		snap={c.snapStore} />
+		snap={c.snapStore}
+		platform={platformKind}
+		onOpenBrowser={c.fileBrowser.handleOpen}
+		onHistoryClick={c.history.handleClick} />
 	{#if c.fileBrowser.vm && c.fileBrowser.open}
 		<FileBrowser
 			bind:vm={c.fileBrowser.vm}

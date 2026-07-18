@@ -1,5 +1,9 @@
 <script lang="ts">
+	import { Dialog, Icon } from '../../index';
+	import { HELP_LINKS, KEYBOARD_TIPS } from '../constants';
+	import type { EditorPlatform } from '../platform';
 	import type { SnapSettings, SnapStore, StatusStore } from '../status';
+	import { themeStore } from '../theme.svelte';
 	import {
 		type CursorState,
 		type CursorStore,
@@ -10,9 +14,26 @@
 		buildStatusBarVM
 	} from '@inkfinite/core';
 
-	type Props = { store: Store; cursor: CursorStore; persistence: StatusStore; snap: SnapStore };
+	type Props = {
+		store: Store;
+		cursor: CursorStore;
+		persistence: StatusStore;
+		snap: SnapStore;
+		platform?: EditorPlatform;
+		onOpenBrowser?: () => void;
+		onHistoryClick?: () => void;
+	};
 
-	let { store, cursor, persistence, snap }: Props = $props();
+	let {
+		store,
+		cursor,
+		persistence,
+		snap,
+		platform = 'web',
+		onOpenBrowser,
+		onHistoryClick
+	}: Props = $props();
+	let infoOpen = $state(false);
 
 	let editorSnapshot: EditorState = EditorStateOps.create();
 	let cursorSnapshot: CursorState = { cursorWorld: { x: 0, y: 0 }, lastMoveAt: Date.now() };
@@ -176,19 +197,121 @@
 			{formatPersistenceSummary()}
 		</span>
 	</div>
+
+	<div class="status-bar__actions" aria-label="Editor utilities">
+		<button
+			class="status-bar__action"
+			onclick={() => themeStore.toggle()}
+			aria-label="Toggle Dark Mode"
+			title="Toggle Dark Mode">
+			<Icon name={themeStore.current === 'dark' ? 'sun' : 'moon'} size={15} />
+			<span>{themeStore.current === 'dark' ? 'Light' : 'Dark'}</span>
+		</button>
+		{#if platform === 'web' && onOpenBrowser}
+			<button class="status-bar__action" onclick={onOpenBrowser} aria-label="Browse boards">
+				<Icon name="folder" size={15} />
+				<span>Boards</span>
+			</button>
+		{/if}
+		<button
+			class="status-bar__action"
+			onclick={() => (infoOpen = true)}
+			aria-label="About Inkfinite">
+			<Icon name="info-circle" size={15} />
+			<span>Info</span>
+		</button>
+		{#if onHistoryClick}
+			<button class="status-bar__action" onclick={onHistoryClick} aria-label="History">
+				<Icon name="history" size={15} />
+				<span>History</span>
+			</button>
+		{/if}
+	</div>
 </div>
+
+<Dialog bind:open={infoOpen} onClose={() => (infoOpen = false)} title="About Inkfinite">
+	<section class="about">
+		<h1>About Inkfinite</h1>
+		<p>
+			Inkfinite is an infinite canvas prototype. The goal is to build a cross-platform editor
+			with a framework-agnostic core so the same engine powers both the web and desktop apps.
+		</p>
+		<div class="about__section">
+			<h2>Quick Tips</h2>
+			<ul>
+				{#each KEYBOARD_TIPS as tip (tip)}<li>{tip}</li>{/each}
+			</ul>
+		</div>
+		<div class="about__section">
+			<h2>Need help?</h2>
+			<ul>
+				{#each HELP_LINKS as link (link.href)}
+					<li>
+						<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+						<a
+							href={link.href}
+							target={link.external ? '_blank' : undefined}
+							rel="noreferrer">{link.label}</a>
+					</li>
+				{/each}
+			</ul>
+		</div>
+	</section>
+</Dialog>
 
 <style>
 	.status-bar {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+		grid-template-columns: repeat(4, minmax(120px, 1fr)) auto auto;
 		gap: 1.5rem;
 		padding: 0.75rem 1.5rem;
 		background: var(--surface-elevated);
-		border-top: 1px solid var(--border);
+		border-top: 1px solid color-mix(in srgb, var(--border) 46%, transparent);
+		box-shadow: 0 -8px 24px color-mix(in srgb, var(--ink-shadow-color) 10%, transparent);
 		font-size: 0.75rem;
 		align-items: center;
 		min-height: 48px;
+	}
+
+	.status-bar__actions {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: var(--ink-space-1);
+	}
+
+	.status-bar__action {
+		display: inline-flex;
+		min-height: 32px;
+		align-items: center;
+		gap: var(--ink-space-1);
+		padding: var(--ink-space-1) var(--ink-space-2);
+		border: 1px solid transparent;
+		border-radius: var(--ink-radius-wobbly-small);
+		color: var(--text-muted);
+		background: transparent;
+		cursor: pointer;
+		transition-property: color, background-color, border-color, transform;
+		transition-duration: var(--ink-duration-fast);
+	}
+
+	.status-bar__action:hover {
+		border-color: color-mix(in srgb, var(--border) 55%, transparent);
+		color: var(--text);
+		background: var(--surface-hover);
+	}
+
+	.status-bar__action:active {
+		transform: scale(0.96);
+	}
+
+	.status-bar__action:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+
+	.status-bar__action span {
+		font-size: var(--ink-type-xs);
 	}
 
 	.status-bar__section {
@@ -248,5 +371,64 @@
 	.status-bar__mode {
 		font-size: 0.75rem;
 		color: var(--text-muted);
+	}
+
+	.about {
+		max-width: 480px;
+		padding: var(--ink-space-5);
+	}
+
+	.about h1 {
+		margin-top: 0;
+	}
+
+	.about__section {
+		margin-top: var(--ink-space-5);
+	}
+
+	.about__section h2 {
+		font-size: var(--ink-type-base);
+	}
+
+	@media (max-width: 960px) {
+		.status-bar {
+			display: flex;
+			min-height: 48px;
+			gap: var(--ink-space-4);
+			padding: var(--ink-space-1) var(--ink-space-3);
+			overflow-x: auto;
+			overflow-y: hidden;
+			white-space: nowrap;
+			scrollbar-width: thin;
+		}
+
+		.status-bar__section,
+		.status-bar__actions {
+			flex: 0 0 auto;
+		}
+
+		.status-bar__actions {
+			justify-content: flex-start;
+			margin-left: auto;
+		}
+	}
+
+	@media (max-width: 720px) {
+		.status-bar {
+			gap: var(--ink-space-3);
+		}
+
+		.status-bar__label,
+		.status-bar__mode {
+			display: none;
+		}
+
+		.status-bar__section {
+			gap: var(--ink-space-1);
+		}
+
+		.status-bar__toggle-row {
+			gap: var(--ink-space-3);
+		}
 	}
 </style>

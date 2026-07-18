@@ -1,16 +1,8 @@
 <script lang="ts">
-	import { BrushPopover, Dialog, Icon } from '../../index';
-	import {
-		DEFAULT_FILL_COLOR,
-		DEFAULT_STROKE_COLOR,
-		HELP_LINKS,
-		KEYBOARD_TIPS,
-		TOOLS,
-		ZOOM_PRESETS
-	} from '../constants';
+	import { BrushPopover, Icon } from '../../index';
+	import { DEFAULT_FILL_COLOR, DEFAULT_STROKE_COLOR, TOOLS, ZOOM_PRESETS } from '../constants';
 	import type { EditorPlatform } from '../platform';
 	import type { BrushSettings, BrushStore } from '../status';
-	import { themeStore } from '../theme.svelte';
 	import type {
 		ArrowShape,
 		BoardMeta,
@@ -34,7 +26,6 @@
 		SnapshotCommand
 	} from '@inkfinite/core';
 	import { fade } from 'svelte/transition';
-	import icon from '../assets/favicon.svg';
 	import ArrowPopover from './ArrowPopover.svelte';
 
 	type Viewport = { width: number; height: number };
@@ -51,28 +42,24 @@
 	type Props = {
 		currentTool: ToolId;
 		onToolChange: (toolId: ToolId) => void;
-		onHistoryClick?: () => void;
 		store: Store;
 		getViewport: () => Viewport;
 		canvas?: HTMLCanvasElement;
 		brushStore: BrushStore;
 		platform?: EditorPlatform;
 		desktop?: DesktopControls;
-		onOpenBrowser?: () => void;
 		onStencilsClick?: () => void;
 	};
 
 	let {
 		currentTool,
 		onToolChange,
-		onHistoryClick,
 		store,
 		getViewport,
 		canvas,
 		brushStore,
 		platform = 'web',
 		desktop,
-		onOpenBrowser,
 		onStencilsClick
 	}: Props = $props();
 
@@ -91,7 +78,6 @@
 	let hasArrowSelection = $derived(
 		getSelectedShapes(editorState).some((s) => s.type === 'arrow')
 	);
-	let infoOpen = $state(false);
 
 	$effect(() => {
 		editorState = store.getState();
@@ -198,21 +184,20 @@
 
 	function handleDragMove(event: PointerEvent) {
 		if (!isDragging) return;
-		position = { x: event.clientX - dragOffset.x, y: event.clientY - dragOffset.y };
+		const width = toolbarEl?.offsetWidth ?? 0;
+		const height = toolbarEl?.offsetHeight ?? 0;
+		const maxX = Math.max(8, window.innerWidth - width - 8);
+		const maxY = Math.max(8, window.innerHeight - height - 8);
+		position = {
+			x: Math.min(maxX, Math.max(8, event.clientX - dragOffset.x)),
+			y: Math.min(maxY, Math.max(8, event.clientY - dragOffset.y))
+		};
 	}
 
 	function handleDragEnd(event: PointerEvent) {
 		isDragging = false;
 		if (typeof document !== 'undefined') document.body.style.userSelect = '';
 		(event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
-	}
-
-	function openInfo() {
-		infoOpen = true;
-	}
-
-	function closeInfo() {
-		infoOpen = false;
 	}
 
 	function handleToolClick(toolId: ToolId) {
@@ -533,12 +518,20 @@
 	</div>
 
 	<div class="toolbar__brand">
-		<div class="toolbar__logo">
-			<img src={icon} alt="Inkfinite Icon" />
+		<div class="toolbar__logo" aria-hidden="true">
+			<svg viewBox="0 0 24 24">
+				<path
+					fill="currentColor"
+					d="M9.75 20.85c1.78-.7 1.39-2.63.49-3.85c-.89-1.25-2.12-2.11-3.36-2.94A9.8 9.8 0 0 1 4.54 12c-.28-.33-.85-.94-.27-1.06c.59-.12 1.61.46 2.13.68c.91.38 1.81.82 2.65 1.34l1.01-1.7C8.5 10.23 6.5 9.32 4.64 9.05c-1.06-.16-2.18.06-2.54 1.21c-.32.99.19 1.99.77 2.77c1.37 1.83 3.5 2.71 5.09 4.29c.34.33.75.72.95 1.18c.21.44.16.47-.31.47c-1.24 0-2.79-.97-3.8-1.61l-1.01 1.7c1.53.94 4.09 2.41 5.96 1.79m9.21-13.52L13.29 13H11v-2.29l5.67-5.68zm3.4-.78c-.01.3-.32.61-.64.92L19.2 10l-.87-.87l2.6-2.59l-.59-.59l-.67.67l-2.29-2.29l2.15-2.15c.24-.24.63-.24.86 0l1.43 1.43c.24.22.24.62 0 .86c-.21.21-.41.41-.41.61c-.02.2.18.42.38.59c.29.3.58.58.57.88" />
+			</svg>
 		</div>
 		<div style="display: flex; gap: 0.125rem; flex-direction:column;">
 			<div class="toolbar__name">Inkfinite</div>
-			<div class="toolbar__tagline">Stormlight Labs</div>
+			<a
+				class="toolbar__tagline"
+				href="https://stormlightlabs.org"
+				target="_blank"
+				rel="noreferrer">Stormlight Labs</a>
 		</div>
 	</div>
 	{#if platform === 'desktop' && desktop}
@@ -590,7 +583,7 @@
 			aria-label={tool.label}
 			aria-pressed={currentTool === tool.id}
 			data-tool-id={tool.id}>
-			<span class="toolbar__tool-icon">{tool.icon}</span>
+			<span class="toolbar__tool-icon"><Icon name={tool.icon} size={20} /></span>
 			<span class="toolbar__tool-label">{tool.label}</span>
 		</button>
 		{#if tool.id === 'select' && onStencilsClick}
@@ -728,110 +721,45 @@
 			</div>
 		{/if}
 	</div>
-
-	<div class="toolbar__info-actions">
-		<button
-			class="toolbar__info"
-			onclick={() => themeStore.toggle()}
-			aria-label="Toggle Dark Mode"
-			title="Toggle Dark Mode">
-			<Icon name={themeStore.current === 'dark' ? 'sun' : 'moon'} size={16} />
-			<span class="toolbar__info-label"
-				>{themeStore.current === 'dark' ? 'Light' : 'Dark'}</span>
-		</button>
-		{#if platform === 'web' && onOpenBrowser}
-			<button class="toolbar__info" onclick={onOpenBrowser} aria-label="Browse boards">
-				<Icon name="folder" size={16} />
-				<span class="toolbar__info-label">Boards</span>
-			</button>
-		{/if}
-		<button class="toolbar__info" onclick={openInfo} aria-label="About Inkfinite">
-			<Icon name="info-circle" size={16} />
-			<span class="toolbar__info-label">Info</span>
-		</button>
-	</div>
-
-	{#if onHistoryClick}
-		<div class="toolbar__divider"></div>
-		<button
-			class="toolbar__tool-button toolbar__tool-button--history tool-button history-button"
-			data-tool-id="history"
-			onclick={onHistoryClick}
-			aria-label="History"
-			aria-pressed="false">
-			<span class="toolbar__tool-icon">⏱</span>
-			<span class="toolbar__tool-label">History</span>
-		</button>
-	{/if}
 </div>
-
-<Dialog bind:open={infoOpen} onClose={closeInfo} title="About Inkfinite">
-	<section class="about">
-		<h1>About Inkfinite</h1>
-		<p>
-			Inkfinite is an infinite canvas prototype. The goal is to build a cross-platform editor
-			with a framework-agnostic core so the same engine powers both the web and desktop apps.
-		</p>
-
-		<div class="about__section">
-			<h2>Quick Tips</h2>
-			<ul>
-				{#each KEYBOARD_TIPS as tip (tip)}
-					<li>{tip}</li>
-				{/each}
-			</ul>
-		</div>
-
-		<div class="about__section">
-			<h2>Need help?</h2>
-			<ul>
-				{#each HELP_LINKS as link (link.href)}
-					<li>
-						<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-						<a
-							href={link.href}
-							target={link.external ? '_blank' : undefined}
-							rel="noreferrer">
-							{link.label}
-						</a>
-					</li>
-				{/each}
-			</ul>
-		</div>
-	</section>
-</Dialog>
 
 <style>
 	.toolbar {
 		display: flex;
-		gap: 0.75rem;
-		padding: 0.75rem 1rem 0.75rem 0.25rem; /* Adjusted padding for handle */
-		background: var(--surface-elevated);
-		border-bottom: 1px solid var(--border);
-		border: 1px solid var(--border);
-		border-radius: 0.75rem;
+		flex-wrap: wrap;
+		gap: var(--ink-space-2);
+		width: max-content;
+		max-width: calc(100vw - 2.5rem);
+		padding: var(--ink-space-2);
+		background: color-mix(in srgb, var(--ink-surface-raised) 94%, transparent);
+		border: 1px solid color-mix(in srgb, var(--ink-border) 64%, transparent);
+		border-radius: var(--ink-radius-panel);
 		align-items: center;
 		box-shadow:
-			0 4px 6px -1px rgba(0, 0, 0, 0.1),
-			0 2px 4px -1px rgba(0, 0, 0, 0.06);
+			0 1px 0 color-mix(in srgb, white 9%, transparent) inset,
+			0 12px 32px color-mix(in srgb, var(--ink-shadow-color) 28%, transparent),
+			0 2px 6px color-mix(in srgb, var(--ink-shadow-color) 24%, transparent);
+		backdrop-filter: blur(14px);
 		z-index: 100;
-		transition: transform 0.1s;
+		transition-property: transform, box-shadow;
+		transition-duration: var(--ink-duration-fast);
+		transition-timing-function: var(--ink-ease-out);
 		touch-action: none;
 	}
 
 	.toolbar[data-dragging='true'] {
-		transform: scale(1.02);
+		transform: scale(0.99);
 		box-shadow:
-			0 20px 25px -5px rgba(0, 0, 0, 0.1),
-			0 10px 10px -5px rgba(0, 0, 0, 0.04);
+			0 10px 26px color-mix(in srgb, var(--ink-shadow-color) 34%, transparent),
+			0 2px 7px color-mix(in srgb, var(--ink-shadow-color) 28%, transparent);
 	}
 
 	.toolbar__drag-handle {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 24px;
-		height: 100%;
+		width: 32px;
+		min-height: 40px;
 		cursor: grab;
 		color: var(--text-muted);
 		opacity: 0.5;
@@ -854,10 +782,10 @@
 		display: flex;
 		align-items: center;
 		gap: 0.75rem;
-		margin-right: 1.5rem;
+		margin-right: var(--ink-space-2);
 	}
 
-	.toolbar__logo img {
+	.toolbar__logo svg {
 		width: 32px;
 		height: 32px;
 	}
@@ -873,21 +801,37 @@
 		font-size: 0.75rem;
 		color: var(--text-muted);
 		font-weight: 500;
+		text-decoration: none;
+	}
+
+	.toolbar__tagline:hover {
+		color: var(--text);
+		text-decoration: underline;
+		text-underline-offset: 0.16em;
+	}
+
+	.toolbar__tagline:focus-visible {
+		border-radius: 2px;
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
 	}
 
 	.toolbar__tool-button {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 0.375rem;
-		padding: 0.625rem 0.875rem;
-		border: 1px solid var(--border);
-		border-radius: 0.5rem;
+		gap: var(--ink-space-1);
+		min-height: 48px;
+		padding: var(--ink-space-2) var(--ink-space-3);
+		border: var(--ink-line-width) solid transparent;
+		border-radius: var(--ink-radius-wobbly-small);
 		background: transparent;
 		color: var(--text);
 		cursor: pointer;
-		transition: all 0.2s ease;
-		min-width: 68px;
+		transition-property: color, background-color, border-color, box-shadow, transform;
+		transition-duration: var(--ink-duration-fast);
+		transition-timing-function: var(--ink-ease-out);
+		min-width: 58px;
 		opacity: 0.8;
 	}
 
@@ -898,6 +842,12 @@
 		border-color: var(--text-muted);
 	}
 
+	.toolbar__tool-button:active,
+	.toolbar__zoom-button:active,
+	.toolbar__export-button:active {
+		transform: scale(0.96);
+	}
+
 	.toolbar__tool-button:focus {
 		outline: 2px solid var(--accent);
 		outline-offset: 2px;
@@ -905,10 +855,10 @@
 
 	.toolbar__tool-button--active,
 	.tool-button.active {
-		background: var(--accent);
-		color: var(--surface);
-		border-color: var(--accent);
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+		background: var(--ink-accent);
+		color: var(--ink-on-accent);
+		border-color: var(--ink-border-strong);
+		box-shadow: 2px 2px 0 var(--ink-shadow-color);
 		opacity: 1;
 	}
 
@@ -925,30 +875,11 @@
 	}
 
 	.toolbar__divider {
-		width: 2px;
+		width: 1px;
 		background-color: var(--border);
-		margin: 0 1.25rem;
+		margin: 0 var(--ink-space-1);
 		height: 32px;
 		opacity: 0.5;
-	}
-
-	.toolbar__info {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.5rem 0.75rem;
-		border-radius: 0.375rem;
-		background: transparent;
-		border: none;
-		color: var(--text-muted);
-		cursor: pointer;
-		transition: color 0.2s;
-		font-size: 0.875rem;
-	}
-
-	.toolbar__info:hover {
-		background: var(--bg-tertiary);
-		color: var(--text);
 	}
 
 	.toolbar__zoom,
@@ -967,7 +898,8 @@
 		font-size: 0.875rem;
 		font-weight: 500;
 		min-width: 72px;
-		transition: all 0.2s;
+		transition-property: color, background-color, border-color, transform;
+		transition-duration: 0.2s;
 	}
 
 	.toolbar__zoom-button:hover,
@@ -1022,10 +954,6 @@
 		height: 1px;
 		background: var(--border);
 		margin: 6px 0;
-	}
-
-	.toolbar__tool-button--history {
-		margin-left: auto;
 	}
 
 	.toolbar__brand {
@@ -1084,16 +1012,12 @@
 	}
 
 	.toolbar__logo {
-		width: 36px;
-		height: 36px;
-		border-radius: 8px;
-		background: var(--accent);
-		color: var(--surface);
-		font-weight: 600;
+		width: 32px;
+		height: 32px;
+		color: var(--text);
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		font-size: 18px;
 	}
 
 	.toolbar__name {
@@ -1104,72 +1028,6 @@
 	.toolbar__tagline {
 		font-size: 0.75rem;
 		color: var(--text-muted);
-	}
-
-	.toolbar__info {
-		display: inline-flex;
-		align-items: center;
-		gap: 8px;
-		border: 1px solid var(--border);
-		background: var(--surface);
-		color: var(--text);
-		border-radius: 999px;
-		padding: 4px 10px;
-		cursor: pointer;
-		font-size: 14px;
-	}
-
-	.toolbar__info:hover {
-		background: var(--surface-elevated);
-	}
-
-	.toolbar__info-label {
-		font-size: 0.75rem;
-		color: var(--text-secondary);
-	}
-
-	.about {
-		padding: 24px;
-		max-width: 480px;
-	}
-
-	.about h1 {
-		margin-top: 0;
-		font-size: 22px;
-	}
-
-	.about__section {
-		margin-top: 20px;
-	}
-
-	.about__section h2 {
-		margin-bottom: 8px;
-		font-size: 16px;
-		color: var(--text-secondary);
-	}
-
-	.about__section ul {
-		margin: 0;
-		padding-left: 20px;
-	}
-
-	.about__section li + li {
-		margin-top: 0.25rem;
-	}
-
-	.about__section a {
-		color: var(--accent);
-		text-decoration: none;
-	}
-
-	.about__section a:hover {
-		text-decoration: underline;
-	}
-
-	.toolbar__info-actions {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
 	}
 
 	.toolbar__colors {
@@ -1183,5 +1041,35 @@
 		grid-template-columns: repeat(2, 1fr);
 		gap: 4px;
 		text-align: right;
+	}
+
+	@media (max-width: 1320px) {
+		.toolbar__tool-label,
+		.toolbar__tagline {
+			display: none;
+		}
+
+		.toolbar__tool-button {
+			min-width: 44px;
+			min-height: 44px;
+			padding: var(--ink-space-2);
+			justify-content: center;
+		}
+
+		.toolbar__brand {
+			margin-right: 0;
+		}
+	}
+
+	@media (max-width: 760px) {
+		.toolbar {
+			max-height: calc(100vh - 5rem);
+			overflow-y: auto;
+		}
+
+		.toolbar__brand,
+		.toolbar__divider {
+			display: none;
+		}
 	}
 </style>

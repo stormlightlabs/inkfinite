@@ -129,18 +129,18 @@ Blocked by: V2-09, V2-10
 
 Acceptance criteria:
 
-- [ ] Backing dimensions change only when CSS size or DPR changes; rendering is
+- [x] Backing dimensions change only when CSS size or DPR changes; rendering is
       scheduled only while dirty and related patches are batched.
-- [ ] Shapes outside visible world bounds are culled without clipping selected
+- [x] Shapes outside visible world bounds are culled without clipping selected
       handles, bound arrows, shadows, or rotation extents.
-- [ ] Durable scene and ephemeral overlays can redraw independently where the
+- [x] Durable scene and ephemeral overlays can redraw independently where the
       benchmark shows a benefit.
-- [ ] Text metrics and freehand outlines are cached with bounded invalidation;
+- [x] Text metrics and freehand outlines are cached with bounded invalidation;
       Markdown layout is cached by source, width, and style.
-- [ ] The V2-01 10,000-shape harness meets the numeric frame and query budgets
+- [x] The V2-01 10,000-shape harness meets the numeric frame and query budgets
       recorded after V2-02. Add an incrementally maintained spatial index only if
       the linear query path misses its budget, and record the evidence either way.
-- [ ] Visual fixtures and hit-test tests show no behavioral regressions.
+- [x] Visual fixtures and hit-test tests show no behavioral regressions.
 
 Verification:
 
@@ -425,5 +425,5 @@ pnpm --filter @inkfinite/web lint
 
 ## Frontier
 
-V2-11 is the current frontier. Meet the recorded 10,000-shape rendering and hit
-testing budgets before starting layers in V2-12.
+V2-12 is the current frontier. Add ordered, visible, lockable layers with active
+layer state and opacity across the model, renderer, interaction, and Svelte UI.

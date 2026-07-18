@@ -458,6 +458,7 @@
 	}
 
 	.filebrowser {
+		--filebrowser-divider: color-mix(in srgb, var(--border) 42%, transparent);
 		display: flex;
 		flex-direction: column;
 		height: 100%;
@@ -470,7 +471,7 @@
 		align-items: center;
 		justify-content: space-between;
 		padding: 1rem;
-		border-bottom: 1px solid var(--border, #e0e0e0);
+		border-bottom: 1px solid var(--filebrowser-divider);
 	}
 
 	.filebrowser__title-row {
@@ -584,13 +585,13 @@
 
 	.filebrowser__search {
 		padding: 0.5rem 1rem;
-		border-bottom: 1px solid var(--border, #e0e0e0);
+		border-bottom: 1px solid var(--filebrowser-divider);
 	}
 
 	.filebrowser__search-input {
 		width: 100%;
 		padding: 0.5rem;
-		border: 1px solid var(--border, #e0e0e0);
+		border: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
 		border-radius: 0.25rem;
 		font-size: 0.875rem;
 		background-color: var(--input-bg, white);
@@ -673,13 +674,13 @@
 		align-items: center;
 		justify-content: space-between;
 		padding: 0.75rem 1rem;
-		border-bottom: 1px solid var(--border, #e0e0e0);
+		border-bottom: 1px solid var(--filebrowser-divider);
 		cursor: pointer;
 		transition: background-color 0.15s;
 	}
 
 	.filebrowser__board:hover {
-		background-color: var(--surface-hover, #f5f5f5);
+		background-color: color-mix(in srgb, var(--surface-hover, #f5f5f5) 72%, transparent);
 	}
 
 	.filebrowser__board-info {

@@ -97,8 +97,11 @@
 	.sheet__content {
 		background-color: var(--ink-surface-raised);
 		color: var(--ink-text);
-		border: var(--ink-line-width) solid var(--ink-border-strong);
-		box-shadow: var(--ink-shadow-panel);
+		border: 0;
+		box-shadow:
+			0 0 0 1px color-mix(in srgb, var(--ink-border) 58%, transparent),
+			0 18px 48px color-mix(in srgb, var(--ink-shadow-color) 38%, transparent),
+			0 2px 8px color-mix(in srgb, var(--ink-shadow-color) 28%, transparent);
 		overflow: auto;
 		outline: none;
 	}
@@ -110,6 +113,7 @@
 		right: 0;
 		height: 100vh;
 		width: min(400px, 80vw);
+		border-left: 1px solid color-mix(in srgb, var(--ink-border) 55%, transparent);
 		animation: slideInRight 0.2s ease-out;
 	}
 
@@ -120,6 +124,7 @@
 		left: 0;
 		height: 100vh;
 		width: min(400px, 80vw);
+		border-right: 1px solid color-mix(in srgb, var(--ink-border) 55%, transparent);
 		animation: slideInLeft 0.2s ease-out;
 	}
 
@@ -130,6 +135,7 @@
 		left: 0;
 		width: 100vw;
 		height: min(400px, 80vh);
+		border-bottom: 1px solid color-mix(in srgb, var(--ink-border) 55%, transparent);
 		animation: slideInTop 0.2s ease-out;
 	}
 
@@ -140,6 +146,7 @@
 		left: 0;
 		width: 100vw;
 		height: min(400px, 80vh);
+		border-top: 1px solid color-mix(in srgb, var(--ink-border) 55%, transparent);
 		animation: slideInBottom 0.2s ease-out;
 	}
 

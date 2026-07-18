@@ -360,7 +360,6 @@ export function createCanvasController(
 			themeProvider: { get: () => themeStore.current }
 		});
 
-		const unsubStore = store.subscribe(() => renderer?.markDirty());
 		const unsubSnap = snapStore.subscribe(() => renderer?.markDirty());
 
 		$effect(() => {
@@ -383,7 +382,6 @@ export function createCanvasController(
 
 		return () => {
 			resizeObserver?.disconnect();
-			unsubStore();
 			unsubSnap();
 			inputAdapter?.dispose();
 			inputAdapter = null;

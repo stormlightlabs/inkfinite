@@ -1,5 +1,5 @@
 import { CursorStore, Store } from '@inkfinite/core';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
 import { createSnapStore, createStatusStore } from '../status';
@@ -39,5 +39,32 @@ describe('StatusBar', () => {
 		});
 
 		await expect.element(screen.getByText(/error/i)).toHaveClass('status-bar__value--error');
+	});
+
+	it('keeps editor utilities together and opens the info dialog', async () => {
+		const onOpenBrowser = vi.fn();
+		const onHistoryClick = vi.fn();
+		const screen = render(StatusBar, {
+			store: new Store(),
+			cursor: new CursorStore(),
+			persistence: createStatusStore({
+				backend: 'indexeddb',
+				state: 'saved',
+				pendingWrites: 0
+			}),
+			snap: createSnapStore(),
+			onOpenBrowser,
+			onHistoryClick
+		});
+
+		await screen.getByRole('button', { name: 'Browse boards' }).click();
+		await screen.getByRole('button', { name: 'History' }).click();
+		await screen.getByRole('button', { name: 'About Inkfinite' }).click();
+
+		expect(onOpenBrowser).toHaveBeenCalledOnce();
+		expect(onHistoryClick).toHaveBeenCalledOnce();
+		await expect
+			.element(screen.getByRole('dialog', { name: 'About Inkfinite' }))
+			.toBeInTheDocument();
 	});
 });

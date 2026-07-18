@@ -173,6 +173,19 @@ hit test for the frozen 10,000-shape board. The V1 medians are 0.61 ms and
 0.22 ms. V2-11 may add a spatial index only if its linear query path misses the
 1 ms budget.
 
+V2-11 completed on July 18, 2026. The Canvas 2D renderer now changes backing
+dimensions only when its CSS size or device pixel ratio changes, schedules no
+idle frames, culls against padded transformed world bounds, and keeps selected
+overlays and bound arrows outside the durable culling path. Per-renderer LRU
+caches bound text and Markdown layout data, while freehand outlines use
+shape-lifetime weak caching. The fixed-seed Apple M1 run recorded a 0.61 ms
+median frame and a 0.34 ms median linear hit test, both below their gates. The
+linear query path therefore remains simpler than an incrementally maintained
+spatial index. A second durable-scene bitmap also offered no useful benefit at
+this frame cost, so overlays remain on the single canvas. The complete machine,
+runtime, budget, and strategy record is in
+[`fixtures/v2/performance/v2-11.json`](fixtures/v2/performance/v2-11.json).
+
 V2-07 completed on July 17, 2026. `inkfinite-core::file` imports the frozen v1
 desktop and web envelopes into normalized pages, default layers, scene
 containers, bindings, styles, and deterministic draw order. It writes compact

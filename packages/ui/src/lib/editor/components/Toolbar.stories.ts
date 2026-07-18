@@ -15,8 +15,6 @@ const meta = {
 		store: controls.store,
 		getViewport: () => ({ width: 1280, height: 720 }),
 		brushStore: controls.brushStore,
-		onHistoryClick: () => {},
-		onOpenBrowser: () => {},
 		onStencilsClick: () => {}
 	},
 	parameters: { layout: 'fullscreen' }
