@@ -186,6 +186,18 @@ this frame cost, so overlays remain on the single canvas. The complete machine,
 runtime, budget, and strategy record is in
 [`fixtures/v2/performance/v2-11.json`](fixtures/v2/performance/v2-11.json).
 
+V2-12 completed on July 18, 2026. The shared editor now migrates flat pages to
+one stable default layer without changing shape order, tracks the active layer,
+and persists ordered layer records through the web and desktop adapters. Canvas
+rendering follows layer and child order, isolates opacity with saved context
+state, and skips hidden layers. Selection, hit testing, marquee, and editing
+exclude hidden and locked content. The accessible Svelte panel creates,
+selects, renames, reorders, hides, locks, changes opacity, and deletes layers;
+non-empty deletion requires an explicit move or content-deletion choice. Rust
+queries omit hidden shapes, locked layers reject changes while still allowing
+an explicit unlock, and the existing Automerge two-replica tests continue to
+cover ordered-list convergence.
+
 V2-07 completed on July 17, 2026. `inkfinite-core::file` imports the frozen v1
 desktop and web envelopes into normalized pages, default layers, scene
 containers, bindings, styles, and deterministic draw order. It writes compact

@@ -16,7 +16,7 @@ import {
 	CursorStore,
 	diffDoc,
 	EllipseTool,
-	getShapesOnCurrentPage,
+	getInteractiveShapesOnCurrentPage,
 	LineTool,
 	MarkdownTool,
 	PenTool,
@@ -165,7 +165,12 @@ export function createCanvasController(
 		const firstPageId = doc.order.pageIds[0] ?? Object.keys(doc.pages)[0] ?? null;
 		store.setState((state) => ({
 			...state,
-			doc: { pages: doc.pages, shapes: doc.shapes, bindings: doc.bindings },
+			doc: {
+				pages: doc.pages,
+				layers: doc.layers ?? doc.order.layers,
+				shapes: doc.shapes,
+				bindings: doc.bindings
+			},
 			ui: { ...state.ui, currentPageId: firstPageId, selectionIds: [] }
 		}));
 	}
@@ -281,6 +286,16 @@ export function createCanvasController(
 		runtime.handleAction(action);
 	}
 
+	function commitLayerState(name: string, nextState: import('@inkfinite/core').EditorState) {
+		const state = store.getState();
+		runtime.commit(
+			state,
+			nextState,
+			name,
+			Action.keyDown(name, name, { ctrl: false, shift: false, alt: false, meta: false })
+		);
+	}
+
 	function handleCanvasDoubleClick(event: MouseEvent) {
 		if (!canvas) {
 			return;
@@ -289,7 +304,7 @@ export function createCanvasController(
 		const screen = { x: event.clientX - rect.left, y: event.clientY - rect.top };
 		const world = Camera.screenToWorld(store.getState().camera, screen, getViewport());
 
-		const shapes = getShapesOnCurrentPage(store.getState());
+		const shapes = getInteractiveShapesOnCurrentPage(store.getState());
 		for (let index = shapes.length - 1; index >= 0; index--) {
 			const shape = shapes[index];
 			if (shape.type === 'text') {
@@ -472,6 +487,7 @@ export function createCanvasController(
 		setCanvasRef,
 		marqueeRect: () => marqueeRect,
 		insertStencil,
+		commitLayerState,
 		get stencilPaletteOpen() {
 			return stencilPaletteOpen;
 		},

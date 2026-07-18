@@ -14,7 +14,7 @@ import type {
 	TextShape
 } from './model';
 import type { EditorState } from './reactivity';
-import { getShapesOnCurrentPage } from './reactivity';
+import { getInteractiveShapesOnCurrentPage } from './reactivity';
 
 const strokeOutlineCache = new WeakMap<StrokeShape, Vec2[]>();
 
@@ -483,7 +483,7 @@ function worldToLocal(p: Vec2, shapeX: number, shapeY: number, shapeRot: number)
  * @returns Shape ID of the topmost shape under the point, or null if no hit
  */
 export function hitTestPoint(state: EditorState, worldPoint: Vec2, tolerance = 5): string | null {
-	const shapes = getShapesOnCurrentPage(state);
+	const shapes = getInteractiveShapesOnCurrentPage(state);
 
 	for (let index = shapes.length - 1; index >= 0; index--) {
 		const shape = shapes[index];

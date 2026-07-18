@@ -63,35 +63,8 @@ commands.
 
 ### V2-09: Extract the editor runtime and transaction drafts
 
-What to build: Split the large Svelte canvas controller into a framework-neutral
-editor runtime and a thin Svelte adapter, with ephemeral gesture previews and
-durable transaction drafts.
-
-Blocked by: V2-06, V2-08
-
-Acceptance criteria:
-
-- [x] Camera, tools, selection, input routing, and gesture previews have no
-      Svelte or persistence dependency.
-- [x] Pointer movement stays local; each completed drag, resize, text edit,
-      stencil insertion, or shortcut produces one transaction draft.
-- [x] The frontend document mirror changes only through snapshots or commit/sync
-      patches from Rust.
-- [x] Svelte adapters compose controls from `@inkfinite/ui`; reusable visual
-      components do not gain `@inkfinite/runtime`, persistence, or Tauri
-      dependencies.
-- [x] Existing keyboard, selection, text, Markdown, arrow, pen, grid snap,
-      stencil, and history behavior remains covered.
-- [x] One browser integration test performs drag → Rust commit → patch → redraw
-      → undo and compares the original document.
-
-Verification:
-
-```sh
-pnpm --filter @inkfinite/core test --run
-pnpm --filter @inkfinite/web test
-pnpm --filter @inkfinite/web check
-```
+Split the large Svelte canvas controller into a framework-neutral editor runtime and a
+thin Svelte adapter, with ephemeral gesture previews and durable transaction drafts.
 
 ## Milestone 4: Editor structure and scale
 
@@ -100,30 +73,12 @@ budget passes with measured optimizations.
 
 ### V2-10: Fix cursor mapping across viewport changes
 
-Implemented current-bound coordinate mapping, reactive viewport invalidation,
-and pointer-capture cleanup across resize, scrolling, and device-pixel-ratio
-changes.
-
-Blocked by: V2-09
-
-Acceptance criteria:
-
-- [x] Coordinate conversion reads current canvas bounds and viewport dimensions
-      for each relevant event; no cached rect survives a layout change.
-- [x] Cursor status, hit testing, marquee, handles, text/Markdown overlays, wheel
-      zoom, and drag previews agree after resize and scroll.
-- [x] Pointer-up outside the canvas cannot leave a stuck drag or cursor state.
-- [x] Browser tests reproduce the previous offset/stuck failure and pass at two
-      DPR values.
-
-Verification:
-
-- Run the focused browser input/canvas tests, then the full web test suite.
+Implemented current-bound coordinate mapping, reactive viewport invalidation, and
+pointer-capture cleanup across resize, scrolling, and device-pixel-ratio changes.
 
 ### V2-11: Meet the 10,000-shape rendering budget
 
-What to build: Optimize measured rendering and hit testing while retaining a
-simple Canvas 2D design.
+Optimized measured rendering and hit testing while retaining a simple Canvas 2D design.
 
 Blocked by: V2-09, V2-10
 
@@ -154,24 +109,24 @@ opacity without regressing existing stencils.
 
 ### V2-12: Ship layers through model, renderer, interaction, and UI
 
-What to build: Add ordered layers with visibility, locking, active-layer state,
-opacity, and a complete Svelte panel.
+Shipped ordered layers with visibility, locking, active-layer state, opacity,
+and a complete Svelte panel.
 
 Blocked by: V2-07, V2-09, V2-11
 
 Acceptance criteria:
 
-- [ ] New and imported pages always have a default layer; migration preserves
+- [x] New and imported pages always have a default layer; migration preserves
       exact shape order and is idempotent.
-- [ ] Rendering follows page layer order and child order, skips hidden layers,
+- [x] Rendering follows page layer order and child order, skips hidden layers,
       and composites layer opacity without leaking canvas state.
-- [ ] Hit testing, marquee, selection UI, editing, and agent transactions ignore
+- [x] Hit testing, marquee, selection UI, editing, and agent transactions ignore
       hidden shapes and reject locked-layer changes.
-- [ ] New shapes use the active layer. Moving and reordering layers or shapes is
+- [x] New shapes use the active layer. Moving and reordering layers or shapes is
       one undoable transaction and converges under concurrent edits.
-- [ ] The panel lists, selects, creates, renames, reorders, hides, locks, deletes,
+- [x] The panel lists, selects, creates, renames, reorders, hides, locks, deletes,
       and changes opacity with accessible controls.
-- [ ] Deleting a non-empty layer requires an explicit move destination or an
+- [x] Deleting a non-empty layer requires an explicit move destination or an
       explicit content deletion; the last layer cannot disappear.
 
 Verification:

@@ -4,6 +4,7 @@
 	import Toolbar from '../components/Toolbar.svelte';
 	import FileBrowser from '../filebrowser/FileBrowser.svelte';
 	import StencilPalette from '../components/StencilPalette.svelte';
+	import LayerPanel from '../components/LayerPanel.svelte';
 	import { createCanvasController } from './canvas-store.svelte';
 	import { draggingStencil, endDrag } from '../dnd.svelte';
 	import type { EditorPlatformAdapter } from '../platform';
@@ -131,6 +132,7 @@
 			bind:this={canvasEl}
 			ondblclick={c.handleCanvasDoubleClick}
 			onpointerleave={c.handlePointerLeave}></canvas>
+		<LayerPanel store={c.store} onCommit={c.commitLayerState} />
 		{#if textEditorCurrent}
 			{@const layout = c.textEditor.getLayout()}
 			{#if layout}

@@ -18,6 +18,7 @@ import {
 	computeOrthogonalPath,
 	computePolylineLength,
 	getPointAtDistance,
+	getLayersOnCurrentPage,
 	getStrokeOutline,
 	getShapesOnCurrentPage,
 	resolveArrowEndpoints,
@@ -225,9 +226,24 @@ function drawScene(
 
 	const shapes = getShapesOnCurrentPage(state);
 	const visibleBounds = getExpandedViewportBounds(state.camera, viewport);
-	for (const shape of shapes) {
-		if (!isShapeVisible(state, shape, visibleBounds)) continue;
-		drawShape(context, state, shape, theme, textLayoutCache, textMetricCache, markdownLayoutCache);
+	const layers = getLayersOnCurrentPage(state);
+	if (layers.length === 0) {
+		for (const shape of shapes) {
+			if (!isShapeVisible(state, shape, visibleBounds)) continue;
+			drawShape(context, state, shape, theme, textLayoutCache, textMetricCache, markdownLayoutCache);
+		}
+	} else {
+		for (const layer of layers) {
+			if (!layer.visible) continue;
+			context.save();
+			context.globalAlpha *= layer.opacity;
+			for (const shapeId of layer.shapeIds) {
+				const shape = state.doc.shapes[shapeId];
+				if (!shape || !isShapeVisible(state, shape, visibleBounds)) continue;
+				drawShape(context, state, shape, theme, textLayoutCache, textMetricCache, markdownLayoutCache);
+			}
+			context.restore();
+		}
 	}
 
 	drawSelection(context, state, shapes, handleState);

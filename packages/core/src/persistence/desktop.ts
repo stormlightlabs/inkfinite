@@ -1,6 +1,6 @@
-import type { BindingRecord, Document, PageRecord, ShapeRecord } from "../model";
-import type { DocOrder, LoadedDoc } from "./document";
-import type { BoardMeta } from "./repo";
+import type { BindingRecord, Document, PageRecord, ShapeRecord } from '../model';
+import type { DocOrder, LoadedDoc } from './document';
+import type { BoardMeta } from './repo';
 
 /**
  * Desktop file representation - combines board metadata with document content
@@ -25,97 +25,103 @@ export type DirectoryEntry = { path: string; name: string; isDir: boolean };
  * metadata, and workspace navigation needed by the shared frontend.
  */
 export interface DesktopFileOps {
-  /**
-   * Show open dialog and return selected file path
-   */
-  showOpenDialog(): Promise<string | null>;
+	/**
+	 * Show open dialog and return selected file path
+	 */
+	showOpenDialog(): Promise<string | null>;
 
-  /**
-   * Show save dialog and return selected file path
-   */
-  showSaveDialog(defaultName?: string): Promise<string | null>;
+	/**
+	 * Show save dialog and return selected file path
+	 */
+	showSaveDialog(defaultName?: string): Promise<string | null>;
 
-  /**
-   * Get recent files list
-   */
-  getRecentFiles(): Promise<FileHandle[]>;
+	/**
+	 * Get recent files list
+	 */
+	getRecentFiles(): Promise<FileHandle[]>;
 
-  /**
-   * Add a file to recent files list
-   */
-  addRecentFile(handle: FileHandle): Promise<void>;
+	/**
+	 * Add a file to recent files list
+	 */
+	addRecentFile(handle: FileHandle): Promise<void>;
 
-  /**
-   * Remove a file from recent files list
-   */
-  removeRecentFile(path: string): Promise<void>;
+	/**
+	 * Remove a file from recent files list
+	 */
+	removeRecentFile(path: string): Promise<void>;
 
-  /**
-   * Clear all recent files
-   */
-  clearRecentFiles(): Promise<void>;
+	/**
+	 * Clear all recent files
+	 */
+	clearRecentFiles(): Promise<void>;
 
-  /**
-   * Get current workspace directory
-   */
-  getWorkspaceDir(): Promise<string | null>;
+	/**
+	 * Get current workspace directory
+	 */
+	getWorkspaceDir(): Promise<string | null>;
 
-  /**
-   * Set workspace directory
-   */
-  setWorkspaceDir(path: string | null): Promise<void>;
+	/**
+	 * Set workspace directory
+	 */
+	setWorkspaceDir(path: string | null): Promise<void>;
 
-  /**
-   * Show directory picker and set as workspace
-   */
-  pickWorkspaceDir(): Promise<string | null>;
+	/**
+	 * Show directory picker and set as workspace
+	 */
+	pickWorkspaceDir(): Promise<string | null>;
 
-  /**
-   * Read directory contents (filtered by pattern)
-   */
-  readDirectory(directory: string, pattern?: string): Promise<DirectoryEntry[]>;
+	/**
+	 * Read directory contents (filtered by pattern)
+	 */
+	readDirectory(directory: string, pattern?: string): Promise<DirectoryEntry[]>;
 
-  /**
-   * Rename a file on disk
-   */
-  renameFile(oldPath: string, newPath: string): Promise<void>;
+	/**
+	 * Rename a file on disk
+	 */
+	renameFile(oldPath: string, newPath: string): Promise<void>;
 
-  /**
-   * Delete a file from disk
-   */
-  deleteFile(path: string): Promise<void>;
+	/**
+	 * Delete a file from disk
+	 */
+	deleteFile(path: string): Promise<void>;
 }
 
 /**
  * Create a loaded document from desktop file data
  */
 export function loadedDocFromFileData(data: DesktopFileData): LoadedDoc {
-  return { pages: data.doc.pages, shapes: data.doc.shapes, bindings: data.doc.bindings, order: data.order };
+	return {
+		pages: data.doc.pages,
+		layers: data.doc.layers ?? data.order.layers,
+		shapes: data.doc.shapes,
+		bindings: data.doc.bindings,
+		order: data.order
+	};
 }
 
 /**
  * Create file data from document parts
  */
 export function createFileData(
-  board: BoardMeta,
-  pages: Record<string, PageRecord>,
-  shapes: Record<string, ShapeRecord>,
-  bindings: Record<string, BindingRecord>,
-  order: DocOrder,
+	board: BoardMeta,
+	pages: Record<string, PageRecord>,
+	shapes: Record<string, ShapeRecord>,
+	bindings: Record<string, BindingRecord>,
+	order: DocOrder
 ): DesktopFileData {
-  return { board, doc: { pages, shapes, bindings }, order };
+	return { board, doc: { pages, shapes, bindings }, order };
 }
 
 export function parseDesktopFile(content: string): DesktopFileData {
-  const data = JSON.parse(content) as DesktopFileData;
+	const data = JSON.parse(content) as DesktopFileData;
 
-  if (!data.board || !data.doc || !data.order) {
-    throw new Error("Invalid file format: missing required fields");
-  }
+	if (!data.board || !data.doc || !data.order) {
+		throw new Error('Invalid file format: missing required fields');
+	}
 
-  return data;
+	return data;
 }
 
 export function serializeDesktopFile(data: DesktopFileData): string {
-  return JSON.stringify(data, null, 2);
+	return JSON.stringify(data, null, 2);
 }

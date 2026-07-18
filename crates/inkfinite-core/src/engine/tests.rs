@@ -50,7 +50,7 @@ fn shape(id: &str, x: f64) -> ShapeRecord {
     }
 }
 
-fn document() -> Document {
+pub fn document() -> Document {
     let page_id = PageId::from("page:one");
     let layer_id = LayerId::from("layer:one");
     let shape_a = shape("shape:a", 0.0);
@@ -308,6 +308,37 @@ fn layer_visual_changes_return_regions_and_deletes_honor_locked_descendants() {
         }],
     );
     assert_eq!(engine.commit(hide).unwrap().affected_regions.len(), 1);
+    assert!(
+        engine
+            .query(&Query { shape_kind: Some("rect".into()), ..Query::default() })
+            .unwrap()
+            .records
+            .is_empty(),
+        "agent-facing queries must not expose shapes in hidden layers"
+    );
+    let mut hidden_agent_edit = transaction(
+        &mut engine,
+        "actor:agent",
+        "edit hidden shape",
+        vec![Operation::PatchShape {
+            shape_id: ShapeId::from("shape:a"),
+            patch: ShapePatch {
+                transform: Some(Transform {
+                    translation: Vec2 { x: 5.0, y: 20.0 },
+                    rotation: 0.0,
+                    scale_x: 1.0,
+                    scale_y: 1.0,
+                }),
+                ..ShapePatch::default()
+            },
+            expected_version: Some(RecordVersion(1)),
+        }],
+    );
+    hidden_agent_edit.origin = Origin::Agent;
+    assert!(matches!(
+        engine.commit(hidden_agent_edit),
+        Err(EngineError::Permission(_))
+    ));
 
     let mut locked_document = document();
     locked_document
@@ -336,6 +367,30 @@ fn layer_visual_changes_return_regions_and_deletes_honor_locked_descendants() {
         locked_engine.commit(delete_layer),
         Err(EngineError::Permission(_))
     ));
+}
+
+#[test]
+fn a_locked_layer_can_be_unlocked_but_not_changed_in_the_same_operation() {
+    let mut document = document();
+    document.layers.get_mut(&LayerId::from("layer:one")).unwrap().locked = true;
+    let mut engine = TransactionEngine::create(
+        DocumentId::from("document:locked-layer"),
+        ActorId::from("actor:a"),
+        document,
+    )
+    .unwrap();
+    let unlock = transaction(
+        &mut engine,
+        "actor:a",
+        "unlock layer",
+        vec![Operation::PatchLayer {
+            layer_id: LayerId::from("layer:one"),
+            patch: LayerPatch { locked: Some(false), ..LayerPatch::default() },
+            expected_version: Some(RecordVersion(1)),
+        }],
+    );
+    engine.commit(unlock).unwrap();
+    assert!(!engine.snapshot().unwrap().document.layers[&LayerId::from("layer:one")].locked);
 }
 
 #[test]
