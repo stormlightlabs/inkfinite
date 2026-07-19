@@ -252,33 +252,6 @@ Acceptance criteria:
 - [ ] File-format and release documentation describe exactly the native model
       and behavior under evaluation.
 
-Verification:
+## Parking Lot
 
-```sh
-cargo fmt --all -- --check
-cargo test --workspace --all-features
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-pnpm format:check
-pnpm bindings:check
-pnpm bindings:test
-pnpm --filter @inkfinite/core test --run
-pnpm --filter @inkfinite/renderer test --run
-pnpm --filter @inkfinite/runtime typecheck
-pnpm --filter @inkfinite/input-dom typecheck
-pnpm --filter @inkfinite/ui test
-pnpm --filter @inkfinite/web test
-pnpm --filter @inkfinite/desktop test
-pnpm --filter @inkfinite/bindings typecheck
-pnpm --filter @inkfinite/core typecheck
-pnpm --filter @inkfinite/renderer typecheck
-pnpm --filter @inkfinite/ui check
-pnpm --filter @inkfinite/web check
-pnpm --filter @inkfinite/web lint
-pnpm --filter @inkfinite/desktop check
-```
-
-## Frontier
-
-V2-22 is complete.
-
-The remaining work is the collaborative desktop session and the final release matrix.
+- How should bundling/packaging work?
