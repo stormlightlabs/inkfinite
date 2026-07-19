@@ -3,6 +3,8 @@ import { pointInMarkdown, shapeBounds } from "../src/geom";
 import type { MarkdownProps } from "../src/model";
 import { Document, PageRecord, ShapeRecord, validateDoc } from "../src/model";
 import { EditorState as EditorStateOps } from "../src/reactivity";
+import { Action, Modifiers, PointerButtons } from "../src/actions";
+import { MarkdownTool } from "../src/tools/markdown";
 
 const createProps = (overrides?: Partial<MarkdownProps>) => ({
   md: "# Hello World",
@@ -395,5 +397,29 @@ const hello = "world";
       expect(cloned).not.toBe(state);
       expect(cloned.doc.shapes.shape1).not.toBe(state.doc.shapes.shape1);
     });
+  });
+});
+
+describe("MarkdownTool", () => {
+  it("returns to select after placing a markdown block", () => {
+    const page = PageRecord.create("Page", "page");
+    const state = {
+      ...EditorStateOps.create(),
+      doc: { pages: { [page.id]: page }, shapes: {}, bindings: {} },
+      ui: { currentPageId: page.id, selectionIds: [], toolId: "markdown" as const },
+    };
+    const result = new MarkdownTool().onAction(
+      state,
+      Action.pointerDown(
+        { x: 20, y: 30 },
+        { x: 20, y: 30 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    expect(result.ui.toolId).toBe("select");
+    expect(result.ui.selectionIds).toHaveLength(1);
   });
 });

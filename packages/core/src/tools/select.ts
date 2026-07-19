@@ -236,7 +236,14 @@ export class SelectTool implements Tool {
 			}
 		}
 
-		return { ...state, ui: { ...state.ui, selectionIds: newSelectionIds } };
+		return {
+			...state,
+			ui: {
+				...state.ui,
+				activeLayerId: clickedShape.layerId ?? state.ui.activeLayerId,
+				selectionIds: newSelectionIds
+			}
+		};
 	}
 
 	/**

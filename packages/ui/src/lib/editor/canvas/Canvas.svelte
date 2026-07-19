@@ -6,10 +6,11 @@
 	import StencilPalette from '../components/StencilPalette.svelte';
 	import LayerPanel from '../components/LayerPanel.svelte';
 	import ProposalReview from '../components/ProposalReview.svelte';
+	import { ContextMenu, type ContextMenuEntry } from '../../index';
 	import { createCanvasController } from './canvas-store.svelte';
 	import { draggingStencil, endDrag } from '../dnd.svelte';
 	import type { EditorPlatformAdapter } from '../platform';
-	import { Camera, stencils } from '@inkfinite/core';
+	import { Action, Camera, hitTestPoint, stencils } from '@inkfinite/core';
 
 	let { platform: platformAdapter }: { platform: EditorPlatformAdapter } = $props();
 
@@ -18,6 +19,9 @@
 	let arrowLabelEditorEl = $state<HTMLInputElement | null>(null);
 	let markdownEditorEl = $state<HTMLTextAreaElement | null>(null);
 	let historyViewerOpen = $state(false);
+	let contextMenuOpen = $state(false);
+	let contextMenuPoint = $state({ x: 0, y: 0 });
+	let contextMenuItems = $state<ContextMenuEntry[]>([]);
 
 	// The composition root fixes the platform adapter for this component's lifetime.
 	// svelte-ignore state_referenced_locally
@@ -103,6 +107,78 @@
 		const world = Camera.screenToWorld(c.store.getState().camera, screen, viewport);
 		c.insertStencil(stencil, world);
 	}
+
+	function handleCanvasContextMenu(event: MouseEvent) {
+		event.preventDefault();
+		if (!canvasEl) return;
+		const rect = canvasEl.getBoundingClientRect();
+		const screen = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+		const world = Camera.screenToWorld(c.store.getState().camera, screen, c.getViewport());
+		const shapeId = hitTestPoint(c.store.getState(), world);
+
+		if (shapeId) {
+			c.store.setState((state) => {
+				const shape = state.doc.shapes[shapeId];
+				return {
+					...state,
+					ui: {
+						...state.ui,
+						activeLayerId: shape?.layerId ?? state.ui.activeLayerId,
+						selectionIds: state.ui.selectionIds.includes(shapeId)
+							? state.ui.selectionIds
+							: [shapeId],
+						toolId: 'select'
+					}
+				};
+			});
+			contextMenuItems = [
+				{ id: 'duplicate', label: 'Duplicate', icon: 'add', shortcut: '⌘/Ctrl D' },
+				{ id: 'forward', label: 'Bring forward', icon: 'arrow-up', shortcut: '⌘/Ctrl ]' },
+				{
+					id: 'backward',
+					label: 'Send backward',
+					icon: 'arrow-down',
+					shortcut: '⌘/Ctrl ['
+				},
+				{ type: 'separator' },
+				{ id: 'delete', label: 'Delete', icon: 'delete', shortcut: '⌫', danger: true }
+			];
+		} else {
+			c.store.setState((state) => ({ ...state, ui: { ...state.ui, selectionIds: [] } }));
+			contextMenuItems = [{ id: 'stencils', label: 'Insert stencil', icon: 'grid-dots' }];
+		}
+
+		contextMenuPoint = { x: event.clientX, y: event.clientY };
+		contextMenuOpen = true;
+	}
+
+	function handleContextMenuAction(id: string) {
+		const primary = { ctrl: false, shift: false, alt: false, meta: true };
+		switch (id) {
+			case 'duplicate':
+				c.handleAction(Action.keyDown('d', 'KeyD', primary));
+				break;
+			case 'forward':
+				c.handleAction(Action.keyDown(']', 'BracketRight', primary));
+				break;
+			case 'backward':
+				c.handleAction(Action.keyDown('[', 'BracketLeft', primary));
+				break;
+			case 'delete':
+				c.handleAction(
+					Action.keyDown('Delete', 'Delete', {
+						ctrl: false,
+						shift: false,
+						alt: false,
+						meta: false
+					})
+				);
+				break;
+			case 'stencils':
+				c.stencilPaletteOpen = true;
+				break;
+		}
+	}
 </script>
 
 <div class="editor">
@@ -134,6 +210,7 @@
 		<canvas
 			bind:this={canvasEl}
 			ondblclick={c.handleCanvasDoubleClick}
+			oncontextmenu={handleCanvasContextMenu}
 			onpointerleave={c.handlePointerLeave}></canvas>
 		{#if liveProposal}
 			<div class="proposal-ghost-layer" aria-hidden="true">
@@ -235,6 +312,15 @@
 			</div>
 		{/if}
 	</div>
+	<ContextMenu
+		items={contextMenuItems}
+		label="Canvas actions"
+		open={contextMenuOpen}
+		returnFocus={canvasEl}
+		x={contextMenuPoint.x}
+		y={contextMenuPoint.y}
+		onOpenChange={(value) => (contextMenuOpen = value)}
+		onSelect={handleContextMenuAction} />
 	<ProposalReview
 		proposal={liveProposal}
 		message={proposalMessage}

@@ -489,6 +489,7 @@ export function createCanvasController(
 		markdownEditor,
 		store,
 		getViewport,
+		handleAction,
 		handleCanvasDoubleClick,
 		handlePointerLeave,
 		cursorStore,

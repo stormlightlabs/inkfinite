@@ -113,6 +113,55 @@ describe("SelectTool", () => {
       const result = tool.onAction(state, action);
       expect(result.ui.selectionIds).toEqual([]);
     });
+
+    it("activates the clicked shape's owning layer", () => {
+      const backLayer = {
+        id: "layer:back",
+        pageId: page.id,
+        name: "Back",
+        shapeIds: [shape1.id],
+        visible: true,
+        locked: false,
+        opacity: 1,
+      };
+      const frontLayer = {
+        id: "layer:front",
+        pageId: page.id,
+        name: "Front",
+        shapeIds: [shape2.id, shape3.id],
+        visible: true,
+        locked: false,
+        opacity: 1,
+      };
+      const layered = {
+        ...initialState,
+        doc: {
+          ...initialState.doc,
+          pages: { [page.id]: { ...page, layerIds: [backLayer.id, frontLayer.id] } },
+          layers: { [backLayer.id]: backLayer, [frontLayer.id]: frontLayer },
+          shapes: {
+            ...initialState.doc.shapes,
+            [shape1.id]: { ...shape1, layerId: backLayer.id },
+            [shape2.id]: { ...shape2, layerId: frontLayer.id },
+            [shape3.id]: { ...shape3, layerId: frontLayer.id },
+          },
+        },
+        ui: { ...initialState.ui, activeLayerId: backLayer.id },
+      };
+
+      const result = tool.onAction(
+        layered,
+        Action.pointerDown(
+          { x: 250, y: 50 },
+          { x: 250, y: 50 },
+          0,
+          PointerButtons.create(true, false, false),
+          Modifiers.create(),
+        ),
+      );
+
+      expect(result.ui.activeLayerId).toBe(frontLayer.id);
+    });
   });
 
   describe("shift-click selection", () => {
@@ -568,6 +617,7 @@ describe("RectTool", () => {
       );
 
       expect(Object.keys(result.doc.shapes).length).toBe(1);
+      expect(result.ui.toolId).toBe("select");
     });
 
     it("should cancel shape creation on Escape", () => {
@@ -710,6 +760,40 @@ describe("EllipseTool", () => {
 
     expect(Object.keys(result.doc.shapes).length).toBe(0);
   });
+
+  it("returns to select after completing an ellipse", () => {
+    let result = tool.onAction(
+      initialState,
+      Action.pointerDown(
+        { x: 100, y: 100 },
+        { x: 100, y: 100 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+    result = tool.onAction(
+      result,
+      Action.pointerMove(
+        { x: 150, y: 140 },
+        { x: 150, y: 140 },
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+    result = tool.onAction(
+      result,
+      Action.pointerUp(
+        { x: 150, y: 140 },
+        { x: 150, y: 140 },
+        0,
+        PointerButtons.create(false, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    expect(result.ui.toolId).toBe("select");
+  });
 });
 
 describe("LineTool", () => {
@@ -850,6 +934,7 @@ describe("LineTool", () => {
     );
 
     expect(Object.keys(result.doc.shapes).length).toBe(1);
+    expect(result.ui.toolId).toBe("select");
   });
 });
 
@@ -954,6 +1039,40 @@ describe("ArrowTool", () => {
 
     expect(Object.keys(result.doc.shapes).length).toBe(0);
   });
+
+  it("returns to select after completing an arrow", () => {
+    let result = tool.onAction(
+      initialState,
+      Action.pointerDown(
+        { x: 100, y: 100 },
+        { x: 100, y: 100 },
+        0,
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+    result = tool.onAction(
+      result,
+      Action.pointerMove(
+        { x: 200, y: 160 },
+        { x: 200, y: 160 },
+        PointerButtons.create(true, false, false),
+        Modifiers.create(),
+      ),
+    );
+    result = tool.onAction(
+      result,
+      Action.pointerUp(
+        { x: 200, y: 160 },
+        { x: 200, y: 160 },
+        0,
+        PointerButtons.create(false, false, false),
+        Modifiers.create(),
+      ),
+    );
+
+    expect(result.ui.toolId).toBe("select");
+  });
 });
 
 describe("TextTool", () => {
@@ -994,32 +1113,7 @@ describe("TextTool", () => {
     expect((shape.props as TextProps).text).toBe("Text");
     expect((shape.props as TextProps).fontSize).toBe(16);
     expect(result.ui.selectionIds).toEqual([shape.id]);
-  });
-
-  it("should create new text shape on each click", () => {
-    let result = tool.onAction(
-      initialState,
-      Action.pointerDown(
-        { x: 100, y: 100 },
-        { x: 100, y: 100 },
-        0,
-        PointerButtons.create(true, false, false),
-        Modifiers.create(),
-      ),
-    );
-
-    result = tool.onAction(
-      result,
-      Action.pointerDown(
-        { x: 200, y: 200 },
-        { x: 200, y: 200 },
-        0,
-        PointerButtons.create(true, false, false),
-        Modifiers.create(),
-      ),
-    );
-
-    expect(Object.keys(result.doc.shapes).length).toBe(2);
+    expect(result.ui.toolId).toBe("select");
   });
 
   it("should not respond to pointer move or up", () => {

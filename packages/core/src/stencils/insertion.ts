@@ -1,5 +1,5 @@
 import { createId, type ShapeRecord } from '../model';
-import type { EditorState } from '../reactivity';
+import { canCreateShapeOnActiveLayer, type EditorState } from '../reactivity';
 import type { Stencil } from './types';
 
 /** Grid configuration applied to a stencil insertion point. */
@@ -21,10 +21,11 @@ export function insertStencil(
 	const pageId = state.ui.currentPageId;
 	const page = pageId ? state.doc.pages[pageId] : undefined;
 	if (!pageId || !page) return state;
+	if (!canCreateShapeOnActiveLayer(state)) return state;
 
 	const activeLayerId = state.ui.activeLayerId;
 	const activeLayer = activeLayerId ? state.doc.layers?.[activeLayerId] : undefined;
-	if (activeLayerId && (!activeLayer || activeLayer.pageId !== pageId || activeLayer.locked)) return state;
+	if (activeLayerId && (!activeLayer || activeLayer.pageId !== pageId)) return state;
 
 	const shouldSnap = snap?.snapEnabled && snap.gridEnabled && Number.isFinite(snap.gridSize) && snap.gridSize > 0;
 	const at = shouldSnap

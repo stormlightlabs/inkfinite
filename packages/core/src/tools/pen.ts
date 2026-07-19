@@ -2,7 +2,7 @@ import type { Action } from "../actions";
 import type { BrushConfig, StrokePoint, StrokeStyle } from "../model";
 import { createId, ShapeRecord } from "../model";
 import type { EditorState, ToolId } from "../reactivity";
-import { getCurrentPage } from "../reactivity";
+import { canCreateShapeOnActiveLayer, getCurrentPage } from "../reactivity";
 import type { Tool } from "../tools/base";
 
 /**
@@ -109,6 +109,7 @@ export class PenTool implements Tool {
 
   private handlePointerDown(state: EditorState, action: Action): EditorState {
     if (action.type !== "pointer-down") return state;
+    if (!canCreateShapeOnActiveLayer(state)) return state;
 
     const currentPage = getCurrentPage(state);
     if (!currentPage) return state;

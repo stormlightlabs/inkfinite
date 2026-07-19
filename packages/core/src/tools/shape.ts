@@ -3,7 +3,7 @@ import { computeNormalizedAnchor, hitTestPoint } from "../geom";
 import { Vec2 } from "../math";
 import { BindingRecord, createId, ShapeRecord } from "../model";
 import type { EditorState, ToolId } from "../reactivity";
-import { getCurrentPage } from "../reactivity";
+import { canCreateShapeOnActiveLayer, getCurrentPage } from "../reactivity";
 import type { Tool } from "../tools/base";
 
 /**
@@ -75,6 +75,7 @@ export class RectTool implements Tool {
 
   private handlePointerDown(state: EditorState, action: Action): EditorState {
     if (action.type !== "pointer-down") return state;
+    if (!canCreateShapeOnActiveLayer(state)) return state;
 
     const currentPage = getCurrentPage(state);
     if (!currentPage) return state;
@@ -136,12 +137,13 @@ export class RectTool implements Tool {
 
     let newState = state;
 
-    if (shape.props.w < MIN_SHAPE_SIZE || shape.props.h < MIN_SHAPE_SIZE) {
+    const completed = shape.props.w >= MIN_SHAPE_SIZE && shape.props.h >= MIN_SHAPE_SIZE;
+    if (!completed) {
       newState = this.cancelShapeCreation(state);
     }
 
     this.resetToolState();
-    return newState;
+    return completed ? { ...newState, ui: { ...newState.ui, toolId: "select" } } : newState;
   }
 
   private handleKeyDown(state: EditorState, action: Action): EditorState {
@@ -236,6 +238,7 @@ export class EllipseTool implements Tool {
 
   private handlePointerDown(state: EditorState, action: Action): EditorState {
     if (action.type !== "pointer-down") return state;
+    if (!canCreateShapeOnActiveLayer(state)) return state;
 
     const currentPage = getCurrentPage(state);
     if (!currentPage) return state;
@@ -296,12 +299,13 @@ export class EllipseTool implements Tool {
 
     let newState = state;
 
-    if (shape.props.w < MIN_SHAPE_SIZE || shape.props.h < MIN_SHAPE_SIZE) {
+    const completed = shape.props.w >= MIN_SHAPE_SIZE && shape.props.h >= MIN_SHAPE_SIZE;
+    if (!completed) {
       newState = this.cancelShapeCreation(state);
     }
 
     this.resetToolState();
-    return newState;
+    return completed ? { ...newState, ui: { ...newState.ui, toolId: "select" } } : newState;
   }
 
   private handleKeyDown(state: EditorState, action: Action): EditorState {
@@ -396,6 +400,7 @@ export class LineTool implements Tool {
 
   private handlePointerDown(state: EditorState, action: Action): EditorState {
     if (action.type !== "pointer-down") return state;
+    if (!canCreateShapeOnActiveLayer(state)) return state;
 
     const currentPage = getCurrentPage(state);
     if (!currentPage) return state;
@@ -451,12 +456,13 @@ export class LineTool implements Tool {
     let newState = state;
 
     const lineLength = Vec2.len(shape.props.b);
-    if (lineLength < MIN_SHAPE_SIZE) {
+    const completed = lineLength >= MIN_SHAPE_SIZE;
+    if (!completed) {
       newState = this.cancelShapeCreation(state);
     }
 
     this.resetToolState();
-    return newState;
+    return completed ? { ...newState, ui: { ...newState.ui, toolId: "select" } } : newState;
   }
 
   private handleKeyDown(state: EditorState, action: Action): EditorState {
@@ -551,6 +557,7 @@ export class ArrowTool implements Tool {
 
   private handlePointerDown(state: EditorState, action: Action): EditorState {
     if (action.type !== "pointer-down") return state;
+    if (!canCreateShapeOnActiveLayer(state)) return state;
 
     const currentPage = getCurrentPage(state);
     if (!currentPage) return state;
@@ -653,7 +660,7 @@ export class ArrowTool implements Tool {
     }
 
     this.resetToolState();
-    return newState;
+    return arrowLength >= MIN_SHAPE_SIZE ? { ...newState, ui: { ...newState.ui, toolId: "select" } } : newState;
   }
 
   /**

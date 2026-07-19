@@ -136,15 +136,16 @@
 	});
 
 	let showColorControls = $derived(
-		toolSupportsStyles(currentTool) ||
-			toolSupportsFill(currentTool) ||
-			getSelectedShapes(editorState).some(
-				(s) =>
-					shapeSupportsFill(s) ||
-					shapeSupportsStroke(s) ||
-					shapeSupportsFillOpacity(s) ||
-					shapeSupportsStrokeOpacity(s)
-			)
+		getSelectedShapes(editorState).some(
+			(s) =>
+				shapeSupportsFill(s) ||
+				shapeSupportsStroke(s) ||
+				shapeSupportsFillOpacity(s) ||
+				shapeSupportsStrokeOpacity(s)
+		)
+	);
+	let showContextControls = $derived(
+		showColorControls || currentTool === 'pen' || hasArrowSelection
 	);
 
 	let position = $state({ x: 20, y: 20 });
@@ -387,14 +388,6 @@
 			shape.type === 'stroke' ||
 			shape.type === 'markdown'
 		);
-	}
-
-	function toolSupportsStyles(tool: ToolId): boolean {
-		return tool === 'rect' || tool === 'ellipse' || tool === 'line' || tool === 'arrow';
-	}
-
-	function toolSupportsFill(tool: ToolId): boolean {
-		return tool === 'rect' || tool === 'ellipse' || tool === 'text';
 	}
 
 	function getSharedColor<T extends ShapeRecord>(
@@ -682,70 +675,78 @@
 		{/if}
 	{/each}
 
-	{#if showColorControls}
+	{#if showContextControls}
 		<div
-			class="toolbar__colors"
-			aria-label="Color controls"
+			class="toolbar__context-panel"
+			aria-label="Contextual tool controls"
 			transition:fade={{ duration: 150 }}>
-			{#if toolSupportsFill(currentTool) || getSelectedShapes(editorState).some(shapeSupportsFill)}
-				<label class="toolbar__color-control">
-					<span>Fill</span>
-					<input
-						type="color"
-						value={fillColorValue}
-						onchange={handleFillChange}
-						disabled={fillDisabled && !toolSupportsFill(currentTool)}
-						aria-label="Fill color" />
-				</label>
+			{#if showColorControls}
+				<div class="toolbar__colors" aria-label="Color controls">
+					{#if getSelectedShapes(editorState).some(shapeSupportsFill)}
+						<label class="toolbar__color-control">
+							<span>Fill</span>
+							<input
+								type="color"
+								value={fillColorValue}
+								onchange={handleFillChange}
+								disabled={fillDisabled}
+								aria-label="Fill color" />
+						</label>
+					{/if}
+					{#if getSelectedShapes(editorState).some(shapeSupportsStroke)}
+						<label class="toolbar__color-control">
+							<span>Stroke</span>
+							<input
+								type="color"
+								value={strokeColorValue}
+								onchange={handleStrokeChange}
+								disabled={strokeDisabled}
+								aria-label="Stroke color" />
+						</label>
+					{/if}
+					{#if getSelectedShapes(editorState).some(shapeSupportsFillOpacity)}
+						<label class="toolbar__opacity-control">
+							<span>Fill opacity</span>
+							<input
+								type="range"
+								min="0"
+								max="1"
+								step="0.05"
+								value={fillOpacityValue}
+								onchange={(event) => handleOpacityChange(event, 'fillOpacity')}
+								aria-label="Fill opacity"
+								aria-valuetext={`${Math.round(fillOpacityValue * 100)}%`} />
+							<output>{Math.round(fillOpacityValue * 100)}%</output>
+						</label>
+					{/if}
+					{#if getSelectedShapes(editorState).some(shapeSupportsStrokeOpacity)}
+						<label class="toolbar__opacity-control">
+							<span>Stroke opacity</span>
+							<input
+								type="range"
+								min="0"
+								max="1"
+								step="0.05"
+								value={strokeOpacityValue}
+								onchange={(event) => handleOpacityChange(event, 'strokeOpacity')}
+								aria-label="Stroke opacity"
+								aria-valuetext={`${Math.round(strokeOpacityValue * 100)}%`} />
+							<output>{Math.round(strokeOpacityValue * 100)}%</output>
+						</label>
+					{/if}
+				</div>
 			{/if}
-			{#if toolSupportsStyles(currentTool) || getSelectedShapes(editorState).some(shapeSupportsStroke)}
-				<label class="toolbar__color-control">
-					<span>Stroke</span>
-					<input
-						type="color"
-						value={strokeColorValue}
-						onchange={handleStrokeChange}
-						disabled={strokeDisabled && !toolSupportsStyles(currentTool)}
-						aria-label="Stroke color" />
-				</label>
+			{#if currentTool === 'pen'}
+				<BrushPopover {brush} onBrushChange={handleBrushChange} />
 			{/if}
-			{#if getSelectedShapes(editorState).some(shapeSupportsFillOpacity)}
-				<label class="toolbar__opacity-control">
-					<span>Fill opacity</span>
-					<input
-						type="range"
-						min="0"
-						max="1"
-						step="0.05"
-						value={fillOpacityValue}
-						onchange={(event) => handleOpacityChange(event, 'fillOpacity')}
-						aria-label="Fill opacity"
-						aria-valuetext={`${Math.round(fillOpacityValue * 100)}%`} />
-					<output>{Math.round(fillOpacityValue * 100)}%</output>
-				</label>
-			{/if}
-			{#if getSelectedShapes(editorState).some(shapeSupportsStrokeOpacity)}
-				<label class="toolbar__opacity-control">
-					<span>Stroke opacity</span>
-					<input
-						type="range"
-						min="0"
-						max="1"
-						step="0.05"
-						value={strokeOpacityValue}
-						onchange={(event) => handleOpacityChange(event, 'strokeOpacity')}
-						aria-label="Stroke opacity"
-						aria-valuetext={`${Math.round(strokeOpacityValue * 100)}%`} />
-					<output>{Math.round(strokeOpacityValue * 100)}%</output>
-				</label>
+			{#if hasArrowSelection}
+				<ArrowPopover {store} />
 			{/if}
 		</div>
 	{/if}
 
 	<div class="toolbar__divider"></div>
 
-	<BrushPopover {brush} onBrushChange={handleBrushChange} disabled={currentTool !== 'pen'} />
-	<ArrowPopover {store} disabled={!hasArrowSelection} />
 	<div class="toolbar__zoom">
 		<button
 			class="toolbar__zoom-button"
@@ -1141,9 +1142,28 @@
 		color: var(--ink-text-muted);
 	}
 
+	.toolbar__context-panel {
+		position: absolute;
+		top: calc(100% + var(--ink-space-2));
+		left: 50%;
+		display: flex;
+		max-width: calc(100vw - 2rem);
+		align-items: center;
+		gap: var(--ink-space-3);
+		padding: var(--ink-space-2) var(--ink-space-3);
+		border-radius: var(--ink-radius-panel-small);
+		background: color-mix(in srgb, var(--ink-surface-raised) 94%, transparent);
+		box-shadow:
+			0 0 0 1px color-mix(in srgb, var(--ink-border) 64%, transparent),
+			0 10px 26px color-mix(in srgb, var(--ink-shadow-color) 24%, transparent),
+			0 2px 6px color-mix(in srgb, var(--ink-shadow-color) 18%, transparent);
+		translate: -50% 0;
+		backdrop-filter: blur(14px);
+	}
+
 	.toolbar__colors {
 		display: flex;
-		flex-direction: column;
+		align-items: center;
 		gap: 8px;
 	}
 
@@ -1180,17 +1200,18 @@
 			justify-content: center;
 		}
 
+		.toolbar__context-panel {
+			left: 0;
+			overflow-x: auto;
+			translate: 0 0;
+		}
+
 		.toolbar__brand {
 			margin-right: 0;
 		}
 	}
 
 	@media (max-width: 760px) {
-		.toolbar {
-			max-height: calc(100vh - 5rem);
-			overflow-y: auto;
-		}
-
 		.toolbar__brand,
 		.toolbar__divider {
 			display: none;

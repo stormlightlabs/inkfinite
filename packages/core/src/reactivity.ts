@@ -290,9 +290,14 @@ function enforceInvariants(state: EditorState): EditorState {
 
 	const currentPage = currentPageId ? doc.pages[currentPageId] : undefined;
 	const layerIds = currentPage?.layerIds ?? [];
-	const nextActiveLayerId = layerIds.includes(state.ui.activeLayerId ?? '')
-		? state.ui.activeLayerId
-		: (layerIds.find((id) => !doc.layers?.[id]?.locked && doc.layers?.[id]?.visible) ?? layerIds[0] ?? null);
+	const requestedActiveLayer = state.ui.activeLayerId ? doc.layers?.[state.ui.activeLayerId] : undefined;
+	const nextActiveLayerId =
+		requestedActiveLayer &&
+		layerIds.includes(requestedActiveLayer.id) &&
+		requestedActiveLayer.visible &&
+		!requestedActiveLayer.locked
+			? requestedActiveLayer.id
+			: ([...layerIds].reverse().find((id) => doc.layers?.[id]?.visible && !doc.layers?.[id]?.locked) ?? null);
 
 	return { ...state, doc, ui: { ...state.ui, currentPageId, activeLayerId: nextActiveLayerId, selectionIds } };
 }
@@ -308,6 +313,16 @@ export function getCurrentPage(state: EditorState): PageRecord | null {
 		return null;
 	}
 	return state.doc.pages[state.ui.currentPageId] ?? null;
+}
+
+/** Returns whether the current active layer can receive a newly created shape. */
+export function canCreateShapeOnActiveLayer(state: EditorState): boolean {
+	const page = getCurrentPage(state);
+	if (!page) return false;
+	if (!state.doc.layers || !page.layerIds?.length) return true;
+	const layerId = state.ui.activeLayerId;
+	const layer = layerId ? state.doc.layers[layerId] : undefined;
+	return Boolean(layer && layer.pageId === page.id && layer.visible && !layer.locked);
 }
 
 /**

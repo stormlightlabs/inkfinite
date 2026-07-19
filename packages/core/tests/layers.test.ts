@@ -5,6 +5,7 @@ import {
 	getInteractiveShapesOnCurrentPage,
 	moveLayer,
 	patchLayer,
+	reorderShapes,
 	ShapeRecord,
 	Store,
 	ensureDocumentLayers
@@ -66,8 +67,10 @@ describe('layers', () => {
 		expect(store.getState().doc.shapes.new.layerId).toBe(activeLayerId);
 		const hidden = patchLayer(store.getState(), activeLayerId, { visible: false });
 		expect(getInteractiveShapesOnCurrentPage(hidden).map(({ id }) => id)).toEqual(['back', 'front']);
+		expect(hidden.ui.activeLayerId).toBe(original.ui.activeLayerId);
 		const locked = patchLayer(store.getState(), activeLayerId, { locked: true });
 		expect(getInteractiveShapesOnCurrentPage(locked).map(({ id }) => id)).toEqual(['back', 'front']);
+		expect(locked.ui.activeLayerId).toBe(original.ui.activeLayerId);
 	});
 
 	it('reorders layers and requires explicit handling before deleting non-empty content', () => {
@@ -83,5 +86,57 @@ describe('layers', () => {
 		});
 		expect(deleted.doc.pages.page.layerIds).toEqual([foreground]);
 		expect(deleted.doc.layers?.[foreground].shapeIds).toEqual(['back', 'front']);
+	});
+
+	it('preserves source-versus-destination stacking when merging layer contents', () => {
+		const original = layeredState();
+		const foregroundState = createLayer(original, 'Foreground');
+		const foreground = foregroundState.ui.activeLayerId!;
+		const foregroundShape = ShapeRecord.createRect(
+			'page',
+			0,
+			0,
+			{ w: 10, h: 10, fill: '#fff', stroke: '#000', radius: 0 },
+			'foreground-shape'
+		);
+		const populated = new Store({
+			...foregroundState,
+			doc: {
+				...foregroundState.doc,
+				shapes: { ...foregroundState.doc.shapes, [foregroundShape.id]: foregroundShape },
+				pages: {
+					...foregroundState.doc.pages,
+					page: {
+						...foregroundState.doc.pages.page,
+						shapeIds: [...foregroundState.doc.pages.page.shapeIds, foregroundShape.id]
+					}
+				}
+			}
+		}).getState();
+		const merged = deleteLayer(populated, original.ui.activeLayerId!, {
+			kind: 'move',
+			destinationLayerId: foreground
+		});
+
+		expect(merged.doc.layers?.[foreground].shapeIds).toEqual(['back', 'front', 'foreground-shape']);
+		expect(merged.doc.pages.page.shapeIds).toEqual(['back', 'front', 'foreground-shape']);
+	});
+
+	it('uses no active destination when every layer is hidden or locked', () => {
+		const original = layeredState();
+		const layerId = original.ui.activeLayerId!;
+		const hidden = new Store(patchLayer(original, layerId, { visible: false })).getState();
+
+		expect(hidden.ui.activeLayerId).toBeNull();
+		expect(hidden.ui.selectionIds).toEqual([]);
+	});
+
+	it('reorders shapes inside their owning layer and keeps the page projection synchronized', () => {
+		const original = layeredState();
+		const reordered = reorderShapes(original, ['back'], 'forward');
+
+		expect(reordered.doc.layers?.[original.ui.activeLayerId!].shapeIds).toEqual(['front', 'back']);
+		expect(reordered.doc.pages.page.shapeIds).toEqual(['front', 'back']);
+		expect(new Store(reordered).getState().doc.pages.page.shapeIds).toEqual(['front', 'back']);
 	});
 });

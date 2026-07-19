@@ -4,6 +4,7 @@ import {
   type CommandKind,
   createId,
   EditorState,
+  reorderShapes,
   routeAction,
   ShapeRecord,
   type Store,
@@ -256,28 +257,8 @@ function duplicateSelection(state: EditorState): EditorState | null {
 }
 
 function reorderSelection(state: EditorState, direction: "forward" | "backward"): EditorState | null {
-  const pageId = state.ui.currentPageId;
-  const page = pageId ? state.doc.pages[pageId] : undefined;
-  if (!page) return null;
-  const selected = new Set(state.ui.selectionIds);
-  const shapeIds = [...page.shapeIds];
-  let changed = false;
-  const start = direction === "forward" ? shapeIds.length - 2 : 1;
-  const end = direction === "forward" ? -1 : shapeIds.length;
-  const step = direction === "forward" ? -1 : 1;
-  for (let index = start; index !== end; index += step) {
-    const id = shapeIds[index];
-    const neighborIndex = index + (direction === "forward" ? 1 : -1);
-    const neighbor = shapeIds[neighborIndex];
-    if (id && selected.has(id) && neighbor && !selected.has(neighbor)) {
-      shapeIds[index] = neighbor;
-      shapeIds[neighborIndex] = id;
-      changed = true;
-    }
-  }
-  return changed
-    ? { ...state, doc: { ...state.doc, pages: { ...state.doc.pages, [page.id]: { ...page, shapeIds } } } }
-    : null;
+  const next = reorderShapes(state, state.ui.selectionIds, direction);
+  return next === state ? null : next;
 }
 
 function ungroupSelection(state: EditorState): EditorState | null {

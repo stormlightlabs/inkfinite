@@ -32,7 +32,7 @@ describe('built-in stencils', () => {
 
 	it.each([
 		['visible', { visible: true, locked: false, opacity: 1 }, true],
-		['hidden', { visible: false, locked: false, opacity: 1 }, true],
+		['hidden', { visible: false, locked: false, opacity: 1 }, false],
 		['locked', { visible: true, locked: true, opacity: 1 }, false],
 		['translucent', { visible: true, locked: false, opacity: 0.35 }, true]
 	] as const)('inserts a grouped stencil atomically in a %s active layer', (_name, layerState, inserts) => {

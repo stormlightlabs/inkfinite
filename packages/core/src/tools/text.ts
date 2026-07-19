@@ -1,7 +1,7 @@
 import type { Action } from "../actions";
 import { createId, ShapeRecord } from "../model";
 import type { EditorState, ToolId } from "../reactivity";
-import { getCurrentPage } from "../reactivity";
+import { canCreateShapeOnActiveLayer, getCurrentPage } from "../reactivity";
 import type { Tool } from "./base";
 
 /**
@@ -36,6 +36,7 @@ export class TextTool implements Tool {
 
   private handlePointerDown(state: EditorState, action: Action): EditorState {
     if (action.type !== "pointer-down") return state;
+    if (!canCreateShapeOnActiveLayer(state)) return state;
 
     const currentPage = getCurrentPage(state);
     if (!currentPage) return state;
@@ -58,7 +59,7 @@ export class TextTool implements Tool {
         shapes: { ...state.doc.shapes, [shapeId]: shape },
         pages: { ...state.doc.pages, [currentPage.id]: newPage },
       },
-      ui: { ...state.ui, selectionIds: [shapeId] },
+      ui: { ...state.ui, selectionIds: [shapeId], toolId: "select" },
     };
   }
 }

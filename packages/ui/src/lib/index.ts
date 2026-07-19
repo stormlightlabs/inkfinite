@@ -4,6 +4,14 @@ export type { ButtonProps, ButtonVariant } from './components/Button.svelte';
 export { default as BrushPopover } from './components/BrushPopover.svelte';
 export type { BrushPopoverProps, BrushSettings } from './components/BrushPopover.svelte';
 
+export { default as ContextMenu } from './components/ContextMenu.svelte';
+export type {
+	ContextMenuEntry,
+	ContextMenuItem,
+	ContextMenuProps,
+	ContextMenuSeparator
+} from './components/ContextMenu.svelte';
+
 export { default as Sheet } from './components/Sheet.svelte';
 export type { SheetProps, SheetSide } from './components/Sheet.svelte';
 

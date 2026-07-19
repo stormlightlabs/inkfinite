@@ -18,28 +18,38 @@ function editorStore() {
 	return new Store(state);
 }
 
-describe('LayerPanel', () => {
-	it('provides accessible controls for the complete layer lifecycle', async () => {
-		const store = editorStore();
-		const screen = render(LayerPanel, {
+function renderPanel(store = editorStore()) {
+	return {
+		store,
+		screen: render(LayerPanel, {
 			store,
 			onCommit: (_name, next) => store.setState(() => next)
-		});
+		})
+	};
+}
+
+describe('LayerPanel', () => {
+	it('provides compact accessible controls for visibility, locking, and activation', async () => {
+		const { screen, store } = renderPanel();
 
 		await expect
 			.element(screen.getByRole('complementary', { name: 'Layers' }))
 			.toBeInTheDocument();
-		await expect
-			.element(screen.getByRole('button', { name: 'Delete Default' }))
-			.toBeDisabled();
 		await screen.getByRole('button', { name: 'Add layer' }).click();
-		await expect.element(screen.getByRole('button', { name: 'Delete Default' })).toBeEnabled();
+		expect(Object.keys(store.getState().doc.layers ?? {})).toHaveLength(2);
+		expect(store.getState().doc.layers?.[store.getState().ui.activeLayerId!].name).toBe(
+			'Layer'
+		);
+
 		await screen.getByRole('button', { name: 'Hide Layer' }).click();
 		expect(
 			Object.values(store.getState().doc.layers ?? {}).find(
 				(layer) => layer.name === 'Layer'
 			)?.visible
 		).toBe(false);
+		expect(store.getState().doc.layers?.[store.getState().ui.activeLayerId!].name).toBe(
+			'Default'
+		);
 		await screen.getByRole('button', { name: 'Show Layer' }).click();
 		await screen.getByRole('button', { name: 'Lock Layer' }).click();
 		expect(
@@ -47,5 +57,37 @@ describe('LayerPanel', () => {
 				(layer) => layer.name === 'Layer'
 			)?.locked
 		).toBe(true);
+	});
+
+	it('opens the layer context menu and supports inline rename', async () => {
+		const { screen, store } = renderPanel();
+		await screen.getByRole('button', { name: 'Add layer' }).click();
+		await screen.getByRole('button', { name: 'More actions for Layer' }).click();
+		await expect
+			.element(screen.getByRole('menu', { name: 'Actions for Layer' }))
+			.toBeInTheDocument();
+		await screen.getByRole('menuitem', { name: 'Rename layer' }).click();
+
+		const input = screen.getByLabelText('Name for Layer').element() as HTMLInputElement;
+		input.value = 'Notes';
+		input.dispatchEvent(new Event('change', { bubbles: true }));
+		input.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+		expect(
+			Object.values(store.getState().doc.layers ?? {}).some(
+				(layer) => layer.name === 'Notes'
+			)
+		).toBe(true);
+	});
+
+	it('collapses to a small toolbar and restores the layer list', async () => {
+		const { screen } = renderPanel();
+		await screen.getByRole('button', { name: 'Collapse layers' }).click();
+		await expect
+			.element(screen.getByRole('list', { name: 'Page layers' }))
+			.not.toBeInTheDocument();
+		await screen.getByRole('button', { name: 'Expand layers' }).click();
+		await expect
+			.element(screen.getByRole('list', { name: 'Page layers' }))
+			.toBeInTheDocument();
 	});
 });
