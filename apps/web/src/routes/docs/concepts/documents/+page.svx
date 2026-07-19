@@ -1,0 +1,20 @@
+<svelte:head>
+	<title>Documents · Inkfinite documentation</title>
+	<meta name="description" content="An outline of Inkfinite's durable document model." />
+</svelte:head>
+
+# Documents
+
+Learn how Inkfinite represents an infinite-canvas document.
+
+<h2 id="document-structure">Document structure</h2>
+
+*todo*
+
+<h2 id="shapes-and-layers">Shapes and Layers</h2>
+
+*todo*
+
+<h2 id="persistence">Persistence</h2>
+
+*todo*

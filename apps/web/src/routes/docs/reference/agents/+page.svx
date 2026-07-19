@@ -1,0 +1,28 @@
+<svelte:head>
+	<title>Agent workflows · Inkfinite documentation</title>
+	<meta name="description" content="An outline of reviewable Inkfinite workflows for coding agents." />
+</svelte:head>
+
+# Agentic Workflows
+
+Use Inkfinite's command-line and proposal tools to make reviewable document changes.
+
+<h2 id="workflow">Workflow</h2>
+
+*todo*
+
+<h2 id="proposals">Proposals</h2>
+
+*todo*
+
+<h2 id="permissions">Permissions</h2>
+
+*todo*
+
+<h2 id="conflicts">Conflicts</h2>
+
+*todo*
+
+<h2 id="skills">Skills</h2>
+
+*todo*

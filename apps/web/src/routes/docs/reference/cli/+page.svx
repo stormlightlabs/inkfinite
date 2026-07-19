@@ -1,0 +1,24 @@
+<svelte:head>
+	<title>Command-line interface · Inkfinite documentation</title>
+	<meta name="description" content="An outline of the Inkfinite CLI." />
+</svelte:head>
+
+# Command-line interface
+
+Inspect, change, validate, and render Inkfinite documents from a terminal.
+
+<h2 id="command-overview">Command overview</h2>
+
+*todo*
+
+<h2 id="file-mode">File mode</h2>
+
+*todo*
+
+<h2 id="live-mode">Live mode</h2>
+
+*todo*
+
+<h2 id="output-format">Output Format</h2>
+
+*todo*

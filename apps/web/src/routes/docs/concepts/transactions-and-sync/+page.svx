@@ -1,0 +1,20 @@
+<svelte:head>
+	<title>Transactions and sync · Inkfinite documentation</title>
+	<meta name="description" content="An outline of Inkfinite transactions, history, and synchronization." />
+</svelte:head>
+
+# Transactions and sync
+
+Understand how Inkfinite applies durable edits and converges between peers.
+
+<h2 id="transactions">Transactions</h2>
+
+*todo*
+
+<h2 id="undo-and-redo">Undo and redo</h2>
+
+*todo*
+
+<h2 id="synchronization">Syncing</h2>
+
+*todo*

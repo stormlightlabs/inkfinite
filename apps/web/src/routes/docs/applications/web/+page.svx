@@ -1,0 +1,16 @@
+<svelte:head>
+	<title>Web editor · Inkfinite documentation</title>
+	<meta name="description" content="An outline for running and deploying the Inkfinite web editor." />
+</svelte:head>
+
+# Web editor
+
+Run Inkfinite in the browser.
+
+<h2 id="run-locally">Web App</h2>
+
+*todo*
+
+<h2 id="browser-storage">Storage & Backups</h2>
+
+*todo*

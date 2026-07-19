@@ -1,0 +1,20 @@
+<svelte:head>
+	<title>Desktop editor · Inkfinite documentation</title>
+	<meta name="description" content="An outline for building and using the Inkfinite desktop editor." />
+</svelte:head>
+
+# Desktop editor
+
+Build and use Inkfinite as a native desktop application.
+
+<h2 id="run-locally">Run locally</h2>
+
+*todo*
+
+<h2 id="document-sessions">Document Sessions</h2>
+
+*todo*
+
+<h2 id="local-control">Local Control</h2>
+
+*todo*

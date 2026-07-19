@@ -1,0 +1,32 @@
+<svelte:head>
+	<title>File Format · Inkfinite documentation</title>
+	<meta name="description" content="An outline of Inkfinite's native files and stable exports." />
+</svelte:head>
+
+# File Format
+
+Understand native `.inkfinite` files and the formats Inkfinite can export.
+
+<h2 id="native-files">Native files</h2>
+
+*todo*
+
+<h2 id="versions-and-compatibility">Versions and compatibility</h2>
+
+*todo*
+
+<h2 id="exports">exports</h2>
+
+*todo*
+
+<h3 id="json-exports">JSON</h3>
+
+*todo*
+
+<h3 id="svg-exports">SVG</h3>
+
+*todo*
+
+<h2 id="recovery">Recovery</h2>
+
+*todo*

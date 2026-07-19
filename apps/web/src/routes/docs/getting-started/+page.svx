@@ -1,0 +1,26 @@
+<svelte:head>
+	<title>Getting started · Inkfinite documentation</title>
+	<meta name="description" content="Install Inkfinite and create your first document." />
+</svelte:head>
+
+# Getting started
+
+Install Inkfinite, run an editor, and create your first document.
+
+<h2 id="requirements">Requirements</h2>
+
+*todo*
+
+<h2 id="installation">Installation</h2>
+
+*todo*
+
+*todo - link to the web app at* `/`
+
+<h2 id="create-a-document">Create a document</h2>
+
+*todo*
+
+<h2 id="next-steps">Next steps</h2>
+
+*todo*
