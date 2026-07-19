@@ -450,7 +450,7 @@ pub enum Request {
         /// Actor that will own the session's local changes.
         actor_id: ActorId,
     },
-    /// Open a canonical or importable document in a new session.
+    /// Open a canonical document in a new session.
     OpenDocument {
         /// File to open.
         path: DocumentPath,

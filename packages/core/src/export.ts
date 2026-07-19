@@ -255,7 +255,7 @@ function textToSVG(shape: TextShape, transform: string): string {
  *
  * Uses foreignObject to embed HTML for markdown rendering.
  *
- * For better compatibility, the markdown is exported as plain text with basic formatting preserved.
+ * For broader interoperability, the markdown is exported as plain text with basic formatting preserved.
  */
 function markdownToSVG(shape: MarkdownShape, transform: string): string {
   const { md, w, h, fontSize, fontFamily, color, bg, border } = shape.props;

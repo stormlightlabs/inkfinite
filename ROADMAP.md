@@ -1,6 +1,6 @@
-# Inkfinite vNext / Version 2
+# Inkfinite native document roadmap
 
-Status: implementation in progress; V2-01 through V2-20 are complete
+Status: V2-01 through V2-20 and V2-22 are complete; V2-23 and V2-21 remain
 
 This is the product and architecture contract for vNext. [TODO.md](TODO.md) is
 the implementation queue.
@@ -17,16 +17,14 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
 
 ## Success criteria
 
-- Rust owns the durable model, migrations, validation, CRDT state, file I/O,
+- Rust owns the durable model, schema-version validation, CRDT state, file I/O,
   history, and queries. TypeScript owns low-latency interaction and rendering.
 - Every completed human or agent edit becomes one validated transaction and one
   Automerge change. Two offline replicas converge after exchanging changes.
-- V2 files survive interrupted writes and expose stable JSON and SVG projections
+- Native `.inkfinite` files survive interrupted writes and expose stable JSON and SVG projections
   for inspection.
-- V1 compatibility remains temporary development scaffolding through the final
-  release-evidence run. Before vNext ships, remove its import paths, fixtures,
-  scripts, tests, and current documentation after converting any useful coverage
-  to v2-native fixtures.
+- Native fixtures and release evidence cover successful, invalid, rendering,
+  performance, persistence, recovery, and export cases.
 - The desktop app, file-mode CLI, and live CLI use the same engine. Stale or
   invalid mutations cannot partly modify a document.
 - A user and a fresh Codex session can co-design a wireframe in the offline
@@ -44,7 +42,7 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
 - The Cargo and pnpm workspaces contain the Rust core, generated TypeScript
   bindings, Canvas 2D renderer, shared Svelte editor, web app, and Tauri desktop
   app.
-- Rust owns the v2 model, Automerge-backed transaction engine, schemas, desktop
+- Rust owns the native model, Automerge-backed transaction engine, schemas, desktop
   sessions, file persistence, recovery, and typed Tauri commands. The desktop
   frontend keeps a read-only mirror; the web app retains its Dexie adapter.
 - `@inkfinite/runtime` and `@inkfinite/input-dom` own framework-neutral editor
@@ -66,9 +64,9 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
 - The desktop owns an authenticated, versioned local IPC server. The CLI can
   inspect open sessions, query the same materialized records as file mode, and
   request frontend focus without a TCP listener or background daemon.
-- [TODO.md](TODO.md) starts the remaining work at V2-22: compatibility removal,
-  collaborative desktop QA, and final release verification. V2-20's bundled
-  agent skill and clean fixture run are complete.
+- [TODO.md](TODO.md) starts the remaining work at V2-23: collaborative desktop
+  QA and final release verification. V2-20's bundled agent skill, V2-22's native
+  cleanup, and the clean fixture run are complete.
 
 ## Architecture
 
@@ -85,7 +83,7 @@ Tauri document service ───── local socket ───── Rust CLI
         └──────────── shared Rust crates ───────────┘
               model · CRDT · transactions
               validation · queries · files
-              migrations · SVG · protocol
+              schema validation · SVG · protocol
 
 TypeScript editor runtime
   camera · tools · selection · gesture previews · Canvas 2D
@@ -108,7 +106,7 @@ TypeScript editor runtime
 
 ### Ownership boundary
 
-Rust owns document records, Automerge changes and heads, format migrations,
+Rust owns document records, Automerge changes and heads, format-version checks,
 transaction validation and application, undo/redo, persistence and recovery,
 permissions and provenance, queries, CLI behavior, and live IPC.
 
@@ -135,7 +133,7 @@ Business logic must not depend on Tauri, Svelte, CLI parsing, or a transport.
 
 ## CRDT and file decisions
 
-Automerge is the v2 CRDT. The V2-02 architecture gate proved cross-language
+Automerge is the document CRDT. The V2-02 architecture gate proved cross-language
 round trips, offline convergence, deterministic hierarchy repair, sync, undo,
 compaction, and the 10,000-shape workload. Production code depends on
 Inkfinite-owned document, patch, and sync interfaces rather than Automerge
@@ -147,7 +145,7 @@ The recorded dependency baseline is Rust 1.89, Automerge Rust 0.10.0, and
 0.61 ms median Canvas frame and a 0.34 ms median linear hit test against budgets
 of 8 ms and 1 ms. The linear path remains; a spatial index and second durable
 scene bitmap did not justify their complexity. The complete performance record
-is in [`fixtures/v2/performance/v2-11.json`](fixtures/v2/performance/v2-11.json).
+is in [`fixtures/native/performance/rendering-budget.json`](fixtures/native/performance/rendering-budget.json).
 
 One Inkfinite transaction maps to one Automerge change. Causal heads, rather
 than a scalar revision, are the concurrency token. A local sequence number may
@@ -155,15 +153,11 @@ be displayed, but callers use inspected heads and operation preconditions.
 Remote changes are merged into a fork, materialized, repaired by deterministic
 rules where specified, and validated before the session adopts them.
 
-The canonical v2 file is Automerge's compact binary form with the `.inkfinite`
-extension. `.inkfinite.json` is a stable snapshot export, not a CRDT round-trip
-format. The development build still accepts the frozen v1 envelope so the
-architecture baselines remain reproducible. V2-22 replaces useful predecessor
-coverage with native fixtures and removes that unreleased compatibility surface
-before collaborative QA and the final release matrix.
-[docs/v2-file-format.md](docs/v2-file-format.md) defines the current file
-behavior. The CLI supplies JSON inspection for repositories and CI and produces
-deterministic SVG.
+The canonical file is Automerge's compact binary form with the `.inkfinite`
+extension. JSON is a deterministic inspection projection, not a second file
+format or CRDT round-trip. [docs/file-format.md](docs/file-format.md) defines
+the current file behavior. The CLI supplies JSON inspection for repositories and
+CI and produces deterministic SVG.
 
 ## Document contract
 
@@ -204,8 +198,8 @@ Page
   are neither rendered nor hit-tested. Locked shapes cannot be selected or
   changed. New pages always have one default layer.
 - Deleting a non-empty layer requires an explicit destination layer or explicit
-  deletion of its contents. Imports backfill one default layer without changing
-  visual order.
+  deletion of its contents. A page repaired without a layer gains one default
+  layer without changing visual order.
 
 Concurrent merge repairs must be deterministic. Missing parents move to a
 stable recovery layer, bindings to missing shapes are removed, duplicate child
@@ -364,7 +358,7 @@ The stable boundary is a document opened or created through a public desktop or
 CLI entry point, changed through the transaction engine, persisted, reopened,
 and compared by materialized snapshot and Automerge heads.
 
-Required coverage includes serialization, migrations, merge convergence,
+Required coverage includes serialization, schema validation, merge convergence,
 deterministic repairs, referential integrity, transaction inversion, actor-scoped
 undo, precondition conflicts, locked/hidden layers, active-layer insertion,
 atomic-write failures, IPC framing/authentication, CLI JSON, tool state machines,
@@ -405,16 +399,15 @@ render parity, proposal UX, recovery prompts, and permission failures.
 Milestones 1 through 7 are complete. [TODO.md](TODO.md) owns ticket-level status,
 acceptance criteria, and dependency order. The remaining path is:
 
-1. Replace useful predecessor coverage and collapse to the native model (V2-22).
-2. Run the human-and-Codex desktop wireframing sequence (V2-23).
-3. Run the final release matrix against that native candidate (V2-21).
+1. Run the human-and-Codex desktop wireframing sequence (V2-23).
+2. Run the final release matrix against the native candidate (V2-21).
 
 ## Deferred milestones
 
-- Adapt the standalone browser's Dexie adapter to the v2 Rust/CRDT authority
-  after the desktop contracts and file format stabilize. Its migration must
-  backfill every existing board with a default layer and preserve shape order.
-  Keep the static web build green while desktop behavior changes.
+- Add a browser-side native-file bridge only if a future product decision needs
+  standalone web documents to leave IndexedDB. The current web adapter stores
+  the same shared editor records locally and does not define another document
+  contract.
 - Add hosted sync relay, identity, invitations, permissions, and ephemeral
   presence after local peer sync is correct and threat-modeled.
 - Consider WebGL, OffscreenCanvas, third-party shape plugins, Figma import,
@@ -424,9 +417,9 @@ acceptance criteria, and dependency order. The remaining path is:
 
 ## Boundaries
 
-- Follow existing patterns, preserve predecessor fixtures until V2-22 replaces
-  their useful coverage, run affected tests, and keep Git read-only unless
-  repository instructions change.
+- Follow existing patterns, keep native fixtures close to the behavior they
+  exercise, run affected tests, and keep Git read-only unless repository
+  instructions change.
 - Ask before adding production dependencies, changing a published format or
   protocol, broadening authentication or network exposure, or deleting user data.
 - Never expose a public control server, accept invalid partial writes, hand-edit
@@ -442,9 +435,9 @@ acceptance criteria, and dependency order. The remaining path is:
   intervening local and remote changes, not only linear histories.
 - Local IPC authentication and framing must remain safe under malformed,
   oversized, replayed, and cross-user requests.
-- Removing v1 compatibility must not discard useful rendering, invalid-input,
-  persistence, recovery, or performance coverage; V2-22 replaces that coverage
-  before deleting its source fixtures.
+- Native-model cleanup must not discard useful rendering, invalid-input,
+  persistence, recovery, or performance coverage; V2-22 preserves that coverage
+  in native fixtures and focused tests.
 
 [am-repo]: https://github.com/automerge/automerge
 [am-rust]: https://docs.rs/automerge/latest/automerge/

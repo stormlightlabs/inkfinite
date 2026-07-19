@@ -1,12 +1,3 @@
-import type { BindingRecord, Document, PageRecord, ShapeRecord } from '../model';
-import type { DocOrder, LoadedDoc } from './document';
-import type { BoardMeta } from './repo';
-
-/**
- * Desktop file representation - combines board metadata with document content
- */
-export type DesktopFileData = { board: BoardMeta; doc: Document; order: DocOrder };
-
 /**
  * File handle for desktop - just the path
  */
@@ -84,44 +75,4 @@ export interface DesktopFileOps {
 	 * Delete a file from disk
 	 */
 	deleteFile(path: string): Promise<void>;
-}
-
-/**
- * Create a loaded document from desktop file data
- */
-export function loadedDocFromFileData(data: DesktopFileData): LoadedDoc {
-	return {
-		pages: data.doc.pages,
-		layers: data.doc.layers ?? data.order.layers,
-		shapes: data.doc.shapes,
-		bindings: data.doc.bindings,
-		order: data.order
-	};
-}
-
-/**
- * Create file data from document parts
- */
-export function createFileData(
-	board: BoardMeta,
-	pages: Record<string, PageRecord>,
-	shapes: Record<string, ShapeRecord>,
-	bindings: Record<string, BindingRecord>,
-	order: DocOrder
-): DesktopFileData {
-	return { board, doc: { pages, shapes, bindings }, order };
-}
-
-export function parseDesktopFile(content: string): DesktopFileData {
-	const data = JSON.parse(content) as DesktopFileData;
-
-	if (!data.board || !data.doc || !data.order) {
-		throw new Error('Invalid file format: missing required fields');
-	}
-
-	return data;
-}
-
-export function serializeDesktopFile(data: DesktopFileData): string {
-	return JSON.stringify(data, null, 2);
 }

@@ -872,7 +872,7 @@
 		width: 32px;
 		min-height: 40px;
 		cursor: grab;
-		color: var(--text-muted);
+		color: var(--ink-text-muted);
 		opacity: 0.5;
 		transition: opacity 0.2s;
 		touch-action: none;
@@ -880,13 +880,13 @@
 
 	.toolbar__drag-handle:hover {
 		opacity: 1;
-		color: var(--text);
+		color: var(--ink-text);
 	}
 
 	.toolbar[data-dragging='true'] .toolbar__drag-handle {
 		cursor: grabbing;
 		opacity: 1;
-		color: var(--accent);
+		color: var(--ink-accent);
 	}
 
 	.toolbar__brand {
@@ -905,25 +905,25 @@
 		font-weight: 600;
 		font-size: 1.125rem;
 		letter-spacing: -0.025em;
-		color: var(--text);
+		color: var(--ink-text);
 	}
 
 	.toolbar__tagline {
 		font-size: 0.75rem;
-		color: var(--text-muted);
+		color: var(--ink-text-muted);
 		font-weight: 500;
 		text-decoration: none;
 	}
 
 	.toolbar__tagline:hover {
-		color: var(--text);
+		color: var(--ink-text);
 		text-decoration: underline;
 		text-underline-offset: 0.16em;
 	}
 
 	.toolbar__tagline:focus-visible {
 		border-radius: 2px;
-		outline: 2px solid var(--accent);
+		outline: 2px solid var(--ink-accent);
 		outline-offset: 2px;
 	}
 
@@ -937,7 +937,7 @@
 		border: var(--ink-line-width) solid transparent;
 		border-radius: var(--ink-radius-wobbly-small);
 		background: transparent;
-		color: var(--text);
+		color: var(--ink-text);
 		cursor: pointer;
 		transition-property: color, background-color, border-color, box-shadow, transform;
 		transition-duration: var(--ink-duration-fast);
@@ -947,10 +947,10 @@
 	}
 
 	.toolbar__tool-button:hover {
-		background: var(--bg-tertiary);
-		color: var(--text);
+		background: var(--ink-surface-hover);
+		color: var(--ink-text);
 		opacity: 1;
-		border-color: var(--text-muted);
+		border-color: var(--ink-text-muted);
 	}
 
 	.toolbar__tool-button:active,
@@ -960,7 +960,7 @@
 	}
 
 	.toolbar__tool-button:focus {
-		outline: 2px solid var(--accent);
+		outline: 2px solid var(--ink-accent);
 		outline-offset: 2px;
 	}
 
@@ -987,7 +987,7 @@
 
 	.toolbar__divider {
 		width: 1px;
-		background-color: var(--border);
+		background-color: var(--ink-border);
 		margin: 0 var(--ink-space-1);
 		height: 32px;
 		opacity: 0.5;
@@ -1000,9 +1000,9 @@
 
 	.toolbar__zoom-button,
 	.toolbar__export-button {
-		border: 1px solid var(--border);
-		background: var(--surface);
-		color: var(--text);
+		border: 1px solid var(--ink-border);
+		background: var(--ink-canvas);
+		color: var(--ink-text);
 		padding: 0.5rem 1rem;
 		border-radius: 0.375rem;
 		cursor: pointer;
@@ -1015,8 +1015,8 @@
 
 	.toolbar__zoom-button:hover,
 	.toolbar__export-button:hover {
-		background: var(--bg-tertiary);
-		border-color: var(--text-muted);
+		background: var(--ink-surface-hover);
+		border-color: var(--ink-text-muted);
 	}
 
 	.toolbar__zoom-menu,
@@ -1024,9 +1024,9 @@
 		position: absolute;
 		top: calc(100% + 8px);
 		left: 0;
-		background: var(--surface-elevated);
-		color: var(--text);
-		border: 1px solid var(--border);
+		background: var(--ink-surface-raised);
+		color: var(--ink-text);
+		border: 1px solid var(--ink-border);
 		border-radius: 0.5rem;
 		box-shadow:
 			0 10px 15px -3px rgba(0, 0, 0, 0.1),
@@ -1044,7 +1044,7 @@
 	.toolbar__menu-item {
 		border: none;
 		background: transparent;
-		color: var(--text);
+		color: var(--ink-text);
 		padding: 4px 8px;
 		border-radius: 0.25rem;
 		text-align: left;
@@ -1053,17 +1053,17 @@
 	}
 
 	.toolbar__menu-item:hover {
-		background: var(--surface-elevated);
+		background: var(--ink-surface-raised);
 	}
 
 	.toolbar__menu-item:focus {
-		outline: 2px solid var(--accent);
+		outline: 2px solid var(--ink-accent);
 		outline-offset: -2px;
 	}
 
 	.toolbar__menu-divider {
 		height: 1px;
-		background: var(--border);
+		background: var(--ink-border);
 		margin: 6px 0;
 	}
 
@@ -1081,7 +1081,7 @@
 
 	.toolbar__file {
 		font-size: 13px;
-		color: var(--text-secondary);
+		color: var(--ink-text-muted);
 	}
 
 	.toolbar__desktop-actions {
@@ -1092,9 +1092,9 @@
 	}
 
 	.toolbar__desktop-button {
-		border: 1px solid var(--border);
-		background: var(--surface);
-		color: var(--text);
+		border: 1px solid var(--ink-border);
+		background: var(--ink-canvas);
+		color: var(--ink-text);
 		border-radius: 6px;
 		padding: 4px 10px;
 		font-size: 13px;
@@ -1102,7 +1102,7 @@
 	}
 
 	.toolbar__desktop-button:hover {
-		background: var(--surface-elevated);
+		background: var(--ink-surface-raised);
 	}
 
 	.toolbar__recent {
@@ -1110,22 +1110,22 @@
 		align-items: center;
 		gap: 6px;
 		font-size: 0.75rem;
-		color: var(--text-secondary);
+		color: var(--ink-text-muted);
 	}
 
 	.toolbar__recent select {
 		font-size: 0.75rem;
 		padding: 4px 6px;
 		border-radius: 0.25rem;
-		border: 1px solid var(--border);
-		background: var(--surface);
-		color: var(--text);
+		border: 1px solid var(--ink-border);
+		background: var(--ink-canvas);
+		color: var(--ink-text);
 	}
 
 	.toolbar__logo {
 		width: 32px;
 		height: 32px;
-		color: var(--text);
+		color: var(--ink-text);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1133,12 +1133,12 @@
 
 	.toolbar__name {
 		font-weight: 600;
-		color: var(--text);
+		color: var(--ink-text);
 	}
 
 	.toolbar__tagline {
 		font-size: 0.75rem;
-		color: var(--text-muted);
+		color: var(--ink-text-muted);
 	}
 
 	.toolbar__colors {

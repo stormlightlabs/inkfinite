@@ -53,7 +53,7 @@ pub struct DiscoveryRecord {
     pub token: String,
 }
 
-/// Read-only operation accepted by the V2-17 desktop server.
+/// Read-only operation accepted by the desktop server.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "type")]
 #[allow(clippy::large_enum_variant)]
@@ -124,7 +124,7 @@ pub struct RequestEnvelope {
     pub request: AppRequest,
 }
 
-/// Successful result from a V2-17 read-only app command.
+/// Successful result from a read-only app command.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "type", content = "value")]
 pub enum AppResponse {
@@ -487,7 +487,7 @@ pub fn session_protocol_error(error: &SessionError) -> ProtocolError {
         SessionError::File(file_error) => match file_error {
             FileError::Locked { .. } => "document_locked",
             FileError::AlreadyExists { .. } => "document_already_exists",
-            FileError::InvalidV1(_)
+            FileError::InvalidDocument(_)
             | FileError::Json(_)
             | FileError::UnsupportedFormat { .. }
             | FileError::UnsupportedShapeKind { .. }

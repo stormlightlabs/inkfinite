@@ -8,177 +8,24 @@ use crate::proto::{Operation, TransactionId};
 use crate::{
     ActorId, Document, DocumentId, LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord, RecordVersion, Timestamp,
 };
-use serde_json::Value;
 
-use super::{DocumentFile, FileError, PersistenceOptions, export_snapshot_json, import_v1_file, import_v1_json};
+use super::{DocumentFile, FileError, PersistenceOptions, export_snapshot_json};
 
 static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[test]
-fn imports_all_valid_v1_features_into_normalized_v2_records() {
-    let input = include_str!("../../../../fixtures/v1/desktop/all-features.inkfinite.json");
-    let imported = import_v1_json(input, ActorId::from("actor:test")).expect("fixture imports");
-    let source: Value = serde_json::from_str(input).expect("fixture JSON");
-    let document = &imported.document;
-
-    let expected_page_ids = source["order"]["pageIds"]
-        .as_array()
-        .expect("page order")
-        .iter()
-        .map(|id| id.as_str().expect("page ID"))
-        .collect::<Vec<_>>();
-    assert_eq!(
-        document.page_ids.iter().map(crate::PageId::as_str).collect::<Vec<_>>(),
-        expected_page_ids
-    );
-    assert_eq!(document.pages.len(), 2);
-    assert_eq!(document.layers.len(), 2);
-    for page in document.pages.values() {
-        assert_eq!(page.layer_ids.len(), 1);
-        let layer = &document.layers[&page.layer_ids[0]];
-        let flattened = flatten_shape_order(document, &layer.shape_ids);
-        let expected = source["order"]["shapeOrder"][page.id.as_str()]
-            .as_array()
-            .expect("shape order")
-            .iter()
-            .map(|id| id.as_str().expect("shape ID"))
-            .map(str::to_owned)
-            .collect::<Vec<_>>();
-        assert_eq!(flattened, expected);
-    }
-
-    assert!(document.shapes.contains_key(&"shape:stencil-process".into()));
-    assert!(document.shapes.contains_key(&"shape:arrow".into()));
-    assert!(document.shapes.contains_key(&"shape:markdown".into()));
-    assert_eq!(document.shapes.len(), 16);
-    assert_eq!(
-        document.shapes[&"shape:stencil-process".into()].properties["width"].as_f64(),
-        Some(120.0)
-    );
-    assert_eq!(
-        document.shapes[&"shape:stencil-process".into()].properties["height"].as_f64(),
-        Some(80.0)
-    );
-    let stroke_opacity = document.shapes[&"shape:stroke".into()]
-        .style
-        .stroke_opacity
-        .expect("stroke opacity")
-        .get();
-    assert!((stroke_opacity - 0.75).abs() < f32::EPSILON);
-    assert_eq!(
-        document.shapes[&"shape:text".into()].properties["legacy_group_id"],
-        Value::from("group:content")
-    );
-    let card_group = &document.shapes[&"group:card".into()];
-    assert_eq!(
-        card_group.child_ids,
-        vec!["shape:stencil-card".into(), "shape:stencil-card-divider".into()]
-    );
-    assert!(matches!(
-        document.bindings[&"binding:arrow-start".into()].anchor,
-        crate::BindingAnchor::Edge { x: 1.0, y: 0.0 }
-    ));
-    assert!(matches!(
-        document.bindings[&"binding:arrow-end".into()].anchor,
-        crate::BindingAnchor::Center
-    ));
-}
-
-#[test]
-fn imports_web_and_performance_v1_fixtures() {
-    let web = include_str!("../../../../fixtures/v1/web/all-features.web.json");
-    let imported = import_v1_json(web, ActorId::from("actor:web")).expect("web fixture imports");
-    assert_eq!(imported.document.page_ids.len(), 2);
-    assert_eq!(imported.document.layers.len(), 2);
-    assert_eq!(imported.document.shapes.len(), 16);
-
-    let performance = include_str!("../../../../fixtures/v1/performance/board-10000.inkfinite.json");
-    let imported = import_v1_json(performance, ActorId::from("actor:performance")).expect("large fixture imports");
-    assert_eq!(imported.document.page_ids, vec![PageId::from("page:10000")]);
-    assert_eq!(imported.document.shapes.len(), 10_000);
-    let page = &imported.document.pages[&PageId::from("page:10000")];
-    let layer = &imported.document.layers[&page.layer_ids[0]];
-    assert_eq!(layer.shape_ids.len(), 10_000);
-    assert_eq!(flatten_shape_order(&imported.document, &layer.shape_ids).len(), 10_000);
-}
-
-#[test]
-fn imports_optional_shape_opacity_without_changing_opaque_defaults() {
-    let mut source: Value = serde_json::from_str(include_str!(
-        "../../../../fixtures/v1/desktop/all-features.inkfinite.json"
-    ))
-    .expect("fixture JSON");
-    source["doc"]["shapes"]["shape:stencil-process"]["opacity"] = Value::from(0.8);
-    source["doc"]["shapes"]["shape:stencil-process"]["fillOpacity"] = Value::from(0.25);
-    source["doc"]["shapes"]["shape:stencil-process"]["strokeOpacity"] = Value::from(0.5);
-    let imported = import_v1_json(
-        &serde_json::to_string(&source).expect("fixture serializes"),
-        ActorId::from("actor:test"),
-    )
-    .expect("fixture imports");
-
-    let styled = &imported.document.shapes[&"shape:stencil-process".into()].style;
-    assert!((styled.opacity.get() - 0.8).abs() < f32::EPSILON);
-    assert_eq!(styled.fill_opacity.map(Opacity::get), Some(0.25));
-    assert_eq!(styled.stroke_opacity.map(Opacity::get), Some(0.5));
-    assert_eq!(
-        imported.document.shapes[&"shape:ellipse".into()].style.opacity,
-        Opacity::OPAQUE
-    );
-}
-
-#[test]
-fn rejects_invalid_and_newer_inputs_before_persistence() {
-    let actor = ActorId::from("actor:test");
-    let invalid_inputs = [
-        include_str!("../../../../fixtures/v1/invalid/malformed-json.inkfinite.json"),
-        include_str!("../../../../fixtures/v1/invalid/missing-envelope-fields.json"),
-        include_str!("../../../../fixtures/v1/invalid/dangling-references.inkfinite.json"),
-        include_str!("../../../../fixtures/v1/invalid/duplicate-order.inkfinite.json"),
-    ];
-    for input in invalid_inputs {
-        assert!(
-            matches!(
-                import_v1_json(input, actor.clone()),
-                Err(FileError::Json(_) | FileError::InvalidV1(_))
-            ),
-            "input should be rejected"
-        );
-    }
-    assert!(matches!(
-        import_v1_json(r#"{"format":"inkfinite.document","format_version":3}"#, actor.clone()),
-        Err(FileError::UnsupportedFormat { version: 3, .. })
-    ));
-
-    let temporary = TestDirectory::new();
-    let source = temporary.path.join("invalid.inkfinite.json");
-    let destination = temporary.path.join("existing.inkfinite");
-    fs::write(
-        &source,
-        include_str!("../../../../fixtures/v1/invalid/duplicate-order.inkfinite.json"),
-    )
-    .expect("write source");
-    fs::write(&destination, b"keep this file").expect("write destination");
-    let result = import_v1_file(&source, &destination, actor);
-    assert!(matches!(result, Err(FileError::InvalidV1(_))));
-    assert_eq!(fs::read(&destination).expect("read destination"), b"keep this file");
-}
-
-#[test]
 fn canonical_sessions_lock_save_reopen_and_export_deterministically() {
-    let input = include_str!("../../../../fixtures/v1/desktop/all-features.inkfinite.json");
-    let imported = import_v1_json(input, ActorId::from("actor:test")).expect("fixture imports");
-    let expected_document = imported.document.clone();
+    let expected_document = simple_document();
     let temporary = TestDirectory::new();
     let canonical = temporary.path.join("board.inkfinite");
-    let snapshot_json = temporary.path.join("board.inkfinite.json");
+    let snapshot_json = temporary.path.join("board.snapshot.json");
     let options = PersistenceOptions::with_recovery_directory(temporary.path.join("recovery"));
 
     let mut session = DocumentFile::create_with_options(
         &canonical,
-        imported.document_id.clone(),
+        DocumentId::from("document:canonical"),
         ActorId::from("actor:test"),
-        imported.document,
+        expected_document.clone(),
         options.clone(),
     )
     .expect("create canonical document");
@@ -197,7 +44,7 @@ fn canonical_sessions_lock_save_reopen_and_export_deterministically() {
     drop(session);
 
     let canonical_bytes = fs::read(&canonical).expect("canonical bytes");
-    assert!(serde_json::from_slice::<Value>(&canonical_bytes).is_err());
+    assert!(serde_json::from_slice::<serde_json::Value>(&canonical_bytes).is_err());
     let exported: crate::DocumentSnapshot =
         serde_json::from_str(&fs::read_to_string(&snapshot_json).expect("snapshot JSON")).expect("snapshot parses");
     assert_eq!(exported.document, expected_document);
@@ -212,12 +59,45 @@ fn canonical_sessions_lock_save_reopen_and_export_deterministically() {
 }
 
 #[test]
+fn rejects_invalid_canonical_bytes_without_replacing_the_file() {
+    let temporary = TestDirectory::new();
+    let canonical = temporary.path.join("invalid.inkfinite");
+    fs::write(&canonical, b"not an Automerge document").expect("write invalid document");
+
+    let result = DocumentFile::open(&canonical, ActorId::from("actor:test"));
+
+    assert!(result.is_err());
+    assert_eq!(
+        fs::read(&canonical).expect("read invalid document"),
+        b"not an Automerge document"
+    );
+}
+
+#[test]
+fn rejects_empty_actor_before_touching_the_document() {
+    let temporary = TestDirectory::new();
+    let canonical = temporary.path.join("actor.inkfinite");
+    let document = simple_document();
+    let _session = DocumentFile::create(
+        &canonical,
+        DocumentId::from("document:actor"),
+        ActorId::from("actor:writer"),
+        document,
+    )
+    .expect("create document");
+
+    let result = DocumentFile::open(&canonical, ActorId::from("  "));
+
+    assert!(matches!(result, Err(FileError::InvalidDocument(message)) if message.contains("actor ID")));
+}
+
+#[test]
 fn recovery_restores_journal_after_canonical_replace_failure() {
     let temporary = TestDirectory::new();
     let canonical = temporary.path.join("board.inkfinite");
     let recovery_directory = temporary.path.join("recovery");
     let options = PersistenceOptions {
-        recovery_directory: Some(recovery_directory.clone()),
+        recovery_directory: Some(recovery_directory),
         max_journal_entries: 1,
         max_journal_bytes: 1024 * 1024,
     };
@@ -253,7 +133,7 @@ fn recovery_restores_journal_after_canonical_replace_failure() {
     let result = session.save();
     assert!(matches!(result, Err(FileError::Io { .. })));
     assert!(recovery_path.exists());
-    let recovery: Value =
+    let recovery: serde_json::Value =
         serde_json::from_slice(&fs::read(&recovery_path).expect("recovery bytes")).expect("recovery JSON");
     assert!(recovery["snapshot"].as_array().is_some_and(|bytes| !bytes.is_empty()));
     assert_eq!(recovery["journal"].as_array().expect("journal").len(), 1);
@@ -279,21 +159,6 @@ fn recovery_restores_journal_after_canonical_replace_failure() {
     );
 }
 
-fn flatten_shape_order(document: &Document, shape_ids: &[crate::ShapeId]) -> Vec<String> {
-    let mut flattened = Vec::new();
-    for shape_id in shape_ids {
-        if let Some(shape) = document.shapes.get(shape_id) {
-            if shape.kind.as_str() != crate::CONTAINER_KIND {
-                flattened.push(shape_id.as_str().to_owned());
-            }
-            flattened.extend(flatten_shape_order(document, &shape.child_ids));
-        } else {
-            flattened.push(shape_id.as_str().to_owned());
-        }
-    }
-    flattened
-}
-
 fn simple_document() -> Document {
     let page_id = PageId::from("page:one");
     let layer_id = LayerId::from("layer:one");
@@ -309,9 +174,9 @@ fn simple_document() -> Document {
         )]),
         page_ids: vec![page_id.clone()],
         layers: BTreeMap::from([(
-            layer_id.clone(),
+            layer_id,
             LayerRecord {
-                id: layer_id,
+                id: LayerId::from("layer:one"),
                 page_id,
                 name: "Default".into(),
                 shape_ids: Vec::new(),

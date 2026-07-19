@@ -32,7 +32,7 @@ const shape: ShapeRecord = {
       actor_id: "actor:fixture",
       origin: "system",
       timestamp: 1_700_000_000_000,
-      source: "v2-06",
+      source: "native-fixture",
     },
   },
   style: { opacity: 1, fill_opacity: null, stroke_opacity: null },
@@ -52,7 +52,7 @@ const transaction: TransactionDraft = {
   actor_id: "actor:fixture",
   origin: "system",
   base_heads: ["head:fixture"],
-  description: "V2-06 shared binding fixture",
+  description: "Native shared binding fixture",
   operations: [{ type: "patch_shape", shape_id: shape.id, patch, expected_version: 1 }],
   timestamp: 1_700_000_000_000,
 };

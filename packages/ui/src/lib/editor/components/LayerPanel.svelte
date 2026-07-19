@@ -183,10 +183,10 @@
 		max-height: calc(100% - 1.5rem);
 		overflow: auto;
 		padding: 0.75rem;
-		border: 1px solid var(--border);
+		border: 1px solid var(--ink-border);
 		border-radius: 0.5rem;
-		background: var(--surface);
-		color: var(--text);
+		background: var(--ink-canvas);
+		color: var(--ink-text);
 		box-shadow: 0 8px 24px rgb(0 0 0 / 14%);
 	}
 	header,
@@ -215,11 +215,11 @@
 		display: grid;
 		gap: 0.4rem;
 		padding: 0.5rem;
-		border: 1px solid var(--border);
+		border: 1px solid var(--ink-border);
 		border-radius: 0.35rem;
 	}
 	li.active {
-		border-color: var(--accent);
+		border-color: var(--ink-accent);
 	}
 	.layer-select {
 		text-align: left;
@@ -235,7 +235,7 @@
 		align-items: stretch;
 		flex-direction: column;
 		padding-top: 0.4rem;
-		border-top: 1px solid var(--border);
+		border-top: 1px solid var(--ink-border);
 	}
 	button,
 	input,

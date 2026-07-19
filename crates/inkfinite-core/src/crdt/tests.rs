@@ -84,7 +84,7 @@ fn changes_and_transport_independent_sync_converge() {
 }
 
 #[test]
-#[ignore = "large production benchmark; run explicitly for V2 performance verification"]
+#[ignore = "large production benchmark; run explicitly for performance verification"]
 fn ten_thousand_shape_projection_round_trips() {
     let mut document = empty_document();
     for index in 0_u32..10_000 {

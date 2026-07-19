@@ -2,7 +2,7 @@ import { type DocPatch, type PersistenceSink, type PersistentDocRepo } from '@in
 import { createStatusStore } from '@inkfinite/ui/editor';
 import type { EditorPlatformAdapter, EditorPlatformSession } from '@inkfinite/ui/editor';
 import { liveQuery } from 'dexie';
-import { InkfiniteDB, KNOWN_MIGRATION_IDS } from './database';
+import { InkfiniteDB } from './database';
 import { createDexieDocRepo, createPersistenceSink, getBoardInspectorData } from './repository';
 import type { PersistenceSinkOptions } from './repository';
 
@@ -83,7 +83,7 @@ export function createDexieSession(
 		repo,
 		sink: trackedSink,
 		status,
-		inspectBoard: (boardId) => getBoardInspectorData(database, boardId, KNOWN_MIGRATION_IDS),
+		inspectBoard: (boardId) => getBoardInspectorData(database, boardId),
 		setActiveBoard(boardId) {
 			if (activeBoardId === boardId) return;
 			subscription?.unsubscribe();

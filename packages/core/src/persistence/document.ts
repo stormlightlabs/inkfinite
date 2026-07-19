@@ -15,7 +15,7 @@ export type DocOrder = {
 	pageIds: string[];
 	/** Optional per-page shape order overrides. */
 	shapeOrder?: Record<string, string[]>;
-	/** Complete layer records, stored with ordering metadata by legacy adapters. */
+	/** Complete layer records, stored with ordering metadata by editor adapters. */
 	layers?: Record<string, LayerRecord>;
 };
 

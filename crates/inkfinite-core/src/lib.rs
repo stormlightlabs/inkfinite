@@ -20,7 +20,7 @@ use serde_json::Value;
 use thiserror::Error;
 use ts_rs::TS;
 
-/// Stable format identifier for an Inkfinite v2 document snapshot.
+/// Stable format identifier for an Inkfinite document snapshot.
 pub const INKFINITE_FORMAT_ID: &str = "inkfinite.document";
 
 /// First version of the Rust-owned Inkfinite document contract.
@@ -228,8 +228,6 @@ pub enum Origin {
     Human,
     /// Edit proposed or applied by an agent.
     Agent,
-    /// Record created while importing another format.
-    Import,
     /// Change received from a trusted peer.
     Sync,
     /// Deterministic repair or other internal change.
@@ -461,7 +459,7 @@ pub struct Provenance {
     pub origin: Origin,
     /// Time at which this provenance entry was recorded.
     pub timestamp: Timestamp,
-    /// Optional source identifier, such as an imported filename or proposal ID.
+    /// Optional source identifier, such as an external reference or proposal ID.
     pub source: Option<String>,
 }
 

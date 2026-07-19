@@ -1,5 +1,5 @@
 import "fake-indexeddb/auto";
-import { InkfiniteDB, runMigrations } from "$lib/persistence/database";
+import { InkfiniteDB } from "$lib/persistence/database";
 import { createDexieDocRepo, createPersistenceSink } from "$lib/persistence/repository";
 import {
   CreateShapeCommand,
@@ -213,75 +213,6 @@ describe("History persistence sink", () => {
     expect(applySpy).toHaveBeenCalledTimes(1);
     const loaded = await repo.loadDoc(boardId);
     expect(Object.keys(loaded.shapes).length).toBeGreaterThanOrEqual(10);
-  });
-});
-
-describe("runMigrations", () => {
-  it("backfills timestamps and default page/order", async () => {
-    const db = new Dexie(`migrations-test-${Math.random().toString(36).slice(2)}`);
-    db.version(1).stores({
-      boards: "id, name, createdAt, updatedAt",
-      pages: "[boardId+id], boardId, updatedAt",
-      shapes: "[boardId+id], boardId, type, updatedAt",
-      bindings: "[boardId+id], boardId, type, updatedAt",
-      meta: "key",
-      migrations: "id, appliedAt",
-    });
-    openDbs.push(db);
-    await db.open();
-    await db.table("boards").add({ id: "board:legacy", name: "Legacy Board" });
-
-    await db.transaction("rw", db.tables, async (tx) => {
-      await runMigrations(tx);
-    });
-
-    const board = await db.table("boards").get("board:legacy");
-    expect(board?.createdAt).toBeTypeOf("number");
-    expect(board?.updatedAt).toBeTypeOf("number");
-
-    const pages = await db.table("pages").where("boardId").equals("board:legacy").toArray();
-    expect(pages).toHaveLength(1);
-
-    const pageOrder = await db.table("meta").get(`page-order:board:legacy`);
-    expect(pageOrder?.value).toEqual([pages[0]!.id]);
-
-    const shapeOrder = await db.table("meta").get(`shape-order:board:legacy`);
-    expect(shapeOrder?.value).toEqual({ [pages[0]!.id]: [] });
-
-    const migrations = await db.table("migrations").toArray();
-    expect(migrations.map((row) => row.id)).toContain("MIG-0001");
-    expect(migrations.map((row) => row.id)).toContain("MIG-0002");
-  });
-
-  it("does not re-apply already applied migrations", async () => {
-    const db = new Dexie(`migrations-repeat-${Math.random().toString(36).slice(2)}`);
-    db.version(1).stores({
-      boards: "id, name, createdAt, updatedAt",
-      pages: "[boardId+id], boardId, updatedAt",
-      shapes: "[boardId+id], boardId, type, updatedAt",
-      bindings: "[boardId+id], boardId, type, updatedAt",
-      meta: "key",
-      migrations: "id, appliedAt",
-    });
-    openDbs.push(db);
-    await db.open();
-    await db.table("boards").add({ id: "board:legacy-two", name: "Legacy", createdAt: 1, updatedAt: 1 });
-
-    await db.transaction("rw", db.tables, async (tx) => {
-      await runMigrations(tx);
-    });
-
-    const migrationsAfterFirstRun = await db.table("migrations").toArray();
-
-    await db.table("pages").clear();
-    await db.table("meta").clear();
-
-    await db.transaction("rw", db.tables, async (tx) => {
-      await runMigrations(tx);
-    });
-
-    const migrationsAfterSecondRun = await db.table("migrations").toArray();
-    expect(migrationsAfterSecondRun).toHaveLength(migrationsAfterFirstRun.length);
   });
 });
 

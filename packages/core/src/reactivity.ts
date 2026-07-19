@@ -10,7 +10,7 @@ import {
 	type HistoryState
 } from './history';
 import type { Document, LayerRecord, PageRecord, ShapeRecord } from './model';
-import { Document as DocumentOps, withDocumentLayers } from './model';
+import { Document as DocumentOps, ensureDocumentLayers } from './model';
 
 export type ToolId = 'select' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'text' | 'pen' | 'markdown';
 
@@ -267,7 +267,7 @@ function enforceInvariants(state: EditorState): EditorState {
 				)
 			}
 		: state.doc;
-	const doc = withDocumentLayers(taggedDocument);
+	const doc = ensureDocumentLayers(taggedDocument);
 	const pages = Object.keys(doc.pages);
 	const shapes = doc.shapes;
 

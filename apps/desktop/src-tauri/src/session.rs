@@ -60,7 +60,7 @@ pub fn create_document(
         .map_err(to_protocol_error)
 }
 
-/// Opens a canonical document or imports a selected frozen v1 JSON file.
+/// Opens a canonical `.inkfinite` document.
 #[tauri::command]
 pub fn open_document(state: State<'_, DesktopState>, path: String, actor_id: String) -> Result<SessionOpened> {
     lock_service(&state)?

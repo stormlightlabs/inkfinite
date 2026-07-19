@@ -8,7 +8,7 @@ import {
   validateShapeProperties,
 } from "../packages/bindings/dist/index.js";
 
-const fixture = JSON.parse(await readFile(new URL("../fixtures/v2/shape-registry.json", import.meta.url), "utf8"));
+const fixture = JSON.parse(await readFile(new URL("../fixtures/native/shape-registry.json", import.meta.url), "utf8"));
 
 assert.deepEqual([...BUILTIN_SHAPE_KINDS], fixture.kind_names);
 assert.deepEqual(GEOMETRY_CONVENTION, {
@@ -38,4 +38,4 @@ assert.equal(shape.kind, "rect");
 assert.equal(shape.transform.translation.x, transaction.operations[0].patch.transform.translation.x);
 assert.equal(transaction.operations[0].type, "patch_shape");
 
-console.log("generated TypeScript bindings conform to the shared V2-06 fixture");
+console.log("generated TypeScript bindings conform to the native shared fixture");

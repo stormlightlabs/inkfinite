@@ -7,7 +7,7 @@ import {
 	patchLayer,
 	ShapeRecord,
 	Store,
-	withDocumentLayers
+	ensureDocumentLayers
 } from '../src';
 import { describe, expect, it } from 'vitest';
 
@@ -33,12 +33,12 @@ function layeredState() {
 }
 
 describe('layers', () => {
-	it('backfills one stable default layer without changing order and is idempotent', () => {
-		const migrated = layeredState().doc;
-		const layerId = migrated.pages.page.layerIds?.[0];
+	it('assigns one stable default layer without changing order and is idempotent', () => {
+		const normalized = layeredState().doc;
+		const layerId = normalized.pages.page.layerIds?.[0];
 		expect(layerId).toBe('layer:page:default');
-		expect(migrated.layers?.[layerId!].shapeIds).toEqual(['back', 'front']);
-		expect(withDocumentLayers(migrated)).toEqual(migrated);
+		expect(normalized.layers?.[layerId!].shapeIds).toEqual(['back', 'front']);
+		expect(ensureDocumentLayers(normalized)).toEqual(normalized);
 	});
 
 	it('places new shapes on the active layer and excludes hidden or locked layers from interaction', () => {

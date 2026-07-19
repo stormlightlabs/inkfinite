@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { MigrationInfo } from "../src/persistence/stats";
-import { BoardStatsOps, getPendingMigrations } from "../src/persistence/stats";
+import { BoardStatsOps } from "../src/persistence/stats";
 
 describe("BoardStatsOps", () => {
   describe("create", () => {
@@ -62,47 +61,5 @@ describe("BoardStatsOps", () => {
       expect(BoardStatsOps.formatDocSize(1567)).toBe("1.5 KB");
       expect(BoardStatsOps.formatDocSize(1234567)).toBe("1.2 MB");
     });
-  });
-});
-
-describe("getPendingMigrations", () => {
-  it("returns empty array when all migrations are applied", () => {
-    const knownIds = ["MIG-0001", "MIG-0002"];
-    const applied: MigrationInfo[] = [{ id: "MIG-0001", appliedAt: 1000 }, { id: "MIG-0002", appliedAt: 2000 }];
-
-    const pending = getPendingMigrations(knownIds, applied);
-    expect(pending).toEqual([]);
-  });
-
-  it("returns pending migrations", () => {
-    const knownIds = ["MIG-0001", "MIG-0002", "MIG-0003"];
-    const applied: MigrationInfo[] = [{ id: "MIG-0001", appliedAt: 1000 }];
-
-    const pending = getPendingMigrations(knownIds, applied);
-    expect(pending).toEqual(["MIG-0002", "MIG-0003"]);
-  });
-
-  it("handles no applied migrations", () => {
-    const knownIds = ["MIG-0001", "MIG-0002"];
-    const applied: MigrationInfo[] = [];
-
-    const pending = getPendingMigrations(knownIds, applied);
-    expect(pending).toEqual(["MIG-0001", "MIG-0002"]);
-  });
-
-  it("ignores applied migrations not in known list", () => {
-    const knownIds = ["MIG-0001", "MIG-0002"];
-    const applied: MigrationInfo[] = [{ id: "MIG-0001", appliedAt: 1000 }, { id: "MIG-0003", appliedAt: 2000 }];
-
-    const pending = getPendingMigrations(knownIds, applied);
-    expect(pending).toEqual(["MIG-0002"]);
-  });
-
-  it("preserves order of known migrations", () => {
-    const knownIds = ["MIG-0001", "MIG-0002", "MIG-0003", "MIG-0004"];
-    const applied: MigrationInfo[] = [{ id: "MIG-0002", appliedAt: 2000 }, { id: "MIG-0004", appliedAt: 4000 }];
-
-    const pending = getPendingMigrations(knownIds, applied);
-    expect(pending).toEqual(["MIG-0001", "MIG-0003"]);
   });
 });

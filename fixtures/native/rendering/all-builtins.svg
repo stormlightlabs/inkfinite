@@ -34,7 +34,7 @@
     </g>
     <g data-shape-id="shape:text" opacity="1">
       <text transform="matrix(1 0 0 1 620 300)" font-family="sans-serif" font-size="18" fill="#111827" fill-opacity="1" dominant-baseline="text-before-edge">
-        <tspan x="0" y="0">Inkfinite v1</tspan>
+        <tspan x="0" y="0">Inkfinite native</tspan>
         <tspan x="0" y="21.6">fixture</tspan>
       </text>
     </g>
@@ -44,12 +44,12 @@
     <g data-shape-id="shape:markdown" opacity="1">
       <g transform="matrix(1 0 0 1 40 500)">
         <rect width="360" height="240" fill="#f8fafc" fill-opacity="1" stroke="#94a3b8" stroke-opacity="1"/>
-        <text x="8" y="8" font-family="sans-serif" font-size="29.6" font-weight="bold" fill="#0f172a" fill-opacity="1" dominant-baseline="text-before-edge"><tspan>Frozen Markdown</tspan></text>
+        <text x="8" y="8" font-family="sans-serif" font-size="29.6" font-weight="bold" fill="#0f172a" fill-opacity="1" dominant-baseline="text-before-edge"><tspan>Native Markdown</tspan></text>
         <text x="8" y="49.44" font-family="sans-serif" font-size="16" font-weight="normal" fill="#0f172a" fill-opacity="1" dominant-baseline="text-before-edge"></text>
         <text x="8" y="71.84" font-family="sans-serif" font-size="16" font-weight="normal" fill="#0f172a" fill-opacity="1" dominant-baseline="text-before-edge"><tspan>• </tspan><tspan font-weight="bold">bold</tspan><tspan> item</tspan></text>
         <text x="8" y="94.24" font-family="sans-serif" font-size="16" font-weight="normal" fill="#0f172a" fill-opacity="1" dominant-baseline="text-before-edge"><tspan>• </tspan><tspan font-family="monospace">code</tspan><tspan> item</tspan></text>
         <text x="8" y="116.64" font-family="sans-serif" font-size="16" font-weight="normal" fill="#0f172a" fill-opacity="1" dominant-baseline="text-before-edge"></text>
-        <text x="8" y="139.04" font-family="monospace" font-size="16" font-weight="normal" fill="#0f172a" fill-opacity="1" dominant-baseline="text-before-edge">const version = 1;</text>
+        <text x="8" y="139.04" font-family="monospace" font-size="16" font-weight="normal" fill="#0f172a" fill-opacity="1" dominant-baseline="text-before-edge">const scale = 1;</text>
       </g>
     </g>
   </g>

@@ -709,7 +709,7 @@ fn live_propose_accept_partial_and_authorized_apply_round_trip_through_cli() {
         id: TransactionId("transaction:proposal".into()),
         actor_id: actor.clone(),
         origin: Origin::Agent,
-        base_heads: snapshot.heads.clone(),
+        base_heads: snapshot.heads,
         description: "preview a page rename".into(),
         operations: vec![Operation::RenamePage {
             page_id: page_id.clone(),
@@ -726,9 +726,9 @@ fn live_propose_accept_partial_and_authorized_apply_round_trip_through_cli() {
 
     let mut service = SessionService::new();
     let opened = service.open(&document_path, actor.clone()).unwrap();
-    let session_id = opened.session_id.clone();
+    let session_id = opened.session_id;
     let authorization = service.authorize_apply(&session_id).unwrap();
-    let authorization_token = authorization.token.clone();
+    let authorization_token = authorization.token;
 
     let previous_discovery = ipc::read_discovery(&ipc::discovery_path()).ok();
     let discovery = DiscoveryRecord {

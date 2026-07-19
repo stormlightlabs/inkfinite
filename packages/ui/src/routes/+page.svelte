@@ -132,7 +132,7 @@
 		padding: var(--ink-space-5);
 		border: 2px solid var(--ink-border-strong);
 		border-radius: var(--ink-radius-panel-small);
-		background: color-mix(in srgb, var(--ink-eldritch-orange) 52%, var(--ink-surface-raised));
+		background: color-mix(in srgb, var(--ink-warning) 52%, var(--ink-surface-raised));
 		box-shadow: 4px 5px 0 var(--ink-shadow-color);
 	}
 

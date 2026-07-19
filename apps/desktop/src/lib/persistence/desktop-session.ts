@@ -7,16 +7,16 @@ import type {
 	DocPatch,
 	FileHandle,
 	LoadedDoc,
-	LayerRecord as LegacyLayerRecord,
-	PageRecord as LegacyPageRecord,
-	BindingRecord as LegacyBindingRecord,
+	LayerRecord as EditorLayerRecord,
+	PageRecord as EditorPageRecord,
+	BindingRecord as EditorBindingRecord,
 	PersistenceSink,
 	PersistentDocRepo,
-	ShapeRecord as LegacyShapeRecord
+	ShapeRecord as EditorShapeRecord
 } from '@inkfinite/core';
 import { createId } from '@inkfinite/core';
 import type {
-	BindingRecord as V2BindingRecord,
+	BindingRecord as SnapshotBindingRecord,
 	ApplyAuthorization,
 	ChangeHash,
 	CommitResult,
@@ -62,9 +62,7 @@ export type SyncPeerStatus = {
 export type SyncQuarantine = { sequence: number; reason: string };
 
 /** Session-level synchronization state. */
-export type SyncState =
-	| { status: 'disabled' }
-	| { status: 'enabled'; peers: SyncPeerStatus[]; warning: string | null };
+export type SyncState = { status: 'disabled' } | { status: 'enabled'; peers: SyncPeerStatus[]; warning: string | null };
 
 /** Transport-neutral Automerge envelope exchanged by trusted peers. */
 export type SyncMessage = {
@@ -189,8 +187,8 @@ export type DesktopSessionRepo = PersistentDocRepo & {
 
 /**
  * Creates the desktop repository adapter. Document bytes cross the Tauri
- * command boundary only; this adapter keeps the renderer's legacy mirror in
- * memory until the backend returns a committed snapshot.
+ * command boundary only; this adapter keeps the editor projection in memory
+ * until the backend returns a committed snapshot.
  */
 export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: SessionApi } = {}): DesktopSessionRepo {
 	const api = opts.api ?? createSessionApi();
@@ -365,10 +363,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		await ensureBoardLoaded(boardId);
 		if (!currentStatus || !currentFile || !currentBoard) throw new Error('No board loaded');
 		const nextName = name.trim() || 'Untitled Board';
-		const nextPath = joinPath(
-			parentPath(currentFile.path),
-			`${safeFileStem(nextName)}${canonicalExtension(currentFile.path)}`
-		);
+		const nextPath = joinPath(parentPath(currentFile.path), `${safeFileStem(nextName)}.inkfinite`);
 		const saved = await api.saveAs({
 			session_id: currentStatus.session_id,
 			path: nextPath,
@@ -637,16 +632,9 @@ export function isDesktopSessionRepo(repo: PersistentDocRepo): repo is DesktopSe
 }
 
 async function listDocumentEntries(fileOps: DesktopFileOps, directory: string) {
-	const [canonical, legacy] = await Promise.all([
-		fileOps.readDirectory(directory, '*.inkfinite'),
-		fileOps.readDirectory(directory, '*.inkfinite.json')
-	]);
-	const canonicalPaths = new Set(canonical.map((entry) => entry.path));
+	const entries = await fileOps.readDirectory(directory, '*.inkfinite');
 	const seen = new Set<string>();
-	return [...canonical, ...legacy].filter((entry) => {
-		if (entry.path.endsWith('.inkfinite.json') && canonicalPaths.has(entry.path.slice(0, -5))) {
-			return false;
-		}
+	return entries.filter((entry) => {
 		if (seen.has(entry.path)) return false;
 		seen.add(entry.path);
 		return true;
@@ -654,10 +642,10 @@ async function listDocumentEntries(fileOps: DesktopFileOps, directory: string) {
 }
 
 function loadedDocFromSnapshot(snapshot: DocumentSnapshot): LoadedDoc {
-	const pages: Record<string, LegacyPageRecord> = {};
-	const layers: Record<string, LegacyLayerRecord> = {};
-	const shapes: Record<string, LegacyShapeRecord> = {};
-	const bindings: Record<string, LegacyBindingRecord> = {};
+	const pages: Record<string, EditorPageRecord> = {};
+	const layers: Record<string, EditorLayerRecord> = {};
+	const shapes: Record<string, EditorShapeRecord> = {};
+	const bindings: Record<string, EditorBindingRecord> = {};
 	const shapeOrder: Record<string, string[]> = {};
 
 	for (const pageId of snapshot.document.page_ids) {
@@ -710,13 +698,13 @@ function flattenShape(
 	shapeId: string,
 	groupId: string | undefined,
 	flattened: string[],
-	shapes: Record<string, LegacyShapeRecord>
+	shapes: Record<string, EditorShapeRecord>
 ) {
 	const shape = snapshot.document.shapes[shapeId];
 	if (!shape) return;
 	if (shape.kind !== 'container') {
 		flattened.push(shape.id);
-		shapes[shape.id] = { ...legacyShapeFromV2(shape, pageId, groupId), layerId };
+		shapes[shape.id] = { ...editorShapeFromSnapshot(shape, pageId, groupId), layerId };
 	}
 	for (const childId of shape.child_ids) {
 		flattenShape(
@@ -731,7 +719,7 @@ function flattenShape(
 	}
 }
 
-function legacyShapeFromV2(shape: ShapeRecord, pageId: string, groupId?: string): LegacyShapeRecord {
+function editorShapeFromSnapshot(shape: ShapeRecord, pageId: string, groupId?: string): EditorShapeRecord {
 	const properties = { ...(shape.properties as Record<string, JsonValue>) };
 	if ('width' in properties) {
 		properties.w = properties.width;
@@ -752,7 +740,7 @@ function legacyShapeFromV2(shape: ShapeRecord, pageId: string, groupId?: string)
 	}
 	return {
 		id: shape.id,
-		type: shape.kind as LegacyShapeRecord['type'],
+		type: shape.kind as EditorShapeRecord['type'],
 		pageId,
 		x: shape.transform.translation.x,
 		y: shape.transform.translation.y,
@@ -761,8 +749,8 @@ function legacyShapeFromV2(shape: ShapeRecord, pageId: string, groupId?: string)
 		...(shape.style.fill_opacity !== null ? { fillOpacity: shape.style.fill_opacity } : {}),
 		...(shape.style.stroke_opacity !== null ? { strokeOpacity: shape.style.stroke_opacity } : {}),
 		...(groupId ? { groupId } : {}),
-		props: properties as LegacyShapeRecord['props']
-	} as LegacyShapeRecord;
+		props: properties as EditorShapeRecord['props']
+	} as EditorShapeRecord;
 }
 
 function applyPatch(doc: LoadedDoc, patch: DocPatch): LoadedDoc {
@@ -798,11 +786,11 @@ function documentFromLoadedDoc(doc: LoadedDoc, current: DocumentSnapshot, actor:
 		}
 		const layerIds = page.layerIds?.length ? page.layerIds : currentPage.layer_ids;
 		for (const layerId of layerIds) {
-			const legacyLayer = doc.layers?.[layerId];
+			const editorLayer = doc.layers?.[layerId];
 			const currentLayer = current.document.layers[layerId];
-			if (!legacyLayer && !currentLayer) continue;
+			if (!editorLayer && !currentLayer) continue;
 			const layerShapeIds =
-				legacyLayer?.shapeIds ?? page.shapeIds.filter((id) => doc.shapes[id]?.layerId === layerId);
+				editorLayer?.shapeIds ?? page.shapeIds.filter((id) => doc.shapes[id]?.layerId === layerId);
 			const roots: string[] = [];
 			for (const shapeId of layerShapeIds) {
 				const shape = doc.shapes[shapeId];
@@ -820,11 +808,11 @@ function documentFromLoadedDoc(doc: LoadedDoc, current: DocumentSnapshot, actor:
 			layers[layerId] = {
 				id: layerId,
 				page_id: pageId,
-				name: legacyLayer?.name ?? currentLayer?.name ?? 'Layer',
+				name: editorLayer?.name ?? currentLayer?.name ?? 'Layer',
 				shape_ids: roots,
-				visible: legacyLayer?.visible ?? currentLayer?.visible ?? true,
-				locked: legacyLayer?.locked ?? currentLayer?.locked ?? false,
-				opacity: legacyLayer?.opacity ?? currentLayer?.opacity ?? 1,
+				visible: editorLayer?.visible ?? currentLayer?.visible ?? true,
+				locked: editorLayer?.locked ?? currentLayer?.locked ?? false,
+				opacity: editorLayer?.opacity ?? currentLayer?.opacity ?? 1,
 				version: currentLayer?.version ?? 1
 			};
 		}
@@ -839,7 +827,7 @@ function documentFromLoadedDoc(doc: LoadedDoc, current: DocumentSnapshot, actor:
 		const location = shapePages.get(shape.id);
 		if (!location) continue;
 		const existing = current.document.shapes[shape.id];
-		shapes[shape.id] = shapeFromLegacy(shape, location, existing, actor);
+		shapes[shape.id] = shapeFromEditor(shape, location, existing, actor);
 	}
 	for (const [groupId, childIds] of groupChildren) {
 		const location = shapePages.get(childIds[0]);
@@ -859,7 +847,7 @@ function documentFromLoadedDoc(doc: LoadedDoc, current: DocumentSnapshot, actor:
 		};
 	}
 
-	const bindings: Record<string, V2BindingRecord> = {};
+	const bindings: Record<string, SnapshotBindingRecord> = {};
 	for (const binding of Object.values(doc.bindings)) {
 		bindings[binding.id] = {
 			id: binding.id,
@@ -881,8 +869,8 @@ function documentFromLoadedDoc(doc: LoadedDoc, current: DocumentSnapshot, actor:
 	};
 }
 
-function shapeFromLegacy(
-	shape: LegacyShapeRecord,
+function shapeFromEditor(
+	shape: EditorShapeRecord,
 	location: { pageId: string; layerId: string },
 	existing: ShapeRecord | undefined,
 	actor: string
@@ -988,15 +976,11 @@ function fileName(path: string): string {
 }
 
 function fileStem(name: string): string {
-	return name.replace(/\.inkfinite(?:\.json)?$/i, '');
+	return name.replace(/\.inkfinite$/i, '');
 }
 
 function safeFileStem(name: string): string {
 	return name.replace(/[\\/:*?"<>|]/g, '-').trim() || 'Untitled';
-}
-
-function canonicalExtension(path: string): string {
-	return path.endsWith('.inkfinite.json') ? '.inkfinite.json' : '.inkfinite';
 }
 
 function parentPath(path: string): string {

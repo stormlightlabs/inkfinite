@@ -94,7 +94,7 @@ fn artifacts() -> Result<BTreeMap<PathBuf, String>, Box<dyn Error>> {
     insert_schema::<Response>(&mut artifacts, "schemas/protocol-response.schema.json")?;
     insert_schema::<ProtocolError>(&mut artifacts, "schemas/protocol-error.schema.json")?;
 
-    artifacts.insert(PathBuf::from("fixtures/v2/shape-registry.json"), fixture_json()?);
+    artifacts.insert(PathBuf::from("fixtures/native/shape-registry.json"), fixture_json()?);
     artifacts.insert(PathBuf::from("packages/bindings/src/model.ts"), model_bindings());
     artifacts.insert(
         PathBuf::from("packages/bindings/src/transaction.ts"),
@@ -314,7 +314,7 @@ fn fixture_shape() -> inkfinite_core::ShapeRecord {
                 actor_id: ActorId::from("actor:fixture"),
                 origin: Origin::System,
                 timestamp: Timestamp(1_700_000_000_000),
-                source: Some("v2-06".into()),
+                source: Some("native-fixture".into()),
             },
         },
         style: ShapeStyle { opacity: Opacity::OPAQUE, fill_opacity: None, stroke_opacity: None },
@@ -328,7 +328,7 @@ fn fixture_transaction() -> TransactionDraft {
         actor_id: ActorId::from("actor:fixture"),
         origin: Origin::System,
         base_heads: vec![ChangeHash::from("head:fixture")],
-        description: "V2-06 shared binding fixture".into(),
+        description: "Native shared binding fixture".into(),
         operations: vec![Operation::PatchShape {
             shape_id: ShapeId::from("shape:fixture"),
             patch: ShapePatch {

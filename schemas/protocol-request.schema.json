@@ -1132,11 +1132,6 @@
           "type": "string"
         },
         {
-          "const": "import",
-          "description": "Record created while importing another format.",
-          "type": "string"
-        },
-        {
           "const": "sync",
           "description": "Change received from a trusted peer.",
           "type": "string"
@@ -1199,7 +1194,7 @@
           "description": "Path by which the record entered the document."
         },
         "source": {
-          "description": "Optional source identifier, such as an imported filename or proposal ID.",
+          "description": "Optional source identifier, such as an external reference or proposal ID.",
           "type": [
             "string",
             "null"
@@ -1950,7 +1945,7 @@
       "type": "object"
     },
     {
-      "description": "Open a canonical or importable document in a new session.",
+      "description": "Open a canonical document in a new session.",
       "properties": {
         "actor_id": {
           "$ref": "#/$defs/ActorId",

@@ -140,7 +140,11 @@
 				{#each liveProposal.affected_regions as region}
 					{@const viewport = c.getViewport()}
 					{@const bounds = region.bounds}
-					{@const topLeft = Camera.worldToScreen(c.store.getState().camera, { x: bounds.x, y: bounds.y }, viewport)}
+					{@const topLeft = Camera.worldToScreen(
+						c.store.getState().camera,
+						{ x: bounds.x, y: bounds.y },
+						viewport
+					)}
 					{@const bottomRight = Camera.worldToScreen(
 						c.store.getState().camera,
 						{ x: bounds.x + bounds.width, y: bounds.y + bounds.height },
@@ -148,7 +152,8 @@
 					)}
 					<div
 						class="proposal-ghost"
-						style={`left:${Math.min(topLeft.x, bottomRight.x)}px; top:${Math.min(topLeft.y, bottomRight.y)}px; width:${Math.abs(bottomRight.x - topLeft.x)}px; height:${Math.abs(bottomRight.y - topLeft.y)}px`}></div>
+						style={`left:${Math.min(topLeft.x, bottomRight.x)}px; top:${Math.min(topLeft.y, bottomRight.y)}px; width:${Math.abs(bottomRight.x - topLeft.x)}px; height:${Math.abs(bottomRight.y - topLeft.y)}px`}>
+					</div>
 				{/each}
 			</div>
 		{/if}
@@ -296,9 +301,9 @@
 	.proposal-ghost {
 		position: absolute;
 		box-sizing: border-box;
-		border: 1px dashed color-mix(in srgb, var(--accent) 82%, white 18%);
-		background: color-mix(in srgb, var(--accent) 13%, transparent);
-		box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent) inset;
+		border: 1px dashed color-mix(in srgb, var(--ink-accent) 82%, white 18%);
+		background: color-mix(in srgb, var(--ink-accent) 13%, transparent);
+		box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink-accent) 18%, transparent) inset;
 		animation: proposal-pulse 1.8s ease-in-out infinite;
 	}
 
@@ -314,9 +319,9 @@
 
 	.canvas-text-editor {
 		position: absolute;
-		border: 1px solid var(--accent);
-		background: var(--surface);
-		color: var(--text);
+		border: 1px solid var(--ink-accent);
+		background: var(--ink-canvas);
+		color: var(--ink-text);
 		padding: 0.25rem;
 		transform-origin: top left;
 		resize: none;
@@ -331,9 +336,9 @@
 
 	.canvas-arrow-label-editor {
 		position: absolute;
-		border: 1px solid var(--accent);
-		background: var(--surface);
-		color: var(--text);
+		border: 1px solid var(--ink-accent);
+		background: var(--ink-canvas);
+		color: var(--ink-text);
 		padding: 6px 8px;
 		transform-origin: center;
 		outline: none;
@@ -348,9 +353,9 @@
 
 	.canvas-markdown-editor {
 		position: absolute;
-		border: 1px solid var(--accent);
-		background: var(--surface);
-		color: var(--text);
+		border: 1px solid var(--ink-accent);
+		background: var(--ink-canvas);
+		color: var(--ink-text);
 		padding: 8px;
 		transform-origin: top left;
 		resize: none;

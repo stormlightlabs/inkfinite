@@ -2,7 +2,6 @@ import {
 	BindingRecord as BindingOps,
 	BoardStatsOps,
 	createId,
-	getPendingMigrations,
 	LayerRecord as LayerOps,
 	PageRecord as PageOps,
 	ShapeRecord as ShapeOps
@@ -18,7 +17,6 @@ import type {
 	Document,
 	LoadedDoc,
 	LayerRecord,
-	MigrationInfo,
 	PageRecord,
 	PersistenceSink,
 	PersistentDocRepo,
@@ -39,9 +37,6 @@ export type BindingRow = BindingRecord & { boardId: string; updatedAt: Timestamp
 
 /** Key-value metadata stored alongside document rows. */
 export type MetaRow = { key: string; value: unknown };
-
-/** Record of a completed IndexedDB data migration. */
-export type MigrationRow = { id: string; appliedAt: Timestamp };
 
 /** Debounce configuration for the web persistence sink. */
 export type PersistenceSinkOptions = { debounceMs?: number };
@@ -565,28 +560,8 @@ export async function getSchemaInfo(database: Dexie): Promise<SchemaInfo> {
 	return { declaredVersion: database.verno, installedVersion: database.verno };
 }
 
-/**
- * Fetch applied migrations from the migrations table.
- */
-export async function getAppliedMigrations(database: DexieLike): Promise<MigrationInfo[]> {
-	const migrations = database.table<MigrationRow>('migrations');
-	return migrations.orderBy('appliedAt').toArray();
-}
-
-/**
- * Fetch complete inspector data for a board including stats, schema, and migrations.
- */
-export async function getBoardInspectorData(
-	database: Dexie,
-	boardId: string,
-	knownMigrationIds: string[]
-): Promise<BoardInspectorData> {
-	const [stats, schema, migrations] = await Promise.all([
-		getBoardStats(database, boardId),
-		getSchemaInfo(database),
-		getAppliedMigrations(database)
-	]);
-
-	const pendingMigrations = getPendingMigrations(knownMigrationIds, migrations);
-	return { storageType: 'IndexedDB (Dexie)', stats, schema, migrations, pendingMigrations };
+/** Fetch complete inspector data for a board. */
+export async function getBoardInspectorData(database: Dexie, boardId: string): Promise<BoardInspectorData> {
+	const [stats, schema] = await Promise.all([getBoardStats(database, boardId), getSchemaInfo(database)]);
+	return { storageType: 'IndexedDB (Dexie)', stats, schema };
 }

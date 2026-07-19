@@ -29,7 +29,7 @@ export function createDesktopFileOps(): DesktopFileOps {
     const result = await open({
       multiple: false,
       directory: false,
-      filters: [{ name: "Inkfinite Files", extensions: ["inkfinite", "inkfinite.json", "json"] }],
+      filters: [{ name: "Inkfinite Files", extensions: ["inkfinite"] }],
     });
 
     return result;
@@ -37,8 +37,8 @@ export function createDesktopFileOps(): DesktopFileOps {
 
   async function showSaveDialog(defaultName?: string): Promise<string | null> {
     const result = await save({
-      defaultPath: defaultName || "Untitled.inkfinite.json",
-      filters: [{ name: "Inkfinite Files", extensions: ["inkfinite", "inkfinite.json"] }],
+      defaultPath: defaultName || "Untitled.inkfinite",
+      filters: [{ name: "Inkfinite Files", extensions: ["inkfinite"] }],
     });
 
     return result;
@@ -94,7 +94,7 @@ export function createDesktopFileOps(): DesktopFileOps {
   }
 
   async function readDirectory(directory: string, pattern?: string): Promise<DirectoryEntry[]> {
-    const entries = await invoke<FileEntry[]>("read_directory", { directory, pattern: pattern || "*.inkfinite.json" });
+    const entries = await invoke<FileEntry[]>("read_directory", { directory, pattern: pattern || "*.inkfinite" });
 
     return entries.map((e) => ({ path: e.path, name: e.name, isDir: e.is_dir }));
   }

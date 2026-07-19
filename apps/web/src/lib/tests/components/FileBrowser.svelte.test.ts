@@ -149,9 +149,7 @@ describe("FileBrowser", () => {
       const fetchInspectorData = vi.fn().mockResolvedValue({
         storageType: "IndexedDB (Dexie)",
         stats: { pageCount: 2, shapeCount: 10, bindingCount: 3, docSizeBytes: 2048, lastUpdated: 3000 },
-        schema: { declaredVersion: 1, installedVersion: 1 },
-        migrations: [{ id: "MIG-0001", appliedAt: 1000 }, { id: "MIG-0002", appliedAt: 2000 }],
-        pendingMigrations: [],
+        schema: { declaredVersion: 2, installedVersion: 2 },
       });
 
       render(FileBrowser, { vm, open: true, fetchInspectorData });
@@ -170,9 +168,7 @@ describe("FileBrowser", () => {
       const fetchInspectorData = vi.fn().mockResolvedValue({
         storageType: "IndexedDB (Dexie)",
         stats: { pageCount: 2, shapeCount: 10, bindingCount: 3, docSizeBytes: 2048, lastUpdated: 3000 },
-        schema: { declaredVersion: 1, installedVersion: 1 },
-        migrations: [],
-        pendingMigrations: [],
+        schema: { declaredVersion: 2, installedVersion: 2 },
       });
 
       render(FileBrowser, { vm, open: true, fetchInspectorData });
@@ -195,9 +191,7 @@ describe("FileBrowser", () => {
       const fetchInspectorData = vi.fn().mockResolvedValue({
         storageType: "IndexedDB (Dexie)",
         stats: { pageCount: 2, shapeCount: 10, bindingCount: 3, docSizeBytes: 2048, lastUpdated: 3000 },
-        schema: { declaredVersion: 1, installedVersion: 1 },
-        migrations: [],
-        pendingMigrations: [],
+        schema: { declaredVersion: 2, installedVersion: 2 },
       });
 
       render(FileBrowser, { vm, open: true, fetchInspectorData });
@@ -210,52 +204,6 @@ describe("FileBrowser", () => {
       await expect.element(page.getByText("Schema")).toBeVisible();
       await expect.element(page.getByText("Declared Version:")).toBeVisible();
       await expect.element(page.getByText("Installed Version:")).toBeVisible();
-    });
-
-    it("should display migrations in inspector", async () => {
-      const boards = createMockBoards();
-      const vm = createMockVM(boards);
-      const fetchInspectorData = vi.fn().mockResolvedValue({
-        storageType: "IndexedDB (Dexie)",
-        stats: { pageCount: 2, shapeCount: 10, bindingCount: 3, docSizeBytes: 2048, lastUpdated: 3000 },
-        schema: { declaredVersion: 1, installedVersion: 1 },
-        migrations: [{ id: "MIG-0001", appliedAt: 1000 }, { id: "MIG-0002", appliedAt: 2000 }],
-        pendingMigrations: [],
-      });
-
-      render(FileBrowser, { vm, open: true, fetchInspectorData });
-
-      const inspectButtons = page.getByLabelText(/inspect board/i);
-      const buttons = inspectButtons.all();
-      const firstButton = buttons[0];
-      await firstButton.click();
-
-      await expect.element(page.getByText("Migrations")).toBeVisible();
-      await expect.element(page.getByText("MIG-0001")).toBeVisible();
-      await expect.element(page.getByText("MIG-0002")).toBeVisible();
-    });
-
-    it("should show pending migrations warning when present", async () => {
-      const boards = createMockBoards();
-      const vm = createMockVM(boards);
-      const fetchInspectorData = vi.fn().mockResolvedValue({
-        storageType: "IndexedDB (Dexie)",
-        stats: { pageCount: 2, shapeCount: 10, bindingCount: 3, docSizeBytes: 2048, lastUpdated: 3000 },
-        schema: { declaredVersion: 1, installedVersion: 1 },
-        migrations: [{ id: "MIG-0001", appliedAt: 1000 }],
-        pendingMigrations: ["MIG-0002", "MIG-0003"],
-      });
-
-      render(FileBrowser, { vm, open: true, fetchInspectorData });
-
-      const inspectButtons = page.getByLabelText(/inspect board/i);
-      const buttons = inspectButtons.all();
-      const firstButton = buttons[0];
-      await firstButton.click();
-
-      await expect.element(page.getByText(/Pending Migrations:/i)).toBeVisible();
-      await expect.element(page.getByText("MIG-0002")).toBeVisible();
-      await expect.element(page.getByText("MIG-0003")).toBeVisible();
     });
 
     it("should show error when inspector data fetch fails", async () => {

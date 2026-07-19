@@ -420,32 +420,6 @@
 						</span>
 					</div>
 				</section>
-
-				<section class="inspector__section">
-					<h4 class="inspector__section-title">Migrations</h4>
-					{#if inspectorData.migrations.length === 0}
-						<div class="inspector__empty">No migrations applied yet</div>
-					{:else}
-						<div class="inspector__migrations">
-							{#each inspectorData.migrations as migration (migration.id)}
-								<div class="inspector__migration">
-									<span class="inspector__migration-id">{migration.id}</span>
-									<span class="inspector__migration-date">
-										{formatTimestamp(migration.appliedAt)}
-									</span>
-								</div>
-							{/each}
-						</div>
-					{/if}
-					{#if inspectorData.pendingMigrations.length > 0}
-						<div class="inspector__pending">
-							<h5 class="inspector__pending-title">Pending Migrations:</h5>
-							{#each inspectorData.pendingMigrations as migrationId (migrationId)}
-								<div class="inspector__pending-migration">{migrationId}</div>
-							{/each}
-						</div>
-					{/if}
-				</section>
 			</div>
 		{/if}
 	</div>
@@ -458,12 +432,12 @@
 	}
 
 	.filebrowser {
-		--filebrowser-divider: color-mix(in srgb, var(--border) 42%, transparent);
+		--filebrowser-divider: color-mix(in srgb, var(--ink-border) 42%, transparent);
 		display: flex;
 		flex-direction: column;
 		height: 100%;
-		background-color: var(--surface);
-		color: var(--text);
+		background-color: var(--ink-canvas);
+		color: var(--ink-text);
 	}
 
 	.filebrowser__header {
@@ -489,7 +463,7 @@
 	.filebrowser__close {
 		background: none;
 		border: 1px solid transparent;
-		color: var(--text-secondary, #666);
+		color: var(--ink-text-muted, #666);
 		font-size: 1.5rem;
 		cursor: pointer;
 		padding: 0.25rem;
@@ -501,14 +475,14 @@
 	.filebrowser__close:hover,
 	.filebrowser__close:focus-visible {
 		background-color: rgba(0, 0, 0, 0.05);
-		color: var(--text);
+		color: var(--ink-text);
 		border: 1px solid #e27878;
 	}
 
 	.filebrowser__action {
 		padding: 0.5rem 1rem;
-		background-color: var(--primary, #007bff);
-		color: white;
+		background-color: var(--ink-accent, #007bff);
+		color: var(--ink-on-accent, white);
 		border: none;
 		border-radius: 0.25rem;
 		cursor: pointer;
@@ -517,13 +491,13 @@
 	}
 
 	.filebrowser__action:hover {
-		background-color: var(--primary-hover, #0056b3);
+		background-color: var(--ink-accent-hover, #0056b3);
 	}
 
 	.filebrowser__workspace {
 		padding: 0.75rem 1rem;
-		border-bottom: 1px solid var(--border, #e0e0e0);
-		background-color: var(--surface-secondary, #f9f9f9);
+		border-bottom: 1px solid var(--ink-border, #e0e0e0);
+		background-color: var(--ink-surface, #f9f9f9);
 	}
 
 	.filebrowser__workspace-info {
@@ -539,23 +513,23 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		font-family: monospace;
-		color: var(--text);
+		color: var(--ink-text);
 	}
 
 	.filebrowser__workspace-change,
 	.filebrowser__workspace-clear {
 		padding: 0.25rem 0.5rem;
 		background-color: transparent;
-		border: 1px solid var(--border, #e0e0e0);
+		border: 1px solid var(--ink-border, #e0e0e0);
 		border-radius: 0.25rem;
 		cursor: pointer;
 		font-size: 0.75rem;
-		color: var(--text);
+		color: var(--ink-text);
 	}
 
 	.filebrowser__workspace-change:hover,
 	.filebrowser__workspace-clear:hover {
-		background-color: var(--surface-hover, #f5f5f5);
+		background-color: var(--ink-surface-hover, #f5f5f5);
 	}
 
 	.filebrowser__workspace-pick {
@@ -564,8 +538,8 @@
 		gap: 0.5rem;
 		width: 100%;
 		padding: 0.5rem;
-		background-color: var(--primary, #007bff);
-		color: white;
+		background-color: var(--ink-accent, #007bff);
+		color: var(--ink-on-accent, white);
 		border: none;
 		border-radius: 0.25rem;
 		cursor: pointer;
@@ -573,13 +547,13 @@
 	}
 
 	.filebrowser__workspace-pick:hover {
-		background-color: var(--primary-hover, #0056b3);
+		background-color: var(--ink-accent-hover, #0056b3);
 	}
 
 	.filebrowser__workspace-hint {
 		margin-top: 0.5rem;
 		font-size: 0.75rem;
-		color: var(--text-muted, #6c757d);
+		color: var(--ink-text-muted, #6c757d);
 		text-align: center;
 	}
 
@@ -591,39 +565,39 @@
 	.filebrowser__search-input {
 		width: 100%;
 		padding: 0.5rem;
-		border: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
+		border: 1px solid color-mix(in srgb, var(--ink-border) 62%, transparent);
 		border-radius: 0.25rem;
 		font-size: 0.875rem;
-		background-color: var(--input-bg, white);
-		color: var(--text);
+		background-color: var(--ink-surface-raised, white);
+		color: var(--ink-text);
 	}
 
 	.filebrowser__search-input:focus {
 		outline: none;
-		border-color: var(--primary, #007bff);
+		border-color: var(--ink-accent, #007bff);
 	}
 
 	.filebrowser__create-form,
 	.filebrowser__edit-form {
 		padding: 1rem;
-		border-bottom: 1px solid var(--border, #e0e0e0);
-		background-color: var(--surface-hover, #f5f5f5);
+		border-bottom: 1px solid var(--ink-border, #e0e0e0);
+		background-color: var(--ink-surface-hover, #f5f5f5);
 	}
 
 	.filebrowser__input {
 		width: 100%;
 		padding: 0.5rem;
-		border: 1px solid var(--border, #e0e0e0);
+		border: 1px solid var(--ink-border, #e0e0e0);
 		border-radius: 0.25rem;
 		font-size: 0.875rem;
 		margin-bottom: 0.5rem;
-		background-color: var(--input-bg, white);
-		color: var(--text);
+		background-color: var(--ink-surface-raised, white);
+		color: var(--ink-text);
 	}
 
 	.filebrowser__input:focus {
 		outline: none;
-		border-color: var(--primary, #007bff);
+		border-color: var(--ink-accent, #007bff);
 	}
 
 	.filebrowser__create-actions,
@@ -641,21 +615,21 @@
 	}
 
 	.filebrowser__btn--primary {
-		background-color: var(--primary, #007bff);
-		color: white;
+		background-color: var(--ink-accent, #007bff);
+		color: var(--ink-on-accent, white);
 	}
 
 	.filebrowser__btn--primary:hover {
-		background-color: var(--primary-hover, #0056b3);
+		background-color: var(--ink-accent-hover, #0056b3);
 	}
 
 	.filebrowser__btn--secondary {
-		background-color: var(--secondary, #6c757d);
-		color: white;
+		background-color: var(--ink-surface, #6c757d);
+		color: var(--ink-text, white);
 	}
 
 	.filebrowser__btn--secondary:hover {
-		background-color: var(--secondary-hover, #5a6268);
+		background-color: var(--ink-surface-hover, #5a6268);
 	}
 
 	.filebrowser__list {
@@ -666,7 +640,7 @@
 	.filebrowser__empty {
 		padding: 2rem;
 		text-align: center;
-		color: var(--text-muted, #6c757d);
+		color: var(--ink-text-muted, #6c757d);
 	}
 
 	.filebrowser__board {
@@ -680,7 +654,7 @@
 	}
 
 	.filebrowser__board:hover {
-		background-color: color-mix(in srgb, var(--surface-hover, #f5f5f5) 72%, transparent);
+		background-color: color-mix(in srgb, var(--ink-surface-hover, #f5f5f5) 72%, transparent);
 	}
 
 	.filebrowser__board-info {
@@ -694,7 +668,7 @@
 
 	.filebrowser__board-meta {
 		font-size: 0.75rem;
-		color: var(--text-muted, #6c757d);
+		color: var(--ink-text-muted, #6c757d);
 	}
 
 	.filebrowser__board-actions {
@@ -721,8 +695,8 @@
 		display: flex;
 		flex-direction: column;
 		height: 100%;
-		background-color: var(--surface);
-		color: var(--text);
+		background-color: var(--ink-canvas);
+		color: var(--ink-text);
 	}
 
 	.inspector__header {
@@ -730,7 +704,7 @@
 		align-items: center;
 		justify-content: space-between;
 		padding: 1rem;
-		border-bottom: 1px solid var(--border, #e0e0e0);
+		border-bottom: 1px solid var(--ink-border, #e0e0e0);
 	}
 
 	.inspector__title {
@@ -755,22 +729,22 @@
 	}
 
 	.inspector__close:hover {
-		background-color: var(--surface-hover, #f5f5f5);
+		background-color: var(--ink-surface-hover, #f5f5f5);
 	}
 
 	.inspector__loading {
 		padding: 2rem;
 		text-align: center;
-		color: var(--text-muted, #6c757d);
+		color: var(--ink-text-muted, #6c757d);
 	}
 
 	.inspector__error {
 		padding: 1rem;
 		margin: 1rem;
-		background-color: var(--error-bg, #f8d7da);
-		color: var(--error-text, #721c24);
+		background-color: var(--ink-danger-surface, #f8d7da);
+		color: var(--ink-danger, #721c24);
 		border-radius: 0.25rem;
-		border: 1px solid var(--error-border, #f5c6cb);
+		border: 1px solid var(--ink-danger, #f5c6cb);
 	}
 
 	.inspector__content {
@@ -788,75 +762,22 @@
 		font-size: 0.875rem;
 		font-weight: 600;
 		text-transform: uppercase;
-		color: var(--text-muted, #6c757d);
+		color: var(--ink-text-muted, #6c757d);
 	}
 
 	.inspector__item {
 		display: flex;
 		justify-content: space-between;
 		padding: 0.5rem 0;
-		border-bottom: 1px solid var(--border-light, #f0f0f0);
+		border-bottom: 1px solid var(--ink-border, #f0f0f0);
 	}
 
 	.inspector__label {
 		font-weight: 500;
-		color: var(--text);
+		color: var(--ink-text);
 	}
 
 	.inspector__value {
-		color: var(--text-muted, #6c757d);
-	}
-
-	.inspector__empty {
-		padding: 1rem;
-		text-align: center;
-		color: var(--text-muted, #6c757d);
-		font-size: 0.875rem;
-	}
-
-	.inspector__migrations {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.inspector__migration {
-		display: flex;
-		justify-content: space-between;
-		padding: 0.5rem;
-		background-color: var(--surface-hover, #f5f5f5);
-		border-radius: 0.25rem;
-	}
-
-	.inspector__migration-id {
-		font-weight: 500;
-		font-family: monospace;
-	}
-
-	.inspector__migration-date {
-		font-size: 0.75rem;
-		color: var(--text-muted, #6c757d);
-	}
-
-	.inspector__pending {
-		margin-top: 1rem;
-		padding: 0.75rem;
-		background-color: var(--warning-bg, #fff3cd);
-		border: 1px solid var(--warning-border, #ffeaa7);
-		border-radius: 0.25rem;
-	}
-
-	.inspector__pending-title {
-		margin: 0 0 0.5rem 0;
-		font-size: 0.875rem;
-		font-weight: 600;
-		color: var(--warning-text, #856404);
-	}
-
-	.inspector__pending-migration {
-		font-family: monospace;
-		font-size: 0.875rem;
-		padding: 0.25rem 0;
-		color: var(--warning-text, #856404);
+		color: var(--ink-text-muted, #6c757d);
 	}
 </style>

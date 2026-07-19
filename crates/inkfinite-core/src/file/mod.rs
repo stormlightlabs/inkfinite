@@ -1,9 +1,8 @@
 #![forbid(unsafe_code)]
 
-//! Import, migration, and durable file boundary for Inkfinite documents.
+//! Durable file boundary for Inkfinite documents.
 //!
-//! The file boundary accepts the frozen v1 JSON envelope, creates a normalized
-//! v2 document, and persists the Rust-owned CRDT as compact Automerge bytes.
+//! The file boundary persists the Rust-owned CRDT as compact Automerge bytes.
 //! Snapshot JSON is an inspection/export format; it does not contain the CRDT
 //! history needed to reproduce a canonical `.inkfinite` file.
 
@@ -13,23 +12,23 @@ use crate::engine::EngineError;
 use crate::sync::SyncError;
 use thiserror::Error;
 
-/// Recoverable failure at the import, persistence, or recovery boundary.
+/// Recoverable failure at the validation, persistence, or recovery boundary.
 #[derive(Debug, Error)]
 pub enum FileError {
-    /// The input was valid JSON but not a valid frozen v1 envelope.
-    #[error("invalid v1 document: {0}")]
-    InvalidV1(String),
+    /// The input was not a valid canonical document or document-related value.
+    #[error("invalid document: {0}")]
+    InvalidDocument(String),
     /// JSON could not be parsed or serialized.
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
     /// A recognized format version is newer than this implementation supports.
     #[error("unsupported document format {format:?} version {version}")]
     UnsupportedFormat { format: String, version: u32 },
-    /// A v1 shape kind has no v2 registry entry.
-    #[error("unsupported v1 shape kind {kind:?} for shape {shape_id}")]
+    /// A shape kind has no registry entry.
+    #[error("unsupported shape kind {kind:?} for shape {shape_id}")]
     UnsupportedShapeKind { kind: String, shape_id: String },
     /// A source and destination path were the same file.
-    #[error("refusing to import a file over itself: {path}")]
+    #[error("refusing to overwrite a file with itself: {path}")]
     SamePath { path: PathBuf },
     /// Another cooperating writer owns the document lock.
     #[error("document is locked by another writer: {path}")]
@@ -65,16 +64,14 @@ pub enum FileError {
     AlreadyExists { path: PathBuf },
 }
 
-mod migration;
 mod persistence;
 
 pub use crate::DocumentSnapshot;
 pub use crate::crdt::CrdtDocument;
 pub use crate::engine::{CommitResult, TransactionDraft, TransactionEngine};
-pub use migration::{ImportedV1, import_v1_json, parse_v1_json};
 pub use persistence::{
-    DocumentFile, PersistenceOptions, SaveResult, export_snapshot_json, import_v1_file, import_v1_file_with_options,
-    read_v1_file, recovery_path_for, sync_state_path_for, write_snapshot_json,
+    DocumentFile, PersistenceOptions, SaveResult, export_snapshot_json, recovery_path_for, sync_state_path_for,
+    write_snapshot_json,
 };
 
 #[cfg(test)]

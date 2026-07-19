@@ -265,8 +265,8 @@
 		grid-template-columns: repeat(4, minmax(120px, 1fr)) auto auto;
 		gap: 1.5rem;
 		padding: 0.75rem 1.5rem;
-		background: var(--surface-elevated);
-		border-top: 1px solid color-mix(in srgb, var(--border) 46%, transparent);
+		background: var(--ink-surface-raised);
+		border-top: 1px solid color-mix(in srgb, var(--ink-border) 46%, transparent);
 		box-shadow: 0 -8px 24px color-mix(in srgb, var(--ink-shadow-color) 10%, transparent);
 		font-size: 0.75rem;
 		align-items: center;
@@ -288,7 +288,7 @@
 		padding: var(--ink-space-1) var(--ink-space-2);
 		border: 1px solid transparent;
 		border-radius: var(--ink-radius-wobbly-small);
-		color: var(--text-muted);
+		color: var(--ink-text-muted);
 		background: transparent;
 		cursor: pointer;
 		transition-property: color, background-color, border-color, transform;
@@ -296,9 +296,9 @@
 	}
 
 	.status-bar__action:hover {
-		border-color: color-mix(in srgb, var(--border) 55%, transparent);
-		color: var(--text);
-		background: var(--surface-hover);
+		border-color: color-mix(in srgb, var(--ink-border) 55%, transparent);
+		color: var(--ink-text);
+		background: var(--ink-surface-hover);
 	}
 
 	.status-bar__action:active {
@@ -306,7 +306,7 @@
 	}
 
 	.status-bar__action:focus-visible {
-		outline: 2px solid var(--accent);
+		outline: 2px solid var(--ink-accent);
 		outline-offset: 2px;
 	}
 
@@ -332,7 +332,7 @@
 		align-items: center;
 		gap: 0.375rem;
 		font-size: 0.75rem;
-		color: var(--text);
+		color: var(--ink-text);
 	}
 
 	.status-bar__toggle input {
@@ -346,13 +346,13 @@
 	}
 
 	.status-bar__toggle input:focus {
-		outline: 2px solid var(--accent);
+		outline: 2px solid var(--ink-accent);
 		outline-offset: 2px;
 	}
 
 	.status-bar__label {
 		font-size: 0.6875rem;
-		color: var(--text-muted);
+		color: var(--ink-text-muted);
 		text-transform: uppercase;
 		letter-spacing: 0.075em;
 		font-weight: 600;
@@ -360,17 +360,17 @@
 
 	.status-bar__value {
 		font-weight: 500;
-		color: var(--text);
+		color: var(--ink-text);
 		font-variant-numeric: tabular-nums;
 	}
 
 	.status-bar__value--error {
-		color: var(--color-error);
+		color: var(--ink-danger);
 	}
 
 	.status-bar__mode {
 		font-size: 0.75rem;
-		color: var(--text-muted);
+		color: var(--ink-text-muted);
 	}
 
 	.about {

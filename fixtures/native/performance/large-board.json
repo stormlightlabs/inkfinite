@@ -1,0 +1,7 @@
+{
+	"shapeCount": 10000,
+	"seed": 439041101,
+	"generator": "scripts/capture-performance.mjs",
+	"pageId": "page:performance",
+	"layerId": "layer:performance:default"
+}

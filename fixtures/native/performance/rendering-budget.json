@@ -1,8 +1,8 @@
 {
-	"schemaVersion": 2,
-	"capturedAt": "2026-07-18T06:08:17.718Z",
+	"schemaVersion": 1,
+	"capturedAt": "2026-07-19T04:39:48.218Z",
 	"fixture": {
-		"path": "fixtures/v1/performance/board-10000.inkfinite.json",
+		"path": "fixtures/native/performance/large-board.json",
 		"seed": 439041101,
 		"documentShapeCount": 10000,
 		"visibleShapeCount": 252,
@@ -16,38 +16,37 @@
 		"logicalCpuCount": 8,
 		"cpuSpeedMHz": 2400,
 		"totalMemoryBytes": 8589934592,
-		"freeMemoryBytesAtCapture": 179568640
+		"freeMemoryBytesAtCapture": 114540544
 	},
 	"runtime": {
 		"node": "v26.5.0",
 		"v8": "14.6.202.34-node.24",
-		"pnpm": "11.13.1",
 		"rustc": "rustc 1.89.0 (29483883e 2025-08-04)",
 		"cargo": "cargo 1.89.0 (c24e10642 2025-06-23)",
 		"typescript": "Version 5.9.3",
 		"vitest": "vitest/4.0.16 darwin-arm64 node-v26.5.0",
 		"tauri": "tauri-cli 2.9.6"
 	},
-	"measurements": {
-		"frameTimeMillisecondsMedian": 0.6100830000000315,
-		"hitTestTimeMillisecondsMedian": 0.343708625,
-		"hitTestSampleCount": 1000,
-		"memoryRssBeforeOpenBytes": 63832064,
-		"memoryRssAfterOpenBytes": 108445696,
-		"memoryRssDeltaBytes": 44613632,
-		"openTimeMillisecondsMedian": 18.335666000000003,
-		"saveTimeMillisecondsMedian": 11.313624999999774
-	},
-	"notes": [
-		"The renderer culls by transformed world bounds with padding for arrowheads, shadows, and selection handles.",
-		"Selected overlays render from the full page list so culling cannot clip handles outside the viewport.",
-		"The linear hit-test median remains below the 1 ms gate, so V2-11 does not add a spatial index."
-	],
 	"budgets": { "frameTimeMillisecondsMedian": 8, "hitTestTimeMillisecondsMedian": 1 },
 	"passed": { "frame": true, "hitTest": true },
 	"strategy": {
 		"renderer": "Canvas 2D with viewport culling, dirty-frame batching, and bounded layout caches",
 		"hitTesting": "Reverse draw-order linear scan; no spatial index",
 		"overlayLayers": "Single canvas; the measured frame cost does not justify a second durable-scene bitmap"
-	}
+	},
+	"measurements": {
+		"frameTimeMillisecondsMedian": 1.2308750000000828,
+		"hitTestTimeMillisecondsMedian": 0.4495441054687499,
+		"hitTestSampleCount": 256,
+		"memoryRssBeforeOpenBytes": 68730880,
+		"memoryRssAfterOpenBytes": 103743488,
+		"memoryRssDeltaBytes": 35012608,
+		"openTimeMillisecondsMedian": 19.266333000000003,
+		"saveTimeMillisecondsMedian": 10.190124999999966
+	},
+	"notes": [
+		"The native performance fixture is generated deterministically from the native document model.",
+		"Timing uses the production Canvas 2D renderer with a no-op context to isolate JavaScript traversal cost.",
+		"The budget remains explicit so release verification can fail when either interaction measure regresses."
+	]
 }

@@ -13,9 +13,9 @@ export function createId(prefix?: string): string {
 export type PageRecord = {
 	id: string;
 	name: string;
-	/** Flat compatibility order. Layer order and each layer's shape order are authoritative. */
+	/** Flat draw-order projection. Layer order and each layer's shape order are authoritative. */
 	shapeIds: string[];
-	/** Layer IDs in back-to-front order. Older documents omit this field. */
+	/** Layer IDs in back-to-front order. */
 	layerIds?: string[];
 };
 
@@ -158,14 +158,14 @@ export type BaseShape = {
 	x: number;
 	y: number;
 	rot: number;
-	/** Opacity applied to the complete shape. Older documents default to `1`. */
+	/** Opacity applied to the complete shape; omitted values use `1`. */
 	opacity?: number;
-	/** Opacity applied only to fills. Older documents default to `1`. */
+	/** Opacity applied only to fills; omitted values use `1`. */
 	fillOpacity?: number;
-	/** Opacity applied only to strokes. Older documents default to `1`. */
+	/** Opacity applied only to strokes; omitted values use `1`. */
 	strokeOpacity?: number;
 	groupId?: string;
-	/** Owning layer. Older documents are assigned to their page's default layer on load. */
+	/** Owning layer assigned when the shape enters an editor document. */
 	layerId?: string;
 };
 export type RectShape = BaseShape & { type: 'rect'; props: RectProps };
@@ -315,7 +315,7 @@ export const BindingRecord = {
 
 export type Document = {
 	pages: Record<string, PageRecord>;
-	/** Layers indexed by stable ID. Older persisted documents omit this field. */
+	/** Layers indexed by stable ID. */
 	layers?: Record<string, LayerRecord>;
 	shapes: Record<string, ShapeRecord>;
 	bindings: Record<string, BindingRecord>;
@@ -353,13 +353,13 @@ export const Document = {
 };
 
 /**
- * Backfills the layer structure used by the v2 editor.
+ * Ensures every page has a valid layer structure for the editor.
  *
- * The migration is deterministic and idempotent. Existing flat shape order is
- * preserved exactly in a stable default layer, while already-layered documents
- * retain their layer and child order.
+ * Normalization is deterministic and idempotent. Existing flat shape order is
+ * preserved exactly in a stable default layer, while layered documents retain
+ * their layer and child order.
  */
-export function withDocumentLayers(document: Document): Document {
+export function ensureDocumentLayers(document: Document): Document {
 	const pages = Object.fromEntries(Object.entries(document.pages).map(([id, page]) => [id, PageRecord.clone(page)]));
 	const layers = Object.fromEntries(
 		Object.entries(document.layers ?? {}).map(([id, layer]) => [id, LayerRecord.clone(layer)])

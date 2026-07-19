@@ -8,7 +8,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -259,25 +259,14 @@ impl SessionService {
         self.insert(file)
     }
 
-    /// Opens a canonical document, or imports a selected frozen v1 JSON file
-    /// into its adjacent `.inkfinite` canonical path.
+    /// Opens a canonical `.inkfinite` document.
     ///
     /// # Errors
     ///
-    /// Returns a typed file, migration, lock, or validation error when the
-    /// document cannot be opened safely.
+    /// Returns a typed file, lock, or validation error when the document cannot
+    /// be opened safely.
     pub fn open(&mut self, path: impl AsRef<Path>, actor_id: ActorId) -> Result<SessionOpened, SessionError> {
-        let path = path.as_ref().to_owned();
-        let file = if is_v1_path(&path) {
-            let destination = canonical_import_path(&path);
-            if destination.exists() {
-                DocumentFile::open(destination, actor_id)?
-            } else {
-                DocumentFile::import_v1(&path, destination, actor_id)?
-            }
-        } else {
-            DocumentFile::open(path, actor_id)?
-        };
+        let file = DocumentFile::open(path, actor_id)?;
         self.insert(file)
     }
 
@@ -847,16 +836,6 @@ fn to_protocol_save(save: crate::file::SaveResult) -> SaveResult {
     SaveResult { path: DocumentPath(save.path.to_string_lossy().into_owned()), heads: save.heads }
 }
 
-fn is_v1_path(path: &Path) -> bool {
-    path.to_string_lossy().ends_with(".inkfinite.json")
-}
-
-fn canonical_import_path(path: &Path) -> PathBuf {
-    let mut destination = path.to_owned();
-    destination.set_extension("inkfinite");
-    destination
-}
-
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -884,7 +863,7 @@ mod tests {
         service
             .commit(
                 &opened.session_id,
-                rename_transaction(&opened.status.snapshot, actor.clone(), "Changed"),
+                rename_transaction(&opened.status.snapshot, actor, "Changed"),
             )
             .expect("commit edit");
 
@@ -1079,10 +1058,7 @@ mod tests {
             )
             .expect("propose transaction");
         service
-            .commit(
-                &opened.session_id,
-                rename_transaction(&snapshot, actor.clone(), "Local edit"),
-            )
+            .commit(&opened.session_id, rename_transaction(&snapshot, actor, "Local edit"))
             .expect("intervening local edit");
 
         let error = service
@@ -1216,7 +1192,7 @@ mod tests {
         let right_actor = ActorId::from("actor:right");
         let mut left_service = SessionService::new();
         let left = left_service
-            .create(&left_path, document_id.clone(), left_actor.clone(), None)
+            .create(&left_path, document_id, left_actor.clone(), None)
             .expect("create left");
         fs::copy(&left_path, &right_path).expect("copy baseline to right");
         let mut right_service = SessionService::new();

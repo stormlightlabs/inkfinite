@@ -177,11 +177,11 @@
 		width: min(24rem, calc(100% - 2rem));
 		box-sizing: border-box;
 		border-radius: 0.9rem;
-		background: color-mix(in srgb, var(--surface) 94%, var(--accent) 6%);
-		color: var(--text);
+		background: color-mix(in srgb, var(--ink-canvas) 94%, var(--ink-accent) 6%);
+		color: var(--ink-text);
 		box-shadow:
 			0 1rem 2.5rem color-mix(in srgb, #000 22%, transparent),
-			0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
+			0 0 0 1px color-mix(in srgb, var(--ink-accent) 24%, transparent);
 		-webkit-font-smoothing: antialiased;
 	}
 
@@ -208,7 +208,7 @@
 
 	.eyebrow {
 		margin: 0 0 0.2rem;
-		color: var(--accent);
+		color: var(--ink-accent);
 		font-size: 0.68rem;
 		font-weight: 700;
 		letter-spacing: 0.12em;
@@ -222,7 +222,7 @@
 	}
 
 	.expiry {
-		color: color-mix(in srgb, var(--text) 60%, transparent);
+		color: color-mix(in srgb, var(--ink-text) 60%, transparent);
 		font-size: 0.68rem;
 		font-variant-numeric: tabular-nums;
 		text-align: right;
@@ -230,7 +230,7 @@
 
 	.summary {
 		margin: 0.8rem 0;
-		color: color-mix(in srgb, var(--text) 72%, transparent);
+		color: color-mix(in srgb, var(--ink-text) 72%, transparent);
 		font-size: 0.78rem;
 		line-height: 1.4;
 		text-wrap: pretty;
@@ -246,7 +246,7 @@
 	.change-grid div {
 		padding: 0.45rem 0.3rem;
 		border-radius: 0.5rem;
-		background: color-mix(in srgb, var(--surface-2, var(--surface)) 88%, var(--accent) 12%);
+		background: color-mix(in srgb, var(--ink-surface) 88%, var(--ink-accent) 12%);
 		text-align: center;
 	}
 
@@ -262,7 +262,7 @@
 
 	.change-grid span {
 		margin-top: 0.12rem;
-		color: color-mix(in srgb, var(--text) 62%, transparent);
+		color: color-mix(in srgb, var(--ink-text) 62%, transparent);
 		font-size: 0.65rem;
 		text-transform: uppercase;
 	}
@@ -273,12 +273,12 @@
 		padding: 0.55rem;
 		overflow: auto;
 		border: 0;
-		background: color-mix(in srgb, var(--surface-2, var(--surface)) 70%, transparent);
+		background: color-mix(in srgb, var(--ink-surface) 70%, transparent);
 	}
 
 	legend {
 		padding: 0 0.25rem;
-		color: color-mix(in srgb, var(--text) 66%, transparent);
+		color: color-mix(in srgb, var(--ink-text) 66%, transparent);
 		font-size: 0.7rem;
 		font-weight: 700;
 		letter-spacing: 0.08em;
@@ -294,12 +294,12 @@
 	.operation-row input {
 		width: 1rem;
 		height: 1rem;
-		accent-color: var(--accent);
+		accent-color: var(--ink-accent);
 	}
 
 	.operation-row code {
 		margin-left: auto;
-		color: color-mix(in srgb, var(--text) 58%, transparent);
+		color: color-mix(in srgb, var(--ink-text) 58%, transparent);
 		font-size: 0.68rem;
 		text-transform: capitalize;
 	}
@@ -331,28 +331,28 @@
 		margin: 0 0 0.8rem;
 		padding: 0.6rem 0.65rem;
 		border-radius: 0.5rem;
-		background: color-mix(in srgb, var(--accent) 13%, transparent);
+		background: color-mix(in srgb, var(--ink-accent) 13%, transparent);
 		font-size: 0.72rem;
 	}
 
 	.authorization > code {
 		padding: 0.35rem;
 		overflow-wrap: anywhere;
-		background: color-mix(in srgb, var(--surface) 72%, transparent);
+		background: color-mix(in srgb, var(--ink-canvas) 72%, transparent);
 		font-size: 0.68rem;
 		user-select: all;
 	}
 
 	.authorization small {
-		color: color-mix(in srgb, var(--text) 66%, transparent);
+		color: color-mix(in srgb, var(--ink-text) 66%, transparent);
 		line-height: 1.35;
 	}
 
 	.authorize {
 		width: 100%;
 		margin-bottom: 0.7rem;
-		background: color-mix(in srgb, var(--accent) 12%, var(--surface));
-		color: var(--text);
+		background: color-mix(in srgb, var(--ink-accent) 12%, var(--ink-canvas));
+		color: var(--ink-text);
 	}
 
 	.actions {
@@ -383,17 +383,17 @@
 	}
 
 	button.primary {
-		background: var(--accent);
-		color: var(--surface);
+		background: var(--ink-accent);
+		color: var(--ink-on-accent);
 	}
 
 	button.secondary {
-		background: color-mix(in srgb, var(--accent) 20%, var(--surface));
-		color: var(--text);
+		background: color-mix(in srgb, var(--ink-accent) 20%, var(--ink-canvas));
+		color: var(--ink-text);
 	}
 
 	button.quiet {
 		background: transparent;
-		color: color-mix(in srgb, var(--text) 68%, transparent);
+		color: color-mix(in srgb, var(--ink-text) 68%, transparent);
 	}
 </style>

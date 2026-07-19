@@ -1,33 +1,26 @@
+/* Color palette adapted from Eldritch: https://github.com/eldritch-theme/eldritch */
+
 :root,
 [data-ink-theme='light'] {
 	color-scheme: light;
 
-	--ink-eldritch-background: #f0f3f4;
-	--ink-eldritch-current-line: #e2e6e8;
-	--ink-eldritch-surface: #d5d9db;
-	--ink-eldritch-overlay: #c9cbcd;
-	--ink-eldritch-foreground: #1e2029;
-	--ink-eldritch-comment: #5b73dc;
-	--ink-eldritch-green: #38ff9f;
-	--ink-eldritch-orange: #ffaf4d;
-	--ink-eldritch-pink: #fb5bb6;
-	--ink-eldritch-purple: #8a69f7;
-	--ink-eldritch-red: #fb5b66;
-
-	--ink-canvas: var(--ink-eldritch-background);
-	--ink-surface: var(--ink-eldritch-current-line);
+	--ink-canvas: #f0f3f4;
+	--ink-surface: #e2e6e8;
 	--ink-surface-raised: #fff;
-	--ink-surface-hover: var(--ink-eldritch-surface);
-	--ink-text: var(--ink-eldritch-foreground);
+	--ink-surface-hover: #d5d9db;
+	--ink-text: #1e2029;
 	--ink-text-muted: #495063;
 	--ink-heading: #4d348f;
 	--ink-border: #858a98;
-	--ink-border-strong: var(--ink-eldritch-foreground);
-	--ink-accent: var(--ink-eldritch-purple);
+	--ink-border-strong: #1e2029;
+	--ink-accent: #8a69f7;
 	--ink-accent-hover: #7556dc;
 	--ink-accent-text: #6044bd;
-	--ink-focus: var(--ink-eldritch-comment);
-	--ink-danger: var(--ink-eldritch-red);
+	--ink-focus: #5b73dc;
+	--ink-danger: #fb5b66;
+	--ink-danger-surface: color-mix(in srgb, var(--ink-danger) 14%, var(--ink-surface-raised));
+	--ink-warning: #ffaf4d;
+	--ink-warning-surface: color-mix(in srgb, var(--ink-warning) 14%, var(--ink-surface-raised));
 	--ink-on-accent: #11131b;
 	--ink-on-danger: #11131b;
 	--ink-shadow-color: #1e2029;
@@ -57,63 +50,26 @@
 	--ink-shadow-toolbar: 3px 4px 0 var(--ink-shadow-color);
 	--ink-duration-fast: 120ms;
 	--ink-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-
-	/* Editor compatibility aliases. Shared editor components use these semantic
-     names while the public primitives use the ink-prefixed token contract. */
-	--surface: var(--ink-canvas);
-	--surface-elevated: var(--ink-surface-raised);
-	--surface-secondary: var(--ink-surface);
-	--surface-hover: var(--ink-surface-hover);
-	--bg-tertiary: var(--ink-surface-hover);
-	--text: var(--ink-text);
-	--text-secondary: var(--ink-text-muted);
-	--text-muted: var(--ink-text-muted);
-	--border: var(--ink-border);
-	--accent: var(--ink-accent);
-	--primary: var(--ink-accent);
-	--primary-hover: var(--ink-accent-hover);
-	--primary-light: var(--ink-surface-hover);
-	--secondary: var(--ink-surface);
-	--secondary-hover: var(--ink-surface-hover);
-	--input-bg: var(--ink-surface-raised);
-	--color-error: var(--ink-danger);
-	--error-bg: color-mix(in srgb, var(--ink-danger) 14%, var(--ink-surface-raised));
-	--error-border: var(--ink-danger);
-	--error-text: var(--ink-danger);
-	--warning-bg: color-mix(in srgb, var(--ink-eldritch-orange) 14%, var(--ink-surface-raised));
-	--warning-border: var(--ink-eldritch-orange);
-	--warning-text: var(--ink-text);
 }
 
 [data-ink-theme='dark'] {
 	color-scheme: dark;
 
-	--ink-eldritch-background: #171928;
-	--ink-eldritch-current-line: #252738;
-	--ink-eldritch-surface: #353746;
-	--ink-eldritch-overlay: #474852;
-	--ink-eldritch-foreground: #d8e6e6;
-	--ink-eldritch-comment: #506299;
-	--ink-eldritch-green: #2dcc82;
-	--ink-eldritch-orange: #d4a666;
-	--ink-eldritch-pink: #d154a1;
-	--ink-eldritch-purple: #8b75d9;
-	--ink-eldritch-red: #cc5860;
-
-	--ink-canvas: var(--ink-eldritch-background);
-	--ink-surface: var(--ink-eldritch-current-line);
-	--ink-surface-raised: var(--ink-eldritch-surface);
-	--ink-surface-hover: var(--ink-eldritch-overlay);
-	--ink-text: var(--ink-eldritch-foreground);
+	--ink-canvas: #171928;
+	--ink-surface: #252738;
+	--ink-surface-raised: #353746;
+	--ink-surface-hover: #474852;
+	--ink-text: #d8e6e6;
 	--ink-text-muted: #a7b4bc;
 	--ink-heading: #c2b5f0;
 	--ink-border: #646675;
 	--ink-border-strong: #b8c5c8;
-	--ink-accent: var(--ink-eldritch-green);
+	--ink-accent: #2dcc82;
 	--ink-accent-hover: #45dda0;
 	--ink-accent-text: #8de2bc;
 	--ink-focus: #7f91d8;
-	--ink-danger: var(--ink-eldritch-red);
+	--ink-danger: #cc5860;
+	--ink-warning: #d4a666;
 	--ink-on-accent: #101b18;
 	--ink-on-danger: #171928;
 	--ink-shadow-color: #080910;
@@ -123,31 +79,21 @@
 	:root:not([data-ink-theme]) {
 		color-scheme: dark;
 
-		--ink-eldritch-background: #171928;
-		--ink-eldritch-current-line: #252738;
-		--ink-eldritch-surface: #353746;
-		--ink-eldritch-overlay: #474852;
-		--ink-eldritch-foreground: #d8e6e6;
-		--ink-eldritch-comment: #506299;
-		--ink-eldritch-green: #2dcc82;
-		--ink-eldritch-orange: #d4a666;
-		--ink-eldritch-pink: #d154a1;
-		--ink-eldritch-purple: #8b75d9;
-		--ink-eldritch-red: #cc5860;
-		--ink-canvas: var(--ink-eldritch-background);
-		--ink-surface: var(--ink-eldritch-current-line);
-		--ink-surface-raised: var(--ink-eldritch-surface);
-		--ink-surface-hover: var(--ink-eldritch-overlay);
-		--ink-text: var(--ink-eldritch-foreground);
+		--ink-canvas: #171928;
+		--ink-surface: #252738;
+		--ink-surface-raised: #353746;
+		--ink-surface-hover: #474852;
+		--ink-text: #d8e6e6;
 		--ink-text-muted: #a7b4bc;
 		--ink-heading: #c2b5f0;
 		--ink-border: #646675;
 		--ink-border-strong: #b8c5c8;
-		--ink-accent: var(--ink-eldritch-green);
+		--ink-accent: #2dcc82;
 		--ink-accent-hover: #45dda0;
 		--ink-accent-text: #8de2bc;
 		--ink-focus: #7f91d8;
-		--ink-danger: var(--ink-eldritch-red);
+		--ink-danger: #cc5860;
+		--ink-warning: #d4a666;
 		--ink-on-accent: #101b18;
 		--ink-on-danger: #171928;
 		--ink-shadow-color: #080910;

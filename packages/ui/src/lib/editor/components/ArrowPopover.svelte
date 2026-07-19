@@ -197,9 +197,9 @@
 	}
 
 	.arrow-popover__button {
-		border: 1px solid var(--border);
-		background: var(--surface);
-		color: var(--text);
+		border: 1px solid var(--ink-border);
+		background: var(--ink-canvas);
+		color: var(--ink-text);
 		padding: 0.5rem 0.75rem;
 		border-radius: 0.25rem;
 		cursor: pointer;
@@ -208,11 +208,11 @@
 	}
 
 	.arrow-popover__button:hover:not(:disabled) {
-		background: var(--surface-elevated);
+		background: var(--ink-surface-raised);
 	}
 
 	.arrow-popover__button:focus {
-		outline: 2px solid var(--accent);
+		outline: 2px solid var(--ink-accent);
 		outline-offset: 2px;
 	}
 
@@ -225,9 +225,9 @@
 		position: absolute;
 		top: calc(100% + 4px);
 		left: 0;
-		background: var(--surface);
-		color: var(--text);
-		border: 1px solid var(--border);
+		background: var(--ink-canvas);
+		color: var(--ink-text);
+		border: 1px solid var(--ink-border);
 		border-radius: 6px;
 		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 		padding: 0.75rem;
@@ -247,7 +247,7 @@
 	.arrow-popover__label {
 		font-size: 0.75rem;
 		font-weight: 500;
-		color: var(--text);
+		color: var(--ink-text);
 	}
 
 	.arrow-popover__routing-buttons {
@@ -257,9 +257,9 @@
 
 	.arrow-popover__routing-btn {
 		flex: 1;
-		border: 1px solid var(--border);
-		background: var(--surface);
-		color: var(--text);
+		border: 1px solid var(--ink-border);
+		background: var(--ink-canvas);
+		color: var(--ink-text);
 		padding: 6px 0.75rem;
 		border-radius: 0.25rem;
 		cursor: pointer;
@@ -268,41 +268,41 @@
 	}
 
 	.arrow-popover__routing-btn:hover {
-		background: var(--surface-elevated);
+		background: var(--ink-surface-raised);
 	}
 
 	.arrow-popover__routing-btn:focus {
-		outline: 2px solid var(--accent);
+		outline: 2px solid var(--ink-accent);
 		outline-offset: 2px;
 	}
 
 	.arrow-popover__routing-btn--active {
-		background: var(--accent);
-		color: var(--surface);
-		border-color: var(--accent);
+		background: var(--ink-accent);
+		color: var(--ink-on-accent);
+		border-color: var(--ink-accent);
 	}
 
 	.arrow-popover__input {
 		width: 100%;
-		border: 1px solid var(--border);
-		background: var(--surface);
-		color: var(--text);
+		border: 1px solid var(--ink-border);
+		background: var(--ink-canvas);
+		color: var(--ink-text);
 		padding: 6px 8px;
 		border-radius: 0.25rem;
 		font-size: 13px;
 	}
 
 	.arrow-popover__input:focus {
-		outline: 2px solid var(--accent);
+		outline: 2px solid var(--ink-accent);
 		outline-offset: 2px;
 	}
 
 	.arrow-popover__input::placeholder {
-		color: var(--text-muted);
+		color: var(--ink-text-muted);
 	}
 
 	.arrow-popover__divider {
 		height: 1px;
-		background: var(--border);
+		background: var(--ink-border);
 	}
 </style>

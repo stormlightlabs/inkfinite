@@ -117,7 +117,7 @@ scale_y: number, };
 /**
  * Origin of a durable record or transaction.
  */
-export type Origin = "human" | "agent" | "import" | "sync" | "system";
+export type Origin = "human" | "agent" | "sync" | "system";
 
 /**
  * Attribution retained with durable content.
@@ -136,7 +136,7 @@ origin: Origin,
  */
 timestamp: Timestamp, 
 /**
- * Optional source identifier, such as an imported filename or proposal ID.
+ * Optional source identifier, such as an external reference or proposal ID.
  */
 source: string | null, };
 

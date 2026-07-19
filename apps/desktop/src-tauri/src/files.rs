@@ -23,7 +23,7 @@ pub fn read_directory(directory: String, pattern: Option<String>) -> Result<Vec<
     let entries = fs::read_dir(path).map_err(|e| format!("Failed to read directory: {e}"))?;
 
     let mut results = Vec::new();
-    let pattern = pattern.unwrap_or_else(|| "*.inkfinite.json".to_string());
+    let pattern = pattern.unwrap_or_else(|| "*.inkfinite".to_string());
 
     for entry in entries {
         let entry = entry.map_err(|e| format!("Failed to read entry: {e}"))?;

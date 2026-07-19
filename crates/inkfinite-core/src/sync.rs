@@ -754,7 +754,7 @@ mod tests {
         let delayed = SyncMessage {
             protocol_id: SYNC_PROTOCOL_ID.into(),
             version: SYNC_PROTOCOL_VERSION,
-            document_id: document_id.clone(),
+            document_id,
             sender: ActorId::from("actor:right"),
             recipient: ActorId::from("actor:left"),
             sequence: 2,

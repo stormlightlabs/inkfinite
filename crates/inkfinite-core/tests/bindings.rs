@@ -7,7 +7,7 @@ use serde_json::Value;
 
 #[test]
 fn shared_shape_fixture_matches_the_rust_registry_and_bindings() {
-    let fixture: Value = serde_json::from_str(include_str!("../../../fixtures/v2/shape-registry.json"))
+    let fixture: Value = serde_json::from_str(include_str!("../../../fixtures/native/shape-registry.json"))
         .expect("shared fixture should be valid JSON");
 
     let kind_names = fixture["kind_names"]

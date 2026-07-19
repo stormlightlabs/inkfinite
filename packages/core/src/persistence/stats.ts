@@ -10,15 +10,11 @@ export type BoardStats = {
 
 export type SchemaInfo = { declaredVersion: number; installedVersion: number };
 
-export type MigrationInfo = { id: string; appliedAt: Timestamp };
-
 export type BoardInspectorData = {
   /** Human-readable storage backend supplied by the application adapter. */
-  storageType: string;
-  stats: BoardStats;
-  schema: SchemaInfo;
-  migrations: MigrationInfo[];
-  pendingMigrations: string[];
+	storageType: string;
+	stats: BoardStats;
+	schema: SchemaInfo;
 };
 
 /**
@@ -53,11 +49,3 @@ export const BoardStatsOps = {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   },
 };
-
-/**
- * Determine pending migrations by comparing known migration list with applied migrations.
- */
-export function getPendingMigrations(knownMigrationIds: string[], appliedMigrations: MigrationInfo[]): string[] {
-  const appliedIds = new Set(appliedMigrations.map((m) => m.id));
-  return knownMigrationIds.filter((id) => !appliedIds.has(id));
-}

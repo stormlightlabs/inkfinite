@@ -14,7 +14,7 @@ use crate::sync::{MAX_SYNC_PEERS, PeerSync, PeerSyncStatus, PersistedPeerSync, S
 use crate::{ActorId, ChangeHash, Document, DocumentId, DocumentSnapshot};
 use serde::{Deserialize, Serialize};
 
-use super::{FileError, ImportedV1, import_v1_json};
+use super::FileError;
 
 const RECOVERY_FORMAT: &str = "inkfinite.recovery";
 const RECOVERY_VERSION: u32 = 1;
@@ -232,28 +232,6 @@ impl DocumentFile {
         session.save()?;
         session.load_sync_state();
         Ok(session)
-    }
-
-    /// Imports a v1 file into a newly persisted canonical destination.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`FileError`] when migration or canonical persistence fails.
-    pub fn import_v1(
-        source: impl AsRef<Path>, destination: impl AsRef<Path>, actor_id: ActorId,
-    ) -> Result<Self, FileError> {
-        import_v1_file(source, destination, actor_id)
-    }
-
-    /// Imports a v1 file with explicit recovery settings.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`FileError`] when migration or canonical persistence fails.
-    pub fn import_v1_with_options(
-        source: impl AsRef<Path>, destination: impl AsRef<Path>, actor_id: ActorId, options: PersistenceOptions,
-    ) -> Result<Self, FileError> {
-        import_v1_file_with_options(source, destination, actor_id, options)
     }
 
     /// Recovers the newest interrupted save associated with the path.
@@ -586,7 +564,7 @@ impl DocumentFile {
         Ok(self.engine.commit(transaction)?)
     }
 
-    /// Materializes the current v2 snapshot.
+    /// Materializes the current document snapshot.
     ///
     /// # Errors
     ///
@@ -785,54 +763,6 @@ impl DocumentFile {
     }
 }
 
-/// Reads and migrates a v1 JSON file without writing any destination.
-///
-/// # Errors
-///
-/// Returns [`FileError`] when the source cannot be read, locked, parsed, or
-/// migrated.
-pub fn read_v1_file(path: impl AsRef<Path>, actor_id: ActorId) -> Result<ImportedV1, FileError> {
-    ensure_actor(&actor_id)?;
-    let path = absolute_path(path.as_ref())?;
-    let _lock = AdvisoryLock::acquire(&path)?;
-    let input = String::from_utf8(read_bytes(&path, "read v1 document")?)
-        .map_err(|error| FileError::InvalidV1(format!("v1 document is not UTF-8: {error}")))?;
-    import_v1_json(&input, actor_id)
-}
-
-/// Imports a v1 file and safely writes its canonical v2 representation.
-///
-/// # Errors
-///
-/// Returns [`FileError`] when the source cannot be migrated or the destination
-/// cannot be written safely.
-pub fn import_v1_file(
-    source: impl AsRef<Path>, destination: impl AsRef<Path>, actor_id: ActorId,
-) -> Result<DocumentFile, FileError> {
-    import_v1_file_with_options(source, destination, actor_id, PersistenceOptions::default())
-}
-
-/// Imports a v1 file and safely writes its canonical v2 representation with
-/// explicit recovery settings.
-///
-/// # Errors
-///
-/// Returns [`FileError`] when the source cannot be migrated or the destination
-/// cannot be written safely.
-pub fn import_v1_file_with_options(
-    source: impl AsRef<Path>, destination: impl AsRef<Path>, actor_id: ActorId, options: PersistenceOptions,
-) -> Result<DocumentFile, FileError> {
-    ensure_actor(&actor_id)?;
-    let source = absolute_path(source.as_ref())?;
-    let destination = absolute_path(destination.as_ref())?;
-    if paths_equivalent(&source, &destination) {
-        return Err(FileError::SamePath { path: source });
-    }
-    let imported = read_v1_file(&source, actor_id.clone())?;
-    let engine = imported.into_engine(actor_id.clone())?;
-    create_session_from_engine(destination, actor_id, engine, options)
-}
-
 /// Loads canonical Automerge bytes into a validated transaction engine.
 ///
 /// # Errors
@@ -844,9 +774,9 @@ pub fn load_canonical_bytes(bytes: &[u8], actor_id: ActorId) -> Result<Transacti
     Ok(TransactionEngine::load(bytes, actor_id)?)
 }
 
-/// Serializes a v2 materialized snapshot in deterministic, human-readable JSON.
+/// Serializes a materialized snapshot in deterministic, human-readable JSON.
 ///
-/// Map keys are ordered by the v2 model's `BTreeMap` fields and causal heads are
+/// Map keys are ordered by the model's `BTreeMap` fields and causal heads are
 /// sorted for stable output. The result is a snapshot projection: applying it
 /// to a new CRDT would create new history rather than preserve the original
 /// Automerge changes.
@@ -900,29 +830,6 @@ pub fn sync_state_path_for(
         "{}.{path_hash:016x}.sync",
         encode_path_component(document_id.as_str())
     ))
-}
-
-fn create_session_from_engine(
-    path: PathBuf, actor_id: ActorId, mut engine: TransactionEngine, options: PersistenceOptions,
-) -> Result<DocumentFile, FileError> {
-    let lock = AdvisoryLock::acquire(&path)?;
-    let baseline_bytes = engine.save()?;
-    let baseline_heads = engine.snapshot()?.heads;
-    let mut session = DocumentFile {
-        path,
-        actor_id,
-        engine,
-        options,
-        baseline_bytes,
-        baseline_heads,
-        pending_recovery: None,
-        sync_peers: BTreeMap::new(),
-        sync_state_warning: None,
-        lock,
-    };
-    session.save()?;
-    session.load_sync_state();
-    Ok(session)
 }
 
 fn write_recovery(path: &Path, recovery: &RecoveryFile) -> Result<(), FileError> {
@@ -1004,7 +911,7 @@ fn find_recovery_path(document_path: &Path, options: &PersistenceOptions) -> Res
 
 fn ensure_actor(actor_id: &ActorId) -> Result<(), FileError> {
     if actor_id.as_str().trim().is_empty() {
-        Err(FileError::InvalidV1("actor ID must not be empty".into()))
+        Err(FileError::InvalidDocument("actor ID must not be empty".into()))
     } else {
         Ok(())
     }
