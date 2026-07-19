@@ -30,6 +30,28 @@ describe('Editor Toolbar', () => {
 			.toBeInTheDocument();
 	});
 
+	it('anchors pen settings directly below the pen tool', async () => {
+		const screen = render(Toolbar, {
+			currentTool: 'pen',
+			onToolChange: vi.fn(),
+			store: new Store(),
+			getViewport: () => ({ width: 1024, height: 768 }),
+			brushStore: createBrushStore()
+		});
+
+		const penBounds = screen
+			.getByRole('button', { name: 'Pen' })
+			.element()
+			.getBoundingClientRect();
+		const brushBounds = screen
+			.getByRole('button', { name: 'Brush settings' })
+			.element()
+			.getBoundingClientRect();
+
+		expect(brushBounds.top).toBeGreaterThan(penBounds.bottom);
+		expect(brushBounds.right).toBeCloseTo(penBounds.right, 0);
+	});
+
 	it('changes selected fill and stroke opacity through labeled undoable controls', async () => {
 		const page = PageRecord.create('Page', 'page');
 		const shape = ShapeRecord.createRect(

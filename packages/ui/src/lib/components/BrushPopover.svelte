@@ -14,11 +14,12 @@
 		brush: BrushSettings;
 		onBrushChange: (brush: BrushSettings) => void;
 		disabled?: boolean;
+		align?: 'start' | 'end';
 	}
 </script>
 
 <script lang="ts">
-	let { brush, onBrushChange, disabled = false }: BrushPopoverProps = $props();
+	let { brush, onBrushChange, disabled = false, align = 'start' }: BrushPopoverProps = $props();
 
 	let isOpen = $state(false);
 	let popoverEl = $state<HTMLDivElement | null>(null);
@@ -132,6 +133,7 @@
 	{#if isOpen}
 		<div
 			class="brush-popover__menu"
+			class:brush-popover__menu--end={align === 'end'}
 			bind:this={popoverEl}
 			role="dialog"
 			aria-label="Brush settings">
@@ -277,6 +279,11 @@
 		gap: 0.75rem;
 		z-index: 10;
 		min-width: 200px;
+	}
+
+	.brush-popover__menu--end {
+		right: 0;
+		left: auto;
 	}
 
 	.brush-popover__control {

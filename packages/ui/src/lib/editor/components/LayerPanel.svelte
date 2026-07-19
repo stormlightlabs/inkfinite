@@ -162,8 +162,8 @@
 <aside class="layer-panel" class:layer-panel--collapsed={collapsed} aria-label="Layers">
 	<header class="layer-panel__header">
 		<div class="layer-panel__title">
-			<Icon name="layers" size="1rem" />
-			{#if !collapsed}<h2>Layers</h2>{/if}
+			{#if !collapsed}<Icon name="layers" size="1rem" />{/if}
+			<h2>Layers</h2>
 		</div>
 		<div class="layer-panel__header-actions">
 			{#if !collapsed}
@@ -375,7 +375,7 @@
 	}
 
 	.layer-panel--collapsed {
-		width: 6.75rem;
+		width: 7.5rem;
 	}
 
 	.layer-panel__header {

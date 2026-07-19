@@ -2,11 +2,8 @@ import type { ToolId } from '@inkfinite/core';
 import type { IconName } from '../icons';
 
 export const HELP_LINKS = [
-	{
-		label: 'Project README',
-		href: 'https://github.com/stormlightlabs/inkfinite',
-		external: true
-	},
+	{ label: 'README', href: 'https://github.com/stormlightlabs/inkfinite', external: true },
+	{ label: 'Read the Docs', href: '/docs', external: true },
 	{
 		label: 'Issue Tracker',
 		href: 'https://github.com/stormlightlabs/inkfinite/issues',
@@ -17,7 +14,7 @@ export const HELP_LINKS = [
 export const KEYBOARD_TIPS = [
 	'⌘/Ctrl + Z to undo, ⇧ + ⌘/Ctrl + Z to redo',
 	'Hold space to pan the canvas',
-	'Scroll to zoom, double-click to reset view'
+	'Scroll to pan; pinch or Ctrl/Cmd+scroll to zoom'
 ];
 
 export const DEFAULT_FILL_COLOR = '#4a90e2';

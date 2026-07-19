@@ -6,6 +6,7 @@
 	import StencilPalette from '../components/StencilPalette.svelte';
 	import LayerPanel from '../components/LayerPanel.svelte';
 	import ProposalReview from '../components/ProposalReview.svelte';
+	import NavigationControls from './NavigationControls.svelte';
 	import { ContextMenu, type ContextMenuEntry } from '../../index';
 	import { createCanvasController } from './canvas-store.svelte';
 	import { draggingStencil, endDrag } from '../dnd.svelte';
@@ -196,6 +197,7 @@
 		onToolChange={c.tools.handleChange}
 		onStencilsClick={handleStencilsClick}
 		store={c.store}
+		camera={c.camera}
 		getViewport={c.getViewport}
 		canvas={canvasEl ?? undefined}
 		brushStore={c.brushStore} />
@@ -234,6 +236,7 @@
 				{/each}
 			</div>
 		{/if}
+		<NavigationControls store={c.store} camera={c.camera} />
 		<LayerPanel store={c.store} onCommit={c.commitLayerState} />
 		{#if textEditorCurrent}
 			{@const layout = c.textEditor.getLayout()}

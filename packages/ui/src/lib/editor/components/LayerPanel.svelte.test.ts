@@ -82,6 +82,9 @@ describe('LayerPanel', () => {
 	it('collapses to a small toolbar and restores the layer list', async () => {
 		const { screen } = renderPanel();
 		await screen.getByRole('button', { name: 'Collapse layers' }).click();
+		await expect.element(screen.getByRole('heading', { name: 'Layers' })).toBeInTheDocument();
+		const panel = screen.getByRole('complementary', { name: 'Layers' }).element();
+		expect(panel.querySelector('.layer-panel__title svg')).toBeNull();
 		await expect
 			.element(screen.getByRole('list', { name: 'Page layers' }))
 			.not.toBeInTheDocument();

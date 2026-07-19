@@ -102,13 +102,17 @@
 	}
 
 	.history-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--ink-space-4);
 		padding: var(--ink-space-5);
 		border-bottom: 1px solid color-mix(in srgb, var(--ink-border) 55%, transparent);
 		background: var(--ink-surface-raised);
 	}
 
 	.history-header h2 {
-		margin: 0 0 var(--ink-space-4);
+		margin: 0;
 		color: var(--ink-heading);
 		font-family: var(--ink-font-display);
 		font-size: var(--ink-type-lg);
@@ -118,6 +122,7 @@
 
 	.history-actions {
 		display: flex;
+		flex-shrink: 0;
 		gap: 8px;
 	}
 
@@ -199,16 +204,14 @@
 		align-items: center;
 		gap: var(--ink-space-3);
 		padding: var(--ink-space-3) var(--ink-space-4);
-		border-left: 3px solid var(--ink-accent);
+		border: 1px solid var(--ink-accent);
 		border-radius: var(--ink-radius-panel-small);
-		background: var(--ink-surface-raised);
-		box-shadow:
-			0 0 0 1px color-mix(in srgb, var(--ink-border) 35%, transparent),
-			0 2px 5px color-mix(in srgb, var(--ink-shadow-color) 16%, transparent);
+		background: var(--ink-canvas);
+		box-shadow: 0 2px 5px color-mix(in srgb, var(--ink-shadow-color) 16%, transparent);
 	}
 
 	.history-entry.redo {
-		border-left-color: var(--ink-warning);
+		border-color: var(--ink-warning);
 		opacity: 0.76;
 	}
 

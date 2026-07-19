@@ -1,18 +1,18 @@
 <script lang="ts">
-	import { Dialog, Icon } from '../../index';
+	import type {
+		CursorState,
+		CursorStore,
+		EditorState,
+		PersistenceStatus,
+		Store
+	} from '@inkfinite/core';
+	import { EditorState as EditorStateOps, buildStatusBarVM } from '@inkfinite/core';
+	import Dialog from '../../components/Dialog.svelte';
+	import Icon from '../../components/Icon.svelte';
 	import { HELP_LINKS, KEYBOARD_TIPS } from '../constants';
 	import type { EditorPlatform } from '../platform';
 	import type { SnapSettings, SnapStore, StatusStore } from '../status';
 	import { themeStore } from '../theme.svelte';
-	import {
-		type CursorState,
-		type CursorStore,
-		type EditorState,
-		type PersistenceStatus,
-		type Store,
-		EditorState as EditorStateOps,
-		buildStatusBarVM
-	} from '@inkfinite/core';
 
 	type Props = {
 		store: Store;
@@ -33,6 +33,7 @@
 		onOpenBrowser,
 		onHistoryClick
 	}: Props = $props();
+
 	let infoOpen = $state(false);
 
 	let editorSnapshot: EditorState = EditorStateOps.create();
@@ -264,7 +265,7 @@
 		display: grid;
 		grid-template-columns: repeat(4, minmax(120px, 1fr)) auto auto;
 		gap: 1.5rem;
-		padding: 0.75rem 1.5rem;
+		padding: 0.5rem 0.75rem;
 		background: var(--ink-surface-raised);
 		border-top: 1px solid color-mix(in srgb, var(--ink-border) 46%, transparent);
 		box-shadow: 0 -8px 24px color-mix(in srgb, var(--ink-shadow-color) 10%, transparent);

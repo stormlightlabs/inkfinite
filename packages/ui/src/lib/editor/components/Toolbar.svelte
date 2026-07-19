@@ -6,7 +6,6 @@
 	import type {
 		ArrowShape,
 		BoardMeta,
-		Box2,
 		EditorState as EditorStateType,
 		EllipseShape,
 		LineShape,
@@ -23,11 +22,10 @@
 		exportToSVG,
 		exportViewportToPNG,
 		getSelectedShapes,
-		getShapesOnCurrentPage,
-		shapeBounds,
 		SnapshotCommand
 	} from '@inkfinite/core';
 	import { fade } from 'svelte/transition';
+	import { CameraController } from '../canvas/controllers/camera-controller';
 	import ArrowPopover from './ArrowPopover.svelte';
 
 	type Viewport = { width: number; height: number };
@@ -45,6 +43,7 @@
 		currentTool: ToolId;
 		onToolChange: (toolId: ToolId) => void;
 		store: Store;
+		camera?: CameraController;
 		getViewport: () => Viewport;
 		canvas?: HTMLCanvasElement;
 		brushStore: BrushStore;
@@ -57,6 +56,7 @@
 		currentTool,
 		onToolChange,
 		store,
+		camera,
 		getViewport,
 		canvas,
 		brushStore,
@@ -64,6 +64,7 @@
 		desktop,
 		onStencilsClick
 	}: Props = $props();
+	let cameraControls = $derived(camera ?? new CameraController(store, getViewport));
 
 	let editorState = $derived<EditorStateType>(store.getState());
 	let zoomMenuOpen = $state(false);
@@ -145,7 +146,7 @@
 		)
 	);
 	let showContextControls = $derived(
-		showColorControls || currentTool === 'pen' || hasArrowSelection
+		currentTool !== 'pen' && (showColorControls || hasArrowSelection)
 	);
 
 	let position = $state({ x: 20, y: 20 });
@@ -223,90 +224,22 @@
 	}
 
 	function getZoomPct(): number {
-		const pct = editorState.camera.zoom * 100;
-		if (!Number.isFinite(pct)) {
-			return 100;
-		}
-		return Math.round(pct);
+		return cameraControls.getZoomPercent();
 	}
 
 	function setZoomPercent(percent: number) {
-		const zoom = percent / 100;
-		store.setState((state) => ({ ...state, camera: { ...state.camera, zoom } }));
-		zoomMenuOpen = false;
-	}
-
-	function zoomToBounds(bounds: Box2) {
-		const viewport = getViewport();
-		const width = bounds.max.x - bounds.min.x || 1;
-		const height = bounds.max.y - bounds.min.y || 1;
-		const margin = 80;
-		const scaleX = (viewport.width - margin) / width;
-		const scaleY = (viewport.height - margin) / height;
-		const zoom = Math.max(Math.min(scaleX, scaleY), 0.05);
-		const center = {
-			x: (bounds.min.x + bounds.max.x) / 2,
-			y: (bounds.min.y + bounds.max.y) / 2
-		};
-		store.setState((state) => ({ ...state, camera: { x: center.x, y: center.y, zoom } }));
+		cameraControls.setZoomPercent(percent);
 		zoomMenuOpen = false;
 	}
 
 	function zoomToFit() {
-		const shapes = getShapesOnCurrentPage(editorState);
-		if (shapes.length === 0) {
-			setZoomPercent(100);
-			return;
-		}
-		const bounds = shapes.reduce<Box2 | null>((acc, shape) => {
-			const shapeBox = shapeBounds(shape);
-			if (!acc) {
-				return shapeBox;
-			}
-			return {
-				min: {
-					x: Math.min(acc.min.x, shapeBox.min.x),
-					y: Math.min(acc.min.y, shapeBox.min.y)
-				},
-				max: {
-					x: Math.max(acc.max.x, shapeBox.max.x),
-					y: Math.max(acc.max.y, shapeBox.max.y)
-				}
-			};
-		}, null);
-
-		if (bounds) {
-			zoomToBounds(bounds);
-		}
+		cameraControls.fitAll();
+		zoomMenuOpen = false;
 	}
 
 	function zoomToSelection() {
-		const shapes = getSelectedShapes(editorState);
-		if (shapes.length === 0) {
-			zoomToFit();
-			return;
-		}
-
-		const bounds = shapes.reduce<Box2 | null>((acc, shape) => {
-			const shapeBox = shapeBounds(shape);
-			if (!acc) {
-				return shapeBox;
-			}
-			return {
-				min: {
-					x: Math.min(acc.min.x, shapeBox.min.x),
-					y: Math.min(acc.min.y, shapeBox.min.y)
-				},
-				max: {
-					x: Math.max(acc.max.x, shapeBox.max.x),
-					y: Math.max(acc.max.y, shapeBox.max.y)
-				}
-			};
-		}, null);
-
-		if (bounds) {
-			zoomToBounds(bounds);
-		}
+		cameraControls.fitSelection();
+		zoomMenuOpen = false;
 	}
 
 	async function exportPNGViewport() {
@@ -649,17 +582,24 @@
 	{/if}
 	<div class="toolbar__divider"></div>
 	{#each TOOLS as tool (`${tool.id}:${tool.label}`)}
-		<button
-			class="toolbar__tool-button tool-button"
-			class:toolbar__tool-button--active={currentTool === tool.id}
-			class:active={currentTool === tool.id}
-			onclick={() => handleToolClick(tool.id)}
-			aria-label={tool.label}
-			aria-pressed={currentTool === tool.id}
-			data-tool-id={tool.id}>
-			<span class="toolbar__tool-icon"><Icon name={tool.icon} size={20} /></span>
-			<span class="toolbar__tool-label">{tool.label}</span>
-		</button>
+		<div class="toolbar__tool-slot">
+			<button
+				class="toolbar__tool-button tool-button"
+				class:toolbar__tool-button--active={currentTool === tool.id}
+				class:active={currentTool === tool.id}
+				onclick={() => handleToolClick(tool.id)}
+				aria-label={tool.label}
+				aria-pressed={currentTool === tool.id}
+				data-tool-id={tool.id}>
+				<span class="toolbar__tool-icon"><Icon name={tool.icon} size={20} /></span>
+				<span class="toolbar__tool-label">{tool.label}</span>
+			</button>
+			{#if tool.id === 'pen' && currentTool === 'pen'}
+				<div class="toolbar__pen-context" transition:fade={{ duration: 150 }}>
+					<BrushPopover {brush} align="end" onBrushChange={handleBrushChange} />
+				</div>
+			{/if}
+		</div>
 		{#if tool.id === 'select' && onStencilsClick}
 			<button
 				class="toolbar__tool-button tool-button"
@@ -735,9 +675,6 @@
 						</label>
 					{/if}
 				</div>
-			{/if}
-			{#if currentTool === 'pen'}
-				<BrushPopover {brush} onBrushChange={handleBrushChange} />
 			{/if}
 			{#if hasArrowSelection}
 				<ArrowPopover {store} />
@@ -945,6 +882,27 @@
 		transition-timing-function: var(--ink-ease-out);
 		min-width: 58px;
 		opacity: 0.8;
+	}
+
+	.toolbar__tool-slot {
+		position: relative;
+		display: flex;
+		align-items: stretch;
+	}
+
+	.toolbar__pen-context {
+		position: absolute;
+		top: calc(100% + var(--ink-space-3, 0.75rem));
+		right: 0;
+		z-index: 20;
+		padding: var(--ink-space-1);
+		border-radius: var(--ink-radius-panel-small);
+		background: color-mix(in srgb, var(--ink-surface-raised) 94%, transparent);
+		box-shadow:
+			0 0 0 1px color-mix(in srgb, var(--ink-border) 64%, transparent),
+			0 10px 26px color-mix(in srgb, var(--ink-shadow-color) 24%, transparent),
+			0 2px 6px color-mix(in srgb, var(--ink-shadow-color) 18%, transparent);
+		backdrop-filter: blur(14px);
 	}
 
 	.toolbar__tool-button:hover {

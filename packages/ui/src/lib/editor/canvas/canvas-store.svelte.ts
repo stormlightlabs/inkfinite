@@ -40,6 +40,7 @@ import { createRenderer, type Renderer } from '@inkfinite/renderer';
 import { onDestroy, onMount } from 'svelte';
 import { computeCursor } from './canvas-helpers';
 import { ArrowLabelEditorController } from './controllers/arrowlabel-controller.svelte';
+import { CameraController } from './controllers/camera-controller';
 import { DesktopFileController } from './controllers/desktop-file-controller.svelte';
 import { FileBrowserController } from './controllers/filebrowser-controller.svelte';
 import { HistoryController } from './controllers/history-controller';
@@ -138,6 +139,8 @@ export function createCanvasController(
 	function getViewport(): Viewport {
 		return measureViewport(canvas);
 	}
+
+	const camera = new CameraController(store, getViewport);
 
 	function getOverlayViewport(): Viewport {
 		return overlayViewport;
@@ -300,6 +303,10 @@ export function createCanvasController(
 			markdownEditor.commit();
 		}
 
+		if (camera.handleAction(action)) {
+			return;
+		}
+
 		runtime.handleAction(action);
 	}
 
@@ -360,6 +367,19 @@ export function createCanvasController(
 					return;
 				}
 			}
+		}
+
+		const clickedShape = shapes.some((shape) => {
+			const bounds = shapeBounds(shape);
+			return (
+				world.x >= bounds.min.x &&
+				world.x <= bounds.max.x &&
+				world.y >= bounds.min.y &&
+				world.y <= bounds.max.y
+			);
+		});
+		if (!clickedShape) {
+			camera.reset();
 		}
 	}
 
@@ -498,6 +518,7 @@ export function createCanvasController(
 		fileBrowser,
 		tools: toolController,
 		history,
+		camera,
 		textEditor,
 		arrowLabelEditor,
 		markdownEditor,

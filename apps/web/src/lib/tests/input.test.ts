@@ -64,6 +64,7 @@ function createWheelEvent(
 	options: {
 		clientX?: number;
 		clientY?: number;
+		deltaX?: number;
 		deltaY?: number;
 		ctrlKey?: boolean;
 		shiftKey?: boolean;
@@ -74,6 +75,7 @@ function createWheelEvent(
 	return new WheelEvent('wheel', {
 		clientX: options.clientX ?? 0,
 		clientY: options.clientY ?? 0,
+		deltaX: options.deltaX ?? 0,
 		deltaY: options.deltaY ?? 0,
 		ctrlKey: options.ctrlKey ?? false,
 		shiftKey: options.shiftKey ?? false,
@@ -404,12 +406,21 @@ describe('InputAdapter', () => {
 
 	describe('wheel events', () => {
 		it('should dispatch wheel action', () => {
-			const event = createWheelEvent({ clientX: 400, clientY: 300, deltaY: -100 });
+			const event = createWheelEvent({
+				clientX: 400,
+				clientY: 300,
+				deltaX: 25,
+				deltaY: -100
+			});
 			canvas.dispatchEvent(event);
 
 			expect(actions).toHaveLength(1);
 			expect(actions[0].type).toBe('wheel');
-			expect(actions[0]).toMatchObject({ screen: { x: 400, y: 300 }, deltaY: -100 });
+			expect(actions[0]).toMatchObject({
+				screen: { x: 400, y: 300 },
+				deltaX: 25,
+				deltaY: -100
+			});
 		});
 
 		it('should include modifiers in wheel events', () => {
@@ -464,6 +475,19 @@ describe('InputAdapter', () => {
 			expect(actions[0]).toMatchObject({
 				modifiers: { ctrl: true, shift: false, alt: false, meta: false }
 			});
+		});
+
+		it.each([
+			{ key: '+', code: 'Equal', shiftKey: true },
+			{ key: '-', code: 'Minus' },
+			{ key: '0', code: 'Digit0' },
+			{ key: '!', code: 'Digit1', shiftKey: true },
+			{ key: '@', code: 'Digit2', shiftKey: true }
+		])('prevents browser behavior for camera shortcut $key', (options) => {
+			const event = createKeyboardEvent('keydown', options);
+			window.dispatchEvent(event);
+
+			expect(event.defaultPrevented).toBe(true);
 		});
 
 		it('should not capture keyboard events when captureKeyboard is false', () => {

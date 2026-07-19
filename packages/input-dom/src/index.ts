@@ -51,7 +51,7 @@ export type InputAdapterConfig = {
  *
  * Features:
  * - Captures pointer events (down, move, up) on canvas
- * - Captures wheel events for zooming
+ * - Captures wheel and trackpad events for camera movement
  * - Captures keyboard events (optionally on window)
  * - Converts screen coordinates to world coordinates
  * - Tracks pointer state
@@ -315,7 +315,7 @@ export class InputAdapter {
 		const world = this.screenToWorld(screen);
 		const modifiers = Modifiers.fromEvent(e);
 
-		this.config.onAction(Action.wheel(screen, world, e.deltaY, modifiers));
+		this.config.onAction(Action.wheel(screen, world, { x: e.deltaX, y: e.deltaY }, modifiers));
 	}
 
 	private handleKeyDown(e: KeyboardEvent): void {
@@ -400,6 +400,7 @@ export class InputAdapter {
 	 * - Arrow keys (scroll)
 	 * - Backspace/Delete (navigation)
 	 * - Cmd/Ctrl+Z, Cmd/Ctrl+Y (browser undo/redo)
+	 * - Camera shortcuts (+, -, 0, Shift+1, Shift+2)
 	 * - Tab (focus change)
 	 */
 	private shouldPreventDefault(e: KeyboardEvent): boolean {
@@ -415,6 +416,14 @@ export class InputAdapter {
 		}
 
 		if (key === 'Tab') {
+			return true;
+		}
+
+		if (key === '+' || key === '=' || key === '-' || key === '_' || key === '0') {
+			return true;
+		}
+
+		if (modifiers.shift && (e.code === 'Digit1' || e.code === 'Digit2')) {
 			return true;
 		}
 
