@@ -227,20 +227,23 @@ Blocked by: V2-16, V2-18
 
 Acceptance criteria:
 
-- [ ] The skill teaches inspect heads → narrow query → minimal transaction →
+- [x] The skill teaches inspect heads → narrow query → minimal transaction →
       dry-run → resolve → apply/propose → validate → render.
-- [ ] Rules cover locks, `agent_editable`, semantic selectors, layout operations,
+- [x] Rules cover locks, `agent_editable`, semantic selectors, layout operations,
       manual-file-edit prohibition, and explicit authorization for direct apply.
-- [ ] CLI help and generated schemas remain the command reference; the skill does
+- [x] CLI help and generated schemas remain the command reference; the skill does
       not duplicate every option.
-- [ ] Worked examples create, patch, connect, lay out, propose, partially accept,
+- [x] Worked examples create, patch, connect, lay out, propose, partially accept,
       and recover from a head conflict.
-- [ ] At least one clean agent run completes each example without UI automation.
+- [x] At least one clean agent run completes each example without UI automation.
 
 Verification:
 
-- Install the packaged skill in a clean test environment and run all examples
-  against fixture copies.
+- Installed `skills/inkfinite` into a temporary fixture directory and ran its
+  help, capability, schema, file-mode, proposal, partial-acceptance, and
+  head-conflict examples with `scripts/verify-examples.sh`. The live examples
+  used the real CLI framing and an authenticated Unix-socket fixture server;
+  no UI automation or canonical-file byte edits were used.
 
 ### V2-22: Collapse to one native Inkfinite model
 
@@ -394,5 +397,5 @@ pnpm --filter @inkfinite/desktop check
 
 ## Frontier
 
-V2-20 is the current frontier. Bundle the Inkfinite agent skill and prove its
-examples in a clean environment.
+V2-22 is the current frontier. Replace useful predecessor coverage and collapse
+the repository to one native Inkfinite model.

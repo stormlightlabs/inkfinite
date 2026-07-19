@@ -1,0 +1,16 @@
+{
+	"id": "transaction:inkfinite-agent-rename-page",
+	"actor_id": "actor:inkfinite-agent",
+	"origin": "agent",
+	"base_heads": [],
+	"description": "Rename the architecture page after reviewing current heads",
+	"operations": [
+		{
+			"type": "rename_page",
+			"page_id": "page:document:agent-skill:1",
+			"name": "Architecture reviewed",
+			"expected_version": null
+		}
+	],
+	"timestamp": 0
+}

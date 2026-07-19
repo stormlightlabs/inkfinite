@@ -136,6 +136,17 @@ The desktop publishes a per-user Unix-domain socket on Unix-like systems or a
 per-user named pipe on Windows. A protected discovery file carries a random
 process token, and requests use versioned length-prefixed frames.
 
+### Agent skill
+
+The installable agent package lives in [`skills/inkfinite`](skills/inkfinite).
+It teaches the inspect/query/transaction/dry-run/proposal workflow and includes
+fixtures for file-mode edits, reviewed partial acceptance, and stale-head recovery.
+
+```sh
+INKFINITE_CLI="$PWD/target/debug/inkfinite" \
+  bash skills/inkfinite/scripts/verify-examples.sh
+```
+
 ## Inkfinite files
 
 Canonical `.inkfinite` files contain the document and its change history in a

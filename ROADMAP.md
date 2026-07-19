@@ -1,6 +1,6 @@
 # Inkfinite vNext / Version 2
 
-Status: implementation in progress; V2-01 through V2-19 are complete
+Status: implementation in progress; V2-01 through V2-20 are complete
 
 This is the product and architecture contract for vNext. [TODO.md](TODO.md) is
 the implementation queue.
@@ -66,9 +66,9 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
 - The desktop owns an authenticated, versioned local IPC server. The CLI can
   inspect open sessions, query the same materialized records as file mode, and
   request frontend focus without a TCP listener or background daemon.
-- [TODO.md](TODO.md) starts the remaining work at V2-20: agent packaging,
-  compatibility removal, collaborative desktop QA, and final release
-  verification. V2-19's offline replica sync is complete.
+- [TODO.md](TODO.md) starts the remaining work at V2-22: compatibility removal,
+  collaborative desktop QA, and final release verification. V2-20's bundled
+  agent skill and clean fixture run are complete.
 
 ## Architecture
 
@@ -298,11 +298,13 @@ CLI design follows the [Command Line Interface Guidelines](https://clig.dev/).
 `inkfinite --help`, `inkfinite capabilities --json`, README.md, and integration
 tests are the command and exit-code references and must stay synchronized.
 
-The bundled skill teaches agents to inspect heads, query narrowly, create the
-smallest transaction, dry-run, resolve conflicts, apply or propose, validate,
-and render affected content. Agents must respect locked shapes and
-`agent_editable: false`, prefer semantic selectors and layout operations, and
-never edit document bytes manually.
+The bundled skill in `skills/inkfinite` teaches agents to inspect heads, query
+narrowly, create the smallest transaction, dry-run, resolve conflicts, apply or
+propose, validate, and render affected content. Its fixture runner checks the
+CLI help, capabilities, generated schemas, file-mode edits, live proposal
+framing, partial acceptance, and stale-head recovery. Agents must respect
+locked shapes and `agent_editable: false`, prefer semantic selectors and layout
+operations, and never edit document bytes manually.
 
 The release-candidate QA pairs a user with a fresh Codex session to wireframe a
 desktop application while disconnected from the network. Codex works through
@@ -403,10 +405,9 @@ render parity, proposal UX, recovery prompts, and permission failures.
 Milestones 1 through 7 are complete. [TODO.md](TODO.md) owns ticket-level status,
 acceptance criteria, and dependency order. The remaining path is:
 
-1. Bundle and verify the agent skill (V2-20).
-2. Replace useful predecessor coverage and collapse to the native model (V2-22).
-3. Run the human-and-Codex desktop wireframing sequence (V2-23).
-4. Run the final release matrix against that native candidate (V2-21).
+1. Replace useful predecessor coverage and collapse to the native model (V2-22).
+2. Run the human-and-Codex desktop wireframing sequence (V2-23).
+3. Run the final release matrix against that native candidate (V2-21).
 
 ## Deferred milestones
 

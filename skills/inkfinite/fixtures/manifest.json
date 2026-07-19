@@ -1,0 +1,28 @@
+{
+	"skill": "inkfinite",
+	"cli_reference": [
+		"inkfinite --help",
+		"inkfinite capabilities --json",
+		"inkfinite schema document",
+		"inkfinite schema transaction",
+		"inkfinite schema protocol"
+	],
+	"examples": [
+		{
+			"name": "file-mode",
+			"script": "examples/file-mode.sh",
+			"covers": ["create", "patch", "connect", "layout", "dry-run", "validate", "render"]
+		},
+		{
+			"name": "proposal-review",
+			"script": "examples/proposal-review.sh",
+			"covers": ["inspect", "narrow-query", "propose", "partial-accept"]
+		},
+		{
+			"name": "head-conflict",
+			"script": "examples/head-conflict.sh",
+			"covers": ["stale-head-rejection", "rebuild-from-current-heads", "validate"]
+		}
+	],
+	"transaction_templates": ["fixtures/rename-page.transaction.json", "fixtures/proposal.transaction.json"]
+}

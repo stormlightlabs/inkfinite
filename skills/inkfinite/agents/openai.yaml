@@ -1,0 +1,4 @@
+interface:
+  display_name: "Inkfinite Agent"
+  short_description: "Safely edit an Inkfinite document through its CLI"
+  default_prompt: "Use $inkfinite to inspect and update an Inkfinite document through validated CLI transactions."
