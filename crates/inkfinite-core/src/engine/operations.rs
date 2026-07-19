@@ -300,7 +300,7 @@ pub fn delete_page(
         .flat_map(|layer_id| descendant_ids_for_layer(document, layer_id))
         .collect();
     let mut inverse = vec![Operation::CreatePage {
-        page: crate::PageRecord { layer_ids: Vec::new(), version: RecordVersion(1), ..page.clone() },
+        page: crate::PageRecord { layer_ids: Vec::new(), version: RecordVersion(1), ..page },
         anchor,
     }];
     for layer_id in &layer_ids {

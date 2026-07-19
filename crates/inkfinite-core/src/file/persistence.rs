@@ -1,5 +1,6 @@
 //! Canonical file persistence, advisory locks, atomic replacement, and recovery.
 
+use std::collections::{BTreeMap, btree_map::Entry};
 use std::fmt::Write as _;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
@@ -7,7 +8,9 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::crdt::EncodedChange;
-use crate::engine::{TransactionDraft, TransactionEngine};
+use crate::engine::{SyncApplyResult, TransactionDraft, TransactionEngine};
+use crate::ipc::CommitResult;
+use crate::sync::{MAX_SYNC_PEERS, PeerSync, PeerSyncStatus, PersistedPeerSync, SyncError, SyncMessage, SyncStatus};
 use crate::{ActorId, ChangeHash, Document, DocumentId, DocumentSnapshot};
 use serde::{Deserialize, Serialize};
 
@@ -15,6 +18,9 @@ use super::{FileError, ImportedV1, import_v1_json};
 
 const RECOVERY_FORMAT: &str = "inkfinite.recovery";
 const RECOVERY_VERSION: u32 = 1;
+const SYNC_STATE_FORMAT: &str = "inkfinite.sync-state";
+const SYNC_STATE_VERSION: u32 = 1;
+const MAX_SYNC_STATE_BYTES: usize = 16 * 1024 * 1024;
 const DEFAULT_MAX_JOURNAL_ENTRIES: usize = 32;
 const DEFAULT_MAX_JOURNAL_BYTES: usize = 8 * 1024 * 1024;
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -96,6 +102,17 @@ struct RecoveryFile {
     journal: Vec<EncodedChange>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SyncStateFile {
+    format: String,
+    version: u32,
+    source_path: String,
+    document_id: DocumentId,
+    actor_id: ActorId,
+    peers: Vec<PersistedPeerSync>,
+}
+
 impl RecoveryFile {
     fn new(source_path: &Path, document_id: DocumentId, snapshot: Vec<u8>, heads: Vec<ChangeHash>) -> Self {
         Self {
@@ -120,6 +137,8 @@ pub struct DocumentFile {
     baseline_bytes: Vec<u8>,
     baseline_heads: Vec<ChangeHash>,
     pending_recovery: Option<RecoveryFile>,
+    sync_peers: BTreeMap<ActorId, PeerSync>,
+    sync_state_warning: Option<String>,
     lock: AdvisoryLock,
 }
 
@@ -150,7 +169,7 @@ impl DocumentFile {
         let bytes = read_bytes(&path, "read canonical document")?;
         let mut engine = load_canonical_bytes(&bytes, actor_id.clone())?;
         let heads = engine.snapshot()?.heads;
-        Ok(Self {
+        let mut session = Self {
             path,
             actor_id,
             engine,
@@ -158,8 +177,12 @@ impl DocumentFile {
             baseline_bytes: bytes,
             baseline_heads: heads,
             pending_recovery: None,
+            sync_peers: BTreeMap::new(),
+            sync_state_warning: None,
             lock,
-        })
+        };
+        session.load_sync_state();
+        Ok(session)
     }
 
     /// Creates and safely persists a new canonical document.
@@ -194,9 +217,20 @@ impl DocumentFile {
         let mut engine = TransactionEngine::create(document_id, actor_id.clone(), document)?;
         let baseline_bytes = engine.save()?;
         let baseline_heads = engine.snapshot()?.heads;
-        let mut session =
-            Self { path, actor_id, engine, options, baseline_bytes, baseline_heads, pending_recovery: None, lock };
+        let mut session = Self {
+            path,
+            actor_id,
+            engine,
+            options,
+            baseline_bytes,
+            baseline_heads,
+            pending_recovery: None,
+            sync_peers: BTreeMap::new(),
+            sync_state_warning: None,
+            lock,
+        };
         session.save()?;
+        session.load_sync_state();
         Ok(session)
     }
 
@@ -258,7 +292,7 @@ impl DocumentFile {
                 "recovery journal did not produce the recorded heads".into(),
             ));
         }
-        Ok(Self {
+        let mut session = Self {
             path,
             actor_id,
             engine,
@@ -266,8 +300,12 @@ impl DocumentFile {
             baseline_bytes: recovery.snapshot.clone(),
             baseline_heads: recovery.base_heads.clone(),
             pending_recovery: Some(recovery),
+            sync_peers: BTreeMap::new(),
+            sync_state_warning: None,
             lock,
-        })
+        };
+        session.load_sync_state();
+        Ok(session)
     }
 
     /// Returns the canonical path held by this session.
@@ -327,12 +365,224 @@ impl DocumentFile {
         &mut self.engine
     }
 
+    /// Returns the bounded synchronization status for this document.
+    #[must_use]
+    pub fn sync_status(&self) -> SyncStatus {
+        SyncStatus {
+            peers: self.sync_peers.values().map(PeerSync::status).collect(),
+            warning: self.sync_state_warning.clone(),
+        }
+    }
+
+    /// Trusts a peer actor and creates or returns its durable checkpoint.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed peer or filesystem error when the checkpoint cannot be
+    /// safely persisted.
+    pub fn connect_peer(&mut self, peer_id: ActorId) -> Result<PeerSyncStatus, FileError> {
+        if let Some(peer) = self.sync_peers.get(&peer_id) {
+            return Ok(peer.status());
+        }
+        if self.sync_peers.len() >= MAX_SYNC_PEERS {
+            return Err(FileError::Sync(SyncError::PeerLimit));
+        }
+        if peer_id == self.actor_id {
+            return Err(FileError::Sync(SyncError::InvalidPeer(
+                "a document cannot sync with its own actor".into(),
+            )));
+        }
+        let peer = PeerSync::new(peer_id.clone())?;
+        let status = peer.status();
+        let mut peers = self.sync_peers.clone();
+        peers.insert(peer_id, peer);
+        self.persist_sync_peers(&peers)?;
+        self.sync_peers = peers;
+        Ok(status)
+    }
+
+    /// Removes a trusted peer checkpoint.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed peer or filesystem error when the checkpoint cannot be
+    /// safely persisted.
+    pub fn disconnect_peer(&mut self, peer_id: &ActorId) -> Result<(), FileError> {
+        let mut peers = self.sync_peers.clone();
+        peers.remove(peer_id);
+        self.persist_sync_peers(&peers)?;
+        self.sync_peers = peers;
+        Ok(())
+    }
+
+    /// Produces the next message for a connected peer.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed peer, CRDT, or filesystem error.
+    pub fn next_sync_message(&mut self, peer_id: &ActorId) -> Result<Option<SyncMessage>, FileError> {
+        let mut peers = self.sync_peers.clone();
+        let peer = peers
+            .get_mut(peer_id)
+            .ok_or_else(|| FileError::Sync(SyncError::PeerNotConnected { peer_id: peer_id.clone() }))?;
+        let message = self.engine.next_sync_message(peer)?;
+        self.persist_sync_peers(&peers)?;
+        self.sync_peers = peers;
+        Ok(message)
+    }
+
+    /// Receives one transport message on a connected peer checkpoint.
+    ///
+    /// The transaction engine validates and repairs a fork before this file
+    /// session adopts it. Peer state is persisted in the same operation, so a
+    /// restart does not resend an unbounded history.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed peer, merge, or filesystem error.
+    pub fn receive_sync_message(&mut self, message: &SyncMessage) -> Result<SyncApplyResult, FileError> {
+        let previous_engine = self.engine.clone();
+        let previous_peers = self.sync_peers.clone();
+        let before_heads = self.engine.snapshot()?.heads;
+        let mut peers = self.sync_peers.clone();
+        let peer = peers
+            .get_mut(&message.sender)
+            .ok_or_else(|| FileError::Sync(SyncError::PeerNotConnected { peer_id: message.sender.clone() }))?;
+        let mut engine = self.engine.clone();
+        let result = engine.receive_sync_message(peer, message)?;
+        let document_changed = !same_heads(&before_heads, &result.heads);
+        if document_changed {
+            self.engine = engine;
+            self.sync_peers = peers;
+            if let Err(error) = self.save() {
+                self.engine = previous_engine;
+                self.sync_peers = previous_peers;
+                return Err(error);
+            }
+            let peers = self.sync_peers.clone();
+            if let Err(error) = self.persist_sync_peers(&peers) {
+                self.sync_state_warning = Some(format!("could not persist sync checkpoint: {error}"));
+            }
+        } else {
+            self.persist_sync_peers_for_engine(&peers, &mut engine)?;
+            self.engine = engine;
+            self.sync_peers = peers;
+        }
+        Ok(result)
+    }
+
+    fn persist_sync_peers(&mut self, peers: &BTreeMap<ActorId, PeerSync>) -> Result<(), FileError> {
+        let mut engine = self.engine.clone();
+        self.persist_sync_peers_for_engine(peers, &mut engine)
+    }
+
+    fn persist_sync_peers_for_engine(
+        &self, peers: &BTreeMap<ActorId, PeerSync>, engine: &mut TransactionEngine,
+    ) -> Result<(), FileError> {
+        let document_id = engine.snapshot()?.document_id;
+        let path = sync_state_path_for(&self.path, &document_id, &self.options);
+        if peers.is_empty() {
+            match fs::remove_file(&path) {
+                Ok(()) => Ok(()),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                Err(error) => Err(io_error("remove sync state", path, error)),
+            }
+        } else {
+            let parent = path
+                .parent()
+                .ok_or_else(|| FileError::InvalidRecovery("sync state path has no parent".into()))?;
+            fs::create_dir_all(parent)
+                .map_err(|error| io_error("create sync state directory", parent.to_owned(), error))?;
+            let state = SyncStateFile {
+                format: SYNC_STATE_FORMAT.into(),
+                version: SYNC_STATE_VERSION,
+                source_path: path_string(&self.path),
+                document_id,
+                actor_id: self.actor_id.clone(),
+                peers: peers.values().map(PeerSync::persisted).collect(),
+            };
+            write_sync_state(&path, &state)
+        }
+    }
+
+    fn load_sync_state(&mut self) {
+        let path = match self.engine.snapshot() {
+            Ok(snapshot) => sync_state_path_for(&self.path, &snapshot.document_id, &self.options),
+            Err(error) => {
+                self.sync_state_warning = Some(format!("could not inspect sync state: {error}"));
+                return;
+            }
+        };
+        let bytes = match fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
+            Err(error) => {
+                self.sync_state_warning = Some(format!("could not read {}: {error}", path.display()));
+                return;
+            }
+        };
+        if bytes.len() > MAX_SYNC_STATE_BYTES {
+            self.sync_state_warning = Some(format!("sync state {} exceeds its size limit", path.display()));
+            return;
+        }
+        let state = match serde_json::from_slice::<SyncStateFile>(&bytes) {
+            Ok(state) => state,
+            Err(error) => {
+                self.sync_state_warning = Some(format!("invalid sync state {}: {error}", path.display()));
+                return;
+            }
+        };
+        let document_id = match self.engine.snapshot() {
+            Ok(snapshot) => snapshot.document_id,
+            Err(error) => {
+                self.sync_state_warning = Some(format!("could not inspect sync state identity: {error}"));
+                return;
+            }
+        };
+        if state.format != SYNC_STATE_FORMAT
+            || state.version != SYNC_STATE_VERSION
+            || state.source_path != path_string(&self.path)
+            || state.document_id != document_id
+            || state.actor_id != self.actor_id
+            || state.peers.len() > MAX_SYNC_PEERS
+        {
+            self.sync_state_warning = Some(format!("sync state {} does not match this replica", path.display()));
+            return;
+        }
+        for persisted in state.peers {
+            if let Err(error) = persisted.validate_for(&document_id, &self.actor_id) {
+                self.sync_state_warning = Some(format!("invalid peer checkpoint envelope: {error}"));
+                continue;
+            }
+            match PeerSync::from_persisted(persisted) {
+                Ok(peer) if peer.peer_id() != &self.actor_id => {
+                    let peer_id = peer.peer_id().clone();
+                    match self.sync_peers.entry(peer_id) {
+                        Entry::Occupied(entry) => {
+                            self.sync_state_warning =
+                                Some(format!("sync state contains duplicate peer {}", entry.key()));
+                        }
+                        Entry::Vacant(entry) => {
+                            entry.insert(peer);
+                        }
+                    }
+                }
+                Ok(_) => {
+                    self.sync_state_warning = Some("sync state contained the local actor as a peer".into());
+                }
+                Err(error) => {
+                    self.sync_state_warning = Some(format!("invalid peer checkpoint: {error}"));
+                }
+            }
+        }
+    }
+
     /// Commits one validated transaction through the held document session.
     ///
     /// # Errors
     ///
     /// Returns [`FileError`] when the transaction engine rejects the draft.
-    pub fn commit(&mut self, transaction: TransactionDraft) -> Result<crate::engine::CommitResult, FileError> {
+    pub fn commit(&mut self, transaction: TransactionDraft) -> Result<CommitResult, FileError> {
         Ok(self.engine.commit(transaction)?)
     }
 
@@ -404,7 +654,7 @@ impl DocumentFile {
     pub fn save(&mut self) -> Result<SaveResult, FileError> {
         let snapshot = self.engine.snapshot()?;
         let document_id = snapshot.document_id.clone();
-        let heads = snapshot.heads.clone();
+        let heads = snapshot.heads;
         let bytes = self.engine.save()?;
         let recovery_path = recovery_path_for(&self.path, &document_id, &self.options);
 
@@ -479,13 +729,14 @@ impl DocumentFile {
             return Err(FileError::SamePath { path: self.path.clone() });
         }
 
+        let previous_path = self.path.clone();
         let replacement_lock = AdvisoryLock::acquire(&destination)?;
         let snapshot = self.engine.snapshot()?;
         let document_id = snapshot.document_id.clone();
-        let heads = snapshot.heads.clone();
+        let heads = snapshot.heads;
         let bytes = self.engine.save()?;
         let recovery_path = recovery_path_for(&destination, &document_id, &self.options);
-        let recovery = RecoveryFile::new(&destination, document_id, bytes.clone(), heads.clone());
+        let recovery = RecoveryFile::new(&destination, document_id.clone(), bytes.clone(), heads.clone());
         let recovery_directory = recovery_path
             .parent()
             .ok_or_else(|| FileError::InvalidRecovery("recovery path has no parent".into()))?;
@@ -505,6 +756,24 @@ impl DocumentFile {
         self.baseline_heads.clone_from(&heads);
         self.pending_recovery = None;
         self.lock = replacement_lock;
+
+        let previous_sync_path = sync_state_path_for(&previous_path, &document_id, &self.options);
+        let current_sync_path = sync_state_path_for(&self.path, &document_id, &self.options);
+        let peers = self.sync_peers.clone();
+        if let Err(error) = self.persist_sync_peers(&peers) {
+            self.sync_state_warning = Some(format!("could not persist sync checkpoint after save-as: {error}"));
+        } else if previous_sync_path != current_sync_path {
+            match fs::remove_file(&previous_sync_path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    self.sync_state_warning = Some(format!(
+                        "could not remove old sync checkpoint {}: {error}",
+                        previous_sync_path.display()
+                    ));
+                }
+            }
+        }
 
         Ok(SaveResult {
             path: self.path.clone(),
@@ -615,20 +884,59 @@ pub fn recovery_path_for(
         .join(format!("{}.recovery", encode_path_component(document_id.as_str())))
 }
 
+/// Returns the bounded per-peer synchronization checkpoint path for a
+/// document. The source path is part of the filename so two local replicas
+/// with the same document ID cannot overwrite one another's checkpoints.
+pub fn sync_state_path_for(
+    document_path: impl AsRef<Path>, document_id: &DocumentId, options: &PersistenceOptions,
+) -> PathBuf {
+    let document_path = document_path.as_ref();
+    let mut path_hash = 0xcbf2_9ce4_8422_2325_u64;
+    for byte in path_string(document_path).bytes() {
+        path_hash ^= u64::from(byte);
+        path_hash = path_hash.wrapping_mul(0x0100_0000_01b3_u64);
+    }
+    options.recovery_directory_for(document_path).join(format!(
+        "{}.{path_hash:016x}.sync",
+        encode_path_component(document_id.as_str())
+    ))
+}
+
 fn create_session_from_engine(
     path: PathBuf, actor_id: ActorId, mut engine: TransactionEngine, options: PersistenceOptions,
 ) -> Result<DocumentFile, FileError> {
     let lock = AdvisoryLock::acquire(&path)?;
     let baseline_bytes = engine.save()?;
     let baseline_heads = engine.snapshot()?.heads;
-    let mut session =
-        DocumentFile { path, actor_id, engine, options, baseline_bytes, baseline_heads, pending_recovery: None, lock };
+    let mut session = DocumentFile {
+        path,
+        actor_id,
+        engine,
+        options,
+        baseline_bytes,
+        baseline_heads,
+        pending_recovery: None,
+        sync_peers: BTreeMap::new(),
+        sync_state_warning: None,
+        lock,
+    };
     session.save()?;
+    session.load_sync_state();
     Ok(session)
 }
 
 fn write_recovery(path: &Path, recovery: &RecoveryFile) -> Result<(), FileError> {
     let bytes = serde_json::to_vec(recovery)?;
+    atomic_write(path, &bytes).map(|_| ())
+}
+
+fn write_sync_state(path: &Path, state: &SyncStateFile) -> Result<(), FileError> {
+    let bytes = serde_json::to_vec(state)?;
+    if bytes.len() > MAX_SYNC_STATE_BYTES {
+        return Err(FileError::InvalidRecovery(format!(
+            "sync state exceeds the {MAX_SYNC_STATE_BYTES} byte limit"
+        )));
+    }
     atomic_write(path, &bytes).map(|_| ())
 }
 

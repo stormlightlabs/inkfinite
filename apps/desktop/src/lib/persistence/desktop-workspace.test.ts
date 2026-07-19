@@ -60,6 +60,10 @@ describe("desktop workspace adapter", () => {
         saveAs: async () => { throw new Error("not used"); },
         query: async () => { throw new Error("not used"); },
         validate: async () => { throw new Error("not used"); },
+        syncConnect: async () => { throw new Error("not used"); },
+        syncDisconnect: async () => { throw new Error("not used"); },
+        syncNext: async () => { throw new Error("not used"); },
+        syncReceive: async () => { throw new Error("not used"); },
         close: async () => {},
       },
     });

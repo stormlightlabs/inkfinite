@@ -1,6 +1,6 @@
 # Inkfinite vNext / Version 2
 
-Status: implementation in progress; V2-01 through V2-18 are complete
+Status: implementation in progress; V2-01 through V2-19 are complete
 
 This is the product and architecture contract for vNext. [TODO.md](TODO.md) is
 the implementation queue.
@@ -29,12 +29,15 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
   to v2-native fixtures.
 - The desktop app, file-mode CLI, and live CLI use the same engine. Stale or
   invalid mutations cannot partly modify a document.
+- A user and a fresh Codex session can co-design a wireframe in the offline
+  desktop app through inspect, query, proposal review, revision, partial
+  acceptance, save, reopen, validation, and deterministic rendering.
 - Pages contain ordered layers. Hidden and locked layers affect rendering and
   interaction; new shapes and built-in stencils use the active layer.
 - A scripted 10,000-shape document meets the recorded interaction budget on the
   project reference machine. Benchmarks decide whether a spatial index ships.
-- Shared fixtures cover Rust/TypeScript schema agreement, migrations, CRDT
-  merges, transactions, rendering, CLI output, and IPC.
+- Shared fixtures cover Rust/TypeScript schema agreement, CRDT merges,
+  transactions, rendering, CLI output, and IPC.
 
 ## Current state
 
@@ -63,9 +66,9 @@ the CLI and a bundled `SKILL.md`; MCP and UI automation are not part of vNext.
 - The desktop owns an authenticated, versioned local IPC server. The CLI can
   inspect open sessions, query the same materialized records as file mode, and
   request frontend focus without a TCP listener or background daemon.
-- [TODO.md](TODO.md) starts the remaining work at V2-19: offline replica sync,
-  followed by agent packaging, release verification, and v1 compatibility
-  removal.
+- [TODO.md](TODO.md) starts the remaining work at V2-20: agent packaging,
+  compatibility removal, collaborative desktop QA, and final release
+  verification. V2-19's offline replica sync is complete.
 
 ## Architecture
 
@@ -154,13 +157,13 @@ rules where specified, and validated before the session adopts them.
 
 The canonical v2 file is Automerge's compact binary form with the `.inkfinite`
 extension. `.inkfinite.json` is a stable snapshot export, not a CRDT round-trip
-format. Through V2-21, the development build also accepts the frozen v1 envelope
-as an import source so the architecture and release baselines remain
-reproducible. V2-22 removes that unreleased compatibility surface before vNext
-ships. [docs/v2-file-format.md](docs/v2-file-format.md) defines the current file
-behavior. The CLI supplies JSON inspection for repositories and CI. The Rust
-core produces deterministic SVG, and V2-16 exposed that renderer through the
-CLI.
+format. The development build still accepts the frozen v1 envelope so the
+architecture baselines remain reproducible. V2-22 replaces useful predecessor
+coverage with native fixtures and removes that unreleased compatibility surface
+before collaborative QA and the final release matrix.
+[docs/v2-file-format.md](docs/v2-file-format.md) defines the current file
+behavior. The CLI supplies JSON inspection for repositories and CI and produces
+deterministic SVG.
 
 ## Document contract
 
@@ -250,9 +253,10 @@ actor-scoped change and must preserve concurrent work from other actors.
 ## Desktop and renderer
 
 The Tauri backend maintains open document sessions with path, Automerge state,
-materialized snapshot, undo/redo metadata, sync peers, and dirty/recovery state.
-Commands cover create/open/snapshot/commit/undo/redo/save/save-as/query/validate/
-close and proposal accept/reject.
+materialized snapshot, undo/redo metadata, trusted sync peers, and
+dirty/recovery state. Commands cover create/open/snapshot/commit/undo/redo/save/
+save-as/query/validate, peer connect/disconnect/send/receive, close, and
+proposal accept/reject.
 
 Use commands for request/response, events for small notifications, and channels
 only for ordered streams. The frontend applies returned patches to its mirror;
@@ -278,29 +282,10 @@ spatial index; WebGL and OffscreenCanvas remain deferred pending evidence.
 ## CLI and agent workflow
 
 The CLI binary is `inkfinite`; the desktop application is `Inkfinite`. File mode
-works without the app. The shipped commands are:
-
-```sh
-inkfinite new architecture.inkfinite
-inkfinite inspect architecture.inkfinite --json
-inkfinite query architecture.inkfinite --role architecture.service --json
-inkfinite validate architecture.inkfinite
-inkfinite schema document
-inkfinite capabilities --json
-inkfinite app status --json
-```
-
-V2-16 added mutating and rendering commands:
-
-```sh
-inkfinite apply architecture.inkfinite --transaction transaction.json --dry-run
-inkfinite render architecture.inkfinite --output architecture.svg
-```
-
-Structured `shape create/patch/delete`, `connect`, and `layout` commands build
-ordinary transactions and never bypass the engine. `schema document`,
-`schema transaction`, `schema protocol`, and `capabilities --json` expose the
-contracts.
+works without the app. It can create, inspect, query, validate, mutate, and render
+closed files. Structured shape, connection, and layout commands build ordinary
+transactions and never bypass the engine. Schema commands and
+`capabilities --json` expose the machine-readable contracts.
 
 `--json` and `--non-interactive` are global and may appear before or after a
 subcommand. Every command supports deterministic JSON where applicable, reads
@@ -309,22 +294,22 @@ stderr, never prompts under either global option, and uses stable exit codes.
 Mutations support `--dry-run`, report heads and affected IDs, write atomically,
 and refuse failed preconditions or invalid documents.
 
-File-mode commands return 0 for success, 2 for invalid usage, 3 for file or
-input errors, 4 for invalid documents or data, and 5 for file, lock, or state
-conflicts. `inkfinite --help` and `inkfinite capabilities --json` expose the
-same contract.
-
 CLI design follows the [Command Line Interface Guidelines](https://clig.dev/).
-Top-level help shows common examples and links to documentation and issue
-reporting. Each subcommand has realistic examples and clear value names. New
-commands must keep help, capabilities, README.md, TODO.md, ROADMAP.md, and
-integration tests synchronized.
+`inkfinite --help`, `inkfinite capabilities --json`, README.md, and integration
+tests are the command and exit-code references and must stay synchronized.
 
 The bundled skill teaches agents to inspect heads, query narrowly, create the
 smallest transaction, dry-run, resolve conflicts, apply or propose, validate,
 and render affected content. Agents must respect locked shapes and
 `agent_editable: false`, prefer semantic selectors and layout operations, and
 never edit document bytes manually.
+
+The release-candidate QA pairs a user with a fresh Codex session to wireframe a
+desktop application while disconnected from the network. Codex works through
+the live proposal path; the user reviews, rejects, revises, and partially accepts
+changes while continuing to edit in the canvas. Save, reopen, undo/redo,
+validation, and SVG rendering must preserve the reviewed result. This is a human
+visual review boundary, not desktop UI automation.
 
 ## Live control and collaboration
 
@@ -348,10 +333,12 @@ one-time authorization grant. The server does not expose public TCP or local
 HTTP. The Tauri process owns the server and removes its discovery record when it
 exits; vNext has no background daemon.
 
-Automerge sync between trusted peers is a vNext deliverable. The sync layer must
-be transport-independent and prove offline concurrent edits between two app
-instances. A hosted relay, accounts, sharing policy, and presence service are
-later milestones; CRDT storage and merge semantics are not deferred with them.
+Automerge sync between trusted peers is implemented through a transport-neutral
+envelope and bounded per-peer checkpoints. The session validates and repairs a
+fork before adopting it, quarantines malformed payloads, and persists document
+state before advancing a durable checkpoint. A hosted relay, accounts, sharing
+policy, and presence service remain later milestones; CRDT storage and merge
+semantics are local and complete.
 
 ## Persistence and generated bindings
 
@@ -407,25 +394,19 @@ pnpm --filter @inkfinite/web lint
 ```
 
 V2-21 extends this with generated-artifact, CLI, IPC, convergence, recovery,
-performance, accessibility, and visual checks. Human review remains required for
-stencils, render parity, proposal UX, recovery prompts, and permission failures.
+performance, accessibility, and visual checks after native-model cleanup and the
+collaborative desktop QA pass. Human review remains required for stencils,
+render parity, proposal UX, recovery prompts, and permission failures.
 
-## Milestones
+## Remaining sequence
 
-Milestones 1 through 6 are complete: the architecture gate, Rust authority,
-desktop vertical slice, editor scale work, layers, opacity, stencils,
-deterministic SVG, and the mutating file-mode CLI all passed.
-[TODO.md](TODO.md) owns ticket-level status and acceptance criteria.
+Milestones 1 through 7 are complete. [TODO.md](TODO.md) owns ticket-level status,
+acceptance criteria, and dependency order. The remaining path is:
 
-- **Milestone 5, layers and styles:** complete.
-- **Milestone 6, CLI and SVG:** complete. The file-mode CLI exposes the SVG
-  renderer and validated, atomic mutation commands.
-- **Milestone 7, live control and sync:** authenticated IPC, reviewable
-  proposals, explicit apply, and one-time authorization are complete; two-replica
-  offline convergence remains.
-- **Milestone 8, agent and release readiness:** bundle the agent skill, record
-  release evidence, replace useful v1 coverage with v2-native fixtures, remove
-  the unreleased v1 compatibility surface, and rerun the release matrix.
+1. Bundle and verify the agent skill (V2-20).
+2. Replace useful predecessor coverage and collapse to the native model (V2-22).
+3. Run the human-and-Codex desktop wireframing sequence (V2-23).
+4. Run the final release matrix against that native candidate (V2-21).
 
 ## Deferred milestones
 
@@ -442,9 +423,9 @@ deterministic SVG, and the mutating file-mode CLI all passed.
 
 ## Boundaries
 
-- Follow existing patterns, preserve v1 fixtures through V2-21, replace useful
-  coverage before V2-22 removes them, run affected tests, and keep Git read-only
-  unless repository instructions change.
+- Follow existing patterns, preserve predecessor fixtures until V2-22 replaces
+  their useful coverage, run affected tests, and keep Git read-only unless
+  repository instructions change.
 - Ask before adding production dependencies, changing a published format or
   protocol, broadening authentication or network exposure, or deleting user data.
 - Never expose a public control server, accept invalid partial writes, hand-edit

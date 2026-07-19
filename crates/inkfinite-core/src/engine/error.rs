@@ -1,4 +1,5 @@
 use super::{ActorId, CrdtError, Error};
+use crate::sync::SyncError;
 
 /// Recoverable rejection from transaction, merge, validation, or query processing.
 #[derive(Debug, Error)]
@@ -6,6 +7,9 @@ pub enum EngineError {
     /// The CRDT adapter could not complete an operation.
     #[error(transparent)]
     Crdt(#[from] CrdtError),
+    /// The peer synchronization boundary rejected an envelope or checkpoint.
+    #[error(transparent)]
+    Sync(#[from] SyncError),
     /// The transaction's serialized contract is structurally invalid.
     #[error("schema validation failed: {0}")]
     Schema(String),

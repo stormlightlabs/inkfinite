@@ -2,6 +2,9 @@
 
 These tickets implement [ROADMAP.md](ROADMAP.md).
 
+Tickets appear in dependency order. Their IDs stay stable when the sequence
+changes.
+
 ## Milestone 1: Architecture gate
 
 Exit when the v1 baseline is reproducible and the CRDT decision has measured
@@ -179,31 +182,41 @@ and integration/accessibility coverage.
 What to build: Wire the selected CRDT sync protocol through a transport-neutral
 peer layer and prove desktop-to-desktop convergence.
 
+Implemented: Added a trusted, transport-neutral Automerge peer envelope with
+bounded retry and quarantine state. Document files persist per-peer checkpoints
+beside the recovery data, and the session and Tauri boundaries expose connect,
+disconnect, send, and receive operations without adding a hosted service.
+
 Blocked by: V2-07, V2-08, V2-17
 
 Acceptance criteria:
 
-- [ ] Two trusted app instances exchange only missing changes, reconnect after
+- [x] Two trusted app instances exchange only missing changes, reconnect after
       offline edits, and converge to the same materialized snapshot and heads.
-- [ ] Concurrent shape edits, hierarchy moves, layer changes, text edits,
+- [x] Concurrent shape edits, hierarchy moves, layer changes, text edits,
       deletions, and undo trigger the specified merge or deterministic repair.
-- [ ] Duplicate, delayed, and retried messages are harmless; corrupt or invalid
+- [x] Duplicate, delayed, and retried messages are harmless; corrupt or invalid
       merged state is quarantined without replacing the open valid session.
-- [ ] Peer state, actor IDs, compaction, and recovery survive restart without
+- [x] Peer state, actor IDs, compaction, and recovery survive restart without
       resending unbounded history.
-- [ ] The transport boundary does not assume hosted accounts, a public relay, or
+- [x] The transport boundary does not assume hosted accounts, a public relay, or
       durable presence.
 
 Verification:
 
-- Run fixed-seed and property-based two-replica tests with reordered, duplicated,
-  delayed, disconnected, restarted, and corrupted message cases.
+- Run fixed-schedule and property-based two-replica tests with reordered,
+  duplicated, delayed, disconnected, restarted, and corrupted message cases.
+
+Verification completed with Rust peer-envelope, quarantine, reorder, and
+property tests; session-level offline/restart tests; and desktop TypeScript
+contract and adapter tests.
 
 ## Milestone 8: Agent and release readiness
 
-Exit when a clean installation completes every human, CLI, proposal, recovery,
-and sync acceptance path, useful predecessor coverage has native replacements,
-and no unreleased predecessor model remains in the product or codebase.
+Exit when a clean installation supports a complete human-and-agent wireframing
+session, every CLI, proposal, recovery, and sync acceptance path passes, useful
+predecessor coverage has native replacements, and no unreleased predecessor
+model remains in the product or codebase.
 
 ### V2-20: Bundle the Inkfinite agent skill
 
@@ -229,26 +242,130 @@ Verification:
 - Install the packaged skill in a clean test environment and run all examples
   against fixture copies.
 
+### V2-22: Collapse to one native Inkfinite model
+
+What to build: Treat the current document model and file flow as Inkfinite's
+only model. The earlier implementation never shipped, so remove the temporary
+predecessor/current split in full: its files, import and migration paths,
+adapters, names, branches, scripts, package commands, tests, fixtures, and
+documentation. Keep explicit file, schema, and protocol version fields where
+they validate persisted or exchanged data or allow future evolution; they must
+not preserve an implementation of the unreleased predecessor.
+
+Blocked by: V2-20
+
+Acceptance criteria:
+
+- [ ] Remove the predecessor fixtures, generators, baseline tooling, imports,
+      migrations, adapters, compatibility-only tests, scripts, package commands,
+      and documentation.
+- [ ] Web, desktop, CLI, Rust, and shared TypeScript code expose one native model
+      and one supported file flow. There are no user-facing format choices or
+      internal branches for the unreleased implementation.
+- [ ] Remove predecessor-only types, fields, metadata, aliases, and terminology.
+      Rename retained code and fixtures by their current purpose instead of
+      preserving `v1`, `v2`, `legacy`, `compatibility`, `migration`, or similar
+      transition-oriented names.
+- [ ] Replace useful rendering, performance, invalid-input, persistence,
+      recovery, and import/export coverage with native fixtures before deleting
+      its predecessor source. The replacement tests must exercise the same
+      observable failure and recovery cases.
+- [ ] Before removing the import path, run the real predecessor-document corpus
+      once, record the results, and convert representative successful, invalid,
+      and recovery cases into native fixtures. Keep backup and rollback evidence
+      with the release records rather than retaining compatibility code.
+- [ ] Update ROADMAP.md and current documentation to describe the native model
+      and supported file flow directly, without presenting the codebase as a
+      compatibility bridge between product generations.
+- [ ] Repository searches find no remaining code or first-party artifact tied to
+      the predecessor/current split. Third-party dependency metadata, historical
+      release notes, and intentional version fields are allowed only when they
+      do not retain predecessor behavior or terminology in Inkfinite-owned APIs.
+- [ ] The native release verification matrix passes after the cleanup.
+
+Verification:
+
+- Run the native release verification matrix after cleanup. Search tracked
+  source, tests, fixtures, scripts, package manifests, generated artifacts, and
+  current documentation for predecessor types and transition-oriented terms;
+  review every match rather than relying on a fixed list of file removals.
+
+### V2-23: Complete a human-and-Codex desktop wireframing session
+
+What to build: Run and record a realistic QA session in which a user and Codex
+co-design a desktop application wireframe through the packaged Inkfinite skill,
+the live CLI, and the desktop proposal review surface.
+
+Blocked by: V2-20, V2-22
+
+Acceptance criteria:
+
+- [ ] Start from a clean desktop build and a fresh Codex context with only the
+      packaged skill installed. After launch, disconnect the network; the rest
+      of the session requires no account, server, browser automation, raw
+      document edit, or unbundled repository instruction.
+- [ ] The user creates or selects a local `.inkfinite` document and gives Codex
+      a short desktop-application brief. The target wireframe exercises named
+      semantic roles, text, connections, at least two layers, and one locked or
+      `agent_editable: false` element.
+- [ ] Codex discovers the open session, inspects its heads, queries only the
+      relevant records, and describes a small first change before proposing it.
+      The first durable agent action uses `app propose`, not direct apply.
+- [ ] The user rejects one proposal and confirms that the snapshot and heads do
+      not change, then requests a revision and reviews its ghost preview and
+      created, changed, and deleted IDs.
+- [ ] The user partially accepts a proposal whose operations can remain valid
+      independently. Inkfinite commits only the selected operations once and
+      Codex re-inspects the result before continuing.
+- [ ] The user makes an intervening canvas edit while a later proposal is open.
+      Accepting the stale proposal produces a refreshed review or a clear
+      conflict; it never commits silently against old heads or loses the human
+      edit.
+- [ ] Codex completes the wireframe with reviewed proposals while respecting
+      locked layers, `agent_editable`, and semantic selectors. The user can also
+      continue editing with normal desktop tools between proposals.
+- [ ] Save and close the document while still offline. File-mode `validate` and
+      deterministic SVG rendering pass; after reopen, the canvas and
+      `app inspect` agree with those artifacts and undo/redo remains coherent
+      across accepted work.
+- [ ] Record the brief, Inkfinite and skill versions, platform, commands, review
+      decisions, final `.inkfinite` file, SVG, screenshots, and any defects. A
+      failed step gets a focused follow-up ticket and the sequence is rerun after
+      its fix.
+
+Verification:
+
+- Build and launch the desktop release candidate, install the V2-20 skill in a
+  clean Codex environment, disable networking, and complete the sequence above
+  without UI automation. Attach the command transcript and artifacts to the
+  release evidence.
+- Use [tldraw offline](https://tldraw.dev/blog/tldraw-offline) only as a product
+  frame of reference: local files and trusted local agents. Inkfinite agents must
+  continue through validated transactions and authenticated local IPC; they do
+  not execute arbitrary code in the canvas or replace an open file externally.
+
 ### V2-21: Run the vNext release matrix
 
 What to build: Assemble release evidence and close every roadmap success
-criterion without adding new architecture.
+criterion against the native release candidate without adding new architecture.
 
-Blocked by: V2-11, V2-12, V2-13, V2-14, V2-16, V2-18, V2-19, V2-20
+Blocked by: V2-11, V2-12, V2-13, V2-14, V2-16, V2-18, V2-19, V2-20, V2-22,
+V2-23
 
 Acceptance criteria:
 
 - [ ] All Rust, TypeScript, browser, shared-fixture, generated-artifact, CLI, IPC,
-      convergence, migration, recovery, accessibility, and visual tests pass.
+      convergence, recovery, accessibility, and visual tests pass against the
+      native model.
 - [ ] The recorded 10,000-shape frame, query, memory, open, save, and sync budgets
       pass on reference hardware with results attached.
-- [ ] A corpus of real v1 documents imports without data loss; rollback and
-      backup restoration are rehearsed.
-- [ ] Human review signs off layers, proposal UX, render parity, recovery prompts,
-      and permission failures on supported desktop platforms.
-- [ ] File-format documentation accurately describes the behavior under
-      evaluation; V2-22 collapses the temporary predecessor/current split before
-      release.
+- [ ] Backup restoration and rollback are rehearsed with native files; malformed,
+      interrupted, and conflicting writes preserve the last valid document.
+- [ ] Human review signs off layers, proposal UX, the V2-23 collaborative
+      wireframe, render parity, recovery prompts, and permission failures on
+      supported desktop platforms.
+- [ ] File-format and release documentation describe exactly the native model
+      and behavior under evaluation.
 
 Verification:
 
@@ -275,50 +392,7 @@ pnpm --filter @inkfinite/web lint
 pnpm --filter @inkfinite/desktop check
 ```
 
-### V2-22: Collapse to one native Inkfinite model
-
-What to build: Treat the current document model and file flow as Inkfinite's
-only model. The earlier implementation never shipped, so remove the temporary
-predecessor/current split in full: its files, import and migration paths,
-adapters, names, branches, scripts, package commands, tests, fixtures, and
-documentation. Keep explicit file, schema, and protocol version fields where
-they validate persisted or exchanged data or allow future evolution; they must
-not preserve an implementation of the unreleased predecessor.
-
-Blocked by: V2-21
-
-Acceptance criteria:
-
-- [ ] Remove the predecessor fixtures, generators, baseline tooling, imports,
-      migrations, adapters, compatibility-only tests, scripts, package commands,
-      and documentation.
-- [ ] Web, desktop, CLI, Rust, and shared TypeScript code expose one native model
-      and one supported file flow. There are no user-facing format choices or
-      internal branches for the unreleased implementation.
-- [ ] Remove predecessor-only types, fields, metadata, aliases, and terminology.
-      Rename retained code and fixtures by their current purpose instead of
-      preserving `v1`, `v2`, `legacy`, `compatibility`, `migration`, or similar
-      transition-oriented names.
-- [ ] Replace useful rendering, performance, invalid-input, persistence,
-      recovery, and import/export coverage with native fixtures before deleting
-      its predecessor source. The replacement tests must exercise the same
-      observable failure and recovery cases.
-- [ ] Update ROADMAP.md and current documentation to describe the native model
-      and supported file flow directly, without presenting the codebase as a
-      compatibility bridge between product generations.
-- [ ] Repository searches find no remaining code or first-party artifact tied to
-      the predecessor/current split. Third-party dependency metadata, historical
-      release notes, and intentional version fields are allowed only when they
-      do not retain predecessor behavior or terminology in Inkfinite-owned APIs.
-- [ ] The native release verification matrix passes after the cleanup.
-
-Verification:
-
-- Run the native release verification matrix after cleanup. Search tracked
-  source, tests, fixtures, scripts, package manifests, generated artifacts, and
-  current documentation for predecessor types and transition-oriented terms;
-  review every match rather than relying on a fixed list of file removals.
-
 ## Frontier
 
-V2-19 is the current frontier. Sync two offline replicas and prove convergence.
+V2-20 is the current frontier. Bundle the Inkfinite agent skill and prove its
+examples in a clean environment.

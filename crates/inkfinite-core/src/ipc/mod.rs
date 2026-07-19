@@ -497,6 +497,7 @@ pub fn session_protocol_error(error: &SessionError) -> ProtocolError {
             | FileError::RecoveryAhead { .. }
             | FileError::Engine(_)
             | FileError::Io { .. } => "document_file_error",
+            FileError::Sync(_) => "sync_error",
         },
         SessionError::Engine(_) => "document_engine_error",
     };

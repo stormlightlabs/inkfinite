@@ -5,11 +5,14 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
+use serde::{Deserialize, Serialize};
+
 use crate::crdt::{AutomergeDocument, CrdtError, EncodedChange};
 use crate::proto::{
     AffectedRegion, AssetPatch, Bounds, DocumentPatch, InverseMetadata, LayerContentsDisposition, LayerPatch,
     LayoutAxis, Operation, Query, QueryResult, RecordId, ShapeAlignment, ShapePatch, TransactionId, Warning,
 };
+use crate::sync::{PeerSync, SyncDisposition, SyncMessage};
 use crate::{
     ActorId, AssetId, BindingId, ChangeHash, ContainerLayout, Document, DocumentId, LayerId, Origin, PageId,
     RecordVersion, ShapeId, ShapeParent, ShapeProperties, ShapeRecord, SiblingAnchor,
@@ -55,6 +58,26 @@ pub struct TransactionPreview {
     pub affected_regions: Vec<AffectedRegion>,
 }
 
+/// Materialized result of one peer synchronization exchange.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SyncApplyResult {
+    /// Classification of the received message.
+    pub disposition: SyncDisposition,
+    /// Number of Automerge protocol messages adopted while draining pending
+    /// delayed messages.
+    pub adopted_messages: usize,
+    /// Causal heads after adoption or quarantine.
+    pub heads: Vec<ChangeHash>,
+    /// Records changed by remote edits or deterministic repair.
+    pub patch: DocumentPatch,
+    /// Records affected directly or by hierarchy repair.
+    pub affected_ids: Vec<RecordId>,
+    /// Document regions that should be redrawn by a frontend mirror.
+    pub affected_regions: Vec<AffectedRegion>,
+    /// Deterministic merge repairs performed before adoption.
+    pub warnings: Vec<Warning>,
+}
+
 struct PreparedTransaction {
     document: Document,
     inverse: Vec<Operation>,
@@ -64,6 +87,7 @@ struct PreparedTransaction {
 }
 
 /// Rust-owned document state plus actor-scoped undo and redo metadata.
+#[derive(Clone)]
 pub struct TransactionEngine {
     crdt: AutomergeDocument,
     undo: BTreeMap<ActorId, Vec<HistoryEntry>>,
@@ -270,6 +294,64 @@ impl TransactionEngine {
         }
         self.crdt = candidate;
         Ok(warnings)
+    }
+
+    /// Produces the next transport-neutral message for one connected peer.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed synchronization or CRDT error when the message cannot
+    /// be generated.
+    pub fn next_sync_message(&mut self, peer: &mut PeerSync) -> Result<Option<SyncMessage>, EngineError> {
+        Ok(peer.next_message(&mut self.crdt)?)
+    }
+
+    /// Receives one peer message on a fork, repairs deterministic hierarchy
+    /// damage, validates the materialized result, and adopts the fork only
+    /// after all checks pass.
+    ///
+    /// Corrupt payloads are quarantined by the peer checkpoint and return a
+    /// `Quarantined` disposition; the current document remains untouched.
+    /// Delayed messages remain queued until their missing dependencies arrive.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed envelope, synchronization, or invariant error when the
+    /// message cannot be addressed or the merged candidate cannot be repaired.
+    pub fn receive_sync_message(
+        &mut self, peer: &mut PeerSync, message: &SyncMessage,
+    ) -> Result<SyncApplyResult, EngineError> {
+        let before = self.crdt.snapshot()?;
+        let mut candidate = self.crdt.clone();
+        let mut candidate_peer = peer.clone();
+        let peer_result = candidate_peer.receive_message(&mut candidate, message)?;
+        let mut candidate_snapshot = candidate.snapshot()?;
+        let mut warnings = Vec::new();
+
+        if validate_document(&candidate_snapshot.document).is_err() {
+            let original = candidate_snapshot.document.clone();
+            warnings = repair_document(&mut candidate_snapshot.document)?;
+            validate_document(&candidate_snapshot.document)?;
+            if candidate_snapshot.document != original {
+                candidate.commit_document(&candidate_snapshot.document, "deterministic sync repair")?;
+                candidate_snapshot = candidate.snapshot()?;
+            }
+        }
+        validate_document(&candidate_snapshot.document)?;
+
+        let (patch, affected_ids) = diff_documents(&before.document, &candidate_snapshot.document);
+        let affected_regions = affected_regions(&before.document, &candidate_snapshot.document, &affected_ids);
+        self.crdt = candidate;
+        *peer = candidate_peer;
+        Ok(SyncApplyResult {
+            disposition: peer_result.disposition,
+            adopted_messages: peer_result.applied_messages,
+            heads: candidate_snapshot.heads,
+            patch,
+            affected_ids,
+            affected_regions,
+            warnings,
+        })
     }
 
     /// Returns changes after a caller's inspected heads.

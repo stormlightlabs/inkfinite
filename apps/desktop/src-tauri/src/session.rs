@@ -7,8 +7,9 @@ use inkfinite_core::proto::{
     TransactionDraft,
 };
 use inkfinite_core::session::{
-    SessionCommit, SessionError, SessionOpened, SessionSaved, SessionService, SessionStatus,
+    SessionCommit, SessionError, SessionOpened, SessionSaved, SessionService, SessionStatus, SessionSync,
 };
+use inkfinite_core::sync::SyncMessage;
 use inkfinite_core::{ActorId, ChangeHash, DocumentId};
 use serde_json::json;
 use tauri::{AppHandle, Emitter, State};
@@ -193,6 +194,48 @@ pub fn validate(state: State<'_, DesktopState>, session_id: String) -> Result<Se
     lock_service(&state)?
         .validate(&SessionId(session_id))
         .map_err(to_protocol_error)
+}
+
+/// Trusts a peer actor for one open document session.
+#[tauri::command]
+pub fn sync_connect(state: State<'_, DesktopState>, session_id: String, peer_id: String) -> Result<SessionStatus> {
+    lock_service(&state)?
+        .connect_peer(&SessionId(session_id), ActorId::new(peer_id))
+        .map_err(to_protocol_error)
+}
+
+/// Removes a trusted peer checkpoint for one open document session.
+#[tauri::command]
+pub fn sync_disconnect(state: State<'_, DesktopState>, session_id: String, peer_id: String) -> Result<SessionStatus> {
+    let peer_id = ActorId::new(peer_id);
+    lock_service(&state)?
+        .disconnect_peer(&SessionId(session_id), &peer_id)
+        .map_err(to_protocol_error)
+}
+
+/// Returns the next transport-neutral message for a connected peer.
+#[tauri::command]
+pub fn sync_next(state: State<'_, DesktopState>, session_id: String, peer_id: String) -> Result<Option<SyncMessage>> {
+    lock_service(&state)?
+        .next_sync_message(&SessionId(session_id), &ActorId::new(peer_id))
+        .map_err(to_protocol_error)
+}
+
+/// Receives a transport-neutral message and returns the refreshed session
+/// mirror after validated merge or quarantine.
+#[tauri::command]
+pub fn sync_receive(
+    app: AppHandle, state: State<'_, DesktopState>, session_id: String, message: SyncMessage,
+) -> Result<SessionSync> {
+    let session_id = SessionId(session_id);
+    let result = lock_service(&state)?.receive_sync_message(&session_id, &message);
+    if let Ok(update) = &result {
+        let _ = app.emit(
+            super::ipc::SYNC_EVENT,
+            json!({ "session_id": session_id, "sync": update }),
+        );
+    }
+    result.map_err(to_protocol_error)
 }
 
 /// Closes a session and releases its advisory file lock.

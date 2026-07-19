@@ -19,6 +19,8 @@ pub const PROPOSAL_EVENT: &str = "inkfinite-proposal";
 pub const PROPOSAL_CLEARED_EVENT: &str = "inkfinite-proposal-cleared";
 /// Tauri event carrying a commit made by a live client.
 pub const COMMIT_EVENT: &str = "inkfinite-live-commit";
+/// Tauri event carrying a remote synchronization result.
+pub const SYNC_EVENT: &str = "inkfinite-sync";
 
 /// Handle used by the Tauri lifecycle to stop the local server and clean up discovery.
 pub struct IpcServerHandle {

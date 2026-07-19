@@ -14,12 +14,13 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::engine::{EngineError, validate_document};
+use crate::engine::{EngineError, SyncApplyResult, validate_document};
 use crate::file::{DocumentFile, FileError};
 use crate::proto::{
     ApplyAuthorization, CommitResult, DocumentPath, Proposal, ProposalId, Query, QueryResult, SaveResult, SessionId,
     TransactionDraft, TransactionId, Warning,
 };
+use crate::sync::{PeerSyncStatus, SyncMessage};
 use crate::{ActorId, DocumentId, DocumentSnapshot, Origin, Timestamp, blank_document};
 
 /// Maximum number of pending proposals held by one live session.
@@ -33,12 +34,19 @@ pub const PROPOSAL_TTL: Duration = Duration::from_secs(5 * 60);
 /// Monotonic lifetime of a one-time direct-apply authorization.
 pub const APPLY_AUTHORIZATION_TTL: Duration = Duration::from_secs(2 * 60);
 
-/// State of the session's future synchronization boundary.
+/// State of the session's trusted peer synchronization boundary.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "status")]
 pub enum SyncState {
-    /// Peer synchronization is not enabled for this local session yet.
+    /// No trusted peer checkpoint is configured for this local session.
     Disabled,
+    /// Peer checkpoints loaded and retained for this session.
+    Enabled {
+        /// Connected peers in stable actor order.
+        peers: Vec<PeerSyncStatus>,
+        /// A checkpoint warning that did not invalidate the document.
+        warning: Option<String>,
+    },
 }
 
 /// Materialized state tracked for one open document session.
@@ -63,7 +71,7 @@ pub struct SessionStatus {
     pub can_undo: bool,
     /// Whether the session actor can redo its latest compensated transaction.
     pub can_redo: bool,
-    /// Synchronization state retained for the later peer layer.
+    /// Trusted peer synchronization state and bounded checkpoints.
     pub sync: SyncState,
 }
 
@@ -91,6 +99,15 @@ pub struct SessionSaved {
     /// Persisted path and causal heads.
     pub save: SaveResult,
     /// Session state after persistence.
+    pub status: SessionStatus,
+}
+
+/// Result returned after adopting or quarantining a peer message.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SessionSync {
+    /// Merge disposition, patch, heads, and repair warnings.
+    pub sync: SyncApplyResult,
+    /// Session state after the exchange.
     pub status: SessionStatus,
 }
 
@@ -192,7 +209,6 @@ pub enum SessionError {
 
 struct DocumentSession {
     file: DocumentFile,
-    sync: SyncState,
     proposals: BTreeMap<ProposalId, PendingProposal>,
     expired_proposals: BTreeSet<ProposalId>,
     authorizations: BTreeMap<String, ApplyGrant>,
@@ -403,7 +419,7 @@ impl SessionService {
 
         let operations = select_operations(&pending.proposal.transaction.operations, operation_positions)?;
         let transaction = if operation_positions.is_none() {
-            pending.proposal.transaction.clone()
+            pending.proposal.transaction
         } else {
             let mut transaction = pending.proposal.transaction.clone();
             transaction.id = TransactionId(format!("{}:partial", pending.proposal.id.0));
@@ -563,6 +579,61 @@ impl SessionService {
         Ok(status)
     }
 
+    /// Trusts a peer actor and persists its empty or previously loaded
+    /// synchronization checkpoint.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed session, peer, or filesystem error.
+    pub fn connect_peer(&mut self, session_id: &SessionId, peer_id: ActorId) -> Result<SessionStatus, SessionError> {
+        let session = self.session_mut(session_id)?;
+        session.file.connect_peer(peer_id)?;
+        session.status(session_id)
+    }
+
+    /// Removes a peer checkpoint without changing the document.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed session or filesystem error.
+    pub fn disconnect_peer(
+        &mut self, session_id: &SessionId, peer_id: &ActorId,
+    ) -> Result<SessionStatus, SessionError> {
+        let session = self.session_mut(session_id)?;
+        session.file.disconnect_peer(peer_id)?;
+        session.status(session_id)
+    }
+
+    /// Produces one message for a connected peer. The returned `None` means
+    /// Automerge is waiting for an acknowledgement or the peer is current.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed session, peer, CRDT, or filesystem error.
+    pub fn next_sync_message(
+        &mut self, session_id: &SessionId, peer_id: &ActorId,
+    ) -> Result<Option<SyncMessage>, SessionError> {
+        let session = self.session_mut(session_id)?;
+        Ok(session.file.next_sync_message(peer_id)?)
+    }
+
+    /// Adopts one peer message through the validated transaction boundary and
+    /// persists a changed replica before returning to the transport.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed session, merge, repair, or filesystem error. Malformed
+    /// payloads are represented by a quarantined result and do not replace the
+    /// open valid document.
+    pub fn receive_sync_message(
+        &mut self, session_id: &SessionId, message: &SyncMessage,
+    ) -> Result<SessionSync, SessionError> {
+        let session = self.session_mut(session_id)?;
+        let sync = session.file.receive_sync_message(message)?;
+        let status = session.status(session_id)?;
+        Ok(SessionSync { sync, status })
+    }
+
     /// Closes a session and releases its advisory lock.
     ///
     /// Closing deliberately does not save dirty state. Callers can inspect the
@@ -603,7 +674,6 @@ impl SessionService {
         let session_id = SessionId(format!("session:{}", self.next_session_number));
         let mut session = DocumentSession {
             file,
-            sync: SyncState::Disabled,
             proposals: BTreeMap::new(),
             expired_proposals: BTreeSet::new(),
             authorizations: BTreeMap::new(),
@@ -654,7 +724,14 @@ impl DocumentSession {
             recovery_available,
             can_undo: self.file.can_undo(),
             can_redo: self.file.can_redo(),
-            sync: self.sync.clone(),
+            sync: {
+                let sync = self.file.sync_status();
+                if sync.peers.is_empty() && sync.warning.is_none() {
+                    SyncState::Disabled
+                } else {
+                    SyncState::Enabled { peers: sync.peers, warning: sync.warning }
+                }
+            },
         })
     }
 }
@@ -1127,6 +1204,163 @@ mod tests {
 
         service.close(&opened.session_id).expect("close session");
         remove_test_directory(root);
+    }
+
+    #[test]
+    fn two_trusted_replicas_converge_after_offline_edits_and_restart() {
+        let root = test_directory();
+        let left_path = root.join("left.inkfinite");
+        let right_path = root.join("right.inkfinite");
+        let document_id = DocumentId::from("document:session-sync");
+        let left_actor = ActorId::from("actor:left");
+        let right_actor = ActorId::from("actor:right");
+        let mut left_service = SessionService::new();
+        let left = left_service
+            .create(&left_path, document_id.clone(), left_actor.clone(), None)
+            .expect("create left");
+        fs::copy(&left_path, &right_path).expect("copy baseline to right");
+        let mut right_service = SessionService::new();
+        let right = right_service
+            .open(&right_path, right_actor.clone())
+            .expect("open right");
+
+        left_service
+            .connect_peer(&left.session_id, right_actor.clone())
+            .expect("connect left peer");
+        right_service
+            .connect_peer(&right.session_id, left_actor.clone())
+            .expect("connect right peer");
+        let left_snapshot = left_service.status(&left.session_id).expect("left status").snapshot;
+        left_service
+            .commit(
+                &left.session_id,
+                rename_transaction(&left_snapshot, left_actor.clone(), "Left offline edit"),
+            )
+            .expect("left offline edit");
+        let right_snapshot = right_service.status(&right.session_id).expect("right status").snapshot;
+        right_service
+            .commit(
+                &right.session_id,
+                rename_transaction(&right_snapshot, right_actor.clone(), "Right offline edit"),
+            )
+            .expect("right offline edit");
+
+        exchange_sessions(
+            &mut left_service,
+            &left.session_id,
+            &right_actor,
+            &mut right_service,
+            &right.session_id,
+            &left_actor,
+        );
+        assert_eq!(
+            left_service
+                .status(&left.session_id)
+                .expect("left merged status")
+                .snapshot,
+            right_service
+                .status(&right.session_id)
+                .expect("right merged status")
+                .snapshot
+        );
+
+        left_service.close(&left.session_id).expect("close left");
+        right_service.close(&right.session_id).expect("close right");
+
+        let mut left_restart = SessionService::new();
+        let left_reopened = left_restart.open(&left_path, left_actor.clone()).expect("restart left");
+        let mut right_restart = SessionService::new();
+        let right_reopened = right_restart
+            .open(&right_path, right_actor.clone())
+            .expect("restart right");
+        assert!(matches!(left_reopened.status.sync, SyncState::Enabled { .. }));
+        assert!(matches!(right_reopened.status.sync, SyncState::Enabled { .. }));
+
+        exchange_sessions(
+            &mut left_restart,
+            &left_reopened.session_id,
+            &right_actor,
+            &mut right_restart,
+            &right_reopened.session_id,
+            &left_actor,
+        );
+        assert_eq!(
+            left_restart
+                .status(&left_reopened.session_id)
+                .expect("restarted left status")
+                .snapshot,
+            right_restart
+                .status(&right_reopened.session_id)
+                .expect("restarted right status")
+                .snapshot
+        );
+
+        left_restart
+            .close(&left_reopened.session_id)
+            .expect("close restarted left");
+        right_restart
+            .close(&right_reopened.session_id)
+            .expect("close restarted right");
+        remove_test_directory(root);
+    }
+
+    #[test]
+    fn corrupt_sync_checkpoint_warns_without_replacing_valid_document() {
+        let root = test_directory();
+        let path = root.join("corrupt-sync.inkfinite");
+        let actor = ActorId::from("actor:session-sync");
+        let mut service = SessionService::new();
+        let opened = service
+            .create(&path, DocumentId::from("document:corrupt-sync"), actor.clone(), None)
+            .expect("create document");
+        service
+            .connect_peer(&opened.session_id, ActorId::from("actor:trusted"))
+            .expect("connect peer");
+        let expected_snapshot = opened.status.snapshot.clone();
+        service.close(&opened.session_id).expect("close document");
+
+        let sync_path = crate::file::sync_state_path_for(
+            &path,
+            &expected_snapshot.document_id,
+            &crate::file::PersistenceOptions::default(),
+        );
+        fs::write(&sync_path, b"not-json").expect("corrupt sync checkpoint");
+
+        let reopened = service.open(&path, actor).expect("open valid document");
+        assert_eq!(reopened.status.snapshot, expected_snapshot);
+        assert!(matches!(
+            reopened.status.sync,
+            SyncState::Enabled { warning: Some(_), .. }
+        ));
+        service.close(&reopened.session_id).expect("close reopened document");
+        remove_test_directory(root);
+    }
+
+    fn exchange_sessions(
+        left: &mut SessionService, left_session: &SessionId, left_peer: &ActorId, right: &mut SessionService,
+        right_session: &SessionId, right_peer: &ActorId,
+    ) {
+        for _ in 0..64 {
+            let left_message = left
+                .next_sync_message(left_session, left_peer)
+                .expect("left sync message");
+            let right_message = right
+                .next_sync_message(right_session, right_peer)
+                .expect("right sync message");
+            let idle = left_message.is_none() && right_message.is_none();
+            if let Some(message) = left_message {
+                right
+                    .receive_sync_message(right_session, &message)
+                    .expect("left to right sync");
+            }
+            if let Some(message) = right_message {
+                left.receive_sync_message(left_session, &message)
+                    .expect("right to left sync");
+            }
+            if idle {
+                break;
+            }
+        }
     }
 
     fn agent_rename(snapshot: &DocumentSnapshot, actor_id: ActorId, name: &str) -> TransactionDraft {

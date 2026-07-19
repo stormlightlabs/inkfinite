@@ -47,7 +47,48 @@ export type SessionStatus = {
 	recovery_available: boolean;
 	can_undo: boolean;
 	can_redo: boolean;
-	sync: { status: 'disabled' };
+	sync: SyncState;
+};
+
+/** Trusted peer checkpoint projected across the desktop command boundary. */
+export type SyncPeerStatus = {
+	peer_id: string;
+	pending_messages: number;
+	shared_heads: ChangeHash[];
+	quarantine: SyncQuarantine | null;
+};
+
+/** Diagnostic retained when a peer payload is rejected without replacing the document. */
+export type SyncQuarantine = { sequence: number; reason: string };
+
+/** Session-level synchronization state. */
+export type SyncState =
+	| { status: 'disabled' }
+	| { status: 'enabled'; peers: SyncPeerStatus[]; warning: string | null };
+
+/** Transport-neutral Automerge envelope exchanged by trusted peers. */
+export type SyncMessage = {
+	protocol_id: string;
+	version: number;
+	document_id: string;
+	sender: string;
+	recipient: string;
+	sequence: number;
+	payload: number[];
+};
+
+/** Classification returned after one peer envelope is processed. */
+export type SyncDisposition = 'applied' | 'duplicate' | 'deferred' | 'quarantined';
+
+/** Document patch and validation result returned by a peer merge. */
+export type SyncApplyResult = {
+	disposition: SyncDisposition;
+	adopted_messages: number;
+	heads: ChangeHash[];
+	patch: CommitResult['patch'];
+	affected_ids: CommitResult['affected_ids'];
+	affected_regions: CommitResult['affected_regions'];
+	warnings: CommitResult['warnings'];
 };
 
 /** Result returned after creating or opening a desktop session. */
@@ -58,6 +99,9 @@ export type SessionCommit = { commit: CommitResult; status: SessionStatus };
 
 /** Result returned after persisting a session. */
 export type SessionSaved = { save: { path: string; heads: ChangeHash[] }; status: SessionStatus };
+
+/** Result returned after adopting, deferring, or quarantining a peer message. */
+export type SessionSync = { sync: SyncApplyResult; status: SessionStatus };
 
 /** State update emitted when a live proposal is created, refreshed, or cleared. */
 export type ProposalUpdate = { proposal: Proposal | null; message?: string };
@@ -87,6 +131,10 @@ export interface SessionApi {
 	saveAs(args: { session_id: string; path: string; expected_heads: ChangeHash[] }): Promise<SessionSaved>;
 	query(args: { session_id: string; query: Query }): Promise<QueryResult>;
 	validate(args: { session_id: string }): Promise<SessionStatus>;
+	syncConnect(args: { session_id: string; peer_id: string }): Promise<SessionStatus>;
+	syncDisconnect(args: { session_id: string; peer_id: string }): Promise<SessionStatus>;
+	syncNext(args: { session_id: string; peer_id: string }): Promise<SyncMessage | null>;
+	syncReceive(args: { session_id: string; message: SyncMessage }): Promise<SessionSync>;
 	close(args: { session_id: string }): Promise<void>;
 }
 
@@ -106,6 +154,10 @@ function createSessionApi(): SessionApi {
 		saveAs: (args) => invoke<SessionSaved>('save_as', args),
 		query: (args) => invoke<QueryResult>('query', args),
 		validate: (args) => invoke<SessionStatus>('validate', args),
+		syncConnect: (args) => invoke<SessionStatus>('sync_connect', args),
+		syncDisconnect: (args) => invoke<SessionStatus>('sync_disconnect', args),
+		syncNext: (args) => invoke<SyncMessage | null>('sync_next', args),
+		syncReceive: (args) => invoke<SessionSync>('sync_receive', args),
 		close: (args) => invoke<void>('close', args)
 	};
 }
@@ -128,6 +180,10 @@ export type DesktopSessionRepo = PersistentDocRepo & {
 	acceptProposal(proposalId: string, operationPositions?: number[]): Promise<void>;
 	rejectProposal(proposalId: string): Promise<void>;
 	authorizeApply(): Promise<ApplyAuthorization>;
+	syncConnect(peerId: string): Promise<SessionStatus>;
+	syncDisconnect(peerId: string): Promise<SessionStatus>;
+	syncNext(peerId: string): Promise<SyncMessage | null>;
+	syncReceive(message: SyncMessage): Promise<SessionSync>;
 	closeSession(): Promise<void>;
 };
 
@@ -150,6 +206,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 	type ProposalEvent = { session_id?: string | null; proposal: Proposal };
 	type ProposalClearedEvent = { message?: string };
 	type LiveCommitEvent = { session_id?: string | null; commit: SessionCommit };
+	type LiveSyncEvent = { session_id?: string | null; sync: SessionSync };
 
 	function notifyProposal(update: ProposalUpdate) {
 		currentProposal = update.proposal;
@@ -180,6 +237,12 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 				proposal: null,
 				message: 'The document changed while this proposal was open. Review it again.'
 			});
+		})
+			.then((stop) => liveUnlisteners.push(stop))
+			.catch(() => undefined);
+		void listen<LiveSyncEvent>('inkfinite-sync', (event) => {
+			if (!eventBelongsToCurrentSession(event.payload.session_id)) return;
+			updateStatus(event.payload.sync.status);
 		})
 			.then((stop) => liveUnlisteners.push(stop))
 			.catch(() => undefined);
@@ -484,6 +547,32 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		return api.authorizeApply({ session_id: currentStatus.session_id });
 	}
 
+	async function syncConnect(peerId: string): Promise<SessionStatus> {
+		if (!currentStatus) throw new Error('No board loaded');
+		const status = await api.syncConnect({ session_id: currentStatus.session_id, peer_id: peerId });
+		updateStatus(status);
+		return status;
+	}
+
+	async function syncDisconnect(peerId: string): Promise<SessionStatus> {
+		if (!currentStatus) throw new Error('No board loaded');
+		const status = await api.syncDisconnect({ session_id: currentStatus.session_id, peer_id: peerId });
+		updateStatus(status);
+		return status;
+	}
+
+	async function syncNext(peerId: string): Promise<SyncMessage | null> {
+		if (!currentStatus) throw new Error('No board loaded');
+		return api.syncNext({ session_id: currentStatus.session_id, peer_id: peerId });
+	}
+
+	async function syncReceive(message: SyncMessage): Promise<SessionSync> {
+		if (!currentStatus) throw new Error('No board loaded');
+		const result = await api.syncReceive({ session_id: currentStatus.session_id, message });
+		updateStatus(result.status);
+		return result;
+	}
+
 	return {
 		kind: 'desktop',
 		listBoards,
@@ -510,6 +599,10 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		acceptProposal,
 		rejectProposal,
 		authorizeApply,
+		syncConnect,
+		syncDisconnect,
+		syncNext,
+		syncReceive,
 		closeSession: closeCurrentSession
 	};
 }

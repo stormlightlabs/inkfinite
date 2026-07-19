@@ -67,7 +67,7 @@ pub struct MergeOutcome {
 pub enum CrdtError {
     /// Automerge rejected a document operation or encoded change.
     #[error("Automerge operation failed: {0}")]
-    Automerge(#[from] automerge::AutomergeError),
+    Automerge(#[source] Box<automerge::AutomergeError>),
     /// A typed snapshot could not be converted to or from its CRDT projection.
     #[error("document projection failed: {0}")]
     Projection(#[from] serde_json::Error),
@@ -80,6 +80,12 @@ pub enum CrdtError {
     /// A requested local change did not alter the document.
     #[error("change contained no document operations")]
     EmptyChange,
+}
+
+impl From<automerge::AutomergeError> for CrdtError {
+    fn from(error: automerge::AutomergeError) -> Self {
+        Self::Automerge(Box::new(error))
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -313,6 +319,7 @@ pub trait SyncSession<D: CrdtDocument> {
 }
 
 /// Per-peer Automerge synchronization state.
+#[derive(Clone)]
 pub struct AutomergeSyncSession {
     state: AutomergeSyncState,
 }
@@ -322,6 +329,50 @@ impl AutomergeSyncSession {
     #[must_use]
     pub fn new() -> Self {
         Self { state: AutomergeSyncState::new() }
+    }
+
+    /// Restores the compact state that Automerge documents for a peer.
+    ///
+    /// The encoded form intentionally contains only durable shared heads;
+    /// in-flight message bookkeeping is rebuilt on the next connection.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CrdtError::InvalidPayload`] when the checkpoint is malformed.
+    pub fn from_encoded_state(bytes: &[u8]) -> Result<Self, CrdtError> {
+        let state = AutomergeSyncState::decode(bytes).map_err(|error| CrdtError::InvalidPayload(error.to_string()))?;
+        Ok(Self { state })
+    }
+
+    /// Returns the bounded durable checkpoint for this peer.
+    #[must_use]
+    pub fn encoded_state(&self) -> Vec<u8> {
+        self.state.encode()
+    }
+
+    /// Returns the causal heads known to be shared with the peer.
+    #[must_use]
+    pub fn shared_heads(&self) -> Vec<ChangeHash> {
+        hashes(self.state.shared_heads.clone())
+    }
+
+    /// Receives a sync payload and reports whether its newly advertised
+    /// changes became materialized rather than remaining as Automerge orphans.
+    pub(crate) fn receive_message_with_status(
+        &mut self, document: &mut AutomergeDocument, bytes: &[u8],
+    ) -> Result<bool, CrdtError> {
+        let message =
+            automerge::sync::Message::decode(bytes).map_err(|error| CrdtError::InvalidPayload(error.to_string()))?;
+        let before_heads = document.document.get_heads();
+        let has_unavailable_head =
+            !message.changes.is_empty() && message.heads.iter().any(|head| !before_heads.contains(head));
+        document
+            .document
+            .sync()
+            .receive_sync_message(&mut self.state, message)?;
+        let after_heads = document.document.get_heads();
+        let document_advanced = after_heads.iter().any(|head| !before_heads.contains(head));
+        Ok(!has_unavailable_head || document_advanced)
     }
 }
 
@@ -343,12 +394,7 @@ impl SyncSession<AutomergeDocument> for AutomergeSyncSession {
     }
 
     fn receive_message(&mut self, document: &mut AutomergeDocument, message: &[u8]) -> Result<(), Self::Error> {
-        let message =
-            automerge::sync::Message::decode(message).map_err(|error| CrdtError::InvalidPayload(error.to_string()))?;
-        document
-            .document
-            .sync()
-            .receive_sync_message(&mut self.state, message)?;
+        self.receive_message_with_status(document, message)?;
         Ok(())
     }
 }

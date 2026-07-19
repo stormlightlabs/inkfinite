@@ -249,6 +249,42 @@ function createFakeSessionApi() {
       return statusFor(args.session_id, session);
     },
 
+    async syncConnect(args: Parameters<SessionApi["syncConnect"]>[0]) {
+      const session = sessions.get(args.session_id);
+      if (!session) throw new Error("Missing fake session");
+      session.status = {
+        ...session.status,
+        sync: {
+          status: "enabled",
+          peers: [
+            {
+              peer_id: args.peer_id,
+              pending_messages: 0,
+              shared_heads: [],
+              quarantine: null,
+            },
+          ],
+          warning: null,
+        },
+      };
+      return statusFor(args.session_id, session);
+    },
+
+    async syncDisconnect(args: Parameters<SessionApi["syncDisconnect"]>[0]) {
+      const session = sessions.get(args.session_id);
+      if (!session) throw new Error("Missing fake session");
+      session.status = { ...session.status, sync: { status: "disabled" } };
+      return statusFor(args.session_id, session);
+    },
+
+    async syncNext(_args: Parameters<SessionApi["syncNext"]>[0]) {
+      return null;
+    },
+
+    async syncReceive(_args: Parameters<SessionApi["syncReceive"]>[0]): Promise<never> {
+      throw new Error("Sync receive is not part of this fake session");
+    },
+
     async close(args: Parameters<SessionApi["close"]>[0]) {
       sessions.delete(args.session_id);
     },
