@@ -179,7 +179,7 @@ describe('Renderer', () => {
 			const renderer = createRenderer(canvas, store);
 			scheduledFrames.shift()?.(0);
 			expect(alphaWrites).toContain(0.4);
-			expect(context.fill).toHaveBeenCalledTimes(1);
+			expect(context.fill).toHaveBeenCalledTimes(2);
 			expect(context.save).toHaveBeenCalledTimes(vi.mocked(context.restore).mock.calls.length);
 			renderer.dispose();
 		});
@@ -233,7 +233,7 @@ describe('Renderer', () => {
 			expect(alphaWrites).toContain(0.2);
 			expect(alphaWrites).toContain(0.4);
 			expect(strokeAlphas).toContain(0.4);
-			expect(context.fill).toHaveBeenCalledOnce();
+			expect(context.fill).toHaveBeenCalledTimes(2);
 			renderer.dispose();
 		});
 
@@ -291,7 +291,7 @@ describe('Renderer', () => {
 			const renderer = createRenderer(canvas, store);
 			scheduledFrames.shift()?.(0);
 
-			expect(context.fill).toHaveBeenCalledTimes(1);
+			expect(context.fill).toHaveBeenCalledTimes(2);
 			expect(context.strokeRect).toHaveBeenCalledWith(0, 0, 50, 50);
 			expect(context.translate).toHaveBeenCalledWith(10_000, 10_000);
 			renderer.dispose();

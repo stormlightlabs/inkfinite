@@ -374,7 +374,10 @@
 		height: 100%;
 		display: block;
 		touch-action: none;
-		cursor: default;
+		cursor:
+			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M4 2.75 22.2 16.1l-8.05 1.15 4.2 7.25-4.2 2.4-4.05-7.2-5.35 6.1z' fill='%23171928' stroke='%2388edc4' stroke-width='2.25' stroke-linejoin='round'/%3E%3C/svg%3E")
+				4 3,
+			default;
 	}
 
 	.proposal-ghost-layer {

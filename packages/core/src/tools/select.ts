@@ -63,9 +63,17 @@ export class SelectTool implements Tool {
 	readonly id: ToolId = 'select';
 	private toolState: SelectToolState;
 	private readonly marqueeListener?: (bounds: Box2 | null) => void;
+	private readonly snapPosition?: (point: Vec2) => Vec2;
 
-	constructor(onMarqueeChange?: (bounds: Box2 | null) => void) {
+	/**
+	 * Creates a selection tool.
+	 *
+	 * The optional position snapper aligns the lead shape during a drag. Other
+	 * selected shapes keep their original offset from that shape.
+	 */
+	constructor(onMarqueeChange?: (bounds: Box2 | null) => void, snapPosition?: (point: Vec2) => Vec2) {
 		this.marqueeListener = onMarqueeChange;
+		this.snapPosition = snapPosition;
 		this.toolState = {
 			isDragging: false,
 			dragStartWorld: null,
@@ -356,7 +364,12 @@ export class SelectTool implements Tool {
 	private handleDragMove(state: EditorState, action: Action): EditorState {
 		if (action.type !== 'pointer-move' || !this.toolState.dragStartWorld) return state;
 
-		const delta = Vec2Ops.sub(action.world, this.toolState.dragStartWorld);
+		let delta = Vec2Ops.sub(action.world, this.toolState.dragStartWorld);
+		const leadPosition = this.toolState.initialShapePositions.values().next().value;
+		if (leadPosition && this.snapPosition) {
+			const candidate = Vec2Ops.add(leadPosition, delta);
+			delta = Vec2Ops.sub(this.snapPosition(candidate), leadPosition);
+		}
 
 		const newShapes = { ...state.doc.shapes };
 

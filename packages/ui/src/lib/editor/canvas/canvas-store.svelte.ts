@@ -156,7 +156,7 @@ export function createCanvasController(
 			{ hover: handleState.hover, active: handleState.active },
 			runtime.getInteractionState().pointerDown
 		);
-		canvas.style.cursor = cursor;
+		canvas.style.cursor = cursor === 'default' ? '' : cursor;
 	}
 
 	function setActiveBoardId(boardId: string) {
@@ -180,7 +180,21 @@ export function createCanvasController(
 
 	const handleMarqueeChange = (bounds: Box2 | null) => void updateMarquee(bounds);
 
-	const selectTool = new SelectTool(handleMarqueeChange);
+	const selectTool = new SelectTool(handleMarqueeChange, (point) => {
+		const snap = snapStore.get();
+		if (
+			!snap.snapEnabled ||
+			!snap.gridEnabled ||
+			!Number.isFinite(snap.gridSize) ||
+			snap.gridSize <= 0
+		) {
+			return point;
+		}
+		return {
+			x: Math.round(point.x / snap.gridSize) * snap.gridSize,
+			y: Math.round(point.y / snap.gridSize) * snap.gridSize
+		};
+	});
 	const rectTool = new RectTool();
 	const ellipseTool = new EllipseTool();
 	const lineTool = new LineTool();

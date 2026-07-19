@@ -311,18 +311,19 @@ function applyCameraTransform(context: CanvasRenderingContext2D, camera: Camera,
 const DEFAULT_GRID_SIZE = 25;
 
 /**
- * Draw grid/graph paper background
+ * Draw a dot-grid background at the same world-space positions used by snapping.
  *
- * Draws a subtle grid that helps with spatial awareness and alignment.
- * The grid adapts to zoom level to maintain visual clarity.
+ * At distant zoom levels, the renderer skips intermediate dots so the grid
+ * stays legible without changing the snapping interval.
  */
 function drawGrid(context: CanvasRenderingContext2D, camera: Camera, viewport: Viewport, snapSettings?: SnapSettings) {
 	if (snapSettings && !snapSettings.gridEnabled) {
 		return;
 	}
 	const gridSize = snapSettings?.gridSize ?? DEFAULT_GRID_SIZE;
-	const minorGridColor = 'rgba(128, 128, 128, 0.1)';
-	const majorGridColor = 'rgba(128, 128, 128, 0.2)';
+	const minimumScreenSpacing = 10;
+	const stepMultiplier = Math.max(1, Math.ceil(minimumScreenSpacing / (gridSize * camera.zoom)));
+	const visibleGridSize = gridSize * stepMultiplier;
 
 	const topLeft = {
 		x: camera.x - viewport.width / (2 * camera.zoom),
@@ -333,30 +334,21 @@ function drawGrid(context: CanvasRenderingContext2D, camera: Camera, viewport: V
 		y: camera.y + viewport.height / (2 * camera.zoom)
 	};
 
-	const startX = Math.floor(topLeft.x / gridSize) * gridSize;
-	const endX = Math.ceil(bottomRight.x / gridSize) * gridSize;
-	const startY = Math.floor(topLeft.y / gridSize) * gridSize;
-	const endY = Math.ceil(bottomRight.y / gridSize) * gridSize;
+	const startX = Math.floor(topLeft.x / visibleGridSize) * visibleGridSize;
+	const endX = Math.ceil(bottomRight.x / visibleGridSize) * visibleGridSize;
+	const startY = Math.floor(topLeft.y / visibleGridSize) * visibleGridSize;
+	const endY = Math.ceil(bottomRight.y / visibleGridSize) * visibleGridSize;
+	const dotRadius = 1 / camera.zoom;
 
-	context.lineWidth = 1 / camera.zoom;
-
-	for (let x = startX; x <= endX; x += gridSize) {
-		const isMajor = x % (gridSize * 5) === 0;
-		context.strokeStyle = isMajor ? majorGridColor : minorGridColor;
-		context.beginPath();
-		context.moveTo(x, startY);
-		context.lineTo(x, endY);
-		context.stroke();
+	context.fillStyle = 'rgba(128, 128, 128, 0.24)';
+	context.beginPath();
+	for (let x = startX; x <= endX; x += visibleGridSize) {
+		for (let y = startY; y <= endY; y += visibleGridSize) {
+			context.moveTo(x + dotRadius, y);
+			context.arc(x, y, dotRadius, 0, Math.PI * 2);
+		}
 	}
-
-	for (let y = startY; y <= endY; y += gridSize) {
-		const isMajor = y % (gridSize * 5) === 0;
-		context.strokeStyle = isMajor ? majorGridColor : minorGridColor;
-		context.beginPath();
-		context.moveTo(startX, y);
-		context.lineTo(endX, y);
-		context.stroke();
-	}
+	context.fill();
 }
 
 function drawSnapGuides(

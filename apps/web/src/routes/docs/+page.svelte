@@ -79,15 +79,19 @@
 			<h2 id="why-inkfinite">Draw or automate.</h2>
 		</div>
 		<div class="feature-grid">
-			{#each features as feature (feature.title)}
-				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-				<a class="feature-card" href={resolveDocsPath(feature.href)}>
+			{#each features as feature, index (feature.title)}
+				<!-- eslint-disable svelte/no-navigation-without-resolve -->
+				<a
+					class="feature-card"
+					href={resolveDocsPath(feature.href)}
+					style={`--card-tilt: ${index % 2 === 0 ? -0.8 : 0.8}deg`}>
 					<span class="feature-icon"><Icon name={feature.icon} size={24} /></span>
 					<h3>{feature.title}</h3>
 					<p>{feature.description}</p>
 					<span class="card-link"
 						>Read the guide <Icon name="arrow-right" size={16} /></span>
 				</a>
+				<!-- eslint-enable svelte/no-navigation-without-resolve -->
 			{/each}
 		</div>
 	</section>
@@ -379,18 +383,26 @@
 			0 12px 32px color-mix(in srgb, var(--ink-shadow-color) 8%, transparent),
 			inset 0 0 0 1px color-mix(in srgb, var(--ink-border) 30%, transparent);
 		text-decoration: none;
-		transition-property: background-color, box-shadow, translate;
-		transition-duration: 180ms;
+		transform: translateY(0) rotate(0deg);
+		transform-origin: 50% 85%;
+		transition-property: background-color, box-shadow, color, transform, scale;
+		transition-duration: 220ms;
 		transition-timing-function: var(--ink-ease-out);
 	}
 
-	.feature-card:hover {
+	.feature-card:hover,
+	.feature-card:focus-visible {
 		color: var(--ink-text);
-		background: color-mix(in srgb, var(--ink-canvas) 75%, var(--ink-accent) 7%);
+		background: color-mix(in srgb, var(--ink-canvas) 88%, var(--ink-accent) 12%);
 		box-shadow:
-			0 18px 40px color-mix(in srgb, var(--ink-shadow-color) 14%, transparent),
-			inset 0 0 0 1px color-mix(in srgb, var(--ink-accent) 45%, transparent);
-		translate: 0 -5px;
+			7px 10px 0 color-mix(in srgb, var(--ink-shadow-color) 88%, transparent),
+			0 24px 44px color-mix(in srgb, var(--ink-shadow-color) 18%, transparent),
+			inset 0 0 0 2px color-mix(in srgb, var(--ink-border-strong) 78%, transparent);
+		transform: translate(-2px, -8px) rotate(var(--card-tilt));
+	}
+
+	.feature-card:active {
+		scale: 0.96;
 	}
 
 	.feature-icon {
@@ -501,6 +513,7 @@
 		.secondary-action:hover,
 		.feature-card:hover {
 			translate: 0;
+			transform: none;
 		}
 	}
 </style>

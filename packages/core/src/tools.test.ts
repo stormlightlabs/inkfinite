@@ -261,6 +261,46 @@ describe("SelectTool", () => {
       expect(movedShape2.y).toBe(100);
     });
 
+    it("snaps the lead shape origin and preserves selection offsets", () => {
+      const snappingTool = new SelectTool(undefined, (point) => ({
+        x: Math.round(point.x / 25) * 25,
+        y: Math.round(point.y / 25) * 25,
+      }));
+      const offGridShape1 = { ...shape1, x: 7, y: 8 };
+      const offGridShape2 = { ...shape2, x: 207, y: 8 };
+      const state = {
+        ...initialState,
+        doc: {
+          ...initialState.doc,
+          shapes: { ...initialState.doc.shapes, [shape1.id]: offGridShape1, [shape2.id]: offGridShape2 },
+        },
+        ui: { ...initialState.ui, selectionIds: [shape1.id, shape2.id] },
+      };
+
+      let result = snappingTool.onAction(
+        state,
+        Action.pointerDown(
+          { x: 20, y: 20 },
+          { x: 20, y: 20 },
+          0,
+          PointerButtons.create(true, false, false),
+          Modifiers.create(),
+        ),
+      );
+      result = snappingTool.onAction(
+        result,
+        Action.pointerMove(
+          { x: 50, y: 50 },
+          { x: 50, y: 50 },
+          PointerButtons.create(true, false, false),
+          Modifiers.create(),
+        ),
+      );
+
+      expect(result.doc.shapes[shape1.id]).toMatchObject({ x: 25, y: 50 });
+      expect(result.doc.shapes[shape2.id]).toMatchObject({ x: 225, y: 50 });
+    });
+
     it("should reset drag state on pointer up", () => {
       const state = { ...initialState, ui: { ...initialState.ui, selectionIds: [shape1.id] } };
 
@@ -387,11 +427,10 @@ describe("SelectTool", () => {
       expect(result.ui.selectionIds).toEqual([]);
     });
 
-    it.each([{ description: "Delete key removes selected shapes", key: "Delete", code: "Delete" }, {
-      description: "Backspace key removes selected shapes",
-      key: "Backspace",
-      code: "Backspace",
-    }])("should handle $description", ({ key, code }) => {
+    it.each([
+      { description: "Delete key removes selected shapes", key: "Delete", code: "Delete" },
+      { description: "Backspace key removes selected shapes", key: "Backspace", code: "Backspace" },
+    ])("should handle $description", ({ key, code }) => {
       const state = { ...initialState, ui: { ...initialState.ui, selectionIds: [shape1.id, shape2.id] } };
       const result = tool.onAction(state, Action.keyDown(key, code, Modifiers.create()));
 

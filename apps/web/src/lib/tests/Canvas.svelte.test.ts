@@ -170,7 +170,7 @@ describe('Canvas component', () => {
 		const { container } = renderCanvas();
 		const canvas = container.querySelector('canvas') as HTMLCanvasElement;
 
-		expect(window.getComputedStyle(canvas).cursor).toBe('default');
+		expect(window.getComputedStyle(canvas).cursor).toContain('data:image/svg+xml');
 
 		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
 		await vi.waitFor(() => expect(canvas.style.cursor).toBe('grab'));
@@ -199,6 +199,6 @@ describe('Canvas component', () => {
 		expect(canvas.style.cursor).toBe('grab');
 
 		window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', code: 'Space' }));
-		expect(canvas.style.cursor).toBe('default');
+		expect(canvas.style.cursor).toBe('');
 	});
 });

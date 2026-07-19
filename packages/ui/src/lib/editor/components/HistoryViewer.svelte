@@ -92,6 +92,7 @@
 <style>
 	:global(.history-viewer) {
 		padding: 0;
+		background: var(--ink-surface);
 	}
 
 	.history-content {
@@ -101,15 +102,18 @@
 	}
 
 	.history-header {
-		padding: 16px;
-		border-bottom: 1px solid #e0e0e0;
-		background-color: #f5f5f5;
+		padding: var(--ink-space-5);
+		border-bottom: 1px solid color-mix(in srgb, var(--ink-border) 55%, transparent);
+		background: var(--ink-surface-raised);
 	}
 
 	.history-header h2 {
-		margin: 0 0 12px 0;
-		font-size: 18px;
-		font-weight: 600;
+		margin: 0 0 var(--ink-space-4);
+		color: var(--ink-heading);
+		font-family: var(--ink-font-display);
+		font-size: var(--ink-type-lg);
+		font-weight: 700;
+		letter-spacing: -0.02em;
 	}
 
 	.history-actions {
@@ -118,43 +122,66 @@
 	}
 
 	.history-actions button {
-		padding: 6px 0.75rem;
-		border: 1px solid #ccc;
-		border-radius: 0.25rem;
-		background-color: white;
+		min-width: 5rem;
+		min-height: var(--ink-control-height);
+		padding: var(--ink-space-2) var(--ink-space-4);
+		border: 1px solid var(--ink-border);
+		border-radius: var(--ink-radius-wobbly-small);
+		background: var(--ink-canvas);
+		color: var(--ink-text);
+		box-shadow: 2px 2px 0 color-mix(in srgb, var(--ink-shadow-color) 82%, transparent);
 		cursor: pointer;
-		font-size: 14px;
+		font-family: inherit;
+		font-size: var(--ink-type-sm);
+		font-weight: 650;
+		transition-property: background-color, border-color, box-shadow, transform;
+		transition-duration: var(--ink-duration-fast);
+		transition-timing-function: var(--ink-ease-out);
 	}
 
 	.history-actions button:hover:not(:disabled) {
-		background-color: #f0f0f0;
+		background: var(--ink-surface-hover);
+		border-color: var(--ink-border-strong);
+		box-shadow: 3px 3px 0 color-mix(in srgb, var(--ink-shadow-color) 90%, transparent);
+		transform: translate(-1px, -1px);
+	}
+
+	.history-actions button:active:not(:disabled) {
+		transform: scale(0.96);
+	}
+
+	.history-actions button:focus-visible {
+		outline: 2px solid var(--ink-focus);
+		outline-offset: 2px;
 	}
 
 	.history-actions button:disabled {
-		opacity: 0.5;
+		opacity: 0.42;
 		cursor: not-allowed;
+		box-shadow: none;
 	}
 
 	.history-section {
-		padding: 16px;
-		border-bottom: 1px solid #e0e0e0;
+		padding: var(--ink-space-5);
+		border-bottom: 1px solid color-mix(in srgb, var(--ink-border) 42%, transparent);
 	}
 
 	.history-section h3 {
-		margin: 0 0 12px 0;
-		font-size: 14px;
-		font-weight: 600;
-		color: #666;
+		margin: 0 0 var(--ink-space-3);
+		color: var(--ink-text-muted);
+		font-size: var(--ink-type-xs);
+		font-weight: 750;
+		font-variant-numeric: tabular-nums;
 		text-transform: uppercase;
-		letter-spacing: 0.5px;
+		letter-spacing: 0.09em;
 	}
 
 	.empty-state {
 		margin: 0;
-		padding: 0.75rem;
+		padding: var(--ink-space-4);
 		text-align: center;
-		color: #999;
-		font-size: 14px;
+		color: var(--ink-text-muted);
+		font-size: var(--ink-type-sm);
 		font-style: italic;
 	}
 
@@ -162,22 +189,27 @@
 		list-style: none;
 		margin: 0;
 		padding: 0;
+		display: grid;
+		gap: var(--ink-space-2);
 	}
 
 	.history-entry {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 0.5rem 0.75rem;
-		margin-bottom: 0.25rem;
-		border-radius: 0.25rem;
-		background-color: #f9f9f9;
-		border-left: 3px solid #4dabf7;
+		gap: var(--ink-space-3);
+		padding: var(--ink-space-3) var(--ink-space-4);
+		border-left: 3px solid var(--ink-accent);
+		border-radius: var(--ink-radius-panel-small);
+		background: var(--ink-surface-raised);
+		box-shadow:
+			0 0 0 1px color-mix(in srgb, var(--ink-border) 35%, transparent),
+			0 2px 5px color-mix(in srgb, var(--ink-shadow-color) 16%, transparent);
 	}
 
 	.history-entry.redo {
-		border-left-color: #999;
-		opacity: 0.7;
+		border-left-color: var(--ink-warning);
+		opacity: 0.76;
 	}
 
 	.entry-info {
@@ -187,18 +219,32 @@
 	}
 
 	.entry-name {
-		font-size: 14px;
-		font-weight: 500;
+		color: var(--ink-text);
+		font-size: var(--ink-type-sm);
+		font-weight: 650;
+		text-wrap: pretty;
 	}
 
 	.entry-time {
 		font-size: 0.75rem;
-		color: #666;
+		color: var(--ink-text-muted);
+		font-variant-numeric: tabular-nums;
 	}
 
 	.entry-index {
 		font-size: 0.75rem;
-		color: #999;
-		font-weight: 500;
+		color: var(--ink-text-muted);
+		font-weight: 650;
+		font-variant-numeric: tabular-nums;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.history-actions button {
+			transition: none;
+		}
+
+		.history-actions button:hover:not(:disabled) {
+			transform: none;
+		}
 	}
 </style>
