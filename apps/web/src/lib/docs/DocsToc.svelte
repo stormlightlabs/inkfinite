@@ -1,15 +1,28 @@
 <script lang="ts">
 	// TODO: active section styling, smooth scrolling
-	import type { DocsPage } from './navigation';
+	import { afterNavigate } from '$app/navigation';
+	import { onMount, tick } from 'svelte';
 
-	let { currentPage }: { currentPage: DocsPage | undefined } = $props();
+	type Heading = { id: string; title: string };
+
+	let headings = $state<Heading[]>([]);
+
+	async function refreshHeadings() {
+		await tick();
+		headings = Array.from(
+			document.querySelectorAll<HTMLElement>('#docs-content article h2[id]')
+		).map((heading) => ({ id: heading.id, title: heading.textContent?.trim() || heading.id }));
+	}
+
+	onMount(() => void refreshHeadings());
+	afterNavigate(() => void refreshHeadings());
 </script>
 
-{#if currentPage}
+{#if headings.length > 0}
 	<aside aria-label="On this page">
 		<h2>On this page</h2>
 		<ul>
-			{#each currentPage.headings as heading (heading.id)}
+			{#each headings as heading (heading.id)}
 				<li><a href={`#${heading.id}`}>{heading.title}</a></li>
 			{/each}
 		</ul>

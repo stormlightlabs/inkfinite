@@ -184,21 +184,10 @@
 
 <div class="editor">
 	<Toolbar
-		platform={platformKind}
-		desktop={{
-			fileName: c.desktop.fileName,
-			recentBoards: c.desktop.boards,
-			onOpen: c.desktop.handleOpen,
-			onNew: c.desktop.handleNew,
-			onSaveAs: () => c.desktop.handleSaveAs(null),
-			onSelectBoard: c.desktop.handleRecentSelect
-		}}
 		currentTool={c.tools.currentToolId}
 		onToolChange={c.tools.handleChange}
 		onStencilsClick={handleStencilsClick}
 		store={c.store}
-		camera={c.camera}
-		getViewport={c.getViewport}
 		canvas={canvasEl ?? undefined}
 		brushStore={c.brushStore} />
 	<div

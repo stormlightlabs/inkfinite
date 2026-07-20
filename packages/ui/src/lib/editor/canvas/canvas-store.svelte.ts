@@ -18,7 +18,9 @@ import {
 	EllipseTool,
 	getInteractiveShapesOnCurrentPage,
 	LineTool,
+	LayerRecord,
 	MarkdownTool,
+	PageRecord,
 	PenTool,
 	RectTool,
 	SelectTool,
@@ -71,11 +73,14 @@ export function createCanvasController(
 	let proposal = $state<LiveProposal | null>(null);
 	let proposalMessage = $state<string | null>(null);
 	let unsubscribeProposal: (() => void) | null = null;
+	let unsubscribeFileMenu: (() => void) | null = null;
 	let removeBeforeUnload: (() => void) | null = null;
 	let stencilPaletteOpen = $state(false);
 	let overlayViewport = $state<Viewport>({ width: 1, height: 1 });
 	let renderer: Renderer | null = null;
 	let inputAdapter: InputAdapter | null = null;
+	const initialPage = PageRecord.create('Page 1');
+	const initialLayer = LayerRecord.create(initialPage.id, 'Default');
 	const handleResize = () => {
 		overlayViewport = measureViewport(canvas);
 		if (marqueeBounds) {
@@ -91,15 +96,32 @@ export function createCanvasController(
 	const pointerState = new PointerState();
 	const handleState = new HandleState();
 
-	const store = new Store(undefined, {
-		onHistoryEvent: (event) => {
-			if (!activeBoardId || event.kind !== 'doc' || !sink) {
-				return;
+	const store = new Store(
+		{
+			doc: {
+				pages: { [initialPage.id]: { ...initialPage, layerIds: [initialLayer.id] } },
+				layers: { [initialLayer.id]: initialLayer },
+				shapes: {},
+				bindings: {}
+			},
+			ui: {
+				currentPageId: initialPage.id,
+				activeLayerId: initialLayer.id,
+				selectionIds: [],
+				toolId: 'select'
+			},
+			camera: Camera.create()
+		},
+		{
+			onHistoryEvent: (event) => {
+				if (!activeBoardId || event.kind !== 'doc' || !sink) {
+					return;
+				}
+				const patch = diffDoc(event.beforeState.doc, event.afterState.doc);
+				sink.enqueueDocPatch(activeBoardId, patch);
 			}
-			const patch = diffDoc(event.beforeState.doc, event.afterState.doc);
-			sink.enqueueDocPatch(activeBoardId, patch);
 		}
-	});
+	);
 
 	const cursorStore = new CursorStore();
 	const snapStore: SnapStore = createSnapStore();
@@ -244,7 +266,9 @@ export function createCanvasController(
 		(boardId, doc) => {
 			setActiveBoardId(boardId);
 			applyLoadedDoc(doc);
-		}
+		},
+		() => activeBoardId,
+		() => store.getState().doc
 	);
 	const fileBrowser = new FileBrowserController(
 		() => repo,
@@ -456,6 +480,20 @@ export function createCanvasController(
 				proposalMessage = update.message ?? null;
 			});
 		}
+		unsubscribeFileMenu =
+			platformSession.subscribeFileMenu?.((action) => {
+				switch (action) {
+					case 'new':
+						void desktop.handleNew();
+						break;
+					case 'open':
+						void desktop.handleOpen();
+						break;
+					case 'save-as':
+						void desktop.handleSaveAs();
+						break;
+				}
+			}) ?? null;
 
 		if (platform === 'desktop') {
 			if (desktopRepo) {
@@ -496,6 +534,7 @@ export function createCanvasController(
 		renderer?.dispose();
 		inputAdapter?.dispose();
 		unsubscribeProposal?.();
+		unsubscribeFileMenu?.();
 		platformSession?.dispose?.();
 		if (platform === 'desktop') {
 			void sink

@@ -4,11 +4,9 @@
 	import DocsHeader from './DocsHeader.svelte';
 	import DocsSidebar from './DocsSidebar.svelte';
 	import DocsToc from './DocsToc.svelte';
-	import { findDocsPage } from './navigation';
 
 	let { children }: { children: Snippet } = $props();
 	let sidebarOpen = $state(false);
-	let currentPage = $derived(findDocsPage(page.url.pathname));
 	let landing = $derived(page.url.pathname === '/docs' || page.url.pathname === '/docs/');
 </script>
 
@@ -34,7 +32,7 @@
 			</article>
 		</main>
 		{#if !landing}
-			<DocsToc {currentPage} />
+			<DocsToc />
 		{/if}
 	</div>
 </div>

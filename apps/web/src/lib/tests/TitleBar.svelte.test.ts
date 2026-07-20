@@ -1,32 +1,22 @@
 import { createBrushStore } from '$editor/status';
-import { type ComponentProps, tick } from 'svelte';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { type ComponentProps } from 'svelte';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, render } from 'vitest-browser-svelte';
 import Toolbar from '$editor/components/Toolbar.svelte';
 import { createStoreWithRect } from './Toolbar.colors.test';
 
 const renderToolbar = (overrides: Partial<ComponentProps<typeof Toolbar>> = {}) => {
-	const onOpen = vi.fn();
-	const onNew = vi.fn();
-	const onSaveAs = vi.fn();
-	const onSelectBoard = vi.fn();
-	const recentBoards = [
-		{ id: 'board-1', name: 'Board 1', createdAt: Date.now(), updatedAt: Date.now() }
-	];
 	const brushStore = createBrushStore();
 
 	const { container } = render(Toolbar, {
 		currentTool: 'select',
 		onToolChange: () => {},
 		store: createStoreWithRect(),
-		getViewport: () => ({ width: 800, height: 600 }),
 		brushStore,
-		platform: 'web',
-		desktop: { fileName: 'Board 1', recentBoards, onOpen, onNew, onSaveAs, onSelectBoard },
 		...overrides
 	});
 
-	return { container, onNew, onOpen, onSaveAs, onSelectBoard, recentBoards };
+	return { container };
 };
 
 describe('TitleBar (merged into Toolbar)', () => {
@@ -42,29 +32,9 @@ describe('TitleBar (merged into Toolbar)', () => {
 		);
 	});
 
-	it('shows desktop controls when running on desktop', async () => {
-		const { container, onNew, onOpen, onSaveAs, onSelectBoard, recentBoards } = renderToolbar({
-			platform: 'desktop'
-		});
-		const buttons = container.querySelectorAll('.toolbar__desktop-button');
-		expect(buttons).toHaveLength(3);
-
-		(buttons[0] as HTMLButtonElement).click();
-		await tick();
-		expect(onNew).toHaveBeenCalled();
-
-		(buttons[1] as HTMLButtonElement).click();
-		await tick();
-		expect(onOpen).toHaveBeenCalled();
-
-		(buttons[2] as HTMLButtonElement).click();
-		await tick();
-		expect(onSaveAs).toHaveBeenCalled();
-
-		const select = container.querySelector('.toolbar__recent select') as HTMLSelectElement;
-		select.value = recentBoards[0].id;
-		select.dispatchEvent(new Event('change', { bubbles: true }));
-		await tick();
-		expect(onSelectBoard).toHaveBeenCalledWith(recentBoards[0].id);
+	it('keeps file commands out of the drawing toolbar', () => {
+		const { container } = renderToolbar();
+		expect(container.querySelector('.toolbar__desktop')).toBeNull();
+		expect(container.textContent).not.toContain('Save As…');
 	});
 });

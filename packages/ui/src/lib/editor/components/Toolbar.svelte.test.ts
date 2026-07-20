@@ -6,28 +6,20 @@ import { createBrushStore } from '../status';
 import Toolbar from './Toolbar.svelte';
 
 describe('Editor Toolbar', () => {
-	it('selects tools and opens the zoom menu through accessible controls', async () => {
+	it('selects tools through accessible controls', async () => {
 		const onToolChange = vi.fn();
 		const screen = render(Toolbar, {
 			currentTool: 'select',
 			onToolChange,
 			store: new Store(),
-			getViewport: () => ({ width: 1024, height: 768 }),
 			brushStore: createBrushStore()
 		});
 
 		await screen.getByRole('button', { name: 'Rectangle' }).click();
 		expect(onToolChange).toHaveBeenCalledWith('rect');
-
-		(
-			screen.getByRole('button', { name: 'Zoom level' }).element() as HTMLButtonElement
-		).click();
 		await expect
-			.element(screen.getByRole('menu', { name: 'Zoom options' }))
-			.toBeInTheDocument();
-		await expect
-			.element(screen.getByRole('menuitem', { name: 'Zoom to 100%' }))
-			.toBeInTheDocument();
+			.element(screen.getByRole('button', { name: 'Zoom level' }))
+			.not.toBeInTheDocument();
 	});
 
 	it('anchors pen settings directly below the pen tool', async () => {
@@ -35,7 +27,6 @@ describe('Editor Toolbar', () => {
 			currentTool: 'pen',
 			onToolChange: vi.fn(),
 			store: new Store(),
-			getViewport: () => ({ width: 1024, height: 768 }),
 			brushStore: createBrushStore()
 		});
 
@@ -75,7 +66,6 @@ describe('Editor Toolbar', () => {
 			currentTool: 'select',
 			onToolChange: vi.fn(),
 			store,
-			getViewport: () => ({ width: 1024, height: 768 }),
 			brushStore: createBrushStore()
 		});
 

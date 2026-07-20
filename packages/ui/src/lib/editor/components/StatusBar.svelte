@@ -191,7 +191,7 @@
 	</div>
 
 	<div class="status-bar__section status-bar__section--persistence">
-		<span class="status-bar__label">Sync</span>
+		<span class="status-bar__label">Save</span>
 		<span
 			class="status-bar__value"
 			class:status-bar__value--error={statusVm.persistence.state === 'error'}>

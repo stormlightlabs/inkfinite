@@ -1,5 +1,6 @@
 mod files;
 mod ipc;
+mod menu;
 mod session;
 
 use tauri::Manager;
@@ -7,6 +8,8 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
+        .menu(menu::build)
+        .on_menu_event(menu::handle_event)
         .manage(session::DesktopState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())

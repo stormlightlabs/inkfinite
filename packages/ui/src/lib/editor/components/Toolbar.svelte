@@ -1,11 +1,9 @@
 <script lang="ts">
 	import { BrushPopover, Icon } from '../../index';
-	import { DEFAULT_FILL_COLOR, DEFAULT_STROKE_COLOR, TOOLS, ZOOM_PRESETS } from '../constants';
-	import type { EditorPlatform } from '../platform';
+	import { DEFAULT_FILL_COLOR, DEFAULT_STROKE_COLOR, TOOLS } from '../constants';
 	import type { BrushSettings, BrushStore } from '../status';
 	import type {
 		ArrowShape,
-		BoardMeta,
 		EditorState as EditorStateType,
 		EllipseShape,
 		LineShape,
@@ -25,51 +23,21 @@
 		SnapshotCommand
 	} from '@inkfinite/core';
 	import { fade } from 'svelte/transition';
-	import { CameraController } from '../canvas/controllers/camera-controller';
 	import ArrowPopover from './ArrowPopover.svelte';
-
-	type Viewport = { width: number; height: number };
-
-	type DesktopControls = {
-		fileName: string | null;
-		recentBoards: BoardMeta[];
-		onOpen?: () => void | Promise<void>;
-		onNew?: () => void | Promise<void>;
-		onSaveAs?: () => void | Promise<void>;
-		onSelectBoard?: (boardId: string) => void | Promise<void>;
-	};
 
 	type Props = {
 		currentTool: ToolId;
 		onToolChange: (toolId: ToolId) => void;
 		store: Store;
-		camera?: CameraController;
-		getViewport: () => Viewport;
 		canvas?: HTMLCanvasElement;
 		brushStore: BrushStore;
-		platform?: EditorPlatform;
-		desktop?: DesktopControls;
 		onStencilsClick?: () => void;
 	};
 
-	let {
-		currentTool,
-		onToolChange,
-		store,
-		camera,
-		getViewport,
-		canvas,
-		brushStore,
-		platform = 'web',
-		desktop,
-		onStencilsClick
-	}: Props = $props();
-	let cameraControls = $derived(camera ?? new CameraController(store, getViewport));
+	let { currentTool, onToolChange, store, canvas, brushStore, onStencilsClick }: Props =
+		$props();
 
 	let editorState = $derived<EditorStateType>(store.getState());
-	let zoomMenuOpen = $state(false);
-	let zoomMenuEl = $state<HTMLDivElement | null>(null);
-	let zoomButtonEl = $state<HTMLButtonElement | null>(null);
 	let exportMenuOpen = $state(false);
 	let exportMenuEl = $state<HTMLDivElement | null>(null);
 	let exportButtonEl = $state<HTMLButtonElement | null>(null);
@@ -155,25 +123,6 @@
 	let toolbarEl = $state<HTMLElement | null>(null);
 
 	$effect(() => {
-		if (!zoomMenuOpen || typeof document === 'undefined') {
-			return;
-		}
-		const handlePointerDown = (event: PointerEvent) => {
-			const target = event.target as Node | null;
-			if (!target) {
-				return;
-			}
-			if (zoomMenuEl?.contains(target) || zoomButtonEl?.contains(target)) {
-				return;
-			}
-			zoomMenuOpen = false;
-		};
-
-		document.addEventListener('pointerdown', handlePointerDown);
-		return () => document.removeEventListener('pointerdown', handlePointerDown);
-	});
-
-	$effect(() => {
 		if (!exportMenuOpen || typeof document === 'undefined') {
 			return;
 		}
@@ -221,25 +170,6 @@
 
 	function handleToolClick(toolId: ToolId) {
 		onToolChange(toolId);
-	}
-
-	function getZoomPct(): number {
-		return cameraControls.getZoomPercent();
-	}
-
-	function setZoomPercent(percent: number) {
-		cameraControls.setZoomPercent(percent);
-		zoomMenuOpen = false;
-	}
-
-	function zoomToFit() {
-		cameraControls.fitAll();
-		zoomMenuOpen = false;
-	}
-
-	function zoomToSelection() {
-		cameraControls.fitSelection();
-		zoomMenuOpen = false;
 	}
 
 	async function exportPNGViewport() {
@@ -481,28 +411,6 @@
 	function handleBrushChange(newBrush: BrushSettings) {
 		brushStore.set(newBrush);
 	}
-
-	function invokeDesktopAction(action?: () => void | Promise<void>) {
-		if (action) {
-			void action();
-		}
-	}
-
-	function handleRecentSelect(event: Event) {
-		if (!desktop?.onSelectBoard) {
-			return;
-		}
-		const select = event.currentTarget as HTMLSelectElement;
-		const boardId = select.value;
-		if (boardId) {
-			void desktop.onSelectBoard(boardId);
-		}
-		select.value = '';
-	}
-
-	function desktopFileLabel() {
-		return desktop?.fileName ?? 'Unsaved board';
-	}
 </script>
 
 <div
@@ -541,45 +449,6 @@
 				rel="noreferrer">Stormlight Labs</a>
 		</div>
 	</div>
-	{#if platform === 'desktop' && desktop}
-		<div class="toolbar__desktop">
-			<div class="toolbar__file" aria-live="polite">{desktopFileLabel()}</div>
-			<div class="toolbar__desktop-actions">
-				<button
-					class="toolbar__desktop-button"
-					type="button"
-					onclick={() => invokeDesktopAction(desktop.onNew)}
-					aria-label="Create new board">
-					New…
-				</button>
-				<button
-					class="toolbar__desktop-button"
-					type="button"
-					onclick={() => invokeDesktopAction(desktop.onOpen)}
-					aria-label="Open board from disk">
-					Open…
-				</button>
-				<button
-					class="toolbar__desktop-button"
-					type="button"
-					onclick={() => invokeDesktopAction(desktop.onSaveAs)}
-					aria-label="Save board as new file">
-					Save As…
-				</button>
-				{#if desktop.recentBoards.length > 0}
-					<label class="toolbar__recent">
-						<span>Recent</span>
-						<select onchange={handleRecentSelect} aria-label="Switch to recent board">
-							<option value="">Select…</option>
-							{#each desktop.recentBoards as board (`${board.id}:${board.name}`)}
-								<option value={board.id}>{board.name}</option>
-							{/each}
-						</select>
-					</label>
-				{/if}
-			</div>
-		</div>
-	{/if}
 	<div class="toolbar__divider"></div>
 	{#each TOOLS as tool (`${tool.id}:${tool.label}`)}
 		<div class="toolbar__tool-slot">
@@ -683,51 +552,6 @@
 	{/if}
 
 	<div class="toolbar__divider"></div>
-
-	<div class="toolbar__zoom">
-		<button
-			class="toolbar__zoom-button"
-			bind:this={zoomButtonEl}
-			onclick={() => (zoomMenuOpen = !zoomMenuOpen)}
-			aria-label="Zoom level"
-			aria-haspopup="true"
-			aria-expanded={zoomMenuOpen}>
-			{getZoomPct()}%
-		</button>
-
-		{#if zoomMenuOpen}
-			<div
-				class="toolbar__zoom-menu"
-				bind:this={zoomMenuEl}
-				role="menu"
-				aria-label="Zoom options">
-				{#each ZOOM_PRESETS as preset (`${preset.label}:${preset.value}`)}
-					<button
-						class="toolbar__menu-item"
-						role="menuitem"
-						onclick={() => setZoomPercent(preset.value)}
-						aria-label="Zoom to {preset.label}">
-						{preset.label}
-					</button>
-				{/each}
-				<div class="toolbar__menu-divider"></div>
-				<button
-					class="toolbar__menu-item"
-					role="menuitem"
-					onclick={zoomToFit}
-					aria-label="Zoom to fit all shapes">
-					Zoom to fit
-				</button>
-				<button
-					class="toolbar__menu-item"
-					role="menuitem"
-					onclick={zoomToSelection}
-					aria-label="Zoom to selected shapes">
-					Zoom to selection
-				</button>
-			</div>
-		{/if}
-	</div>
 
 	<div class="toolbar__export">
 		<button
@@ -913,7 +737,6 @@
 	}
 
 	.toolbar__tool-button:active,
-	.toolbar__zoom-button:active,
 	.toolbar__export-button:active {
 		transform: scale(0.96);
 	}
@@ -952,12 +775,10 @@
 		opacity: 0.5;
 	}
 
-	.toolbar__zoom,
 	.toolbar__export {
 		position: relative;
 	}
 
-	.toolbar__zoom-button,
 	.toolbar__export-button {
 		border: 1px solid var(--ink-border);
 		background: var(--ink-canvas);
@@ -972,13 +793,11 @@
 		transition-duration: 0.2s;
 	}
 
-	.toolbar__zoom-button:hover,
 	.toolbar__export-button:hover {
 		background: var(--ink-surface-hover);
 		border-color: var(--ink-text-muted);
 	}
 
-	.toolbar__zoom-menu,
 	.toolbar__export-menu {
 		position: absolute;
 		top: calc(100% + 8px);
@@ -1020,65 +839,10 @@
 		outline-offset: -2px;
 	}
 
-	.toolbar__menu-divider {
-		height: 1px;
-		background: var(--ink-border);
-		margin: 6px 0;
-	}
-
 	.toolbar__brand {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-	}
-
-	.toolbar__desktop {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-	}
-
-	.toolbar__file {
-		font-size: 13px;
-		color: var(--ink-text-muted);
-	}
-
-	.toolbar__desktop-actions {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		flex-wrap: wrap;
-	}
-
-	.toolbar__desktop-button {
-		border: 1px solid var(--ink-border);
-		background: var(--ink-canvas);
-		color: var(--ink-text);
-		border-radius: 6px;
-		padding: 4px 10px;
-		font-size: 13px;
-		cursor: pointer;
-	}
-
-	.toolbar__desktop-button:hover {
-		background: var(--ink-surface-raised);
-	}
-
-	.toolbar__recent {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		font-size: 0.75rem;
-		color: var(--ink-text-muted);
-	}
-
-	.toolbar__recent select {
-		font-size: 0.75rem;
-		padding: 4px 6px;
-		border-radius: 0.25rem;
-		border: 1px solid var(--ink-border);
-		background: var(--ink-canvas);
-		color: var(--ink-text);
 	}
 
 	.toolbar__logo {

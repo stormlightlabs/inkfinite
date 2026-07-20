@@ -13,7 +13,6 @@ const meta = {
 		currentTool: 'select',
 		onToolChange: () => {},
 		store: controls.store,
-		getViewport: () => ({ width: 1280, height: 720 }),
 		brushStore: controls.brushStore,
 		onStencilsClick: () => {}
 	},
@@ -24,16 +23,3 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Web: Story = {};
-export const Desktop: Story = {
-	args: {
-		platform: 'desktop',
-		desktop: {
-			fileName: 'launch-ideas.inkfinite',
-			recentBoards: [],
-			onOpen: () => {},
-			onNew: () => {},
-			onSaveAs: () => {},
-			onSelectBoard: () => {}
-		}
-	}
-};
