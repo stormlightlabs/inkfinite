@@ -23,6 +23,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             session::create_document,
             session::open_document,
+            session::open_or_create_draft,
             session::snapshot,
             session::commit,
             session::propose,
@@ -33,6 +34,7 @@ pub fn run() {
             session::redo,
             session::save,
             session::save_as,
+            session::save_draft_as,
             session::query,
             session::validate,
             session::sync_connect,

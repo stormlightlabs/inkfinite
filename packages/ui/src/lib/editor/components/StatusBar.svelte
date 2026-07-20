@@ -20,6 +20,7 @@
 		persistence: StatusStore;
 		snap: SnapStore;
 		platform?: EditorPlatform;
+		draft?: boolean;
 		onOpenBrowser?: () => void;
 		onHistoryClick?: () => void;
 	};
@@ -30,6 +31,7 @@
 		persistence,
 		snap,
 		platform = 'web',
+		draft = false,
 		onOpenBrowser,
 		onHistoryClick
 	}: Props = $props();
@@ -117,24 +119,25 @@
 
 	function formatPersistenceSummary(): string {
 		const state = statusVm.persistence;
+		const savedLabel = draft ? 'Draft saved' : 'Saved';
 		if (state.state === 'error') {
 			return state.errorMsg ? `Error: ${state.errorMsg}` : 'Error';
 		}
 		if (state.state === 'saving' || (state.pendingWrites ?? 0) > 0) {
-			return 'Saving…';
+			return draft ? 'Saving draft…' : 'Saving…';
 		}
 		if (state.lastSavedAt) {
 			const seconds = Math.floor((Date.now() - state.lastSavedAt) / 1000);
 			if (seconds < 1) {
-				return 'Saved just now';
+				return `${savedLabel} just now`;
 			}
 			if (seconds < 60) {
-				return `Saved ${seconds}s ago`;
+				return `${savedLabel} ${seconds}s ago`;
 			}
 			const minutes = Math.floor(seconds / 60);
-			return `Saved ${minutes}m ago`;
+			return `${savedLabel} ${minutes}m ago`;
 		}
-		return 'Saved';
+		return savedLabel;
 	}
 
 	function handleSnapToggle(event: Event) {

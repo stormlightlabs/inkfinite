@@ -9,11 +9,12 @@ export function createDesktopPlatformAdapter(): EditorPlatformAdapter {
 		kind: 'desktop',
 		async connect() {
 			const repo = createDesktopSessionRepo(createDesktopFileOps());
+			const status = createStatusStore({ backend: 'filesystem', state: 'saved', pendingWrites: 0 });
 			return {
 				repo,
 				desktop: repo,
-				sink: createDesktopPersistenceSink(repo),
-				status: createStatusStore({ backend: 'filesystem', state: 'saved', pendingWrites: 0 }),
+				sink: createDesktopPersistenceSink(repo, status),
+				status,
 				subscribeFileMenu(listener) {
 					let active = true;
 					let stop: (() => void) | undefined;

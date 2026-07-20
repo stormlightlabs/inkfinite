@@ -40,6 +40,8 @@ export type NativeFileMenuAction = 'new' | 'open' | 'save-as';
  * the editor package.
  */
 export interface DesktopDocumentRepo extends PersistentDocRepo {
+	openDraft(): Promise<{ boardId: string; doc: import('@inkfinite/core').LoadedDoc }>;
+	isDraft(): boolean;
 	getCurrentFile(): FileHandle | null;
 	openFromDialog(): Promise<{ boardId: string; doc: import('@inkfinite/core').LoadedDoc }>;
 	getWorkspaceDir(): Promise<string | null>;

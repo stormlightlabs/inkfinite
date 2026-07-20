@@ -41,6 +41,23 @@ describe('StatusBar', () => {
 		await expect.element(screen.getByText(/error/i)).toHaveClass('status-bar__value--error');
 	});
 
+	it('identifies a safely persisted desktop draft', async () => {
+		const screen = render(StatusBar, {
+			store: new Store(),
+			cursor: new CursorStore(),
+			persistence: createStatusStore({
+				backend: 'filesystem',
+				state: 'saved',
+				pendingWrites: 0
+			}),
+			snap: createSnapStore(),
+			platform: 'desktop',
+			draft: true
+		});
+
+		await expect.element(screen.getByText('Draft saved')).toBeInTheDocument();
+	});
+
 	it('keeps editor utilities together and opens the info dialog', async () => {
 		const onOpenBrowser = vi.fn();
 		const onHistoryClick = vi.fn();

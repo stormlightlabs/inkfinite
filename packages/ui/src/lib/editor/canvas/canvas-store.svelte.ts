@@ -267,8 +267,7 @@ export function createCanvasController(
 			setActiveBoardId(boardId);
 			applyLoadedDoc(doc);
 		},
-		() => activeBoardId,
-		() => store.getState().doc
+		() => activeBoardId
 	);
 	const fileBrowser = new FileBrowserController(
 		() => repo,
@@ -497,13 +496,7 @@ export function createCanvasController(
 
 		if (platform === 'desktop') {
 			if (desktopRepo) {
-				const boards = await desktop.refreshBoards();
-				if (boards.length > 0) {
-					const boardId = boards[0].id;
-					const doc = await desktopRepo.loadDoc(boardId);
-					setActiveBoardId(boardId);
-					applyLoadedDoc(doc);
-				}
+				await desktop.openDraft();
 			}
 		} else {
 			const boards = await repo.listBoards();

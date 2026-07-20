@@ -43,6 +43,7 @@ function createSnapshot(documentId: string, pageName = 'Page 1', heads: ChangeHa
 }
 
 function createFakeSessionApi() {
+	const draftPath = '/app-data/drafts/untitled.inkfinite';
 	const files = new Map<string, DocumentSnapshot>();
 	const sessions = new Map<string, FakeSession>();
 	let sessionNumber = 0;
@@ -103,6 +104,18 @@ function createFakeSessionApi() {
 			};
 			sessions.set(sessionId, { status, undo: [], redo: [] });
 			return { session_id: sessionId, status: statusFor(sessionId, sessions.get(sessionId)!) };
+		},
+
+		async openOrCreateDraft(args: Parameters<SessionApi['openOrCreateDraft']>[0]): Promise<SessionOpened> {
+			if (!files.has(draftPath)) {
+				return this.createDocument({
+					path: draftPath,
+					document_id: args.document_id,
+					actor_id: args.actor_id,
+					page_name: 'Page 1'
+				});
+			}
+			return this.openDocument({ path: draftPath, actor_id: args.actor_id });
 		},
 
 		async snapshot(args: Parameters<SessionApi['snapshot']>[0]) {
@@ -207,6 +220,18 @@ function createFakeSessionApi() {
 			};
 		},
 
+		async saveDraftAs(args: Parameters<SessionApi['saveDraftAs']>[0]): Promise<SessionSaved> {
+			const session = sessions.get(args.session_id);
+			if (!session) throw new Error('Missing fake session');
+			files.set(args.path, structuredClone(session.status.snapshot));
+			session.status = { ...session.status, path: args.path, dirty: false };
+			files.delete(draftPath);
+			return {
+				save: { path: args.path, heads: session.status.snapshot.heads },
+				status: statusFor(args.session_id, session)
+			};
+		},
+
 		async query(args: Parameters<SessionApi['query']>[0]) {
 			const session = sessions.get(args.session_id);
 			if (!session) throw new Error('Missing fake session');
@@ -253,7 +278,7 @@ function createFakeSessionApi() {
 		}
 	} satisfies SessionApi;
 
-	return { api, files };
+	return { api, files, draftPath };
 }
 
 function createFakeFileOps() {
@@ -384,5 +409,39 @@ describe('Rust-backed desktop session repository', () => {
 
 		expect(boards.map((board) => board.name)).toEqual(['alpha']);
 		expect(boards.every((board) => board.id.startsWith('path:'))).toBe(true);
+	});
+
+	it('persists the app-managed draft across renderer sessions without adding it to recent files', async () => {
+		const firstRepo = createDesktopSessionRepo(fileOps.ops, { api: session.api });
+		const opened = await firstRepo.openDraft();
+		const pageId = Object.keys(opened.doc.pages)[0];
+
+		await firstRepo.applyDocPatch(opened.boardId, {
+			upserts: { pages: [{ id: pageId, name: 'Recovered after reload', shapeIds: [] }] }
+		});
+		await firstRepo.closeSession();
+
+		const reloadedRepo = createDesktopSessionRepo(fileOps.ops, { api: session.api });
+		const reloaded = await reloadedRepo.openDraft();
+
+		expect(reloaded.doc.pages[pageId].name).toBe('Recovered after reload');
+		expect(reloadedRepo.isDraft()).toBe(true);
+		expect(reloadedRepo.getCurrentFile()).toBeNull();
+		expect(await reloadedRepo.listBoards()).toEqual([]);
+		expect(fileOps.recent).toEqual([]);
+	});
+
+	it('promotes a draft with Save As and removes the app-data source', async () => {
+		fileOps.setSavePath('/tmp/promoted.inkfinite');
+		const repo = createDesktopSessionRepo(fileOps.ops, { api: session.api });
+		const opened = await repo.openDraft();
+		const snapshot = await repo.exportBoard(opened.boardId);
+
+		await repo.importBoard(snapshot);
+
+		expect(repo.isDraft()).toBe(false);
+		expect(repo.getCurrentFile()?.path).toBe('/tmp/promoted.inkfinite');
+		expect(session.files.has(session.draftPath)).toBe(false);
+		expect(fileOps.recent.map((file) => file.path)).toEqual(['/tmp/promoted.inkfinite']);
 	});
 });

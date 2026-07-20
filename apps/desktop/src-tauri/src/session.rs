@@ -1,5 +1,7 @@
 //! Tauri commands for document sessions.
 
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use inkfinite_core::proto::{
@@ -12,9 +14,12 @@ use inkfinite_core::session::{
 use inkfinite_core::sync::SyncMessage;
 use inkfinite_core::{ActorId, ChangeHash, DocumentId};
 use serde_json::json;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 type Result<T> = std::result::Result<T, ProtocolError>;
+
+const DRAFT_DIRECTORY: &str = "drafts";
+const DRAFT_FILE_NAME: &str = "untitled.inkfinite";
 
 /// Owner of every open document session in this app process.
 pub struct DesktopState {
@@ -45,6 +50,35 @@ fn to_protocol_error(error: SessionError) -> ProtocolError {
     inkfinite_core::ipc::session_protocol_error(&error)
 }
 
+fn draft_document_path(app: &AppHandle) -> Result<PathBuf> {
+    let directory = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|error| ProtocolError {
+            code: "draft_path_unavailable".into(),
+            message: format!("could not resolve the desktop draft directory: {error}"),
+            details: None,
+        })?
+        .join(DRAFT_DIRECTORY);
+    fs::create_dir_all(&directory).map_err(|error| ProtocolError {
+        code: "draft_directory_unavailable".into(),
+        message: format!(
+            "could not create the desktop draft directory {}: {error}",
+            directory.display()
+        ),
+        details: None,
+    })?;
+    Ok(directory.join(DRAFT_FILE_NAME))
+}
+
+fn draft_promotion_path(draft_path: &Path) -> PathBuf {
+    draft_path.with_extension("inkfinite.promoting")
+}
+
+fn same_path(left: &str, right: &Path) -> bool {
+    Path::new(left) == right
+}
+
 /// Creates a new canonical `.inkfinite` file and opens its session.
 #[tauri::command]
 pub fn create_document(
@@ -66,6 +100,53 @@ pub fn open_document(state: State<'_, DesktopState>, path: String, actor_id: Str
     lock_service(&state)?
         .open(path, ActorId::new(actor_id))
         .map_err(to_protocol_error)
+}
+
+/// Reopens the app-managed unsaved document, creating it on first launch.
+///
+/// A renderer replacement takes ownership of an already-open draft session.
+/// Completed gestures are saved synchronously, so closing that stale session
+/// before reopening the canonical draft does not discard acknowledged edits.
+#[tauri::command]
+pub fn open_or_create_draft(
+    app: AppHandle, state: State<'_, DesktopState>, document_id: String, actor_id: String,
+) -> Result<SessionOpened> {
+    let path = draft_document_path(&app)?;
+    let promotion_path = draft_promotion_path(&path);
+    if !path.exists() && promotion_path.exists() {
+        fs::rename(&promotion_path, &path).map_err(|error| ProtocolError {
+            code: "draft_recovery_failed".into(),
+            message: format!("could not restore an interrupted desktop draft promotion: {error}"),
+            details: None,
+        })?;
+    }
+    let mut service = lock_service(&state)?;
+    if let Some(status) = service
+        .statuses()
+        .map_err(to_protocol_error)?
+        .into_iter()
+        .find(|status| same_path(&status.path.0, &path))
+    {
+        if status.dirty {
+            service
+                .save(&status.session_id, &status.snapshot.heads)
+                .map_err(to_protocol_error)?;
+        }
+        service.close(&status.session_id).map_err(to_protocol_error)?;
+    }
+
+    if path.exists() {
+        service.open(path, ActorId::new(actor_id)).map_err(to_protocol_error)
+    } else {
+        service
+            .create(
+                path,
+                DocumentId::new(document_id),
+                ActorId::new(actor_id),
+                Some("Page 1"),
+            )
+            .map_err(to_protocol_error)
+    }
 }
 
 /// Returns the current snapshot and session state.
@@ -178,6 +259,56 @@ pub fn save_as(
     lock_service(&state)?
         .save_as(&SessionId(session_id), path.0, &expected_heads)
         .map_err(to_protocol_error)
+}
+
+/// Promotes the app-managed draft to a user-selected document path.
+///
+/// Unlike ordinary Save As, promotion removes the app-data source after the
+/// replacement is safely written and adopted by the live session.
+#[tauri::command]
+pub fn save_draft_as(
+    app: AppHandle, state: State<'_, DesktopState>, session_id: String, path: DocumentPath,
+    expected_heads: Vec<ChangeHash>,
+) -> Result<SessionSaved> {
+    let draft_path = draft_document_path(&app)?;
+    let promotion_path = draft_promotion_path(&draft_path);
+    let session_id = SessionId(session_id);
+    let mut service = lock_service(&state)?;
+    let status = service.status(&session_id).map_err(to_protocol_error)?;
+    if !same_path(&status.path.0, &draft_path) {
+        return Err(ProtocolError {
+            code: "not_draft_session".into(),
+            message: "only the app-managed draft can be promoted".into(),
+            details: None,
+        });
+    }
+    fs::rename(&draft_path, &promotion_path).map_err(|error| ProtocolError {
+        code: "draft_promotion_failed".into(),
+        message: format!("could not prepare the desktop draft for Save As: {error}"),
+        details: None,
+    })?;
+    let saved = match service.save_as(&session_id, path.0, &expected_heads) {
+        Ok(saved) => saved,
+        Err(error) => {
+            if let Err(restore_error) = fs::rename(&promotion_path, &draft_path) {
+                return Err(ProtocolError {
+                    code: "draft_restore_failed".into(),
+                    message: format!("Save As failed and the desktop draft could not be restored: {restore_error}"),
+                    details: None,
+                });
+            }
+            return Err(to_protocol_error(error));
+        }
+    };
+    match fs::remove_file(&promotion_path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => {
+            // The non-document extension prevents a cleanup orphan from being
+            // reopened as a draft or shown in the document browser.
+        }
+    }
+    Ok(saved)
 }
 
 /// Queries records through the shared deterministic query implementation.

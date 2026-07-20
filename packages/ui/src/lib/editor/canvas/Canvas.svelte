@@ -326,6 +326,7 @@
 		persistence={persistenceStatusStore}
 		snap={c.snapStore}
 		platform={platformKind}
+		draft={c.desktop.isDraft}
 		onOpenBrowser={c.fileBrowser.handleOpen}
 		onHistoryClick={c.history.handleClick} />
 	{#if c.fileBrowser.vm && c.fileBrowser.open}

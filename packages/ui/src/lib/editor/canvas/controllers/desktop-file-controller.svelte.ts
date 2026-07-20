@@ -1,10 +1,4 @@
-import {
-	diffDoc,
-	type BoardMeta,
-	type Document,
-	type LoadedDoc,
-	type PersistentDocRepo
-} from '@inkfinite/core';
+import type { BoardMeta, LoadedDoc, PersistentDocRepo } from '@inkfinite/core';
 import type { DesktopDocumentRepo } from '../../platform';
 
 function isUserCancelled(error: unknown) {
@@ -13,18 +7,27 @@ function isUserCancelled(error: unknown) {
 
 export class DesktopFileController {
 	boards = $state<BoardMeta[]>([]);
+	isDraft = $state(false);
 
 	constructor(
 		private getRepo: () => PersistentDocRepo | null,
 		private getDesktopRepo: () => DesktopDocumentRepo | null,
 		private onLoadDoc: (boardId: string, doc: LoadedDoc) => void,
-		private getActiveBoardId: () => string | null,
-		private getCurrentDocument: () => Document
+		private getActiveBoardId: () => string | null
 	) {}
 
 	get repo(): DesktopDocumentRepo | null {
 		return this.getDesktopRepo();
 	}
+
+	openDraft = async () => {
+		const desktopRepo = this.getDesktopRepo();
+		if (!desktopRepo) return;
+		const opened = await desktopRepo.openDraft();
+		this.isDraft = true;
+		this.onLoadDoc(opened.boardId, opened.doc);
+		await this.refreshBoards();
+	};
 
 	refreshBoards = async (): Promise<BoardMeta[]> => {
 		const desktopRepo = this.getDesktopRepo();
@@ -51,6 +54,7 @@ export class DesktopFileController {
 		}
 		try {
 			const opened = await desktopRepo.openFromDialog();
+			this.isDraft = false;
 			this.onLoadDoc(opened.boardId, opened.doc);
 			await this.refreshBoards();
 		} catch (error) {
@@ -69,6 +73,7 @@ export class DesktopFileController {
 		try {
 			const boardId = await repo.createBoard('Untitled');
 			const loaded = await repo.loadDoc(boardId);
+			this.isDraft = false;
 			this.onLoadDoc(boardId, loaded);
 			await this.refreshBoards();
 		} catch (error) {
@@ -86,30 +91,11 @@ export class DesktopFileController {
 			return;
 		}
 		try {
-			if (!activeBoardId) {
-				const unsavedDocument = this.getCurrentDocument();
-				const boardId = await repo.createBoard('Untitled');
-				const blank = await repo.loadDoc(boardId);
-				await repo.applyDocPatch(
-					boardId,
-					diffDoc(
-						{
-							pages: blank.pages,
-							layers: blank.layers ?? blank.order.layers,
-							shapes: blank.shapes,
-							bindings: blank.bindings
-						},
-						unsavedDocument
-					)
-				);
-				const saved = await repo.loadDoc(boardId);
-				this.onLoadDoc(boardId, saved);
-				await this.refreshBoards();
-				return;
-			}
+			if (!activeBoardId) return;
 			const snapshot = await repo.exportBoard(activeBoardId);
 			const newBoardId = await repo.importBoard(snapshot);
 			const loaded = await repo.loadDoc(newBoardId);
+			this.isDraft = false;
 			this.onLoadDoc(newBoardId, loaded);
 			await this.refreshBoards();
 		} catch (error) {
@@ -122,11 +108,13 @@ export class DesktopFileController {
 
 	handleRecentSelect = async (boardId: string) => {
 		const repo = this.getRepo();
+		const desktopRepo = this.getDesktopRepo();
 		if (!repo) {
 			return;
 		}
 		try {
 			const loaded = await repo.loadDoc(boardId);
+			this.isDraft = desktopRepo?.isDraft() ?? false;
 			this.onLoadDoc(boardId, loaded);
 			await this.refreshBoards();
 		} catch (error) {

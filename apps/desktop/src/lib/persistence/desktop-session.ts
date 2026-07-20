@@ -11,6 +11,7 @@ import type {
 	PageRecord as EditorPageRecord,
 	BindingRecord as EditorBindingRecord,
 	PersistenceSink,
+	PersistenceStatus,
 	PersistentDocRepo,
 	ShapeRecord as EditorShapeRecord
 } from '@inkfinite/core';
@@ -113,6 +114,7 @@ export interface SessionApi {
 		page_name?: string;
 	}): Promise<SessionOpened>;
 	openDocument(args: { path: string; actor_id: string }): Promise<SessionOpened>;
+	openOrCreateDraft(args: { document_id: string; actor_id: string }): Promise<SessionOpened>;
 	snapshot(args: { session_id: string }): Promise<SessionStatus>;
 	commit(args: { session_id: string; transaction: TransactionDraft }): Promise<SessionCommit>;
 	propose(args: { session_id: string; transaction: TransactionDraft }): Promise<Proposal>;
@@ -127,6 +129,7 @@ export interface SessionApi {
 	redo(args: { session_id: string; actor_id: string }): Promise<SessionCommit>;
 	save(args: { session_id: string; expected_heads: ChangeHash[] }): Promise<SessionSaved>;
 	saveAs(args: { session_id: string; path: string; expected_heads: ChangeHash[] }): Promise<SessionSaved>;
+	saveDraftAs(args: { session_id: string; path: string; expected_heads: ChangeHash[] }): Promise<SessionSaved>;
 	query(args: { session_id: string; query: Query }): Promise<QueryResult>;
 	validate(args: { session_id: string }): Promise<SessionStatus>;
 	syncConnect(args: { session_id: string; peer_id: string }): Promise<SessionStatus>;
@@ -140,6 +143,7 @@ function createSessionApi(): SessionApi {
 	return {
 		createDocument: (args) => invoke<SessionOpened>('create_document', args),
 		openDocument: (args) => invoke<SessionOpened>('open_document', args),
+		openOrCreateDraft: (args) => invoke<SessionOpened>('open_or_create_draft', args),
 		snapshot: (args) => invoke<SessionStatus>('snapshot', args),
 		commit: (args) => invoke<SessionCommit>('commit', args),
 		propose: (args) => invoke<Proposal>('propose', args),
@@ -150,6 +154,7 @@ function createSessionApi(): SessionApi {
 		redo: (args) => invoke<SessionCommit>('redo', args),
 		save: (args) => invoke<SessionSaved>('save', args),
 		saveAs: (args) => invoke<SessionSaved>('save_as', args),
+		saveDraftAs: (args) => invoke<SessionSaved>('save_draft_as', args),
 		query: (args) => invoke<QueryResult>('query', args),
 		validate: (args) => invoke<SessionStatus>('validate', args),
 		syncConnect: (args) => invoke<SessionStatus>('sync_connect', args),
@@ -163,6 +168,8 @@ function createSessionApi(): SessionApi {
 /** Persistent document repository backed by one backend/tauri-owned session. */
 export type DesktopSessionRepo = PersistentDocRepo & {
 	kind: 'desktop';
+	openDraft(): Promise<{ boardId: string; doc: LoadedDoc }>;
+	isDraft(): boolean;
 	getCurrentFile(): FileHandle | null;
 	openFromDialog(): Promise<{ boardId: string; doc: LoadedDoc }>;
 	getWorkspaceDir(): Promise<string | null>;
@@ -196,6 +203,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 	let currentBoard: BoardMeta | null = null;
 	let currentDoc: LoadedDoc | null = null;
 	let currentStatus: SessionStatus | null = null;
+	let currentIsDraft = false;
 	let currentProposal: Proposal | null = null;
 	const proposalListeners = new Set<(update: ProposalUpdate) => void>();
 	const liveUnlisteners: Array<() => void> = [];
@@ -248,8 +256,9 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 
 	startLiveListeners();
 
-	function setCurrentState(status: SessionStatus, boardName?: string) {
+	function setCurrentState(status: SessionStatus, boardName?: string, isDraft = false) {
 		currentStatus = status;
+		currentIsDraft = isDraft;
 		currentFile = { path: status.path, name: fileName(status.path) };
 		currentBoard = {
 			id: status.snapshot.document_id,
@@ -258,8 +267,10 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 			updatedAt: Date.now()
 		};
 		currentDoc = loadedDocFromSnapshot(status.snapshot);
-		boardFiles.set(currentBoard.id, currentFile);
-		boardFiles.set(boardIdForPath(status.path), currentFile);
+		if (!isDraft) {
+			boardFiles.set(currentBoard.id, currentFile);
+			boardFiles.set(boardIdForPath(status.path), currentFile);
+		}
 	}
 
 	function updateStatus(status: SessionStatus) {
@@ -267,12 +278,12 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		currentStatus = status;
 		currentFile = { path: status.path, name: fileName(status.path) };
 		currentDoc = loadedDocFromSnapshot(status.snapshot);
-		if (currentBoard) {
+		if (currentBoard && !currentIsDraft) {
 			currentBoard = { ...currentBoard, updatedAt: Date.now() };
 			boardFiles.set(currentBoard.id, currentFile);
 		}
 		if (previousPath && previousPath !== status.path) boardFiles.delete(boardIdForPath(previousPath));
-		boardFiles.set(boardIdForPath(status.path), currentFile);
+		if (!currentIsDraft) boardFiles.set(boardIdForPath(status.path), currentFile);
 	}
 
 	async function closeCurrentSession() {
@@ -283,6 +294,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		currentFile = null;
 		currentBoard = null;
 		currentDoc = null;
+		currentIsDraft = false;
 	}
 
 	async function saveCurrentSession() {
@@ -308,6 +320,14 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		return currentDoc!;
 	}
 
+	async function openDraft(): Promise<{ boardId: string; doc: LoadedDoc }> {
+		if (currentStatus) await closeCurrentSession();
+		const opened = await api.openOrCreateDraft({ document_id: createId('board'), actor_id: ACTOR_ID });
+		setCurrentState(opened.status, 'Untitled', true);
+		if (!currentBoard || !currentDoc) throw new Error('Failed to open desktop draft');
+		return { boardId: currentBoard.id, doc: currentDoc };
+	}
+
 	async function listBoards(): Promise<BoardMeta[]> {
 		const workspace = await fileOps.getWorkspaceDir();
 		const handles: FileHandle[] = [];
@@ -325,7 +345,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 			boardFiles.set(id, handle);
 			return { id, name: fileStem(handle.name), createdAt: 0, updatedAt: 0 } satisfies BoardMeta;
 		});
-		if (currentBoard) {
+		if (currentBoard && !currentIsDraft) {
 			const currentIndex = boards.findIndex((board) => boardFiles.get(board.id)?.path === currentFile?.path);
 			if (currentIndex >= 0) {
 				boards[currentIndex] = currentBoard;
@@ -445,12 +465,14 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		if (!currentStatus || !currentBoard) throw new Error('No board loaded');
 		const path = await fileOps.showSaveDialog(`${safeFileStem(snapshot.board.name)}.inkfinite`);
 		if (!path) throw new Error('Save cancelled');
-		const saved = await api.saveAs({
+		const saveAs = currentIsDraft ? api.saveDraftAs : api.saveAs;
+		const saved = await saveAs({
 			session_id: currentStatus.session_id,
 			path,
 			expected_heads: currentStatus.snapshot.heads
 		});
 		updateStatus(saved.status);
+		currentIsDraft = false;
 		currentBoard = { ...currentBoard, name: snapshot.board.name, updatedAt: Date.now() };
 		if (currentFile) await fileOps.addRecentFile(currentFile);
 		return currentBoard.id;
@@ -570,6 +592,8 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 
 	return {
 		kind: 'desktop',
+		openDraft,
+		isDraft: () => currentIsDraft,
 		listBoards,
 		createBoard,
 		openBoard,
@@ -579,7 +603,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		applyDocPatch,
 		exportBoard,
 		importBoard,
-		getCurrentFile: () => currentFile,
+		getCurrentFile: () => (currentIsDraft ? null : currentFile),
 		openFromDialog,
 		getWorkspaceDir: () => fileOps.getWorkspaceDir(),
 		setWorkspaceDir: (path: string | null) => fileOps.setWorkspaceDir(path),
@@ -602,17 +626,53 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 	};
 }
 
+type PersistenceStatusStore = { update(updater: (status: PersistenceStatus) => PersistenceStatus): void };
+
 /** Creates a serialized desktop persistence queue for editor history events. */
-export function createDesktopPersistenceSink(repo: DesktopSessionRepo): PersistenceSink {
+export function createDesktopPersistenceSink(
+	repo: DesktopSessionRepo,
+	statusStore?: PersistenceStatusStore
+): PersistenceSink {
 	let queue = Promise.resolve();
 	let lastError: unknown = null;
+
+	function updatePendingStatus(error?: unknown) {
+		statusStore?.update((status) => {
+			const pendingWrites = Math.max(0, (status.pendingWrites ?? 1) - 1);
+			const persistenceError = error ?? lastError;
+			if (persistenceError) {
+				return {
+					...status,
+					state: 'error',
+					pendingWrites,
+					errorMsg: persistenceError instanceof Error ? persistenceError.message : String(persistenceError)
+				};
+			}
+			return {
+				...status,
+				state: pendingWrites === 0 ? 'saved' : 'saving',
+				pendingWrites,
+				lastSavedAt: pendingWrites === 0 ? Date.now() : status.lastSavedAt,
+				errorMsg: undefined
+			};
+		});
+	}
+
 	return {
 		enqueueDocPatch(boardId, patch) {
+			statusStore?.update((status) => ({
+				...status,
+				state: 'saving',
+				pendingWrites: (status.pendingWrites ?? 0) + 1,
+				errorMsg: undefined
+			}));
 			queue = queue
 				.catch(() => undefined)
 				.then(() => repo.applyDocPatch(boardId, patch))
+				.then(() => updatePendingStatus())
 				.catch((error) => {
 					lastError = error;
+					updatePendingStatus(error);
 				});
 		},
 		async flush() {
