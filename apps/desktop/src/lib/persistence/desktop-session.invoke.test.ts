@@ -1,5 +1,5 @@
 import type { DesktopFileOps } from '@inkfinite/core';
-import type { DocumentSnapshot } from '@inkfinite/bindings';
+import type { DocumentSnapshot, Proposal } from '@inkfinite/bindings';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const tauri = vi.hoisted(() => ({ invoke: vi.fn(), listen: vi.fn(async () => () => undefined) }));
@@ -127,5 +127,71 @@ describe('Tauri desktop session command boundary', () => {
 
 		expect(tauri.invoke).toHaveBeenCalledWith('create_document', expect.any(Object));
 		expect(tauri.invoke).toHaveBeenCalledWith('save_as', expect.any(Object));
+	});
+
+	it('clears a live proposal when its review window expires', async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(1_000);
+		try {
+			const files = fileOps();
+			const document = snapshot('board:proposal-expiry');
+			tauri.invoke.mockImplementation(async (command: string) => {
+				if (command !== 'create_document') throw new Error(`Unexpected command: ${command}`);
+				return {
+					session_id: 'session:1',
+					status: {
+						session_id: 'session:1',
+						path: '/tmp/Untitled.inkfinite',
+						actor_id: 'actor:desktop',
+						snapshot: document,
+						dirty: false,
+						lock_held: true,
+						recovery_available: false,
+						can_undo: false,
+						can_redo: false,
+						sync: { status: 'disabled' }
+					}
+				} satisfies SessionOpened;
+			});
+
+			const repo = createDesktopSessionRepo(files.ops);
+			await repo.createBoard('Untitled');
+			const updates: Array<{ proposal: Proposal | null; message?: string }> = [];
+			repo.subscribeProposal((update) => updates.push(update));
+			const listenCalls = tauri.listen.mock.calls as unknown as Array<
+				[string, (event: { payload: { session_id?: string; proposal: Proposal } }) => void]
+			>;
+			const proposalListener = listenCalls.find(([event]) => event === 'inkfinite-proposal')?.[1];
+			expect(proposalListener).toBeTypeOf('function');
+
+			const proposal: Proposal = {
+				id: 'proposal:1',
+				transaction: {
+					id: 'transaction:1',
+					actor_id: 'actor:desktop',
+					origin: 'agent',
+					base_heads: ['head:1'],
+					description: 'Preview expiry',
+					operations: [],
+					timestamp: 1_000
+				},
+				preview: { created: [], changed: [], deleted: [] },
+				affected_regions: [],
+				warnings: [],
+				expires_at: 2_000
+			};
+			proposalListener?.({ payload: { session_id: 'session:1', proposal } });
+			expect(repo.getProposal()?.id).toBe('proposal:1');
+
+			vi.advanceTimersByTime(1_000);
+
+			expect(repo.getProposal()).toBeNull();
+			expect(updates.at(-1)).toEqual({
+				proposal: null,
+				message: 'The proposal expired without changing the document.'
+			});
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 });

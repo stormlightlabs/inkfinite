@@ -190,18 +190,18 @@ Blocked by: V2-20, V2-22
 
 Acceptance criteria:
 
-- [ ] Start from a clean desktop build and a fresh Codex context with only the
+- [x] Start from a clean desktop build and a fresh Codex context with only the
       packaged skill installed. After launch, disconnect the network; the rest
       of the session requires no account, server, browser automation, raw
       document edit, or unbundled repository instruction.
-- [ ] The user creates or selects a local `.inkfinite` document and gives Codex
+- [x] The user creates or selects a local `.inkfinite` document and gives Codex
       a short desktop-application brief. The target wireframe exercises named
       semantic roles, text, connections, at least two layers, and one locked or
       `agent_editable: false` element.
-- [ ] Codex discovers the open session, inspects its heads, queries only the
+- [x] Codex discovers the open session, inspects its heads, queries only the
       relevant records, and describes a small first change before proposing it.
       The first durable agent action uses `app propose`, not direct apply.
-- [ ] The user rejects one proposal and confirms that the snapshot and heads do
+- [x] The user rejects one proposal and confirms that the snapshot and heads do
       not change, then requests a revision and reviews its ghost preview and
       created, changed, and deleted IDs.
 - [ ] The user partially accepts a proposal whose operations can remain valid
@@ -258,8 +258,7 @@ Acceptance criteria:
 
 ### QA
 
-- [x] Expose agent-editable state in the UI.
-- [x] Make Save As open the native dialog and persist to the selected path.
-- We don't expose dirty when creating a new board
-- [x] Make New Board create and persist the selected `.inkfinite` file.
-- [x] Recover app-managed drafts after a crash leaves the lock sidecar behind.
+- [x] The desktop kept an expired proposal visible even though the backend had
+      discarded it, leaving Accept and Reject unable to complete. The desktop
+      now clears the review when its deadline passes and confirms that the
+      document did not change.

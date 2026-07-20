@@ -250,6 +250,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 	let currentStatus: SessionStatus | null = null;
 	let currentIsDraft = false;
 	let currentProposal: Proposal | null = null;
+	let proposalExpiryTimer: ReturnType<typeof setTimeout> | null = null;
 	const proposalListeners = new Set<(update: ProposalUpdate) => void>();
 	const liveUnlisteners: Array<() => void> = [];
 	const boardFiles = new Map<string, FileHandle>();
@@ -260,8 +261,26 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 	type LiveSyncEvent = { session_id?: string | null; sync: SessionSync };
 
 	function notifyProposal(update: ProposalUpdate) {
+		if (proposalExpiryTimer) clearTimeout(proposalExpiryTimer);
+		proposalExpiryTimer = null;
 		currentProposal = update.proposal;
 		for (const listener of proposalListeners) listener(update);
+		if (update.proposal) {
+			const delay = update.proposal.expires_at - Date.now();
+			if (delay <= 0) {
+				notifyProposal({ proposal: null, message: 'The proposal expired without changing the document.' });
+			} else {
+				proposalExpiryTimer = setTimeout(() => {
+					notifyProposal({ proposal: null, message: 'The proposal expired without changing the document.' });
+				}, delay);
+			}
+		}
+	}
+
+	function clearExpiredProposal(proposalId: string): boolean {
+		if (currentProposal?.id !== proposalId || Date.now() < currentProposal.expires_at) return false;
+		notifyProposal({ proposal: null, message: 'The proposal expired without changing the document.' });
+		return true;
 	}
 
 	function eventBelongsToCurrentSession(sessionId?: string | null): boolean {
@@ -613,6 +632,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 
 	async function acceptProposal(proposalId: string, operationPositions?: number[]): Promise<void> {
 		if (!currentStatus) throw new Error('No board loaded');
+		if (clearExpiredProposal(proposalId)) return;
 		const result = await api.acceptProposal({
 			session_id: currentStatus.session_id,
 			proposal_id: proposalId,
@@ -625,6 +645,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 
 	async function rejectProposal(proposalId: string): Promise<void> {
 		if (!currentStatus) throw new Error('No board loaded');
+		if (clearExpiredProposal(proposalId)) return;
 		await api.rejectProposal({ session_id: currentStatus.session_id, proposal_id: proposalId });
 		notifyProposal({ proposal: null });
 	}
