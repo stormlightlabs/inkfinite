@@ -256,4 +256,34 @@ Acceptance criteria:
 
 - How should bundling/packaging work?
 
+### Agent drawing workflow
+
+- [ ] Add a concise live context command for drawing sessions. It should return the
+      current heads, page, active layer, selection, camera, visible world bounds, and
+      canvas regions covered by floating UI. Agents should not have to infer the user's
+      viewport from document coordinates.
+- [ ] Let structured shape, stencil, connection, and layout commands target a
+      live session and create a review proposal.
+      The CLI should fill the session actor, current heads, timestamps, and provenance
+      instead of requiring agents to hand-write a complete `TransactionDraft`.
+- [ ] Support placement relative to semantic targets, such as inside, below,
+      right of, aligned with, or spaced from a shape selected by role, name, or ID.
+      Return the resolved bounds in the preview so the agent can explain the placement
+      before review.
+- [ ] Render the current live document and a proposed result to deterministic
+      SVG without applying the transaction. Include created, changed, and deleted
+      geometry so an agent can check composition before asking the user to review the
+      desktop ghost.
+- [ ] Expose proposal state through a status or wait command. Report accepted,
+      partially accepted, rejected, expired, or refreshed outcomes along with committed
+      heads and affected IDs; agents should not have to infer the decision by comparing
+      full snapshots.
+- [ ] Give proposal operations stable human-readable labels and per-operation geometry.
+      Partial acceptance should identify the shape or semantic role, not only a
+      zero-based operation position or one broad affected region.
+- [ ] Allow an unchanged proposal to be refreshed or given more review time. Human
+      discussion during a drawing session should not require rebuilding the same
+      transaction solely because its review timer expired.
+- [ ] We need a mechanism whereby the agent can freely control the UI
+
 ### QA
