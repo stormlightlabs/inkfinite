@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::Path;
 use tauri::AppHandle;
+use tauri_plugin_dialog::DialogExt;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct FileEntry {
@@ -89,11 +90,57 @@ pub fn delete_file(file_path: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Opens the native document picker and returns the selected Inkfinite path.
+#[tauri::command]
+pub async fn pick_open_document(app: AppHandle) -> Result<Option<String>, String> {
+    log::info!("opening native document picker");
+    let selected = app
+        .dialog()
+        .file()
+        .add_filter("Inkfinite Files", &["inkfinite"])
+        .blocking_pick_file();
+    let path = selected
+        .map(|path| path.into_path().map(|path| path.to_string_lossy().into_owned()))
+        .transpose()
+        .map_err(|error| {
+            log::error!("failed to resolve the selected document path: {error}");
+            format!("Failed to resolve selected document: {error}")
+        })?;
+    match &path {
+        Some(path) => log::info!("native document picker selected {path}"),
+        None => log::info!("native document picker was cancelled"),
+    }
+    Ok(path)
+}
+
+/// Opens the native Save dialog and returns the selected Inkfinite path.
+#[tauri::command]
+pub async fn pick_save_document(app: AppHandle, default_name: Option<String>) -> Result<Option<String>, String> {
+    log::info!("opening native Save dialog with default name {:?}", default_name);
+    let dialog = app.dialog().file().add_filter("Inkfinite Files", &["inkfinite"]);
+    let selected = match default_name {
+        Some(name) => dialog.set_file_name(name),
+        None => dialog,
+    }
+    .blocking_save_file();
+    let path = selected
+        .map(|path| path.into_path().map(|path| path.to_string_lossy().into_owned()))
+        .transpose()
+        .map_err(|error| {
+            log::error!("failed to resolve the selected Save path: {error}");
+            format!("Failed to resolve selected Save path: {error}")
+        })?;
+    match &path {
+        Some(path) => log::info!("native Save dialog selected {path}"),
+        None => log::info!("native Save dialog was cancelled"),
+    }
+    Ok(path)
+}
+
 /// Pick a workspace directory using the system folder picker
 #[tauri::command]
 pub async fn pick_workspace_directory(app: AppHandle) -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::DialogExt;
-
+    log::info!("opening native workspace directory picker");
     let result = app.dialog().file().blocking_pick_folder();
 
     match result {

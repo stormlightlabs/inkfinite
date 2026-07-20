@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, btree_map::Entry};
 use std::fmt::Write as _;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File, OpenOptions, TryLockError};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -971,33 +971,39 @@ fn lock_path(path: &Path) -> PathBuf {
         .join(format!(".{file_name}.lock"))
 }
 
+/// Holds an OS-exclusive lock on a stable sidecar inode for one document.
+///
+/// The sidecar remains after clean shutdown so another process cannot create a
+/// different inode while a waiting writer still holds the previous one open.
+/// Closing the file releases the kernel lock, including when the process exits
+/// after a crash.
 struct AdvisoryLock {
-    path: PathBuf,
     _file: File,
 }
 
 impl AdvisoryLock {
     fn acquire(document_path: &Path) -> Result<Self, FileError> {
         let path = lock_path(document_path);
-        let mut file = match OpenOptions::new().write(true).create_new(true).open(&path) {
-            Ok(file) => file,
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                return Err(FileError::Locked { path: document_path.to_owned() });
-            }
-            Err(error) => return Err(io_error("create document lock", path, error)),
-        };
-        let owner = format!("pid={}\n", std::process::id());
-        if let Err(error) = file.write_all(owner.as_bytes()).and_then(|()| file.sync_all()) {
-            let _ = fs::remove_file(&path);
-            return Err(io_error("write document lock", path, error));
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&path)
+            .map_err(|error| io_error("open document lock", path.clone(), error))?;
+        match file.try_lock() {
+            Ok(()) => {}
+            Err(TryLockError::WouldBlock) => return Err(FileError::Locked { path: document_path.to_owned() }),
+            Err(TryLockError::Error(error)) => return Err(io_error("lock document", path, error)),
         }
-        Ok(Self { path, _file: file })
-    }
-}
-
-impl Drop for AdvisoryLock {
-    fn drop(&mut self) {
-        let _ = fs::remove_file(&self.path);
+        if let Err(error) = file
+            .set_len(0)
+            .and_then(|()| file.write_all(format!("pid={}\n", std::process::id()).as_bytes()))
+            .and_then(|()| file.sync_all())
+        {
+            return Err(io_error("write document lock", path, error));
+        };
+        Ok(Self { _file: file })
     }
 }
 

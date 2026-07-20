@@ -39,14 +39,18 @@ impl DesktopState {
 }
 
 fn lock_service(state: &DesktopState) -> Result<MutexGuard<'_, SessionService>> {
-    state.service.lock().map_err(|_| ProtocolError {
-        code: "session_service_unavailable".into(),
-        message: "the desktop session service lock is poisoned".into(),
-        details: None,
+    state.service.lock().map_err(|_| {
+        log::error!("desktop session service lock is poisoned");
+        ProtocolError {
+            code: "session_service_unavailable".into(),
+            message: "the desktop session service lock is poisoned".into(),
+            details: None,
+        }
     })
 }
 
 fn to_protocol_error(error: SessionError) -> ProtocolError {
+    log::error!("desktop session command failed: {error}");
     inkfinite_core::ipc::session_protocol_error(&error)
 }
 
@@ -84,14 +88,21 @@ fn same_path(left: &str, right: &Path) -> bool {
 pub fn create_document(
     state: State<'_, DesktopState>, path: String, document_id: String, actor_id: String, page_name: Option<String>,
 ) -> Result<SessionOpened> {
-    lock_service(&state)?
+    log::info!("creating document at {path}");
+    let opened = lock_service(&state)?
         .create(
             path,
             DocumentId::new(document_id),
             ActorId::new(actor_id),
             page_name.as_deref(),
         )
-        .map_err(to_protocol_error)
+        .map_err(to_protocol_error)?;
+    log::info!(
+        "created document session {} at {}",
+        opened.session_id.0,
+        opened.status.path.0
+    );
+    Ok(opened)
 }
 
 /// Opens a canonical `.inkfinite` document.
@@ -112,6 +123,7 @@ pub fn open_or_create_draft(
     app: AppHandle, state: State<'_, DesktopState>, document_id: String, actor_id: String,
 ) -> Result<SessionOpened> {
     let path = draft_document_path(&app)?;
+    log::info!("opening desktop draft at {}", path.display());
     let promotion_path = draft_promotion_path(&path);
     if !path.exists() && promotion_path.exists() {
         fs::rename(&promotion_path, &path).map_err(|error| ProtocolError {
@@ -246,9 +258,12 @@ pub fn redo(state: State<'_, DesktopState>, session_id: String, actor_id: String
 pub fn save(
     state: State<'_, DesktopState>, session_id: String, expected_heads: Vec<ChangeHash>,
 ) -> Result<SessionSaved> {
-    lock_service(&state)?
+    log::info!("saving document session {session_id}");
+    let saved = lock_service(&state)?
         .save(&SessionId(session_id), &expected_heads)
-        .map_err(to_protocol_error)
+        .map_err(to_protocol_error)?;
+    log::info!("saved document at {}", saved.status.path.0);
+    Ok(saved)
 }
 
 /// Saves the current session at a replacement path after checking its heads.
@@ -256,9 +271,12 @@ pub fn save(
 pub fn save_as(
     state: State<'_, DesktopState>, session_id: String, path: DocumentPath, expected_heads: Vec<ChangeHash>,
 ) -> Result<SessionSaved> {
-    lock_service(&state)?
+    log::info!("saving document session {session_id} as {}", path.0);
+    let saved = lock_service(&state)?
         .save_as(&SessionId(session_id), path.0, &expected_heads)
-        .map_err(to_protocol_error)
+        .map_err(to_protocol_error)?;
+    log::info!("saved document as {}", saved.status.path.0);
+    Ok(saved)
 }
 
 /// Promotes the app-managed draft to a user-selected document path.
@@ -271,6 +289,7 @@ pub fn save_draft_as(
     expected_heads: Vec<ChangeHash>,
 ) -> Result<SessionSaved> {
     let draft_path = draft_document_path(&app)?;
+    log::info!("promoting desktop draft session {session_id} to {}", path.0);
     let promotion_path = draft_promotion_path(&draft_path);
     let session_id = SessionId(session_id);
     let mut service = lock_service(&state)?;
@@ -308,6 +327,7 @@ pub fn save_draft_as(
             // reopened as a draft or shown in the document browser.
         }
     }
+    log::info!("promoted desktop draft to {}", saved.status.path.0);
     Ok(saved)
 }
 
@@ -372,9 +392,12 @@ pub fn sync_receive(
 /// Closes a session and releases its advisory file lock.
 #[tauri::command]
 pub fn close(state: State<'_, DesktopState>, session_id: String) -> Result<()> {
+    log::info!("closing document session {session_id}");
     lock_service(&state)?
         .close(&SessionId(session_id))
-        .map_err(to_protocol_error)
+        .map_err(to_protocol_error)?;
+    log::info!("closed document session");
+    Ok(())
 }
 
 #[cfg(test)]

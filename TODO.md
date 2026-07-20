@@ -258,7 +258,8 @@ Acceptance criteria:
 
 ### QA
 
-- We don't expose agent editable in the UI
-- Save As doesn't work
+- [x] Expose agent-editable state in the UI.
+- [x] Make Save As open the native dialog and persist to the selected path.
 - We don't expose dirty when creating a new board
-- Saving doesn't work
+- [x] Make New Board create and persist the selected `.inkfinite` file.
+- [x] Recover app-managed drafts after a crash leaves the lock sidecar behind.

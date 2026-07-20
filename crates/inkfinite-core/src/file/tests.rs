@@ -59,6 +59,30 @@ fn canonical_sessions_lock_save_reopen_and_export_deterministically() {
 }
 
 #[test]
+fn stale_lock_sidecar_does_not_block_a_new_writer() {
+    let temporary = TestDirectory::new();
+    let canonical = temporary.path.join("board.inkfinite");
+    let lock = temporary.path.join(".board.inkfinite.lock");
+    fs::write(&lock, b"pid=999999999\n").expect("write abandoned lock sidecar");
+
+    let session = DocumentFile::create(
+        &canonical,
+        DocumentId::from("document:stale-lock"),
+        ActorId::from("actor:first"),
+        simple_document(),
+    )
+    .expect("reclaim stale lock sidecar");
+    assert!(matches!(
+        DocumentFile::open(&canonical, ActorId::from("actor:blocked")),
+        Err(FileError::Locked { .. })
+    ));
+
+    drop(session);
+    assert!(lock.exists());
+    DocumentFile::open(&canonical, ActorId::from("actor:restart")).expect("open after the previous writer exits");
+}
+
+#[test]
 fn rejects_invalid_canonical_bytes_without_replacing_the_file() {
     let temporary = TestDirectory::new();
     let canonical = temporary.path.join("invalid.inkfinite");

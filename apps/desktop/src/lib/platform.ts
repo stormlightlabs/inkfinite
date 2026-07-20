@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { createStatusStore, type EditorPlatformAdapter, type NativeFileMenuAction } from '@inkfinite/ui/editor';
 import { createDesktopFileOps } from './fileops';
@@ -18,7 +19,12 @@ export function createDesktopPlatformAdapter(): EditorPlatformAdapter {
 				subscribeFileMenu(listener) {
 					let active = true;
 					let stop: (() => void) | undefined;
-					void listen<NativeFileMenuAction>('inkfinite-file-menu', (event) => listener(event.payload))
+					void listen<NativeFileMenuAction>('inkfinite-file-menu', (event) => {
+						void invoke('record_renderer_event', { action: event.payload }).catch((error) =>
+							console.error('Failed to record native File menu command', error)
+						);
+						listener(event.payload);
+					})
 						.then((unlisten) => {
 							if (active) stop = unlisten;
 							else unlisten();

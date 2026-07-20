@@ -141,28 +141,72 @@ export interface SessionApi {
 
 function createSessionApi(): SessionApi {
 	return {
-		createDocument: (args) => invoke<SessionOpened>('create_document', args),
-		openDocument: (args) => invoke<SessionOpened>('open_document', args),
-		openOrCreateDraft: (args) => invoke<SessionOpened>('open_or_create_draft', args),
-		snapshot: (args) => invoke<SessionStatus>('snapshot', args),
-		commit: (args) => invoke<SessionCommit>('commit', args),
-		propose: (args) => invoke<Proposal>('propose', args),
-		acceptProposal: (args) => invoke<SessionCommit>('accept_proposal', args),
-		rejectProposal: (args) => invoke<void>('reject_proposal', args),
-		authorizeApply: (args) => invoke<ApplyAuthorization>('authorize_apply', args),
-		undo: (args) => invoke<SessionCommit>('undo', args),
-		redo: (args) => invoke<SessionCommit>('redo', args),
-		save: (args) => invoke<SessionSaved>('save', args),
-		saveAs: (args) => invoke<SessionSaved>('save_as', args),
-		saveDraftAs: (args) => invoke<SessionSaved>('save_draft_as', args),
-		query: (args) => invoke<QueryResult>('query', args),
-		validate: (args) => invoke<SessionStatus>('validate', args),
-		syncConnect: (args) => invoke<SessionStatus>('sync_connect', args),
-		syncDisconnect: (args) => invoke<SessionStatus>('sync_disconnect', args),
-		syncNext: (args) => invoke<SyncMessage | null>('sync_next', args),
-		syncReceive: (args) => invoke<SessionSync>('sync_receive', args),
-		close: (args) => invoke<void>('close', args)
+		createDocument: (args) =>
+			invokeSession<SessionOpened>('create_document', {
+				path: args.path,
+				documentId: args.document_id,
+				actorId: args.actor_id,
+				pageName: args.page_name
+			}),
+		openDocument: (args) =>
+			invokeSession<SessionOpened>('open_document', { path: args.path, actorId: args.actor_id }),
+		openOrCreateDraft: (args) =>
+			invokeSession<SessionOpened>('open_or_create_draft', {
+				documentId: args.document_id,
+				actorId: args.actor_id
+			}),
+		snapshot: (args) => invokeSession<SessionStatus>('snapshot', { sessionId: args.session_id }),
+		commit: (args) =>
+			invokeSession<SessionCommit>('commit', { sessionId: args.session_id, transaction: args.transaction }),
+		propose: (args) =>
+			invokeSession<Proposal>('propose', { sessionId: args.session_id, transaction: args.transaction }),
+		acceptProposal: (args) =>
+			invokeSession<SessionCommit>('accept_proposal', {
+				sessionId: args.session_id,
+				proposalId: args.proposal_id,
+				operationPositions: args.operation_positions
+			}),
+		rejectProposal: (args) =>
+			invokeSession<void>('reject_proposal', { sessionId: args.session_id, proposalId: args.proposal_id }),
+		authorizeApply: (args) => invokeSession<ApplyAuthorization>('authorize_apply', { sessionId: args.session_id }),
+		undo: (args) => invokeSession<SessionCommit>('undo', { sessionId: args.session_id, actorId: args.actor_id }),
+		redo: (args) => invokeSession<SessionCommit>('redo', { sessionId: args.session_id, actorId: args.actor_id }),
+		save: (args) =>
+			invokeSession<SessionSaved>('save', { sessionId: args.session_id, expectedHeads: args.expected_heads }),
+		saveAs: (args) =>
+			invokeSession<SessionSaved>('save_as', {
+				sessionId: args.session_id,
+				path: args.path,
+				expectedHeads: args.expected_heads
+			}),
+		saveDraftAs: (args) =>
+			invokeSession<SessionSaved>('save_draft_as', {
+				sessionId: args.session_id,
+				path: args.path,
+				expectedHeads: args.expected_heads
+			}),
+		query: (args) => invokeSession<QueryResult>('query', { sessionId: args.session_id, query: args.query }),
+		validate: (args) => invokeSession<SessionStatus>('validate', { sessionId: args.session_id }),
+		syncConnect: (args) =>
+			invokeSession<SessionStatus>('sync_connect', { sessionId: args.session_id, peerId: args.peer_id }),
+		syncDisconnect: (args) =>
+			invokeSession<SessionStatus>('sync_disconnect', { sessionId: args.session_id, peerId: args.peer_id }),
+		syncNext: (args) =>
+			invokeSession<SyncMessage | null>('sync_next', { sessionId: args.session_id, peerId: args.peer_id }),
+		syncReceive: (args) =>
+			invokeSession<SessionSync>('sync_receive', { sessionId: args.session_id, message: args.message }),
+		close: (args) => invokeSession<void>('close', { sessionId: args.session_id })
 	};
+}
+
+function invokeSession<T>(command: string, args: Record<string, unknown>): Promise<T> {
+	return invoke<T>(command, args).catch((error: unknown) => {
+		const detail =
+			error instanceof Error ? error.message : typeof error === 'string' ? error : JSON.stringify(error);
+		const message = `${command} failed: ${detail}`;
+		void invoke('record_renderer_error', { message }).catch(() => undefined);
+		throw error;
+	});
 }
 
 /** Persistent document repository backed by one backend/tauri-owned session. */
@@ -495,10 +539,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		if (!currentStatus || !currentBoard || !currentDoc) throw new Error('No board loaded');
 		const saved =
 			path === currentStatus.path
-				? await api.save({
-						session_id: currentStatus.session_id,
-						expected_heads: currentStatus.snapshot.heads
-					})
+				? await api.save({ session_id: currentStatus.session_id, expected_heads: currentStatus.snapshot.heads })
 				: await (currentIsDraft ? api.saveDraftAs : api.saveAs)({
 						session_id: currentStatus.session_id,
 						path,

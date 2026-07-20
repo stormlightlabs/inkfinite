@@ -8,6 +8,7 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_log::Builder::new().level(log::LevelFilter::Debug).build())
         .menu(menu::build)
         .on_menu_event(menu::handle_event)
         .manage(session::DesktopState::default())
@@ -18,6 +19,7 @@ pub fn run() {
             let service = app.state::<session::DesktopState>().service_handle();
             let server = tauri::async_runtime::block_on(ipc::start(app.handle().clone(), service))?;
             app.manage(server);
+            log::info!("desktop application setup completed");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -43,9 +45,13 @@ pub fn run() {
             session::sync_receive,
             session::close,
             files::read_directory,
+            files::pick_open_document,
+            files::pick_save_document,
             files::rename_file,
             files::delete_file,
-            files::pick_workspace_directory
+            files::pick_workspace_directory,
+            menu::record_renderer_event,
+            menu::record_renderer_error
         ]);
     let app = builder
         .build(tauri::generate_context!())

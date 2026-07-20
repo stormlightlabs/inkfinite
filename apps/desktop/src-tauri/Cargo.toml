@@ -21,8 +21,10 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
+tauri-plugin-log = "2"
 tauri-plugin-store = "2"
 inkfinite-core.workspace = true
+log = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio.workspace = true
