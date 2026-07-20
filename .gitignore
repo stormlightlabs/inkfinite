@@ -7,3 +7,4 @@ coverage
 __screenshots__
 target/
 .vscode
+.agents

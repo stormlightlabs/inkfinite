@@ -8,7 +8,7 @@ export type DocsGroup = { pages: DocsPage[]; title: string };
 export const DOCS_MANIFEST: DocsPage[] = [
 	{
 		title: 'Introduction',
-		href: '/docs/',
+		href: '/docs/introduction/',
 		description: 'What Inkfinite is and how the documentation is organized.'
 	},
 	{
@@ -65,7 +65,7 @@ function docs(...hrefs: string[]): DocsPage[] {
 
 /** Sidebar structure assembled from canonical manifest entries. */
 export const DOCS_GROUPS: DocsGroup[] = [
-	{ title: 'Start here', pages: docs('/docs/', '/docs/getting-started/') },
+	{ title: 'Start here', pages: docs('/docs/introduction/', '/docs/getting-started/') },
 	{
 		title: 'Concepts',
 		pages: docs('/docs/concepts/documents/', '/docs/concepts/transactions-and-sync/')
