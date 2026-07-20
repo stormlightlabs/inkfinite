@@ -354,8 +354,8 @@
 <style>
 	.layer-panel {
 		position: absolute;
-		right: var(--ink-space-3);
-		top: var(--ink-space-3);
+		right: var(--ink-space-3, 0.75rem);
+		bottom: var(--ink-space-3, 0.75rem);
 		z-index: 30;
 		display: grid;
 		width: min(19rem, calc(100% - 1.5rem));

@@ -629,7 +629,7 @@
 <style>
 	.toolbar {
 		display: flex;
-		flex-wrap: wrap;
+		flex-wrap: nowrap;
 		gap: var(--ink-space-2);
 		width: max-content;
 		max-width: calc(100vw - 2.5rem);
@@ -978,6 +978,10 @@
 
 		.toolbar__brand {
 			margin-right: 0;
+		}
+
+		.toolbar {
+			gap: var(--ink-space-1);
 		}
 	}
 

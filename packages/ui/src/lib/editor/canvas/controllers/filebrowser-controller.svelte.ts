@@ -13,7 +13,10 @@ export class FileBrowserController {
 	constructor(
 		private getRepo: () => PersistentDocRepo | null,
 		private onLoadDoc?: (boardId: string, doc: LoadedDoc) => void,
-		private getInspector?: () => ((boardId: string) => Promise<BoardInspectorData>) | undefined
+		private getInspector?: () =>
+			| ((boardId: string) => Promise<BoardInspectorData>)
+			| undefined,
+		private prepareToSwitch?: () => Promise<void>
 	) {}
 
 	handleOpen = () => {
@@ -55,9 +58,11 @@ export class FileBrowserController {
 
 	private createBrowserRepo(repo: PersistentDocRepo): PersistentDocRepo {
 		const onLoadDoc = this.onLoadDoc;
+		const prepareToSwitch = this.prepareToSwitch;
 		return {
 			...repo,
 			async openBoard(boardId) {
+				await prepareToSwitch?.();
 				await repo.openBoard(boardId);
 				const doc = await repo.loadDoc(boardId);
 				onLoadDoc?.(boardId, doc);

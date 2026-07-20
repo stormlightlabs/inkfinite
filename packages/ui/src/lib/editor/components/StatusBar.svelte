@@ -211,8 +211,12 @@
 			<Icon name={themeStore.current === 'dark' ? 'sun' : 'moon'} size={15} />
 			<span>{themeStore.current === 'dark' ? 'Light' : 'Dark'}</span>
 		</button>
-		{#if platform === 'web' && onOpenBrowser}
-			<button class="status-bar__action" onclick={onOpenBrowser} aria-label="Browse boards">
+		{#if onOpenBrowser}
+			<button
+				class="status-bar__action"
+				onclick={onOpenBrowser}
+				aria-label="Browse boards"
+				title="Boards (Cmd/Ctrl+B)">
 				<Icon name="folder" size={15} />
 				<span>Boards</span>
 			</button>

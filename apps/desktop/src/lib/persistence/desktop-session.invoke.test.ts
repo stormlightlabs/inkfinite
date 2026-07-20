@@ -129,6 +129,21 @@ describe('Tauri desktop session command boundary', () => {
 		expect(tauri.invoke).toHaveBeenCalledWith('save_as', expect.any(Object));
 	});
 
+	it('turns structured Tauri failures into readable errors', async () => {
+		const files = fileOps();
+		tauri.invoke.mockImplementation(async (command: string) => {
+			if (command === 'record_renderer_error') return undefined;
+			throw { code: 'document_locked', message: 'Another editor holds the document lock.' };
+		});
+
+		const repo = createDesktopSessionRepo(files.ops);
+
+		await expect(repo.createBoard('Locked')).rejects.toThrow('Another editor holds the document lock.');
+		expect(tauri.invoke).toHaveBeenCalledWith('record_renderer_error', {
+			message: 'create_document failed: Another editor holds the document lock.'
+		});
+	});
+
 	it('clears a live proposal when its review window expires', async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(1_000);

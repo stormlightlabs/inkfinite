@@ -199,13 +199,28 @@ function createSessionApi(): SessionApi {
 	};
 }
 
+/** Converts errors crossing the Tauri boundary into readable renderer text. */
+function describeError(error: unknown): string {
+	if (error instanceof Error) return error.message;
+	if (typeof error === 'string') return error;
+	if (typeof error === 'object' && error !== null) {
+		const message = (error as { message?: unknown }).message;
+		if (typeof message === 'string' && message.trim()) return message;
+		try {
+			return JSON.stringify(error);
+		} catch {
+			return 'Unknown structured error';
+		}
+	}
+	return String(error);
+}
+
 function invokeSession<T>(command: string, args: Record<string, unknown>): Promise<T> {
 	return invoke<T>(command, args).catch((error: unknown) => {
-		const detail =
-			error instanceof Error ? error.message : typeof error === 'string' ? error : JSON.stringify(error);
+		const detail = describeError(error);
 		const message = `${command} failed: ${detail}`;
 		void invoke('record_renderer_error', { message }).catch(() => undefined);
-		throw error;
+		throw new Error(detail, { cause: error });
 	});
 }
 
@@ -215,7 +230,7 @@ export type DesktopSessionRepo = PersistentDocRepo & {
 	openDraft(): Promise<{ boardId: string; doc: LoadedDoc }>;
 	isDraft(): boolean;
 	getCurrentFile(): FileHandle | null;
-	openFromDialog(): Promise<{ boardId: string; doc: LoadedDoc }>;
+	openFromDialog(prepareToOpen?: () => Promise<void>): Promise<{ boardId: string; doc: LoadedDoc }>;
 	saveAs(prepareToSave?: () => Promise<void>): Promise<{ boardId: string; doc: LoadedDoc }>;
 	getWorkspaceDir(): Promise<string | null>;
 	setWorkspaceDir(path: string | null): Promise<void>;
@@ -227,7 +242,7 @@ export type DesktopSessionRepo = PersistentDocRepo & {
 	getSessionStatus(): SessionStatus | null;
 	getProposal(): Proposal | null;
 	subscribeProposal(listener: (update: ProposalUpdate) => void): () => void;
-	acceptProposal(proposalId: string, operationPositions?: number[]): Promise<void>;
+	acceptProposal(proposalId: string, operationPositions?: number[]): Promise<LoadedDoc>;
 	rejectProposal(proposalId: string): Promise<void>;
 	authorizeApply(): Promise<ApplyAuthorization>;
 	syncConnect(peerId: string): Promise<SessionStatus>;
@@ -542,9 +557,10 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		return currentBoard.id;
 	}
 
-	async function openFromDialog(): Promise<{ boardId: string; doc: LoadedDoc }> {
+	async function openFromDialog(prepareToOpen?: () => Promise<void>): Promise<{ boardId: string; doc: LoadedDoc }> {
 		const path = await fileOps.showOpenDialog();
 		if (!path) throw new Error('Open cancelled');
+		await prepareToOpen?.();
 		const doc = await openPath(path);
 		if (!currentBoard) throw new Error('Failed to open document');
 		return { boardId: currentBoard.id, doc };
@@ -630,9 +646,12 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		return () => proposalListeners.delete(listener);
 	}
 
-	async function acceptProposal(proposalId: string, operationPositions?: number[]): Promise<void> {
+	async function acceptProposal(proposalId: string, operationPositions?: number[]): Promise<LoadedDoc> {
 		if (!currentStatus) throw new Error('No board loaded');
-		if (clearExpiredProposal(proposalId)) return;
+		if (clearExpiredProposal(proposalId)) {
+			if (!currentDoc) throw new Error('No board loaded');
+			return currentDoc;
+		}
 		const result = await api.acceptProposal({
 			session_id: currentStatus.session_id,
 			proposal_id: proposalId,
@@ -641,6 +660,8 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		updateStatus(result.status);
 		notifyProposal({ proposal: null });
 		await saveCurrentSession();
+		if (!currentDoc) throw new Error('Accepted proposal did not return a document');
+		return currentDoc;
 	}
 
 	async function rejectProposal(proposalId: string): Promise<void> {
@@ -733,12 +754,7 @@ export function createDesktopPersistenceSink(
 			const pendingWrites = Math.max(0, (status.pendingWrites ?? 1) - 1);
 			const persistenceError = error ?? lastError;
 			if (persistenceError) {
-				return {
-					...status,
-					state: 'error',
-					pendingWrites,
-					errorMsg: persistenceError instanceof Error ? persistenceError.message : String(persistenceError)
-				};
+				return { ...status, state: 'error', pendingWrites, errorMsg: describeError(persistenceError) };
 			}
 			return {
 				...status,

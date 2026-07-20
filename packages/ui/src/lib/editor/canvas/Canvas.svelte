@@ -6,6 +6,7 @@
 	import StencilPalette from '../components/StencilPalette.svelte';
 	import LayerPanel from '../components/LayerPanel.svelte';
 	import ProposalReview from '../components/ProposalReview.svelte';
+	import ProposalGhostLayer from '../components/ProposalGhostLayer.svelte';
 	import NavigationControls from './NavigationControls.svelte';
 	import { ContextMenu, type ContextMenuEntry } from '../../index';
 	import { createCanvasController } from './canvas-store.svelte';
@@ -204,26 +205,10 @@
 			oncontextmenu={handleCanvasContextMenu}
 			onpointerleave={c.handlePointerLeave}></canvas>
 		{#if liveProposal}
-			<div class="proposal-ghost-layer" aria-hidden="true">
-				{#each liveProposal.affected_regions as region}
-					{@const viewport = c.getViewport()}
-					{@const bounds = region.bounds}
-					{@const topLeft = Camera.worldToScreen(
-						c.store.getState().camera,
-						{ x: bounds.x, y: bounds.y },
-						viewport
-					)}
-					{@const bottomRight = Camera.worldToScreen(
-						c.store.getState().camera,
-						{ x: bounds.x + bounds.width, y: bounds.y + bounds.height },
-						viewport
-					)}
-					<div
-						class="proposal-ghost"
-						style={`left:${Math.min(topLeft.x, bottomRight.x)}px; top:${Math.min(topLeft.y, bottomRight.y)}px; width:${Math.abs(bottomRight.x - topLeft.x)}px; height:${Math.abs(bottomRight.y - topLeft.y)}px`}>
-					</div>
-				{/each}
-			</div>
+			<ProposalGhostLayer
+				proposal={liveProposal}
+				camera={c.store.getState().camera}
+				viewport={c.getViewport()} />
 		{/if}
 		<NavigationControls store={c.store} camera={c.camera} />
 		<LayerPanel store={c.store} onCommit={c.commitLayerState} />
@@ -371,32 +356,6 @@
 			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M4 2.75 22.2 16.1l-8.05 1.15 4.2 7.25-4.2 2.4-4.05-7.2-5.35 6.1z' fill='%23171928' stroke='%2388edc4' stroke-width='2.25' stroke-linejoin='round'/%3E%3C/svg%3E")
 				4 3,
 			default;
-	}
-
-	.proposal-ghost-layer {
-		position: absolute;
-		inset: 0;
-		pointer-events: none;
-		z-index: 1;
-	}
-
-	.proposal-ghost {
-		position: absolute;
-		box-sizing: border-box;
-		border: 1px dashed color-mix(in srgb, var(--ink-accent) 82%, white 18%);
-		background: color-mix(in srgb, var(--ink-accent) 13%, transparent);
-		box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink-accent) 18%, transparent) inset;
-		animation: proposal-pulse 1.8s ease-in-out infinite;
-	}
-
-	@keyframes proposal-pulse {
-		0%,
-		100% {
-			opacity: 0.58;
-		}
-		50% {
-			opacity: 0.95;
-		}
 	}
 
 	.canvas-text-editor {

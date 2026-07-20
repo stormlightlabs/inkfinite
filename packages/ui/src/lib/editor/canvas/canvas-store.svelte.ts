@@ -266,7 +266,8 @@ export function createCanvasController(
 		(boardId, doc) => {
 			setActiveBoardId(boardId);
 			applyLoadedDoc(doc);
-		}
+		},
+		() => sink?.flush() ?? Promise.resolve()
 	);
 	const fileBrowser = new FileBrowserController(
 		() => repo,
@@ -274,7 +275,8 @@ export function createCanvasController(
 			setActiveBoardId(boardId);
 			applyLoadedDoc(doc);
 		},
-		() => platformSession?.inspectBoard
+		() => platformSession?.inspectBoard,
+		() => sink?.flush() ?? Promise.resolve()
 	);
 	const runtime = new EditorRuntime({
 		store,
@@ -289,7 +291,7 @@ export function createCanvasController(
 			store.executeCommand(new SnapshotCommand(name, kind, before, after));
 			syncHandleState();
 		},
-		onOpenRequested: () => fileBrowser.handleOpen(),
+		onBrowseRequested: () => fileBrowser.handleOpen(),
 		onHandleHover: setHandleHover,
 		onInteractionChanged: syncHandleState,
 		onSnappedWorldChanged: (world) => {
@@ -566,9 +568,10 @@ export function createCanvasController(
 		marqueeRect: () => marqueeRect,
 		proposal: () => proposal,
 		proposalMessage: () => proposalMessage,
-		acceptProposal: (operationPositions?: number[]) => {
+		acceptProposal: async (operationPositions?: number[]) => {
 			if (!desktopRepo || !proposal) return Promise.reject(new Error('No proposal is open'));
-			return desktopRepo.acceptProposal(proposal.id, operationPositions);
+			const doc = await desktopRepo.acceptProposal(proposal.id, operationPositions);
+			applyLoadedDoc(doc);
 		},
 		rejectProposal: () => {
 			if (!desktopRepo || !proposal) return Promise.reject(new Error('No proposal is open'));

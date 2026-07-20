@@ -43,7 +43,9 @@ export interface DesktopDocumentRepo extends PersistentDocRepo {
 	openDraft(): Promise<{ boardId: string; doc: import('@inkfinite/core').LoadedDoc }>;
 	isDraft(): boolean;
 	getCurrentFile(): FileHandle | null;
-	openFromDialog(): Promise<{ boardId: string; doc: import('@inkfinite/core').LoadedDoc }>;
+	openFromDialog(
+		prepareToOpen?: () => Promise<void>
+	): Promise<{ boardId: string; doc: import('@inkfinite/core').LoadedDoc }>;
 	/** Opens the native dialog, then waits for pending editor writes before saving the selected path. */
 	saveAs(
 		prepareToSave?: () => Promise<void>
@@ -54,7 +56,10 @@ export interface DesktopDocumentRepo extends PersistentDocRepo {
 	closeSession(): Promise<void>;
 	getProposal(): LiveProposal | null;
 	subscribeProposal(listener: (update: ProposalUpdate) => void): () => void;
-	acceptProposal(proposalId: string, operationPositions?: number[]): Promise<void>;
+	acceptProposal(
+		proposalId: string,
+		operationPositions?: number[]
+	): Promise<import('@inkfinite/core').LoadedDoc>;
 	rejectProposal(proposalId: string): Promise<void>;
 	authorizeApply(): Promise<{ token: string; session_id: string; expires_at: number }>;
 }

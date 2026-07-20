@@ -96,7 +96,7 @@
 		</div>
 
 		<p class="summary">
-			Ghost regions mark the document geometry this transaction would change.
+			Ghost shapes preview proposed creations. Outlined regions mark other affected geometry.
 		</p>
 
 		<div class="change-grid" aria-label="Proposal changes">

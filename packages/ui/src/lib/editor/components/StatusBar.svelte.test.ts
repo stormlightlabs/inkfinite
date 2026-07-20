@@ -42,6 +42,7 @@ describe('StatusBar', () => {
 	});
 
 	it('identifies a safely persisted desktop draft', async () => {
+		const onOpenBrowser = vi.fn();
 		const screen = render(StatusBar, {
 			store: new Store(),
 			cursor: new CursorStore(),
@@ -52,10 +53,13 @@ describe('StatusBar', () => {
 			}),
 			snap: createSnapStore(),
 			platform: 'desktop',
-			draft: true
+			draft: true,
+			onOpenBrowser
 		});
 
 		await expect.element(screen.getByText('Draft saved')).toBeInTheDocument();
+		await screen.getByRole('button', { name: 'Browse boards' }).click();
+		expect(onOpenBrowser).toHaveBeenCalledOnce();
 	});
 
 	it('keeps editor utilities together and opens the info dialog', async () => {

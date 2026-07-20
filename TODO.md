@@ -257,8 +257,3 @@ Acceptance criteria:
 - How should bundling/packaging work?
 
 ### QA
-
-- [x] The desktop kept an expired proposal visible even though the backend had
-      discarded it, leaving Accept and Reject unable to complete. The desktop
-      now clears the review when its deadline passes and confirms that the
-      document did not change.

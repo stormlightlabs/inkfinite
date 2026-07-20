@@ -490,6 +490,17 @@ describe('InputAdapter', () => {
 			expect(event.defaultPrevented).toBe(true);
 		});
 
+		it('prevents browser behavior for the board browser shortcut', () => {
+			const event = createKeyboardEvent('keydown', {
+				key: 'b',
+				code: 'KeyB',
+				metaKey: true
+			});
+			window.dispatchEvent(event);
+
+			expect(event.defaultPrevented).toBe(true);
+		});
+
 		it('should not capture keyboard events when captureKeyboard is false', () => {
 			const testActions: ActionType[] = [];
 			const testAdapter = new InputAdapter({

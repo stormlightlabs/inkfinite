@@ -12,7 +12,8 @@ export class DesktopFileController {
 	constructor(
 		private getRepo: () => PersistentDocRepo | null,
 		private getDesktopRepo: () => DesktopDocumentRepo | null,
-		private onLoadDoc: (boardId: string, doc: LoadedDoc) => void
+		private onLoadDoc: (boardId: string, doc: LoadedDoc) => void,
+		private prepareToSwitch: () => Promise<void>
 	) {}
 
 	get repo(): DesktopDocumentRepo | null {
@@ -52,7 +53,7 @@ export class DesktopFileController {
 			return;
 		}
 		try {
-			const opened = await desktopRepo.openFromDialog();
+			const opened = await desktopRepo.openFromDialog(this.prepareToSwitch);
 			this.isDraft = false;
 			this.onLoadDoc(opened.boardId, opened.doc);
 			await this.refreshBoards();
@@ -70,6 +71,7 @@ export class DesktopFileController {
 			return;
 		}
 		try {
+			await this.prepareToSwitch();
 			const boardId = await repo.createBoard('Untitled');
 			const loaded = await repo.loadDoc(boardId);
 			this.isDraft = false;
@@ -108,6 +110,7 @@ export class DesktopFileController {
 			return;
 		}
 		try {
+			await this.prepareToSwitch();
 			const loaded = await repo.loadDoc(boardId);
 			this.isDraft = desktopRepo?.isDraft() ?? false;
 			this.onLoadDoc(boardId, loaded);

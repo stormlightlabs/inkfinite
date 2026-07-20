@@ -36,7 +36,8 @@ export type EditorRuntimeOptions = {
   selectionTool: SelectionTool;
   getSnapSettings: () => SnapSettings;
   onTransactionDraft: (draft: RuntimeTransactionDraft) => void;
-  onOpenRequested?: () => void;
+  /** Opens the board browser from its dedicated Cmd/Ctrl+B shortcut. */
+  onBrowseRequested?: () => void;
   onHandleHover?: (handle: string | null) => void;
   onInteractionChanged?: () => void;
   onSnappedWorldChanged?: (world: { x: number; y: number }) => void;
@@ -120,7 +121,7 @@ export class EditorRuntime {
     }
 
     const before = store.getState();
-    const shortcut = applyKeyboardShortcut(before, routedAction, this.options.onOpenRequested);
+    const shortcut = applyKeyboardShortcut(before, routedAction, this.options.onBrowseRequested);
     const after = shortcut ?? routeAction(before, routedAction, this.options.tools);
 
     if (!statesEqual(before, after)) {
@@ -189,12 +190,12 @@ function snapAction(action: Action, snap: SnapSettings): Action {
 function applyKeyboardShortcut(
   state: EditorState,
   action: Action,
-  onOpenRequested: (() => void) | undefined,
+  onBrowseRequested: (() => void) | undefined,
 ): EditorState | null {
   if (action.type !== "key-down") return null;
   const primary = action.modifiers.meta || action.modifiers.ctrl;
-  if (primary && ["o", "O", "n", "N"].includes(action.key)) {
-    onOpenRequested?.();
+  if (primary && (action.key === "b" || action.key === "B")) {
+    onBrowseRequested?.();
     return null;
   }
   if (state.ui.selectionIds.length === 0) return null;

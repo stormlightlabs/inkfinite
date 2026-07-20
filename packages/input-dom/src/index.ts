@@ -399,7 +399,7 @@ export class InputAdapter {
 	 * - Space (scroll)
 	 * - Arrow keys (scroll)
 	 * - Backspace/Delete (navigation)
-	 * - Cmd/Ctrl+Z, Cmd/Ctrl+Y (browser undo/redo)
+	 * - Cmd/Ctrl+B (board browser), Cmd/Ctrl+Z, Cmd/Ctrl+Y (browser undo/redo)
 	 * - Camera shortcuts (+, -, 0, Shift+1, Shift+2)
 	 * - Tab (focus change)
 	 */
@@ -432,6 +432,10 @@ export class InputAdapter {
 		}
 
 		if (Modifiers.isPrimaryModifier(modifiers) && (key === 'y' || key === 'Y')) {
+			return true;
+		}
+
+		if (Modifiers.isPrimaryModifier(modifiers) && (key === 'b' || key === 'B')) {
 			return true;
 		}
 

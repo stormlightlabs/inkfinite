@@ -464,4 +464,46 @@ describe('Rust-backed desktop session repository', () => {
 		expect(repo.getCurrentFile()?.path).toBe('/tmp/Untitled.inkfinite');
 		expect(repo.getSessionStatus()?.dirty).toBe(false);
 	});
+
+	it('flushes pending editor writes before replacing the open session', async () => {
+		fileOps.setOpenPath('/tmp/Funtitled.inkfinite');
+		const repo = createDesktopSessionRepo(fileOps.ops, { api: session.api });
+		const draft = await repo.openDraft();
+		const pendingFailure = new Error('Pending write failed');
+
+		await expect(
+			repo.openFromDialog(async () => {
+				throw pendingFailure;
+			})
+		).rejects.toBe(pendingFailure);
+
+		expect(repo.getSessionStatus()?.snapshot.document_id).toBe(draft.boardId);
+		expect(repo.isDraft()).toBe(true);
+	});
+
+	it('returns the committed document after accepting a proposal', async () => {
+		const repo = createDesktopSessionRepo(fileOps.ops, { api: session.api });
+		const opened = await repo.openDraft();
+		const pageId = Object.keys(opened.doc.pages)[0];
+		session.api.acceptProposal = ({ session_id }) =>
+			session.api.commit({
+				session_id,
+				transaction: {
+					id: 'transaction:accepted-proposal',
+					actor_id: 'actor:desktop',
+					origin: 'agent',
+					base_heads: repo.getSessionStatus()?.snapshot.heads ?? [],
+					description: 'Accepted proposal fixture',
+					operations: [
+						{ type: 'rename_page', page_id: pageId, name: 'Accepted proposal', expected_version: 1 }
+					],
+					timestamp: Date.now()
+				}
+			});
+
+		const committed = await repo.acceptProposal('proposal:accepted');
+
+		expect(committed.pages[pageId].name).toBe('Accepted proposal');
+		expect((await repo.loadDoc(opened.boardId)).pages[pageId].name).toBe('Accepted proposal');
+	});
 });

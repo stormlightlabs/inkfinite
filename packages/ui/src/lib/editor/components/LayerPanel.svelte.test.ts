@@ -29,6 +29,14 @@ function renderPanel(store = editorStore()) {
 }
 
 describe('LayerPanel', () => {
+	it('anchors below other floating review controls', async () => {
+		const { screen } = renderPanel();
+
+		await expect
+			.element(screen.getByRole('complementary', { name: 'Layers' }))
+			.toHaveStyle({ bottom: '12px' });
+	});
+
 	it('provides compact accessible controls for visibility, locking, and activation', async () => {
 		const { screen, store } = renderPanel();
 

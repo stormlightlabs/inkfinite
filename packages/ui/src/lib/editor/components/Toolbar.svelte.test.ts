@@ -22,6 +22,19 @@ describe('Editor Toolbar', () => {
 			.not.toBeInTheDocument();
 	});
 
+	it('keeps drawing tools in one row when the window narrows', async () => {
+		const screen = render(Toolbar, {
+			currentTool: 'select',
+			onToolChange: vi.fn(),
+			store: new Store(),
+			brushStore: createBrushStore()
+		});
+
+		await expect
+			.element(screen.getByRole('toolbar', { name: 'Drawing tools' }))
+			.toHaveStyle({ flexWrap: 'nowrap' });
+	});
+
 	it('anchors pen settings directly below the pen tool', async () => {
 		const screen = render(Toolbar, {
 			currentTool: 'pen',
