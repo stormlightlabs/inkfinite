@@ -266,8 +266,7 @@ export function createCanvasController(
 		(boardId, doc) => {
 			setActiveBoardId(boardId);
 			applyLoadedDoc(doc);
-		},
-		() => activeBoardId
+		}
 	);
 	const fileBrowser = new FileBrowserController(
 		() => repo,
@@ -489,7 +488,7 @@ export function createCanvasController(
 						void desktop.handleOpen();
 						break;
 					case 'save-as':
-						void desktop.handleSaveAs();
+						void desktop.handleSaveAs(() => (sink ? sink.flush() : Promise.resolve()));
 						break;
 				}
 			}) ?? null;

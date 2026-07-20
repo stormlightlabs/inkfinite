@@ -1,15 +1,13 @@
-import type { CanvasControllerBindings } from "../canvas-store.svelte";
+import type { CanvasControllerBindings } from '../canvas-store.svelte';
 
 export class HistoryController {
-  constructor(
-    private bindings: CanvasControllerBindings,
-  ) {}
+	constructor(private bindings: CanvasControllerBindings) {}
 
-  handleClick = () => {
-    this.bindings.setHistoryViewerOpen(true);
-  };
+	handleClick = () => {
+		this.bindings.setHistoryViewerOpen(true);
+	};
 
-  handleClose = () => {
-    this.bindings.setHistoryViewerOpen(false);
-  };
+	handleClose = () => {
+		this.bindings.setHistoryViewerOpen(false);
+	};
 }

@@ -47,6 +47,7 @@
 	let strokeOpacityValue = $state(1);
 	let fillDisabled = $state(true);
 	let strokeDisabled = $state(true);
+	let agentEditableValue = $state(true);
 	let brush = $derived<BrushSettings>(brushStore.get());
 	let hasArrowSelection = $derived(
 		getSelectedShapes(editorState).some((s) => s.type === 'arrow')
@@ -102,6 +103,7 @@
 					? (shape.strokeOpacity ?? shape.props.style.opacity)
 					: shape.strokeOpacity
 			) ?? 1;
+		agentEditableValue = selection.every((shape) => shape.agentEditable !== false);
 	});
 
 	let showColorControls = $derived(
@@ -114,7 +116,7 @@
 		)
 	);
 	let showContextControls = $derived(
-		currentTool !== 'pen' && (showColorControls || hasArrowSelection)
+		currentTool !== 'pen' && (getSelectedShapes(editorState).length > 0 || hasArrowSelection)
 	);
 
 	let position = $state({ x: 20, y: 20 });
@@ -411,6 +413,27 @@
 	function handleBrushChange(newBrush: BrushSettings) {
 		brushStore.set(newBrush);
 	}
+
+	function handleAgentEditableChange(event: Event) {
+		const state = store.getState();
+		const targets = getSelectedShapes(state);
+		if (targets.length === 0) return;
+		const agentEditable = (event.currentTarget as HTMLInputElement).checked;
+		const before = EditorState.clone(state);
+		const shapes = { ...state.doc.shapes };
+		for (const shape of targets) {
+			shapes[shape.id] = { ...shape, agentEditable } as ShapeRecord;
+		}
+		const after = { ...state, doc: { ...state.doc, shapes } };
+		store.executeCommand(
+			new SnapshotCommand(
+				agentEditable ? 'Allow Agent Edits' : 'Prevent Agent Edits',
+				'doc',
+				before,
+				EditorState.clone(after)
+			)
+		);
+	}
 </script>
 
 <div
@@ -548,6 +571,13 @@
 			{#if hasArrowSelection}
 				<ArrowPopover {store} />
 			{/if}
+			<label class="toolbar__agent-control">
+				<input
+					type="checkbox"
+					checked={agentEditableValue}
+					onchange={handleAgentEditableChange} />
+				<span>Agent editable</span>
+			</label>
 		</div>
 	{/if}
 
@@ -687,6 +717,24 @@
 		border-radius: 2px;
 		outline: 2px solid var(--ink-accent);
 		outline-offset: 2px;
+	}
+
+	.toolbar__agent-control {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--ink-space-2);
+		min-height: 2.5rem;
+		padding: 0 var(--ink-space-2);
+		color: var(--ink-text);
+		font: 600 var(--ink-type-xs) / 1 var(--ink-font-body);
+		white-space: nowrap;
+	}
+
+	.toolbar__agent-control input {
+		width: 1rem;
+		height: 1rem;
+		margin: 0;
+		accent-color: var(--ink-accent);
 	}
 
 	.toolbar__tool-button {

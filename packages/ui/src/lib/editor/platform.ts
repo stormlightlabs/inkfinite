@@ -44,6 +44,10 @@ export interface DesktopDocumentRepo extends PersistentDocRepo {
 	isDraft(): boolean;
 	getCurrentFile(): FileHandle | null;
 	openFromDialog(): Promise<{ boardId: string; doc: import('@inkfinite/core').LoadedDoc }>;
+	/** Opens the native dialog, then waits for pending editor writes before saving the selected path. */
+	saveAs(
+		prepareToSave?: () => Promise<void>
+	): Promise<{ boardId: string; doc: import('@inkfinite/core').LoadedDoc }>;
 	getWorkspaceDir(): Promise<string | null>;
 	setWorkspaceDir(path: string | null): Promise<void>;
 	pickWorkspaceDir(): Promise<string | null>;

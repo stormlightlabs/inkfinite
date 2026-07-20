@@ -167,6 +167,8 @@ export type BaseShape = {
 	groupId?: string;
 	/** Owning layer assigned when the shape enters an editor document. */
 	layerId?: string;
+	/** Whether an agent may propose or apply edits to this shape; omitted values allow edits. */
+	agentEditable?: boolean;
 };
 export type RectShape = BaseShape & { type: 'rect'; props: RectProps };
 export type EllipseShape = BaseShape & { type: 'ellipse'; props: EllipseProps };

@@ -255,3 +255,10 @@ Acceptance criteria:
 ## Parking Lot
 
 - How should bundling/packaging work?
+
+### QA
+
+- We don't expose agent editable in the UI
+- Save As doesn't work
+- We don't expose dirty when creating a new board
+- Saving doesn't work

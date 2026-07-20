@@ -84,4 +84,38 @@ describe('Editor Toolbar', () => {
 		expect(store.getState().doc.shapes.shape.strokeOpacity).toBe(0.65);
 		expect(store.canUndo()).toBe(true);
 	});
+
+	it('changes whether agents may edit selected shapes', async () => {
+		const page = PageRecord.create('Page', 'page');
+		const shape = ShapeRecord.createRect(
+			page.id,
+			0,
+			0,
+			{ w: 20, h: 20, fill: '#fff', stroke: '#000', radius: 0 },
+			'shape'
+		);
+		const store = new Store();
+		store.setState((state) => ({
+			...state,
+			doc: {
+				pages: { [page.id]: { ...page, shapeIds: [shape.id] } },
+				shapes: { [shape.id]: shape },
+				bindings: {}
+			},
+			ui: { ...state.ui, currentPageId: page.id, selectionIds: [shape.id] }
+		}));
+		const screen = render(Toolbar, {
+			currentTool: 'select',
+			onToolChange: vi.fn(),
+			store,
+			brushStore: createBrushStore()
+		});
+
+		const control = screen.getByRole('checkbox', { name: 'Agent editable' });
+		await expect.element(control).toBeChecked();
+		await control.click();
+
+		expect(store.getState().doc.shapes.shape.agentEditable).toBe(false);
+		expect(store.canUndo()).toBe(true);
+	});
 });

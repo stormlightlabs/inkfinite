@@ -212,6 +212,7 @@ function createFakeSessionApi() {
 		async saveAs(args: Parameters<SessionApi['saveAs']>[0]): Promise<SessionSaved> {
 			const session = sessions.get(args.session_id);
 			if (!session) throw new Error('Missing fake session');
+			if (session.status.path === args.path) throw new Error('Save As requires a different path');
 			files.set(args.path, structuredClone(session.status.snapshot));
 			session.status = { ...session.status, path: args.path, dirty: false };
 			return {
@@ -286,6 +287,7 @@ function createFakeFileOps() {
 	let workspace: string | null = null;
 	let openPath: string | null = null;
 	let savePath: string | null = null;
+	let saveDialogCount = 0;
 	let entries: Array<{ path: string; name: string; isDir: boolean }> = [];
 
 	const ops: DesktopFileOps = {
@@ -293,6 +295,7 @@ function createFakeFileOps() {
 			return openPath;
 		},
 		async showSaveDialog() {
+			saveDialogCount += 1;
 			return savePath;
 		},
 		async getRecentFiles() {
@@ -341,6 +344,9 @@ function createFakeFileOps() {
 		},
 		setSavePath(path: string | null) {
 			savePath = path;
+		},
+		getSaveDialogCount() {
+			return saveDialogCount;
 		},
 		setEntries(next: typeof entries) {
 			entries = next;
@@ -435,13 +441,27 @@ describe('Rust-backed desktop session repository', () => {
 		fileOps.setSavePath('/tmp/promoted.inkfinite');
 		const repo = createDesktopSessionRepo(fileOps.ops, { api: session.api });
 		const opened = await repo.openDraft();
-		const snapshot = await repo.exportBoard(opened.boardId);
-
-		await repo.importBoard(snapshot);
+		const saved = await repo.saveAs();
 
 		expect(repo.isDraft()).toBe(false);
+		expect(saved.boardId).toBe(opened.boardId);
+		expect(saved.doc).toEqual(opened.doc);
 		expect(repo.getCurrentFile()?.path).toBe('/tmp/promoted.inkfinite');
 		expect(session.files.has(session.draftPath)).toBe(false);
 		expect(fileOps.recent.map((file) => file.path)).toEqual(['/tmp/promoted.inkfinite']);
+	});
+
+	it('saves normally when Save As selects the current document path', async () => {
+		fileOps.setSavePath('/tmp/Untitled.inkfinite');
+		const repo = createDesktopSessionRepo(fileOps.ops, { api: session.api });
+		const boardId = await repo.createBoard('Untitled');
+
+		const saved = await repo.saveAs(async () => {
+			expect(fileOps.getSaveDialogCount()).toBe(2);
+		});
+
+		expect(saved.boardId).toBe(boardId);
+		expect(repo.getCurrentFile()?.path).toBe('/tmp/Untitled.inkfinite');
+		expect(repo.getSessionStatus()?.dirty).toBe(false);
 	});
 });

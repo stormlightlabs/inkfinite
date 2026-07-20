@@ -12,8 +12,7 @@ export class DesktopFileController {
 	constructor(
 		private getRepo: () => PersistentDocRepo | null,
 		private getDesktopRepo: () => DesktopDocumentRepo | null,
-		private onLoadDoc: (boardId: string, doc: LoadedDoc) => void,
-		private getActiveBoardId: () => string | null
+		private onLoadDoc: (boardId: string, doc: LoadedDoc) => void
 	) {}
 
 	get repo(): DesktopDocumentRepo | null {
@@ -84,19 +83,15 @@ export class DesktopFileController {
 		}
 	};
 
-	handleSaveAs = async () => {
-		const repo = this.getRepo();
-		const activeBoardId = this.getActiveBoardId();
-		if (!repo) {
+	handleSaveAs = async (prepareToSave?: () => Promise<void>) => {
+		const desktopRepo = this.getDesktopRepo();
+		if (!desktopRepo) {
 			return;
 		}
 		try {
-			if (!activeBoardId) return;
-			const snapshot = await repo.exportBoard(activeBoardId);
-			const newBoardId = await repo.importBoard(snapshot);
-			const loaded = await repo.loadDoc(newBoardId);
+			const { boardId, doc } = await desktopRepo.saveAs(prepareToSave);
 			this.isDraft = false;
-			this.onLoadDoc(newBoardId, loaded);
+			this.onLoadDoc(boardId, doc);
 			await this.refreshBoards();
 		} catch (error) {
 			if (isUserCancelled(error)) {

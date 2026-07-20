@@ -1,6 +1,6 @@
-@import "@fontsource-variable/ibm-plex-sans/wght.css";
-@import "@fontsource-variable/playpen-sans/wght.css";
-@import "./tokens.css";
-@import "./reset.css";
-@import "./base.css";
-@import "./icons.css";
+@import '@fontsource-variable/ibm-plex-sans/wght.css';
+@import '@fontsource-variable/playpen-sans/wght.css';
+@import './tokens.css';
+@import './reset.css';
+@import './base.css';
+@import './icons.css';

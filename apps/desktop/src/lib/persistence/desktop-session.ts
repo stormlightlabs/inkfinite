@@ -172,6 +172,7 @@ export type DesktopSessionRepo = PersistentDocRepo & {
 	isDraft(): boolean;
 	getCurrentFile(): FileHandle | null;
 	openFromDialog(): Promise<{ boardId: string; doc: LoadedDoc }>;
+	saveAs(prepareToSave?: () => Promise<void>): Promise<{ boardId: string; doc: LoadedDoc }>;
 	getWorkspaceDir(): Promise<string | null>;
 	setWorkspaceDir(path: string | null): Promise<void>;
 	pickWorkspaceDir(): Promise<string | null>;
@@ -486,6 +487,34 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		return { boardId: currentBoard.id, doc };
 	}
 
+	async function saveAs(prepareToSave?: () => Promise<void>): Promise<{ boardId: string; doc: LoadedDoc }> {
+		if (!currentStatus || !currentBoard || !currentDoc) throw new Error('No board loaded');
+		const path = await fileOps.showSaveDialog(`${safeFileStem(currentBoard.name)}.inkfinite`);
+		if (!path) throw new Error('Save cancelled');
+		await prepareToSave?.();
+		if (!currentStatus || !currentBoard || !currentDoc) throw new Error('No board loaded');
+		const saved =
+			path === currentStatus.path
+				? await api.save({
+						session_id: currentStatus.session_id,
+						expected_heads: currentStatus.snapshot.heads
+					})
+				: await (currentIsDraft ? api.saveDraftAs : api.saveAs)({
+						session_id: currentStatus.session_id,
+						path,
+						expected_heads: currentStatus.snapshot.heads
+					});
+		updateStatus(saved.status);
+		currentIsDraft = false;
+		currentBoard = { ...currentBoard, name: fileStem(path), updatedAt: Date.now() };
+		if (currentFile) {
+			boardFiles.set(currentBoard.id, currentFile);
+			boardFiles.set(boardIdForPath(currentFile.path), currentFile);
+			await fileOps.addRecentFile(currentFile);
+		}
+		return { boardId: currentBoard.id, doc: currentDoc };
+	}
+
 	async function ensureBoardLoaded(boardId: string): Promise<void> {
 		if (currentBoard?.id === boardId && currentDoc) return;
 		const handle = boardFiles.get(boardId);
@@ -605,6 +634,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		importBoard,
 		getCurrentFile: () => (currentIsDraft ? null : currentFile),
 		openFromDialog,
+		saveAs,
 		getWorkspaceDir: () => fileOps.getWorkspaceDir(),
 		setWorkspaceDir: (path: string | null) => fileOps.setWorkspaceDir(path),
 		pickWorkspaceDir: () => fileOps.pickWorkspaceDir(),
@@ -809,6 +839,7 @@ function editorShapeFromSnapshot(shape: ShapeRecord, pageId: string, groupId?: s
 		...(shape.style.fill_opacity !== null ? { fillOpacity: shape.style.fill_opacity } : {}),
 		...(shape.style.stroke_opacity !== null ? { strokeOpacity: shape.style.stroke_opacity } : {}),
 		...(groupId ? { groupId } : {}),
+		agentEditable: shape.metadata.agent_editable,
 		props: properties as EditorShapeRecord['props']
 	} as EditorShapeRecord;
 }
@@ -963,7 +994,10 @@ function shapeFromEditor(
 		child_ids: [],
 		layout: null,
 		properties: properties as ShapeProperties,
-		metadata: existing?.metadata ?? defaultMetadata(actor),
+		metadata: {
+			...(existing?.metadata ?? defaultMetadata(actor)),
+			agent_editable: shape.agentEditable ?? existing?.metadata.agent_editable ?? true
+		},
 		style: {
 			opacity: shape.opacity ?? existing?.style.opacity ?? 1,
 			fill_opacity: shape.fillOpacity ?? existing?.style.fill_opacity ?? null,
