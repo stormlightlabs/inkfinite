@@ -1480,6 +1480,96 @@
       ],
       "type": "object"
     },
+    "QueryRecord": {
+      "description": "Complete materialized record returned by a detailed query.",
+      "oneOf": [
+        {
+          "description": "Page record.",
+          "properties": {
+            "kind": {
+              "const": "page",
+              "type": "string"
+            },
+            "record": {
+              "$ref": "#/$defs/PageRecord"
+            }
+          },
+          "required": [
+            "kind",
+            "record"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Layer record.",
+          "properties": {
+            "kind": {
+              "const": "layer",
+              "type": "string"
+            },
+            "record": {
+              "$ref": "#/$defs/LayerRecord"
+            }
+          },
+          "required": [
+            "kind",
+            "record"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Shape record.",
+          "properties": {
+            "kind": {
+              "const": "shape",
+              "type": "string"
+            },
+            "record": {
+              "$ref": "#/$defs/ShapeRecord"
+            }
+          },
+          "required": [
+            "kind",
+            "record"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Binding record.",
+          "properties": {
+            "kind": {
+              "const": "binding",
+              "type": "string"
+            },
+            "record": {
+              "$ref": "#/$defs/BindingRecord"
+            }
+          },
+          "required": [
+            "kind",
+            "record"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Asset record.",
+          "properties": {
+            "kind": {
+              "const": "asset",
+              "type": "string"
+            },
+            "record": {
+              "$ref": "#/$defs/AssetRecord"
+            }
+          },
+          "required": [
+            "kind",
+            "record"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "QueryResult": {
       "description": "Materialized query result suitable for machine clients.",
       "properties": {
@@ -1489,6 +1579,14 @@
           },
           "description": "Bounds for matching shapes, in the same order as their shape records.",
           "type": "object"
+        },
+        "details": {
+          "default": [],
+          "description": "Complete records when the query requested them.",
+          "items": {
+            "$ref": "#/$defs/QueryRecord"
+          },
+          "type": "array"
         },
         "heads": {
           "description": "Causal heads inspected by the query.",
@@ -1503,6 +1601,18 @@
             "$ref": "#/$defs/RecordId"
           },
           "type": "array"
+        },
+        "total": {
+          "default": 0,
+          "description": "Number of matches before applying the requested limit.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "truncated": {
+          "default": false,
+          "description": "Whether the result omitted matches because of the requested limit.",
+          "type": "boolean"
         }
       },
       "required": [

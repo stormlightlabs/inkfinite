@@ -1,6 +1,6 @@
 use super::geometry::{intersects, world_shape_bounds};
 use super::hierarchy::containing_layer;
-use super::{BTreeMap, DocumentSnapshot, Ordering, Query, QueryResult, RecordId, ShapeParent};
+use super::{BTreeMap, BTreeSet, DocumentSnapshot, Ordering, Query, QueryRecord, QueryResult, RecordId, ShapeParent};
 
 #[allow(clippy::too_many_lines)]
 pub fn query_document(snapshot: &DocumentSnapshot, query: &Query) -> QueryResult {
@@ -93,7 +93,39 @@ pub fn query_document(snapshot: &DocumentSnapshot, query: &Query) -> QueryResult
         }
     }
     records.sort_by(record_id_order);
-    QueryResult { heads: snapshot.heads.clone(), records, bounds }
+    let total = records.len();
+    if let Some(limit) = query.limit {
+        records.truncate(limit as usize);
+    }
+    let returned_shapes: BTreeSet<_> = records
+        .iter()
+        .filter_map(|record| match record {
+            RecordId::Shape(shape_id) => Some(shape_id.clone()),
+            _ => None,
+        })
+        .collect();
+    bounds.retain(|shape_id, _| returned_shapes.contains(shape_id));
+    let details = if query.include_records {
+        records
+            .iter()
+            .filter_map(|record| match record {
+                RecordId::Page(id) => document.pages.get(id).cloned().map(Box::new).map(QueryRecord::Page),
+                RecordId::Layer(id) => document.layers.get(id).cloned().map(Box::new).map(QueryRecord::Layer),
+                RecordId::Shape(id) => document.shapes.get(id).cloned().map(Box::new).map(QueryRecord::Shape),
+                RecordId::Binding(id) => document
+                    .bindings
+                    .get(id)
+                    .cloned()
+                    .map(Box::new)
+                    .map(QueryRecord::Binding),
+                RecordId::Asset(id) => document.assets.get(id).cloned().map(Box::new).map(QueryRecord::Asset),
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let truncated = total > records.len();
+    QueryResult { heads: snapshot.heads.clone(), records, bounds, details, total, truncated }
 }
 
 pub fn matches_common(query: &Query, id: &str, name: Option<&String>) -> bool {

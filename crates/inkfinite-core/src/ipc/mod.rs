@@ -17,11 +17,10 @@ use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::DocumentSnapshot;
+use crate::engine::EngineError;
 use crate::file::FileError;
-use crate::proto::{
-    ApplyAuthorization, PROTOCOL_ID, PROTOCOL_VERSION, Proposal, ProposalId, Query, QueryResult, SessionId,
-};
-use crate::session::{SessionCommit, SessionError, SessionService, SessionStatus};
+use crate::proto::{ApplyAuthorization, PROTOCOL_ID, PROTOCOL_VERSION, Proposal, Query, QueryResult, SessionId};
+use crate::session::{ProposalStatus, SessionCommit, SessionContext, SessionError, SessionService, SessionStatus};
 
 pub use crate::engine::{CommitResult, TransactionDraft};
 pub use crate::proto::{ProtocolError, Request, Response};
@@ -53,13 +52,18 @@ pub struct DiscoveryRecord {
     pub token: String,
 }
 
-/// Read-only operation accepted by the desktop server.
+/// Agent-facing operation accepted by the desktop server.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "type")]
 #[allow(clippy::large_enum_variant)]
 pub enum AppRequest {
     /// List open desktop document sessions.
     Status,
+    /// Return the latest desktop page, selection, viewport, actor, and heads.
+    Context {
+        /// Session to inspect, or the only open session when omitted.
+        session_id: Option<SessionId>,
+    },
     /// Return the current snapshot for an open session.
     Inspect {
         /// Session to inspect, or the only open session when omitted.
@@ -79,21 +83,12 @@ pub enum AppRequest {
         /// Agent transaction to validate and preview.
         transaction: TransactionDraft,
     },
-    /// Accept all or selected operations from a reviewed proposal.
-    AcceptProposal {
+    /// Read a proposal outcome without changing its review state.
+    ProposalStatus {
         /// Session owning the proposal, or the only open session when omitted.
         session_id: Option<SessionId>,
-        /// Proposal to accept.
-        proposal_id: ProposalId,
-        /// Zero-based operation positions, or all operations when omitted.
-        operation_positions: Option<Vec<u32>>,
-    },
-    /// Reject a reviewed proposal without changing the document.
-    RejectProposal {
-        /// Session owning the proposal, or the only open session when omitted.
-        session_id: Option<SessionId>,
-        /// Proposal to reject.
-        proposal_id: ProposalId,
+        /// Proposal whose review state should be returned.
+        proposal_id: crate::proto::ProposalId,
     },
     /// Apply an agent transaction after consuming explicit desktop authorization.
     Apply {
@@ -120,24 +115,26 @@ pub struct RequestEnvelope {
     pub request_id: String,
     /// Token read from the protected discovery record.
     pub token: String,
-    /// Requested read-only operation.
+    /// Requested agent-facing operation.
     pub request: AppRequest,
 }
 
-/// Successful result from a read-only app command.
+/// Successful result from an agent-facing app command.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "type", content = "value")]
 pub enum AppResponse {
     /// Current state of every open document session.
     Status(Vec<SessionStatus>),
+    /// Current context for one editor session.
+    Context(SessionContext),
     /// Shared materialized document snapshot.
     Snapshot(DocumentSnapshot),
     /// Shared deterministic query result.
     QueryResult(QueryResult),
     /// A transaction was validated and stored for review.
     Proposal(Proposal),
-    /// A proposal was rejected and removed.
-    ProposalRejected,
+    /// Current or retained proposal review state.
+    ProposalStatus(ProposalStatus),
     /// A directly authorized transaction was committed.
     Committed(Box<SessionCommit>),
     /// The focus notification was emitted.
@@ -391,18 +388,28 @@ pub fn remove_discovery(path: &Path, expected: &DiscoveryRecord) -> Result<(), I
     Ok(())
 }
 
-/// Dispatches one authenticated read-only app request through the shared session service.
+/// Dispatches one authenticated app request through the shared session service.
 ///
 /// # Errors
 ///
 /// Returns a stable [`ProtocolError`] for unavailable sessions or document
-/// failures. No request in this module mutates a document.
+/// failures. Proposal acceptance and rejection are deliberately unavailable on
+/// this agent-facing transport; those decisions belong to the desktop UI.
 pub fn dispatch(service: &mut SessionService, request: AppRequest) -> Result<AppResponse, ProtocolError> {
     match request {
         AppRequest::Status => service
             .statuses()
             .map(AppResponse::Status)
             .map_err(|error| session_protocol_error(&error)),
+        AppRequest::Context { session_id } => {
+            let session_id = service
+                .resolve_session_id(session_id.as_ref())
+                .map_err(|error| session_protocol_error(&error))?;
+            service
+                .context(&session_id)
+                .map(AppResponse::Context)
+                .map_err(|error| session_protocol_error(&error))
+        }
         AppRequest::Inspect { session_id } => {
             let session_id = service
                 .resolve_session_id(session_id.as_ref())
@@ -425,40 +432,44 @@ pub fn dispatch(service: &mut SessionService, request: AppRequest) -> Result<App
             let session_id = service
                 .resolve_session_id(session_id.as_ref())
                 .map_err(|error| session_protocol_error(&error))?;
-            service
-                .propose(&session_id, transaction)
-                .map(AppResponse::Proposal)
-                .map_err(|error| session_protocol_error(&error))
+            match service.propose(&session_id, transaction) {
+                Ok(proposal) => Ok(AppResponse::Proposal(proposal)),
+                Err(error) => Err(session_protocol_error_with_heads(service, &session_id, &error)),
+            }
         }
-        AppRequest::AcceptProposal { session_id, proposal_id, operation_positions } => {
+        AppRequest::ProposalStatus { session_id, proposal_id } => {
             let session_id = service
                 .resolve_session_id(session_id.as_ref())
                 .map_err(|error| session_protocol_error(&error))?;
             service
-                .accept_proposal(&session_id, &proposal_id, operation_positions.as_deref())
-                .map(|commit| AppResponse::Committed(Box::new(commit)))
-                .map_err(|error| session_protocol_error(&error))
-        }
-        AppRequest::RejectProposal { session_id, proposal_id } => {
-            let session_id = service
-                .resolve_session_id(session_id.as_ref())
-                .map_err(|error| session_protocol_error(&error))?;
-            service
-                .reject_proposal(&session_id, &proposal_id)
-                .map(|()| AppResponse::ProposalRejected)
+                .proposal_status(&session_id, &proposal_id)
+                .map(AppResponse::ProposalStatus)
                 .map_err(|error| session_protocol_error(&error))
         }
         AppRequest::Apply { session_id, transaction, authorization } => {
             let session_id = service
                 .resolve_session_id(session_id.as_ref())
                 .map_err(|error| session_protocol_error(&error))?;
-            service
-                .apply_authorized(&session_id, &authorization, transaction)
-                .map(|commit| AppResponse::Committed(Box::new(commit)))
-                .map_err(|error| session_protocol_error(&error))
+            match service.apply_authorized(&session_id, &authorization, transaction) {
+                Ok(commit) => Ok(AppResponse::Committed(Box::new(commit))),
+                Err(error) => Err(session_protocol_error_with_heads(service, &session_id, &error)),
+            }
         }
         AppRequest::Focus => Ok(AppResponse::Focused),
     }
+}
+
+fn session_protocol_error_with_heads(
+    service: &mut SessionService, session_id: &SessionId, error: &SessionError,
+) -> ProtocolError {
+    let mut protocol_error = session_protocol_error(error);
+    if protocol_error.details.is_none()
+        && matches!(protocol_error.code.as_str(), "stale_heads" | "precondition_failed")
+        && let Ok(status) = service.status(session_id)
+    {
+        protocol_error.details = Some(serde_json::json!({ "current_heads": status.snapshot.heads }));
+    }
+    protocol_error
 }
 
 /// Converts a session failure into the shared protocol error contract.
@@ -468,6 +479,7 @@ pub fn session_protocol_error(error: &SessionError) -> ProtocolError {
         SessionError::NotFound(_) => "session_not_found",
         SessionError::SessionSelectionRequired { open_sessions: 0 } => "app_session_unavailable",
         SessionError::SessionSelectionRequired { .. } => "session_selection_required",
+        SessionError::InvalidContext(_) => "invalid_context",
         SessionError::ActorMismatch { .. } => "actor_mismatch",
         SessionError::StaleHeads => "stale_heads",
         SessionError::ProposalLimit(_)
@@ -495,10 +507,16 @@ pub fn session_protocol_error(error: &SessionError) -> ProtocolError {
             | FileError::RecoveryNotFound { .. }
             | FileError::InvalidRecovery(_)
             | FileError::RecoveryAhead { .. }
-            | FileError::Engine(_)
             | FileError::Io { .. } => "document_file_error",
+            FileError::Engine(EngineError::StaleHeads) => "stale_heads",
+            FileError::Engine(EngineError::Precondition(_)) => "precondition_failed",
+            FileError::Engine(EngineError::Permission(_)) => "permission_denied",
+            FileError::Engine(_) => "document_engine_error",
             FileError::Sync(_) => "sync_error",
         },
+        SessionError::Engine(EngineError::StaleHeads) => "stale_heads",
+        SessionError::Engine(EngineError::Precondition(_)) => "precondition_failed",
+        SessionError::Engine(EngineError::Permission(_)) => "permission_denied",
         SessionError::Engine(_) => "document_engine_error",
     };
     let details = match error {
@@ -774,6 +792,8 @@ mod tests {
 
         let status = dispatch(&mut service, AppRequest::Status).unwrap();
         assert!(matches!(status, AppResponse::Status(statuses) if statuses.len() == 1));
+        let context = dispatch(&mut service, AppRequest::Context { session_id: None }).unwrap();
+        assert!(matches!(context, AppResponse::Context(context) if context.session_id == opened.session_id));
         let snapshot = dispatch(&mut service, AppRequest::Inspect { session_id: None }).unwrap();
         assert!(matches!(snapshot, AppResponse::Snapshot(snapshot) if snapshot == opened.status.snapshot));
         let query = dispatch(

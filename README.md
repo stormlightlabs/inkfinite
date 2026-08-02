@@ -44,14 +44,14 @@ pnpm tauri dev
 
 ## CLI
 
-The `inkfinite` CLI works on `.inkfinite` files while the desktop app is closed.
-It can also inspect a running desktop app through authenticated local IPC.
+The `inkfinite` CLI works with closed `.inkfinite` files and open desktop
+sessions. Live commands use authenticated local IPC.
 
 Run it through Cargo during development:
 
 ```sh
 inkfinite new architecture.inkfinite
-inkfinite inspect architecture.inkfinite
+inkfinite inspect architecture.inkfinite --summary
 inkfinite validate architecture.inkfinite
 ```
 
@@ -59,7 +59,8 @@ Use `query` to find records by ID, name, role, tag, shape kind, page, layer,
 parent, or bounds:
 
 ```sh
-inkfinite query architecture.inkfinite --role architecture.service --json
+inkfinite query architecture.inkfinite \
+  --role architecture.service --detail --limit 20 --json
 ```
 
 Use `apply` for a complete transaction draft. Pass `-` to read the transaction
@@ -71,12 +72,13 @@ inkfinite apply architecture.inkfinite --transaction transaction.json --dry-run
 cat transaction.json | inkfinite apply architecture.inkfinite --transaction - --json
 ```
 
-The structured mutation commands build ordinary transactions. Shapes can be
-selected by exact ID, name, or semantic role, depending on the command:
+The structured mutation commands build ordinary transactions. They generate
+shape and binding IDs when you omit them. Shapes can be selected by exact ID,
+name, or semantic role:
 
 ```sh
 inkfinite shape create architecture.inkfinite \
-  --shape-id shape:api --kind rect --layer layer:architecture:1 \
+  --kind rect --layer layer:architecture:1 \
   --x 80 --y 120 --properties '{"width":240,"height":120}' \
   --role architecture.service
 inkfinite shape patch architecture.inkfinite --role architecture.service \
@@ -86,6 +88,11 @@ inkfinite connect architecture.inkfinite --binding-id binding:api-db \
 inkfinite layout align architecture.inkfinite \
   --role architecture.service --alignment top
 ```
+
+Use `--transaction-out FILE` to validate a structured edit and write its
+transaction without changing the document. The destination must not exist.
+Use `shape kinds` and `shape describe KIND` to inspect the built-in shape
+contract instead of guessing at property names.
 
 `shape delete` removes a selected shape and its descendants. `layout align`
 requires at least two shapes, and `layout distribute` requires at least three.
@@ -104,8 +111,9 @@ inkfinite render architecture.inkfinite --output services.svg \
 Mutation results include the previous and current heads, transaction ID,
 created, updated, and deleted records, repairs, and warnings. `--json` and
 `--non-interactive` are global options and may appear before or after a
-subcommand. JSON commands keep stdout machine-readable and send diagnostics to
-stderr.
+subcommand. JSON commands keep successful data on stdout. Failures are JSON on
+stderr with a stable code, structured details, retryability, and a suggested
+next step.
 
 The CLI can also print its schemas and capability contract:
 
@@ -118,22 +126,30 @@ Run `inkfinite --help` for examples and the complete command reference.
 
 ### Live desktop control
 
-With the desktop app running, use `app status`, `app inspect`, and `app query` to
-read its open sessions. `app focus` asks the frontend to bring its window forward.
-Use `app propose` to send a transaction for ghost-preview review, then accept all
-or selected operations with `app accept`, or reject it with `app reject`. Direct
-`app apply` requires a one-time authorization token issued by the desktop UI:
+With the desktop app running, use `app status`, `app context`, `app inspect`, and
+`app query` to read current state. `app context` includes the active page,
+selection, viewport, actor, and heads. Add `--app` to a structured mutation to
+open a ghost preview instead of changing a file. The user accepts or rejects
+that proposal in the desktop UI; agent-facing IPC cannot make the decision.
+Use `app proposal status` for one check or `app proposal wait` to wait for the
+result.
 
 ```sh
 inkfinite app status --json
+inkfinite app context --json
 inkfinite app inspect --json
-inkfinite app query --role architecture.service --json
+inkfinite app query --role architecture.service --detail --limit 20 --json
 inkfinite app focus
+inkfinite shape patch --app --role architecture.service \
+  --patch '@service-patch.json' --json
 inkfinite app propose --transaction transaction.json --json
-inkfinite app accept --proposal-id proposal:1 --operation-position 0
-inkfinite app reject --proposal-id proposal:2
+inkfinite app proposal wait --proposal-id proposal:1 --json
 inkfinite app apply --transaction transaction.json --authorization TOKEN --json
 ```
+
+`app propose` remains available for operations that the structured commands do
+not cover. Direct `app apply` requires a one-time authorization token issued by
+the desktop UI.
 
 The desktop publishes a per-user Unix-domain socket on Unix-like systems or a
 per-user named pipe on Windows. A protected discovery file carries a random
@@ -141,13 +157,13 @@ process token, and requests use versioned length-prefixed frames.
 
 ### Agent skill
 
-The installable agent package lives in [`skills/inkfinite`](skills/inkfinite).
+The installable agent package lives in [`.agents/skills/inkfinite`](.agents/skills/inkfinite).
 It teaches the inspect/query/transaction/dry-run/proposal workflow and includes
-fixtures for file-mode edits, reviewed partial acceptance, and stale-head recovery.
+fixtures for file edits, desktop review polling, and stale-head recovery.
 
 ```sh
 INKFINITE_CLI="$PWD/target/debug/inkfinite" \
-  bash skills/inkfinite/scripts/verify-examples.sh
+  bash .agents/skills/inkfinite/scripts/verify-examples.sh
 ```
 
 ## Inkfinite files

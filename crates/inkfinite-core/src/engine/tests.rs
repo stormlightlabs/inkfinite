@@ -441,6 +441,14 @@ fn queries_bounds_alignment_and_distribution_share_the_transaction_engine() {
         vec![crate::proto::RecordId::Shape(ShapeId::from("shape:a"))]
     );
 
+    let detailed = engine
+        .query(&Query { include_records: true, limit: Some(1), ..Query::default() })
+        .unwrap();
+    assert!(detailed.total > 1);
+    assert!(detailed.truncated);
+    assert_eq!(detailed.records.len(), 1);
+    assert_eq!(detailed.details.len(), 1);
+
     let align = transaction(
         &mut engine,
         "actor:a",

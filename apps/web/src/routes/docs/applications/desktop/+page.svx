@@ -35,8 +35,12 @@ live proposal workflow instead.
 <h2 id="local-control">Local CLI access</h2>
 
 The desktop app exposes authenticated IPC to the local `inkfinite` CLI. Read-only commands can list
-sessions, inspect the open document, query records, or focus the window. Mutation commands normally
-create a proposal that appears as a ghost preview for human review.
+sessions, report the active page, selection, and viewport, inspect the open document, query records,
+or focus the window. Structured mutation commands create a proposal that appears as a ghost preview
+for human review.
+
+Only the desktop UI can accept or reject a proposal. The CLI can poll the outcome, which lets an
+agent wait for a decision without gaining review authority.
 
 Direct live apply requires a one-time authorization token issued by the desktop UI. Discovery and
 authentication remain local to the current user account. See [Agent workflows](/docs/reference/agents/)

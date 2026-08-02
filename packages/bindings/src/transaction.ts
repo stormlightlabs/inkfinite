@@ -312,6 +312,11 @@ expected_versions: { [key in ShapeId]: RecordVersion }, };
 export type RecordId = { "kind": "page", "id": PageId } | { "kind": "layer", "id": LayerId } | { "kind": "shape", "id": ShapeId } | { "kind": "binding", "id": BindingId } | { "kind": "asset", "id": AssetId };
 
 /**
+ * Complete materialized record returned by a detailed query.
+ */
+export type QueryRecord = { "kind": "page", "record": PageRecord } | { "kind": "layer", "record": LayerRecord } | { "kind": "shape", "record": ShapeRecord } | { "kind": "binding", "record": BindingRecord } | { "kind": "asset", "record": AssetRecord };
+
+/**
  * Materialized patch returned after a successful commit.
  */
 export type DocumentPatch = { 
@@ -428,60 +433,80 @@ warnings: Array<Warning>, };
 /**
  * Optional semantic filters for a document query.
  */
-export type Query = { 
+export type Query = {
 /**
  * Match one exact record ID, regardless of record kind.
  */
-id: string | null, 
+id: string | null,
 /**
  * Match a page, layer, shape, or asset display name.
  */
-name: string | null, 
+name: string | null,
 /**
  * Match one exact semantic role.
  */
-role: string | null, 
+role: string | null,
 /**
  * Match one exact tag.
  */
-tag: string | null, 
+tag: string | null,
 /**
  * Match one exact shape registry key.
  */
-shape_kind: string | null, 
+shape_kind: string | null,
 /**
  * Restrict the query to one page.
  */
-page_id: PageId | null, 
+page_id: PageId | null,
 /**
  * Restrict the query to one layer.
  */
-layer_id: LayerId | null, 
+layer_id: LayerId | null,
 /**
  * Restrict shapes to one direct parent.
  */
-parent_id: string | null, 
+parent_id: string | null,
 /**
  * Restrict shapes to those intersecting these document bounds.
  */
-bounds: Bounds | null, };
+bounds: Bounds | null,
+/**
+ * Include complete matching records in the response.
+ */
+include_records: boolean,
+/**
+ * Return at most this many matches after deterministic sorting.
+ */
+limit: number | null, };
 
 /**
  * Materialized query result suitable for machine clients.
  */
-export type QueryResult = { 
+export type QueryResult = {
 /**
  * Causal heads inspected by the query.
  */
-heads: Array<ChangeHash>, 
+heads: Array<ChangeHash>,
 /**
  * Matching records in deterministic order.
  */
-records: Array<RecordId>, 
+records: Array<RecordId>,
 /**
  * Bounds for matching shapes, in the same order as their shape records.
  */
-bounds: { [key in ShapeId]: Bounds }, };
+bounds: { [key in ShapeId]: Bounds },
+/**
+ * Complete records when the query requested them.
+ */
+details: Array<QueryRecord>,
+/**
+ * Number of matches before applying the requested limit.
+ */
+total: number,
+/**
+ * Whether the result omitted matches because of the requested limit.
+ */
+truncated: boolean, };
 
 /**
  * Result of saving an open document session.

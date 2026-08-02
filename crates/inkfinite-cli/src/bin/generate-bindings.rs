@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use inkfinite_core::proto::{
     AffectedRegion, ApplyAuthorization, AssetPatch, Bounds, CommitResult, DocumentPatch, DocumentPath, InverseMetadata,
     LayerContentsDisposition, LayerPatch, LayoutAxis, Operation, Proposal, ProposalId, ProtocolError, Query,
-    QueryResult, RecordId, Request, Response, SaveResult, SessionId, ShapeAlignment, ShapePatch, TransactionDraft,
-    TransactionId, Warning,
+    QueryRecord, QueryResult, RecordId, Request, Response, SaveResult, SessionId, ShapeAlignment, ShapePatch,
+    TransactionDraft, TransactionId, Warning,
 };
 use inkfinite_core::{
     ActorId, AssetId, AssetRecord, AssetSource, BindingAnchor, BindingId, BindingKind, BindingRecord, ChangeHash,
@@ -185,14 +185,15 @@ fn transaction_bindings() -> String {
     append_declaration::<ShapeAlignment>(&mut output, &config);
     append_declaration::<Operation>(&mut output, &config);
     append_declaration::<RecordId>(&mut output, &config);
+    append_clean_declaration::<QueryRecord>(&mut output, &config);
     append_declaration::<DocumentPatch>(&mut output, &config);
     append_declaration::<Bounds>(&mut output, &config);
     append_declaration::<AffectedRegion>(&mut output, &config);
     append_declaration::<InverseMetadata>(&mut output, &config);
     append_declaration::<Warning>(&mut output, &config);
     append_declaration::<CommitResult>(&mut output, &config);
-    append_declaration::<Query>(&mut output, &config);
-    append_declaration::<QueryResult>(&mut output, &config);
+    append_clean_declaration::<Query>(&mut output, &config);
+    append_clean_declaration::<QueryResult>(&mut output, &config);
     append_declaration::<SaveResult>(&mut output, &config);
     append_declaration::<ProposalId>(&mut output, &config);
     append_declaration::<Proposal>(&mut output, &config);
@@ -229,7 +230,7 @@ fn registry_bindings() -> String {
 
 fn index_bindings() -> String {
     format!(
-        "{GENERATED_TS_HEADER}export * from \"./model.js\";\nexport * from \"./protocol.js\";\nexport * from \"./registry.js\";\nexport * from \"./transaction.js\";\n"
+        "{GENERATED_TS_HEADER}export * from './model.js';\nexport * from './protocol.js';\nexport * from './registry.js';\nexport * from './transaction.js';\n"
     )
 }
 
@@ -244,6 +245,18 @@ fn append_declaration<T: TS>(output: &mut String, config: &Config) {
     output.push_str("export ");
     output.push_str(&T::decl(config));
     output.push_str("\n\n");
+}
+
+fn append_clean_declaration<T: TS>(output: &mut String, config: &Config) {
+    if let Some(docs) = T::docs() {
+        output.push_str(&docs);
+    }
+    let declaration = format!("export {}", T::decl(config));
+    for line in declaration.lines() {
+        output.push_str(line.trim_end());
+        output.push('\n');
+    }
+    output.push('\n');
 }
 
 fn fixture_json() -> Result<String, Box<dyn Error>> {

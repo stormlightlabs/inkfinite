@@ -1233,6 +1233,11 @@
             "null"
           ]
         },
+        "include_records": {
+          "default": false,
+          "description": "Include complete matching records in the response.",
+          "type": "boolean"
+        },
         "layer_id": {
           "anyOf": [
             {
@@ -1243,6 +1248,16 @@
             }
           ],
           "description": "Restrict the query to one layer."
+        },
+        "limit": {
+          "default": null,
+          "description": "Return at most this many matches after deterministic sorting.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
         },
         "name": {
           "description": "Match a page, layer, shape, or asset display name.",

@@ -53,7 +53,7 @@ pub enum Command {
     inkfinite inspect architecture.inkfinite
     inkfinite inspect architecture.inkfinite --json
 ")]
-    Inspect(FileOutputArgs),
+    Inspect(InspectArgs),
     /// Find records using semantic, hierarchy, kind, and bounds filters.
     #[command(after_help = "Examples:
 
@@ -136,6 +136,17 @@ pub struct FileOutputArgs {
 }
 
 #[derive(Debug, Args)]
+pub struct InspectArgs {
+    /// Canonical .inkfinite document to read.
+    #[arg(value_name = "FILE")]
+    pub path: PathBuf,
+
+    /// Return identity, heads, initial record IDs, and counts instead of the complete snapshot.
+    #[arg(long)]
+    pub summary: bool,
+}
+
+#[derive(Debug, Args)]
 pub struct ApplyArgs {
     /// Canonical .inkfinite document to change.
     #[arg(value_name = "FILE")]
@@ -170,6 +181,17 @@ pub enum ShapeCommand {
     inkfinite shape delete architecture.inkfinite --role architecture.deprecated --expected-version 3
 ")]
     Delete(ShapeDeleteArgs),
+    /// List built-in shape kinds and their common property contract.
+    Kinds,
+    /// Describe one built-in shape kind.
+    Describe(ShapeDescribeArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct ShapeDescribeArgs {
+    /// Built-in registry key to describe.
+    #[arg(value_name = "KIND")]
+    pub kind: String,
 }
 
 #[derive(Debug, Args)]
@@ -181,17 +203,29 @@ pub struct MutationOptions {
     /// Stable transaction ID. A command-specific ID is used when omitted.
     #[arg(long, value_name = "ID")]
     pub transaction_id: Option<String>,
+
+    /// Write the validated transaction to a new JSON file without changing the document.
+    #[arg(long, value_name = "FILE")]
+    pub transaction_out: Option<PathBuf>,
+
+    /// Propose this structured edit to the running desktop app instead of changing a file.
+    #[arg(long)]
+    pub app: bool,
+
+    /// Target this desktop session when --app is used.
+    #[arg(long, value_name = "SESSION_ID", requires = "app")]
+    pub session_id: Option<String>,
 }
 
 #[derive(Debug, Args)]
 #[command(group(ArgGroup::new("parent").required(true).args(["layer", "parent_shape"])))]
 pub struct ShapeCreateArgs {
-    /// Canonical .inkfinite document to change.
+    /// Canonical document to change. Omit when using --app.
     #[arg(value_name = "FILE")]
-    pub path: PathBuf,
-    /// Stable ID for the new shape.
+    pub path: Option<PathBuf>,
+    /// Stable ID for the new shape. A deterministic available ID is generated when omitted.
     #[arg(long, value_name = "ID")]
-    pub shape_id: String,
+    pub shape_id: Option<String>,
     /// Built-in shape registry key.
     #[arg(long, value_name = "KIND")]
     pub kind: String,
@@ -235,9 +269,9 @@ pub struct ShapeCreateArgs {
 #[derive(Debug, Args)]
 #[command(group(ArgGroup::new("selector").required(true).multiple(false).args(["shape_id", "name", "role"])))]
 pub struct ShapePatchArgs {
-    /// Canonical .inkfinite document to change.
+    /// Canonical document to change. Omit when using --app.
     #[arg(value_name = "FILE")]
-    pub path: PathBuf,
+    pub path: Option<PathBuf>,
     /// Select an exact shape ID.
     #[arg(long = "shape-id", value_name = "ID")]
     pub shape_id: Option<String>,
@@ -260,9 +294,9 @@ pub struct ShapePatchArgs {
 #[derive(Debug, Args)]
 #[command(group(ArgGroup::new("selector").required(true).multiple(false).args(["shape_id", "name", "role"])))]
 pub struct ShapeDeleteArgs {
-    /// Canonical .inkfinite document to change.
+    /// Canonical document to change. Omit when using --app.
     #[arg(value_name = "FILE")]
-    pub path: PathBuf,
+    pub path: Option<PathBuf>,
     /// Select an exact shape ID.
     #[arg(long = "shape-id", value_name = "ID")]
     pub shape_id: Option<String>,
@@ -281,12 +315,12 @@ pub struct ShapeDeleteArgs {
 
 #[derive(Debug, Args)]
 pub struct ConnectArgs {
-    /// Canonical .inkfinite document to change.
+    /// Canonical document to change. Omit when using --app.
     #[arg(value_name = "FILE")]
-    pub path: PathBuf,
-    /// Stable ID for the new binding.
+    pub path: Option<PathBuf>,
+    /// Stable ID for the new binding. A deterministic available ID is generated when omitted.
     #[arg(long, value_name = "ID")]
-    pub binding_id: String,
+    pub binding_id: Option<String>,
     /// Exact source shape ID.
     #[arg(long, value_name = "SHAPE_ID", required_unless_present = "source_role")]
     pub source: Option<String>,
@@ -335,9 +369,9 @@ pub struct LayoutSelectionArgs {
 
 #[derive(Debug, Args)]
 pub struct LayoutAlignArgs {
-    /// Canonical .inkfinite document to change.
+    /// Canonical document to change. Omit when using --app.
     #[arg(value_name = "FILE")]
-    pub path: PathBuf,
+    pub path: Option<PathBuf>,
     /// Alignment line.
     #[arg(long, value_enum)]
     pub alignment: AlignmentArg,
@@ -349,9 +383,9 @@ pub struct LayoutAlignArgs {
 
 #[derive(Debug, Args)]
 pub struct LayoutDistributeArgs {
-    /// Canonical .inkfinite document to change.
+    /// Canonical document to change. Omit when using --app.
     #[arg(value_name = "FILE")]
-    pub path: PathBuf,
+    pub path: Option<PathBuf>,
     /// Distribution axis.
     #[arg(long, value_enum)]
     pub axis: AxisArg,
@@ -435,6 +469,12 @@ pub struct QueryArgs {
     /// Restrict shapes to bounds formatted as x,y,width,height.
     #[arg(long, value_name = "X,Y,WIDTH,HEIGHT", value_parser = parse_bounds)]
     pub bounds: Option<Bounds>,
+    /// Include complete matching records, including versions and semantic metadata.
+    #[arg(long)]
+    pub detail: bool,
+    /// Return at most this many matches after deterministic sorting.
+    #[arg(long, value_parser = clap::value_parser!(u32).range(1..))]
+    pub limit: Option<u32>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -446,6 +486,8 @@ pub enum AppCommand {
     inkfinite app status --json
 ")]
     Status,
+    /// Return the active page, selection, viewport, actor, and current heads.
+    Context(AppInspectArgs),
     /// Print the current snapshot from the desktop app.
     #[command(after_help = "Examples:
 
@@ -467,19 +509,9 @@ pub enum AppCommand {
     cat transaction.json | inkfinite app propose --transaction - --json
 ")]
     Propose(AppProposeArgs),
-    /// Accept all or selected operations from a reviewed proposal.
-    #[command(after_help = "Examples:
-
-    inkfinite app accept --proposal-id proposal:1 --json
-    inkfinite app accept --proposal-id proposal:1 --operation-position 0 --operation-position 2
-")]
-    Accept(AppAcceptArgs),
-    /// Reject a reviewed proposal without changing the document.
-    #[command(after_help = "Example:
-
-    inkfinite app reject --proposal-id proposal:1
-")]
-    Reject(AppRejectArgs),
+    /// Observe a proposal without accepting or rejecting it.
+    #[command(subcommand)]
+    Proposal(AppProposalCommand),
     /// Apply an agent transaction using a one-time authorization issued by the desktop UI.
     #[command(after_help = "Example:
 
@@ -492,6 +524,37 @@ pub enum AppCommand {
     inkfinite app focus
 ")]
     Focus,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum AppProposalCommand {
+    /// Return the current review state once.
+    Status(AppProposalStatusArgs),
+    /// Wait until desktop review accepts, rejects, or expires the proposal.
+    Wait(AppProposalWaitArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct AppProposalStatusArgs {
+    /// Proposal whose review state should be read.
+    #[arg(long, value_name = "PROPOSAL_ID")]
+    pub proposal_id: String,
+    /// Read from this session, or the only open session when omitted.
+    #[arg(long, value_name = "SESSION_ID")]
+    pub session_id: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct AppProposalWaitArgs {
+    /// Proposal whose final review state should be awaited.
+    #[arg(long, value_name = "PROPOSAL_ID")]
+    pub proposal_id: String,
+    /// Wait in this session, or the only open session when omitted.
+    #[arg(long, value_name = "SESSION_ID")]
+    pub session_id: Option<String>,
+    /// Maximum number of seconds to wait.
+    #[arg(long, default_value_t = 300, value_parser = clap::value_parser!(u64).range(1..))]
+    pub timeout_seconds: u64,
 }
 
 #[derive(Debug, Args)]
@@ -533,6 +596,12 @@ pub struct AppQueryArgs {
     /// Restrict shapes to bounds formatted as x,y,width,height.
     #[arg(long, value_name = "X,Y,WIDTH,HEIGHT", value_parser = parse_bounds)]
     pub bounds: Option<Bounds>,
+    /// Include complete matching records, including versions and semantic metadata.
+    #[arg(long)]
+    pub detail: bool,
+    /// Return at most this many matches after deterministic sorting.
+    #[arg(long, value_parser = clap::value_parser!(u32).range(1..))]
+    pub limit: Option<u32>,
 }
 
 #[derive(Debug, Args)]
@@ -541,29 +610,6 @@ pub struct AppProposeArgs {
     #[arg(long, value_name = "TRANSACTION")]
     pub transaction: PathBuf,
     /// Propose against this session, or the only open session when omitted.
-    #[arg(long, value_name = "SESSION_ID")]
-    pub session_id: Option<String>,
-}
-
-#[derive(Debug, Args)]
-pub struct AppAcceptArgs {
-    /// Proposal to accept.
-    #[arg(long, value_name = "PROPOSAL_ID")]
-    pub proposal_id: String,
-    /// Zero-based operation position to accept. Repeat for partial acceptance.
-    #[arg(long = "operation-position", value_name = "INDEX")]
-    pub operation_positions: Vec<u32>,
-    /// Accept in this session, or the only open session when omitted.
-    #[arg(long, value_name = "SESSION_ID")]
-    pub session_id: Option<String>,
-}
-
-#[derive(Debug, Args)]
-pub struct AppRejectArgs {
-    /// Proposal to reject.
-    #[arg(long, value_name = "PROPOSAL_ID")]
-    pub proposal_id: String,
-    /// Reject in this session, or the only open session when omitted.
     #[arg(long, value_name = "SESSION_ID")]
     pub session_id: Option<String>,
 }

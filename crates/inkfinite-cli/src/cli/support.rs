@@ -74,16 +74,46 @@ pub fn map_file_error(error: FileError) -> CliError {
         FileError::Io { .. } | FileError::RecoveryNotFound { .. } => EXIT_INPUT,
         _ => EXIT_INVALID,
     };
-    CliError::new(exit_code, error)
+    let code = match &error {
+        FileError::AlreadyExists { .. } => "document_exists",
+        FileError::Locked { .. } => "document_locked",
+        FileError::SamePath { .. } => "same_path",
+        FileError::Engine(EngineError::StaleHeads) => "stale_heads",
+        FileError::Engine(EngineError::Precondition(_)) => "precondition_failed",
+        FileError::Engine(EngineError::Permission(_)) => "permission_denied",
+        FileError::Io { .. } => "file_io_error",
+        FileError::Json(_) => "invalid_json",
+        FileError::InvalidDocument(_) => "invalid_document",
+        FileError::UnsupportedFormat { .. } => "unsupported_format",
+        FileError::UnsupportedShapeKind { .. } => "unsupported_shape_kind",
+        FileError::RecoveryNotFound { .. } => "recovery_not_found",
+        FileError::InvalidRecovery(_) => "invalid_recovery",
+        FileError::RecoveryAhead { .. } => "recovery_ahead",
+        FileError::Engine(_) => "document_engine_error",
+        FileError::Sync(_) => "sync_error",
+    };
+    let retryable = matches!(
+        &error,
+        FileError::Locked { .. } | FileError::Engine(EngineError::StaleHeads | EngineError::Precondition(_))
+    );
+    let mut diagnostic = CliError::new(exit_code, error).with_code(code);
+    if retryable {
+        diagnostic = diagnostic.retryable("Refresh the document state, then retry the command.");
+    }
+    diagnostic
 }
 
 pub fn map_json_error(error: serde_json::Error) -> CliError {
     let exit_code = if error.is_io() { EXIT_INPUT } else { EXIT_INVALID };
-    CliError::new(exit_code, error).context("could not write JSON output")
+    CliError::new(exit_code, error)
+        .with_code("json_output_error")
+        .context("could not write JSON output")
 }
 
 pub fn map_output_error(error: io::Error) -> CliError {
-    CliError::new(EXIT_INPUT, error).context("could not write stdout")
+    CliError::new(EXIT_INPUT, error)
+        .with_code("output_error")
+        .context("could not write stdout")
 }
 
 #[cfg(test)]

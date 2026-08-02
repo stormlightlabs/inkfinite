@@ -27,6 +27,7 @@ pub fn run() {
             session::open_document,
             session::open_or_create_draft,
             session::snapshot,
+            session::update_context,
             session::commit,
             session::propose,
             session::accept_proposal,

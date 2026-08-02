@@ -31,6 +31,13 @@ export type LiveProposal = {
 /** Change notification used by the desktop review surface. */
 export type ProposalUpdate = { proposal: LiveProposal | null; message?: string };
 
+/** Editor-only state shared with read-only agent context queries. */
+export type AgentEditorContext = {
+	pageId: string | null;
+	selectionIds: string[];
+	viewport: { x: number; y: number; width: number; height: number } | null;
+};
+
 /** File command selected from a desktop application's native menu. */
 export type NativeFileMenuAction =
 	| 'new'
@@ -78,6 +85,8 @@ export interface DesktopDocumentRepo extends PersistentDocRepo {
 	): Promise<import('@inkfinite/core').LoadedDoc>;
 	rejectProposal(proposalId: string): Promise<void>;
 	authorizeApply(): Promise<{ token: string; session_id: string; expires_at: number }>;
+	/** Publishes the current page, selection, and visible world-space rectangle. */
+	updateAgentContext(context: AgentEditorContext): Promise<void>;
 }
 
 /** Connected persistence services used for one mounted editor. */

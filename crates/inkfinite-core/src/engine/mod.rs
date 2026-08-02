@@ -10,7 +10,8 @@ use serde::{Deserialize, Serialize};
 use crate::crdt::{AutomergeDocument, CrdtError, EncodedChange};
 use crate::proto::{
     AffectedRegion, AssetPatch, Bounds, DocumentPatch, InverseMetadata, LayerContentsDisposition, LayerPatch,
-    LayoutAxis, Operation, Query, QueryResult, RecordId, ShapeAlignment, ShapePatch, TransactionId, Warning,
+    LayoutAxis, Operation, Query, QueryRecord, QueryResult, RecordId, ShapeAlignment, ShapePatch, TransactionId,
+    Warning,
 };
 use crate::sync::{PeerSync, SyncDisposition, SyncMessage};
 use crate::{

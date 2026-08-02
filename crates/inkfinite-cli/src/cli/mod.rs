@@ -15,10 +15,10 @@ use inkfinite_core::proto::{
 };
 use inkfinite_core::render::{SvgRenderOptions, render_svg};
 use inkfinite_core::{
-    ActorId, BindingAnchor, BindingId, BindingKind, BindingRecord, DocumentId, INKFINITE_FORMAT_ID,
-    INKFINITE_FORMAT_VERSION, LayerId, Opacity, Origin, PageId, Provenance, RecordVersion, SemanticMetadata, ShapeId,
-    ShapeKind, ShapeParent, ShapeRecord, ShapeStyle, SiblingAnchor, Timestamp, Transform, Vec2, blank_document,
-    builtin_shape_kinds,
+    ActorId, BindingAnchor, BindingId, BindingKind, BindingRecord, BuiltinShapeKind, DocumentId, DocumentSnapshot,
+    INKFINITE_FORMAT_ID, INKFINITE_FORMAT_VERSION, LayerId, Opacity, Origin, PageId, Provenance, RecordVersion,
+    SemanticMetadata, ShapeId, ShapeKind, ShapeParent, ShapeRecord, ShapeStyle, SiblingAnchor, Timestamp, Transform,
+    Vec2, blank_document, builtin_shape_kinds,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -39,20 +39,66 @@ pub type Result<T> = std::result::Result<T, CliError>;
 #[derive(Debug)]
 pub struct CliError {
     exit_code: i32,
+    code: String,
+    details: Option<Value>,
+    retryable: bool,
+    suggestion: Option<String>,
     pub source: Error,
 }
 
 impl CliError {
     fn new(exit_code: i32, source: impl Into<Error>) -> Self {
-        Self { exit_code, source: source.into() }
+        Self {
+            exit_code,
+            code: match exit_code {
+                EXIT_INPUT => "input_error",
+                EXIT_INVALID => "invalid_data",
+                EXIT_CONFLICT => "state_conflict",
+                _ => "command_failed",
+            }
+            .into(),
+            details: None,
+            retryable: false,
+            suggestion: None,
+            source: source.into(),
+        }
     }
 
     fn context(self, message: impl std::fmt::Display + Send + Sync + 'static) -> Self {
-        Self { exit_code: self.exit_code, source: self.source.context(message) }
+        Self { source: self.source.context(message), ..self }
+    }
+
+    fn with_code(mut self, code: impl Into<String>) -> Self {
+        self.code = code.into();
+        self
+    }
+
+    fn with_details(mut self, details: Value) -> Self {
+        self.details = Some(details);
+        self
+    }
+
+    fn retryable(mut self, suggestion: impl Into<String>) -> Self {
+        self.retryable = true;
+        self.suggestion = Some(suggestion.into());
+        self
     }
 
     pub fn exit_code(&self) -> i32 {
         self.exit_code
+    }
+
+    /// Returns a stable JSON diagnostic for automation.
+    pub fn diagnostic(&self) -> Value {
+        json!({
+            "error": {
+                "code": self.code,
+                "message": format!("{:#}", self.source),
+                "details": self.details,
+                "retryable": self.retryable,
+                "suggestion": self.suggestion,
+            }
+        })
     }
 }
 
@@ -69,8 +115,9 @@ mod shape;
 mod support;
 
 use args::{
-    AlignmentArg, ApplyArgs, AxisArg, ConnectArgs, FileOutputArgs, LayoutCommand, LayoutSelectionArgs, NewArgs,
-    QueryArgs, RenderArgs, SchemaKind, ShapeCommand, ShapeCreateArgs, ShapeDeleteArgs, ShapePatchArgs,
+    AlignmentArg, ApplyArgs, AxisArg, ConnectArgs, FileOutputArgs, InspectArgs, LayoutCommand, LayoutSelectionArgs,
+    MutationOptions, NewArgs, QueryArgs, RenderArgs, SchemaKind, ShapeCommand, ShapeCreateArgs, ShapeDeleteArgs,
+    ShapeDescribeArgs, ShapePatchArgs,
 };
 use support::parse_bounds;
 

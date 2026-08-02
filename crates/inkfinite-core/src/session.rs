@@ -6,7 +6,7 @@
 //! Adapters can expose this service over Tauri, local IPC, or a CLI without
 //! moving document bytes into the frontend.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt::Write as _;
 use std::path::Path;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -17,14 +17,16 @@ use thiserror::Error;
 use crate::engine::{EngineError, SyncApplyResult, validate_document};
 use crate::file::{DocumentFile, FileError};
 use crate::proto::{
-    ApplyAuthorization, CommitResult, DocumentPath, Proposal, ProposalId, Query, QueryResult, SaveResult, SessionId,
-    TransactionDraft, TransactionId, Warning,
+    ApplyAuthorization, Bounds, CommitResult, DocumentPath, Proposal, ProposalId, Query, QueryResult, SaveResult,
+    SessionId, TransactionDraft, TransactionId, Warning,
 };
 use crate::sync::{PeerSyncStatus, SyncMessage};
-use crate::{ActorId, DocumentId, DocumentSnapshot, Origin, Timestamp, blank_document};
+use crate::{ActorId, ChangeHash, DocumentId, DocumentSnapshot, Origin, PageId, ShapeId, Timestamp, blank_document};
 
 /// Maximum number of pending proposals held by one live session.
 pub const MAX_PROPOSALS_PER_SESSION: usize = 32;
+/// Maximum number of completed proposal outcomes retained for agent polling.
+pub const MAX_PROPOSAL_OUTCOMES_PER_SESSION: usize = 64;
 /// Maximum number of operations accepted by a proposal or direct live apply.
 pub const MAX_PROPOSAL_OPERATIONS: usize = 256;
 /// Maximum UTF-8 byte length of a proposal description.
@@ -93,6 +95,54 @@ pub struct SessionCommit {
     pub status: SessionStatus,
 }
 
+/// Review state exposed to an agent without granting review authority.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProposalReviewState {
+    /// The proposal is waiting for a desktop review decision.
+    Pending,
+    /// A human accepted the proposal in the desktop UI.
+    Accepted,
+    /// A human rejected the proposal in the desktop UI.
+    Rejected,
+    /// The proposal was not reviewed before its bounded lifetime elapsed.
+    Expired,
+}
+
+/// Pollable proposal state for agent workflows.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ProposalStatus {
+    /// Stable proposal identifier.
+    pub proposal_id: ProposalId,
+    /// Current review state.
+    pub state: ProposalReviewState,
+    /// Current document heads when this status was observed or recorded.
+    pub heads: Vec<ChangeHash>,
+    /// Full proposal while review is still pending.
+    pub proposal: Option<Proposal>,
+}
+
+/// Current desktop editing context exposed to read-only agent workflows.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SessionContext {
+    /// Session whose editor state is represented.
+    pub session_id: SessionId,
+    /// Canonical path currently held by the desktop.
+    pub path: DocumentPath,
+    /// Actor used to build proposals for this session.
+    pub actor_id: ActorId,
+    /// Current causal heads.
+    pub heads: Vec<ChangeHash>,
+    /// Page currently visible in the editor.
+    pub page_id: Option<PageId>,
+    /// Shapes selected by the user in stable UI order.
+    pub selection_ids: Vec<ShapeId>,
+    /// Visible world-space rectangle, when the renderer has reported one.
+    pub viewport: Option<Bounds>,
+    /// Wall-clock time of the latest editor context update.
+    pub updated_at: Timestamp,
+}
+
 /// Result returned after a successful save or save-as.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SessionSaved {
@@ -123,6 +173,9 @@ pub enum SessionError {
         /// Number of sessions currently available for selection.
         open_sessions: usize,
     },
+    /// The frontend reported editor context that does not belong to the session document.
+    #[error("invalid editor context: {0}")]
+    InvalidContext(String),
     /// The actor does not own the session's local mutation stream.
     #[error("actor {actual} does not own session actor {expected}")]
     ActorMismatch {
@@ -211,6 +264,12 @@ struct DocumentSession {
     file: DocumentFile,
     proposals: BTreeMap<ProposalId, PendingProposal>,
     expired_proposals: BTreeSet<ProposalId>,
+    proposal_outcomes: BTreeMap<ProposalId, ProposalStatus>,
+    proposal_outcome_order: VecDeque<ProposalId>,
+    page_id: Option<PageId>,
+    selection_ids: Vec<ShapeId>,
+    viewport: Option<Bounds>,
+    context_updated_at: Timestamp,
     authorizations: BTreeMap<String, ApplyGrant>,
 }
 
@@ -291,6 +350,91 @@ impl SessionService {
             .iter_mut()
             .map(|(session_id, session)| session.status(session_id))
             .collect()
+    }
+
+    /// Returns the latest page, selection, viewport, actor, and heads reported by the desktop editor.
+    ///
+    /// # Errors
+    ///
+    /// Returns a session lookup or snapshot error.
+    pub fn context(&mut self, session_id: &SessionId) -> Result<SessionContext, SessionError> {
+        let session = self.session_mut(session_id)?;
+        let snapshot = session.file.snapshot()?;
+        Ok(SessionContext {
+            session_id: session_id.clone(),
+            path: DocumentPath(session.file.path().to_string_lossy().into_owned()),
+            actor_id: session.file.actor_id().clone(),
+            heads: snapshot.heads,
+            page_id: session.page_id.clone(),
+            selection_ids: session.selection_ids.clone(),
+            viewport: session.viewport,
+            updated_at: session.context_updated_at,
+        })
+    }
+
+    /// Records the current frontend page, selection, and world-space viewport.
+    ///
+    /// # Errors
+    ///
+    /// Returns a session, snapshot, or context validation error.
+    pub fn update_context(
+        &mut self, session_id: &SessionId, page_id: Option<PageId>, selection_ids: Vec<ShapeId>,
+        viewport: Option<Bounds>,
+    ) -> Result<(), SessionError> {
+        let session = self.session_mut(session_id)?;
+        if page_id != session.page_id || selection_ids != session.selection_ids {
+            let snapshot = session.file.snapshot()?;
+            if let Some(page_id) = &page_id
+                && !snapshot.document.pages.contains_key(page_id)
+            {
+                return Err(SessionError::InvalidContext(format!("page {page_id} does not exist")));
+            }
+            if let Some(shape_id) = selection_ids
+                .iter()
+                .find(|shape_id| !snapshot.document.shapes.contains_key(*shape_id))
+            {
+                return Err(SessionError::InvalidContext(format!("shape {shape_id} does not exist")));
+            }
+            if page_id.is_none() && !selection_ids.is_empty() {
+                return Err(SessionError::InvalidContext(
+                    "a selection requires an active page".into(),
+                ));
+            }
+            if let Some(page_id) = &page_id {
+                for selected_shape_id in &selection_ids {
+                    let mut shape_id = selected_shape_id;
+                    let layer_id = loop {
+                        let shape = &snapshot.document.shapes[shape_id];
+                        match &shape.parent {
+                            crate::ShapeParent::Layer(layer_id) => break layer_id,
+                            crate::ShapeParent::Shape(parent_id) => shape_id = parent_id,
+                        }
+                    };
+                    if snapshot.document.layers[layer_id].page_id != *page_id {
+                        return Err(SessionError::InvalidContext(format!(
+                            "shape {selected_shape_id} is not on page {page_id}"
+                        )));
+                    }
+                }
+            }
+        }
+        if let Some(bounds) = viewport
+            && (!bounds.x.is_finite()
+                || !bounds.y.is_finite()
+                || !bounds.width.is_finite()
+                || !bounds.height.is_finite()
+                || bounds.width < 0.0
+                || bounds.height < 0.0)
+        {
+            return Err(SessionError::InvalidContext(
+                "viewport must be finite with non-negative width and height".into(),
+            ));
+        }
+        session.page_id = page_id;
+        session.selection_ids = selection_ids;
+        session.viewport = viewport;
+        session.context_updated_at = timestamp_now();
+        Ok(())
     }
 
     /// Resolves an explicit session, or the only open session when omitted.
@@ -418,6 +562,12 @@ impl SessionService {
         };
         let commit = session.file.commit(transaction)?;
         session.proposals.remove(proposal_id);
+        session.record_proposal_outcome(ProposalStatus {
+            proposal_id: proposal_id.clone(),
+            state: ProposalReviewState::Accepted,
+            heads: commit.heads.clone(),
+            proposal: None,
+        });
         let status = session.status(session_id)?;
         Ok(SessionCommit { commit, status })
     }
@@ -431,12 +581,44 @@ impl SessionService {
         let session = self.session_mut(session_id)?;
         session.expire_state();
         if session.proposals.remove(proposal_id).is_some() {
+            let heads = session.file.snapshot()?.heads;
+            session.record_proposal_outcome(ProposalStatus {
+                proposal_id: proposal_id.clone(),
+                state: ProposalReviewState::Rejected,
+                heads,
+                proposal: None,
+            });
             Ok(())
         } else if session.expired_proposals.remove(proposal_id) {
             Err(SessionError::ProposalExpired(proposal_id.clone()))
         } else {
             Err(SessionError::ProposalNotFound(proposal_id.clone()))
         }
+    }
+
+    /// Returns the current or retained review state for a proposal.
+    ///
+    /// # Errors
+    ///
+    /// Returns a session, snapshot, or proposal lookup error.
+    pub fn proposal_status(
+        &mut self, session_id: &SessionId, proposal_id: &ProposalId,
+    ) -> Result<ProposalStatus, SessionError> {
+        let session = self.session_mut(session_id)?;
+        session.expire_state();
+        if let Some(pending) = session.proposals.get(proposal_id) {
+            return Ok(ProposalStatus {
+                proposal_id: proposal_id.clone(),
+                state: ProposalReviewState::Pending,
+                heads: session.file.snapshot()?.heads,
+                proposal: Some(pending.proposal.clone()),
+            });
+        }
+        session
+            .proposal_outcomes
+            .get(proposal_id)
+            .cloned()
+            .ok_or_else(|| SessionError::ProposalNotFound(proposal_id.clone()))
     }
 
     /// Issues a one-time authorization that the desktop UI can pass to a
@@ -650,7 +832,7 @@ impl SessionService {
         self.sessions.is_empty()
     }
 
-    fn insert(&mut self, file: DocumentFile) -> Result<SessionOpened, SessionError> {
+    fn insert(&mut self, mut file: DocumentFile) -> Result<SessionOpened, SessionError> {
         let path = file.path().to_owned();
         if let Some((session_id, _)) = self.sessions.iter().find(|(_, session)| session.file.path() == path) {
             return Err(SessionError::AlreadyOpen {
@@ -661,10 +843,17 @@ impl SessionService {
 
         self.next_session_number = self.next_session_number.saturating_add(1);
         let session_id = SessionId(format!("session:{}", self.next_session_number));
+        let page_id = file.snapshot()?.document.page_ids.first().cloned();
         let mut session = DocumentSession {
             file,
             proposals: BTreeMap::new(),
             expired_proposals: BTreeSet::new(),
+            proposal_outcomes: BTreeMap::new(),
+            proposal_outcome_order: VecDeque::new(),
+            page_id,
+            selection_ids: Vec::new(),
+            viewport: None,
+            context_updated_at: timestamp_now(),
             authorizations: BTreeMap::new(),
         };
         let status = session.status(&session_id)?;
@@ -690,13 +879,33 @@ impl DocumentSession {
             .collect::<Vec<_>>();
         for proposal_id in expired {
             self.proposals.remove(&proposal_id);
-            self.expired_proposals.insert(proposal_id);
+            self.expired_proposals.insert(proposal_id.clone());
+            if let Ok(snapshot) = self.file.snapshot() {
+                self.record_proposal_outcome(ProposalStatus {
+                    proposal_id,
+                    state: ProposalReviewState::Expired,
+                    heads: snapshot.heads,
+                    proposal: None,
+                });
+            }
         }
         while self.expired_proposals.len() > MAX_PROPOSALS_PER_SESSION {
             let Some(oldest) = self.expired_proposals.iter().next().cloned() else { break };
             self.expired_proposals.remove(&oldest);
         }
         self.authorizations.retain(|_, grant| now < grant.expires_at);
+    }
+
+    fn record_proposal_outcome(&mut self, status: ProposalStatus) {
+        let proposal_id = status.proposal_id.clone();
+        if !self.proposal_outcomes.contains_key(&proposal_id) {
+            self.proposal_outcome_order.push_back(proposal_id.clone());
+        }
+        self.proposal_outcomes.insert(proposal_id, status);
+        while self.proposal_outcome_order.len() > MAX_PROPOSAL_OUTCOMES_PER_SESSION {
+            let Some(oldest) = self.proposal_outcome_order.pop_front() else { break };
+            self.proposal_outcomes.remove(&oldest);
+        }
     }
 
     fn status(&mut self, session_id: &SessionId) -> Result<SessionStatus, SessionError> {
@@ -850,6 +1059,32 @@ mod tests {
     static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     #[test]
+    fn editor_context_tracks_page_selection_viewport_actor_and_heads() {
+        let root = test_directory();
+        let path = root.join("context.inkfinite");
+        let actor = ActorId::from("actor:context");
+        let mut service = SessionService::new();
+        let opened = service
+            .create(&path, DocumentId::from("document:context"), actor.clone(), None)
+            .expect("create session");
+        let page_id = opened.status.snapshot.document.page_ids[0].clone();
+        let viewport = Bounds { x: -100.0, y: -50.0, width: 200.0, height: 100.0 };
+
+        service
+            .update_context(&opened.session_id, Some(page_id.clone()), Vec::new(), Some(viewport))
+            .expect("update context");
+        let context = service.context(&opened.session_id).expect("read context");
+
+        assert_eq!(context.page_id, Some(page_id));
+        assert_eq!(context.viewport, Some(viewport));
+        assert_eq!(context.actor_id, actor);
+        assert_eq!(context.heads, opened.status.snapshot.heads);
+
+        service.close(&opened.session_id).expect("close session");
+        remove_test_directory(root);
+    }
+
+    #[test]
     fn stale_save_is_rejected_without_changing_the_session() {
         let root = test_directory();
         let path = root.join("stale.inkfinite");
@@ -977,6 +1212,10 @@ mod tests {
         service
             .reject_proposal(&opened.session_id, &proposal.id)
             .expect("reject proposal");
+        let review = service
+            .proposal_status(&opened.session_id, &proposal.id)
+            .expect("retain rejected status");
+        assert_eq!(review.state, ProposalReviewState::Rejected);
         assert_eq!(fs::read(&path).expect("read unchanged canonical file"), before_bytes);
         assert_eq!(
             service.status(&opened.session_id).expect("final status").snapshot,
@@ -1026,6 +1265,12 @@ mod tests {
         let accepted = service
             .accept_proposal(&opened.session_id, &proposal.id, Some(&[1_u32]))
             .expect("accept selected operation");
+
+        let review = service
+            .proposal_status(&opened.session_id, &proposal.id)
+            .expect("retain accepted status");
+        assert_eq!(review.state, ProposalReviewState::Accepted);
+        assert_eq!(review.heads, accepted.commit.heads);
 
         assert_eq!(accepted.commit.patch.changed.len(), 1);
         let status = service

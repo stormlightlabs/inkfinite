@@ -46,6 +46,7 @@ function createFakeSessionApi() {
 	const draftPath = '/app-data/drafts/untitled.inkfinite';
 	const files = new Map<string, DocumentSnapshot>();
 	const sessions = new Map<string, FakeSession>();
+	const agentContexts: Array<Parameters<SessionApi['updateContext']>[0]> = [];
 	let sessionNumber = 0;
 	let headNumber = 0;
 
@@ -122,6 +123,10 @@ function createFakeSessionApi() {
 			const session = sessions.get(args.session_id);
 			if (!session) throw new Error('Missing fake session');
 			return statusFor(args.session_id, session);
+		},
+
+		async updateContext(args: Parameters<SessionApi['updateContext']>[0]): Promise<void> {
+			agentContexts.push(structuredClone(args));
 		},
 
 		async commit(args: Parameters<SessionApi['commit']>[0]): Promise<SessionCommit> {
@@ -245,7 +250,14 @@ function createFakeSessionApi() {
 		async query(args: Parameters<SessionApi['query']>[0]) {
 			const session = sessions.get(args.session_id);
 			if (!session) throw new Error('Missing fake session');
-			return { heads: session.status.snapshot.heads, records: [], bounds: {} };
+			return {
+				heads: session.status.snapshot.heads,
+				records: [],
+				bounds: {},
+				details: [],
+				total: 0,
+				truncated: false
+			};
 		},
 
 		async validate(args: Parameters<SessionApi['validate']>[0]) {
@@ -288,7 +300,7 @@ function createFakeSessionApi() {
 		}
 	} satisfies SessionApi;
 
-	return { api, files, draftPath };
+	return { api, files, draftPath, agentContexts };
 }
 
 function createFakeFileOps() {
@@ -389,7 +401,9 @@ describe('Rust-backed desktop session repository', () => {
 					page_id: null,
 					layer_id: null,
 					parent_id: null,
-					bounds: null
+					bounds: null,
+					include_records: false,
+					limit: null
 				})
 			).records
 		).toEqual([]);
@@ -410,6 +424,22 @@ describe('Rust-backed desktop session repository', () => {
 		await repo.closeSession();
 		const reopened = await repo.loadDoc(boards[0].id);
 		expect(reopened.pages[pageId].name).toBe('Renamed');
+	});
+
+	it('publishes editor context only after a desktop session is open', async () => {
+		const repo = createDesktopSessionRepo(fileOps.ops, { api: session.api });
+		await repo.updateAgentContext({ pageId: 'page:none', selectionIds: [], viewport: null });
+		expect(session.agentContexts).toEqual([]);
+
+		const opened = await repo.openDraft();
+		const pageId = opened.doc.order.pageIds[0];
+		await repo.updateAgentContext({
+			pageId,
+			selectionIds: [],
+			viewport: { x: -100, y: -50, width: 200, height: 100 }
+		});
+
+		expect(session.agentContexts.at(-1)).toMatchObject({ page_id: pageId, viewport: { width: 200, height: 100 } });
 	});
 
 	it('lists native document paths without reading document bytes in the frontend', async () => {

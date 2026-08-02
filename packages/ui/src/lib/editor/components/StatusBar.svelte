@@ -245,8 +245,8 @@
 	<section class="about">
 		<h1>About Inkfinite</h1>
 		<p>
-			Inkfinite is an infinite canvas prototype. The goal is to build a cross-platform editor
-			with a framework-agnostic core so the same engine powers both the web and desktop apps.
+			Inkfinite is an open canvas for sketching, diagramming, and working with coding agents.
+			The web and desktop apps share the same editor and document model.
 		</p>
 		<div class="about__section">
 			<h2>Quick Tips</h2>
@@ -390,8 +390,8 @@
 		padding: var(--ink-space-5);
 	}
 
-	:global(.about-dialog) {
-		--ink-dialog-radius: 1rem;
+	:global(.dialog__content.about-dialog) {
+		border-radius: 1rem;
 	}
 
 	.about h1 {

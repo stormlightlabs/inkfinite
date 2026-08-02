@@ -48,22 +48,29 @@ pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(
         "format": { "id": INKFINITE_FORMAT_ID, "version": INKFINITE_FORMAT_VERSION },
         "global_options": ["--json", "--non-interactive"],
         "json_stdout_is_machine_only": true,
+        "json_errors": {
+            "fields": ["code", "message", "details", "retryable", "suggestion"],
+            "stderr_only": true
+        },
         "live_mode": {
-            "commands": ["status", "inspect", "query", "focus", "propose", "accept", "reject", "apply"],
+            "commands": ["status", "context", "inspect", "query", "focus", "propose", "proposal status", "proposal wait", "apply"],
             "proposal_review": true,
+            "proposal_decisions": "desktop_ui_only",
             "direct_apply_requires_one_time_authorization": true,
             "transport": "authenticated_local_socket",
             "tcp_or_http": false
         },
         "mutation_commands": {
             "apply": ["--transaction", "--dry-run"],
-            "connect": ["--binding-id", "--source", "--source-role", "--target", "--target-role", "--dry-run"],
+            "connect": ["--binding-id", "--source", "--source-role", "--target", "--target-role", "--dry-run", "--transaction-out", "--app"],
             "layout": ["align", "distribute"],
-            "shape": ["create", "patch", "delete"]
+            "shape": ["create", "patch", "delete", "kinds", "describe"],
+            "structured_targets": ["file", "app_proposal"]
         },
         "path_format": "forward_slashes",
         "protocol": { "id": PROTOCOL_ID, "version": PROTOCOL_VERSION },
         "query_filters": ["id", "name", "role", "tag", "kind", "page", "layer", "parent", "bounds"],
+        "query_options": ["detail", "limit"],
         "render_filters": ["page", "layer", "shape", "role", "region"],
         "schemas": ["document", "transaction", "protocol", "protocol-request", "protocol-response", "protocol-error"],
         "shape_kinds": builtin_shape_kinds()
@@ -85,7 +92,7 @@ pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(
     .map_err(map_output_error)?;
     writeln!(
         stdout,
-        "Live mode: app status, app inspect, app query, app focus, app propose, app accept, app reject, app apply"
+        "Live mode: app status, app context, app inspect, app query, app focus, app propose, app proposal status/wait, app apply"
     )
     .map_err(map_output_error)?;
     writeln!(stdout, "Global options: --json, --non-interactive").map_err(map_output_error)?;

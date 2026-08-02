@@ -53,6 +53,10 @@ fn help_makes_common_tasks_and_support_paths_discoverable() {
         String::from_utf8(version.stdout).unwrap(),
         format!("inkfinite {}\n", env!("CARGO_PKG_VERSION"))
     );
+
+    let agent_review_attempt = run(["app", "accept", "--proposal-id", "proposal:1", "--json"]);
+    assert_eq!(agent_review_attempt.status.code(), Some(2));
+    assert_eq!(parse_stderr(&agent_review_attempt)["error"]["code"], "invalid_usage");
 }
 
 #[test]
@@ -64,6 +68,8 @@ fn closed_file_workflow_has_stable_human_and_json_output() {
     assert_success(&created);
     let created_json = parse_stdout(&created);
     assert_eq!(created_json["document_id"], "document:system-map");
+    assert_eq!(created_json["page_id"], "page:document:system-map:1");
+    assert_eq!(created_json["layer_id"], "layer:document:system-map:1");
     assert_eq!(created_json["path"], document_path.to_string_lossy().replace('\\', "/"));
     assert!(created_json["heads"].as_array().is_some_and(|heads| !heads.is_empty()));
 
@@ -72,6 +78,11 @@ fn closed_file_workflow_has_stable_human_and_json_output() {
     let inspected_json = parse_stdout(&inspected);
     assert_eq!(inspected_json["document_id"], "document:system-map");
     assert_eq!(inspected_json["heads"], created_json["heads"]);
+
+    let summary = parse_stdout(&run(["inspect", path(&document_path), "--summary", "--json"]));
+    assert_eq!(summary["counts"]["pages"], 1);
+    assert_eq!(summary["counts"]["layers"], 1);
+    assert!(summary.get("document").is_none());
 
     let globally_selected_json = run(["--json", "inspect", path(&document_path)]);
     assert_success(&globally_selected_json);
@@ -165,6 +176,9 @@ fn query_forwards_semantic_hierarchy_kind_and_bounds_filters() {
         "layer:filters:1",
         "--bounds",
         "10,20,40,30",
+        "--detail",
+        "--limit",
+        "1",
         "--json",
     ]);
     assert_success(&output);
@@ -173,6 +187,48 @@ fn query_forwards_semantic_hierarchy_kind_and_bounds_filters() {
     assert_eq!(result["records"][0]["kind"], "shape");
     assert_eq!(result["records"][0]["id"], "shape:api");
     assert_eq!(result["bounds"]["shape:api"]["width"], 40.0);
+    assert_eq!(result["details"][0]["kind"], "shape");
+    assert_eq!(result["details"][0]["record"]["version"], 1);
+    assert_eq!(result["total"], 1);
+    assert_eq!(result["truncated"], false);
+}
+
+#[test]
+fn shape_discovery_and_transaction_output_are_agent_friendly() {
+    let temporary = TestDirectory::new("transaction-output");
+    let document_path = temporary.path.join("output.inkfinite");
+    let transaction_path = temporary.path.join("create.json");
+    assert_success(&run(["new", path(&document_path), "--json"]));
+    let original = fs::read(&document_path).unwrap();
+
+    let kinds = parse_stdout(&run(["shape", "kinds", "--json"]));
+    assert!(kinds.as_array().unwrap().iter().any(|kind| kind["kind"] == "rect"));
+    let described = parse_stdout(&run(["shape", "describe", "container", "--json"]));
+    assert_eq!(described["allows_children"], true);
+
+    let emitted = run([
+        "shape",
+        "create",
+        path(&document_path),
+        "--kind",
+        "rect",
+        "--layer",
+        "layer:document:output:1",
+        "--properties",
+        "{\"width\":40,\"height\":30}",
+        "--transaction-out",
+        path(&transaction_path),
+        "--json",
+    ]);
+    assert_success(&emitted);
+    let emitted_json = parse_stdout(&emitted);
+    assert_eq!(emitted_json["dry_run"], true);
+    assert_eq!(fs::read(&document_path).unwrap(), original);
+    let transaction: TransactionDraft = serde_json::from_slice(&fs::read(&transaction_path).unwrap()).unwrap();
+    let Operation::CreateShape { shape, .. } = &transaction.operations[0] else {
+        panic!("structured create should emit a create-shape operation")
+    };
+    assert_eq!(shape.id.as_str(), "shape:rect:1");
 }
 
 #[test]
@@ -227,6 +283,11 @@ fn schemas_and_capabilities_match_checked_in_contracts() {
         "authenticated_local_socket"
     );
     assert_eq!(capabilities_json["live_mode"]["tcp_or_http"], false);
+    assert_eq!(capabilities_json["live_mode"]["proposal_decisions"], "desktop_ui_only");
+    assert_eq!(
+        capabilities_json["query_options"],
+        serde_json::json!(["detail", "limit"])
+    );
     assert_eq!(capabilities_json["mutation_commands"]["shape"][0], "create");
     assert!(
         capabilities_json["commands"]
@@ -550,8 +611,14 @@ fn json_failures_keep_stdout_clean_and_use_stable_exit_codes() {
     assert_eq!(missing_output.status.code(), Some(3));
     assert!(missing_output.stdout.is_empty());
     let diagnostic = String::from_utf8(missing_output.stderr).unwrap();
-    assert!(diagnostic.starts_with("inkfinite: could not open"));
-    assert!(diagnostic.contains("read canonical document"));
+    let diagnostic: Value = serde_json::from_str(&diagnostic).unwrap();
+    assert_eq!(diagnostic["error"]["code"], "file_io_error");
+    assert!(
+        diagnostic["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("could not open")
+    );
 
     let document = temporary.path.join("existing.inkfinite");
     assert_success(&run(["new", path(&document), "--json"]));
@@ -562,6 +629,7 @@ fn json_failures_keep_stdout_clean_and_use_stable_exit_codes() {
     let usage = run(["query", path(&document), "--bounds", "1,2,3", "--json"]);
     assert_eq!(usage.status.code(), Some(2));
     assert!(usage.stdout.is_empty());
+    assert_eq!(parse_stderr(&usage)["error"]["code"], "invalid_usage");
 }
 
 #[cfg(unix)]
@@ -623,12 +691,17 @@ fn live_commands_read_shared_records_from_the_authenticated_local_server() {
                         heads: server_snapshot.heads.clone(),
                         records: Vec::new(),
                         bounds: BTreeMap::new(),
+                        details: Vec::new(),
+                        total: 0,
+                        truncated: false,
                     }),
                     AppRequest::Focus => AppResponse::Focused,
-                    AppRequest::Propose { .. }
-                    | AppRequest::AcceptProposal { .. }
-                    | AppRequest::RejectProposal { .. }
-                    | AppRequest::Apply { .. } => panic!("proposal requests are outside this IPC fixture"),
+                    AppRequest::Context { .. }
+                    | AppRequest::Propose { .. }
+                    | AppRequest::ProposalStatus { .. }
+                    | AppRequest::Apply { .. } => {
+                        panic!("proposal requests are outside this IPC fixture")
+                    }
                 };
                 ipc::write_frame(&mut stream, &ResponseEnvelope { request_id, result: Ok(response) })
                     .await
@@ -672,7 +745,7 @@ fn live_commands_read_shared_records_from_the_authenticated_local_server() {
 #[cfg(unix)]
 #[test]
 #[allow(clippy::too_many_lines)]
-fn live_propose_accept_partial_and_authorized_apply_round_trip_through_cli() {
+fn live_structured_proposal_review_status_and_authorized_apply_round_trip() {
     use std::os::unix::fs::FileTypeExt;
     use std::os::unix::net::{UnixListener, UnixStream};
     use std::sync::mpsc;
@@ -705,28 +778,19 @@ fn live_propose_accept_partial_and_authorized_apply_round_trip_through_cli() {
     drop(file);
 
     let page_id = snapshot.document.page_ids[0].clone();
-    let proposal_transaction = TransactionDraft {
-        id: TransactionId("transaction:proposal".into()),
-        actor_id: actor.clone(),
-        origin: Origin::Agent,
-        base_heads: snapshot.heads,
-        description: "preview a page rename".into(),
-        operations: vec![Operation::RenamePage {
-            page_id: page_id.clone(),
-            name: "Proposed".into(),
-            expected_version: None,
-        }],
-        timestamp: Timestamp(10),
-    };
-    fs::write(
-        &transaction_path,
-        serde_json::to_vec_pretty(&proposal_transaction).unwrap(),
-    )
-    .unwrap();
+    let layer_id = snapshot.document.pages[&page_id].layer_ids[0].clone();
 
     let mut service = SessionService::new();
     let opened = service.open(&document_path, actor.clone()).unwrap();
     let session_id = opened.session_id;
+    service
+        .update_context(
+            &session_id,
+            Some(page_id.clone()),
+            Vec::new(),
+            Some(inkfinite_core::proto::Bounds { x: -50.0, y: -25.0, width: 100.0, height: 50.0 }),
+        )
+        .unwrap();
     let authorization = service.authorize_apply(&session_id).unwrap();
     let authorization_token = authorization.token;
 
@@ -748,12 +812,17 @@ fn live_propose_accept_partial_and_authorized_apply_round_trip_through_cli() {
         runtime.block_on(async move {
             let listener = tokio::net::UnixListener::from_std(listener).unwrap();
             let mut guard = RequestGuard::new(server_token);
-            for _ in 0..3 {
+            for _ in 0..6 {
                 let (mut stream, _) = listener.accept().await.unwrap();
                 let request = ipc::read_frame::<RequestEnvelope>(&mut stream).await.unwrap();
                 guard.validate(&request).unwrap();
                 let request_id = request.request_id;
                 let result: Result<AppResponse, ProtocolError> = ipc::dispatch(&mut service, request.request);
+                if let Ok(AppResponse::Proposal(proposal)) = &result {
+                    service
+                        .accept_proposal(&session_id, &proposal.id, None)
+                        .expect("desktop review fixture should accept the proposal");
+                }
                 ipc::write_frame(&mut stream, &ResponseEnvelope { request_id, result })
                     .await
                     .unwrap();
@@ -767,31 +836,47 @@ fn live_propose_accept_partial_and_authorized_apply_round_trip_through_cli() {
     });
 
     let proposed = run([
-        "app",
-        "propose",
+        "shape",
+        "create",
+        "--app",
         "--session-id",
         "session:1",
-        "--transaction",
-        path(&transaction_path),
+        "--kind",
+        "rect",
+        "--layer",
+        layer_id.as_str(),
+        "--role",
+        "architecture.service",
         "--json",
     ]);
     assert_success(&proposed);
     let proposed_json = parse_stdout(&proposed);
     assert_eq!(proposed_json["id"], "proposal:1");
-    assert_eq!(proposed_json["preview"]["changed"].as_array().unwrap().len(), 1);
+    assert_eq!(proposed_json["preview"]["created"].as_array().unwrap().len(), 1);
 
-    let accepted = run([
+    let proposal_status = run([
         "app",
-        "accept",
+        "proposal",
+        "status",
         "--session-id",
         "session:1",
         "--proposal-id",
         "proposal:1",
         "--json",
     ]);
+    assert_success(&proposal_status);
+    assert_eq!(parse_stdout(&proposal_status)["state"], "accepted");
+
+    let context = run(["app", "context", "--session-id", "session:1", "--json"]);
+    assert_success(&context);
+    let context_json = parse_stdout(&context);
+    assert_eq!(context_json["page_id"], page_id.as_str());
+    assert_eq!(context_json["viewport"]["width"], 100.0);
+
+    let accepted = run(["app", "inspect", "--session-id", "session:1", "--json"]);
     assert_success(&accepted);
     let accepted_json = parse_stdout(&accepted);
-    let accepted_heads = accepted_json["status"]["snapshot"]["heads"].clone();
+    let accepted_heads = accepted_json["heads"].clone();
     let direct_transaction = TransactionDraft {
         id: TransactionId("transaction:authorized".into()),
         actor_id: actor,
@@ -824,6 +909,12 @@ fn live_propose_accept_partial_and_authorized_apply_round_trip_through_cli() {
     server.join().unwrap();
     let final_snapshot = final_snapshot_receiver.recv().unwrap();
     assert_eq!(final_snapshot.document.pages.values().next().unwrap().name, "Applied");
+    assert!(
+        final_snapshot
+            .document
+            .shapes
+            .contains_key(&ShapeId::from("shape:rect:1"))
+    );
     let mut reopened = DocumentFile::open(&document_path, ActorId::from("actor:verify")).unwrap();
     assert_eq!(
         reopened
@@ -872,6 +963,10 @@ fn assert_success(output: &Output) {
 
 fn parse_stdout(output: &Output) -> Value {
     serde_json::from_slice(&output.stdout).unwrap()
+}
+
+fn parse_stderr(output: &Output) -> Value {
+    serde_json::from_slice(&output.stderr).unwrap()
 }
 
 struct TestDirectory {

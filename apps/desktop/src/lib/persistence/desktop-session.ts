@@ -116,6 +116,12 @@ export interface SessionApi {
 	openDocument(args: { path: string; actor_id: string }): Promise<SessionOpened>;
 	openOrCreateDraft(args: { document_id: string; actor_id: string }): Promise<SessionOpened>;
 	snapshot(args: { session_id: string }): Promise<SessionStatus>;
+	updateContext(args: {
+		session_id: string;
+		page_id: string | null;
+		selection_ids: string[];
+		viewport: { x: number; y: number; width: number; height: number } | null;
+	}): Promise<void>;
 	commit(args: { session_id: string; transaction: TransactionDraft }): Promise<SessionCommit>;
 	propose(args: { session_id: string; transaction: TransactionDraft }): Promise<Proposal>;
 	acceptProposal(args: {
@@ -156,6 +162,13 @@ function createSessionApi(): SessionApi {
 				actorId: args.actor_id
 			}),
 		snapshot: (args) => invokeSession<SessionStatus>('snapshot', { sessionId: args.session_id }),
+		updateContext: (args) =>
+			invokeSession<void>('update_context', {
+				sessionId: args.session_id,
+				pageId: args.page_id,
+				selectionIds: args.selection_ids,
+				viewport: args.viewport
+			}),
 		commit: (args) =>
 			invokeSession<SessionCommit>('commit', { sessionId: args.session_id, transaction: args.transaction }),
 		propose: (args) =>
@@ -245,6 +258,12 @@ export type DesktopSessionRepo = PersistentDocRepo & {
 	acceptProposal(proposalId: string, operationPositions?: number[]): Promise<LoadedDoc>;
 	rejectProposal(proposalId: string): Promise<void>;
 	authorizeApply(): Promise<ApplyAuthorization>;
+	/** Publishes editor-only context for read-only agent queries. */
+	updateAgentContext(context: {
+		pageId: string | null;
+		selectionIds: string[];
+		viewport: { x: number; y: number; width: number; height: number } | null;
+	}): Promise<void>;
 	syncConnect(peerId: string): Promise<SessionStatus>;
 	syncDisconnect(peerId: string): Promise<SessionStatus>;
 	syncNext(peerId: string): Promise<SyncMessage | null>;
@@ -688,6 +707,20 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		return api.authorizeApply({ session_id: currentStatus.session_id });
 	}
 
+	async function updateAgentContext(context: {
+		pageId: string | null;
+		selectionIds: string[];
+		viewport: { x: number; y: number; width: number; height: number } | null;
+	}): Promise<void> {
+		if (!currentStatus) return;
+		await api.updateContext({
+			session_id: currentStatus.session_id,
+			page_id: context.pageId,
+			selection_ids: context.selectionIds,
+			viewport: context.viewport
+		});
+	}
+
 	async function syncConnect(peerId: string): Promise<SessionStatus> {
 		if (!currentStatus) throw new Error('No board loaded');
 		const status = await api.syncConnect({ session_id: currentStatus.session_id, peer_id: peerId });
@@ -743,6 +776,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		acceptProposal,
 		rejectProposal,
 		authorizeApply,
+		updateAgentContext,
 		syncConnect,
 		syncDisconnect,
 		syncNext,

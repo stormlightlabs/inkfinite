@@ -58,6 +58,9 @@ describe('desktop workspace adapter', () => {
 				snapshot: async () => {
 					throw new Error('not used');
 				},
+				updateContext: async () => {
+					throw new Error('not used');
+				},
 				commit: async () => {
 					throw new Error('not used');
 				},

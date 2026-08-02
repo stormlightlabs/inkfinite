@@ -2,8 +2,8 @@ use super::support::{
     default_document_id, map_file_error, map_output_error, open_document, portable_path, write_heads, write_json,
 };
 use super::{
-    ACTOR_ID, ActorId, CliError, DocumentFile, DocumentId, EXIT_INVALID, FileOutputArgs, LayerId, NewArgs, PageId,
-    Query, QueryArgs, RecordId, Result, Write, anyhow, blank_document, json, validate_document,
+    ACTOR_ID, ActorId, CliError, DocumentFile, DocumentId, EXIT_INVALID, FileOutputArgs, InspectArgs, LayerId, NewArgs,
+    PageId, Query, QueryArgs, RecordId, Result, Write, anyhow, blank_document, json, validate_document,
 };
 
 pub fn create_document(args: NewArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
@@ -25,6 +25,8 @@ pub fn create_document(args: NewArgs, json_output: bool, stdout: &mut dyn Write)
                 "document_id": document_id,
                 "heads": snapshot.heads,
                 "path": portable_path(&args.path),
+                "page_id": snapshot.document.page_ids.first(),
+                "layer_id": snapshot.document.page_ids.first().and_then(|page_id| snapshot.document.pages.get(page_id)).and_then(|page| page.layer_ids.first()),
             }),
         )
     } else {
@@ -33,9 +35,28 @@ pub fn create_document(args: NewArgs, json_output: bool, stdout: &mut dyn Write)
     }
 }
 
-pub fn inspect_document(args: &FileOutputArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
+pub fn inspect_document(args: &InspectArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
     let mut file = open_document(&args.path)?;
     let snapshot = file.snapshot().map_err(map_file_error)?;
+    if json_output && args.summary {
+        return write_json(
+            stdout,
+            &json!({
+                "document_id": snapshot.document_id,
+                "format": snapshot.format,
+                "format_version": snapshot.format_version,
+                "heads": snapshot.heads,
+                "page_ids": snapshot.document.page_ids,
+                "counts": {
+                    "pages": snapshot.document.pages.len(),
+                    "layers": snapshot.document.layers.len(),
+                    "shapes": snapshot.document.shapes.len(),
+                    "bindings": snapshot.document.bindings.len(),
+                    "assets": snapshot.document.assets.len(),
+                },
+            }),
+        );
+    }
     if json_output {
         return write_json(stdout, &snapshot);
     }
@@ -62,6 +83,8 @@ pub fn query_document(args: QueryArgs, json_output: bool, stdout: &mut dyn Write
         layer_id: args.layer.map(LayerId::from),
         parent_id: args.parent,
         bounds: args.bounds,
+        include_records: args.detail,
+        limit: args.limit,
     };
     let result = file
         .engine_mut()
@@ -72,7 +95,10 @@ pub fn query_document(args: QueryArgs, json_output: bool, stdout: &mut dyn Write
     }
 
     write_heads(stdout, &result.heads)?;
-    writeln!(stdout, "Matches: {}", result.records.len()).map_err(map_output_error)?;
+    writeln!(stdout, "Matches: {} of {}", result.records.len(), result.total).map_err(map_output_error)?;
+    if result.truncated {
+        writeln!(stdout, "Truncated: true").map_err(map_output_error)?;
+    }
     for record in &result.records {
         match record {
             RecordId::Page(id) => writeln!(stdout, "page\t{id}"),

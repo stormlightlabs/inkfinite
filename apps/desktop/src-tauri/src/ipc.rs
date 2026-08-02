@@ -224,11 +224,11 @@ fn dispatch_request(
     app: &AppHandle, service: &Arc<Mutex<SessionService>>, request: AppRequest,
 ) -> Result<AppResponse, ProtocolError> {
     let requested_session = match &request {
-        AppRequest::Inspect { session_id }
+        AppRequest::Context { session_id }
+        | AppRequest::Inspect { session_id }
         | AppRequest::Query { session_id, .. }
         | AppRequest::Propose { session_id, .. }
-        | AppRequest::AcceptProposal { session_id, .. }
-        | AppRequest::RejectProposal { session_id, .. }
+        | AppRequest::ProposalStatus { session_id, .. }
         | AppRequest::Apply { session_id, .. } => session_id.clone(),
         AppRequest::Status | AppRequest::Focus => None,
     };
@@ -271,12 +271,6 @@ fn dispatch_request(
                     format!("could not notify the desktop frontend: {error}"),
                 )
             })?,
-        AppResponse::ProposalRejected => app.emit(PROPOSAL_CLEARED_EVENT, json!({})).map_err(|error| {
-            protocol_error(
-                "proposal_notification_failed",
-                format!("could not notify the desktop frontend: {error}"),
-            )
-        })?,
         AppResponse::Committed(commit) => app
             .emit(
                 COMMIT_EVENT,
@@ -288,7 +282,12 @@ fn dispatch_request(
                     format!("could not notify the desktop frontend: {error}"),
                 )
             })?,
-        AppResponse::Status(_) | AppResponse::Snapshot(_) | AppResponse::QueryResult(_) | AppResponse::Focused => {}
+        AppResponse::Status(_)
+        | AppResponse::Context(_)
+        | AppResponse::Snapshot(_)
+        | AppResponse::QueryResult(_)
+        | AppResponse::ProposalStatus(_)
+        | AppResponse::Focused => {}
     }
     Ok(response)
 }

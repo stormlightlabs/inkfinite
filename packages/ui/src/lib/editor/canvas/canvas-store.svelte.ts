@@ -78,6 +78,9 @@ export function createCanvasController(
 	let proposalMessage = $state<string | null>(null);
 	let unsubscribeProposal: (() => void) | null = null;
 	let unsubscribeFileMenu: (() => void) | null = null;
+	let unsubscribeAgentContext: (() => void) | null = null;
+	let agentContextTimer: ReturnType<typeof setTimeout> | null = null;
+	let lastAgentContext = '';
 	let removeBeforeUnload: (() => void) | null = null;
 	let stencilPaletteOpen = $state(false);
 	let interchangeBusy = $state(false);
@@ -98,6 +101,7 @@ export function createCanvasController(
 			updateMarquee(marqueeBounds);
 		}
 		renderer?.markDirty();
+		scheduleAgentContext();
 	};
 	if (typeof window !== 'undefined') {
 		window.addEventListener('resize', handleResize);
@@ -171,6 +175,34 @@ export function createCanvasController(
 
 	function getViewport(): Viewport {
 		return measureViewport(canvas);
+	}
+
+	function scheduleAgentContext() {
+		if (!desktopRepo || agentContextTimer) return;
+		agentContextTimer = setTimeout(() => {
+			agentContextTimer = null;
+			if (!desktopRepo) return;
+			const state = store.getState();
+			const viewport = getViewport();
+			const width = viewport.width / state.camera.zoom;
+			const height = viewport.height / state.camera.zoom;
+			const context = {
+				pageId: state.ui.currentPageId,
+				selectionIds: [...state.ui.selectionIds],
+				viewport: {
+					x: state.camera.x - width / 2,
+					y: state.camera.y - height / 2,
+					width,
+					height
+				}
+			};
+			const serialized = JSON.stringify(context);
+			if (serialized === lastAgentContext) return;
+			lastAgentContext = serialized;
+			void desktopRepo
+				.updateAgentContext(context)
+				.catch((error) => console.error('Failed to publish desktop agent context', error));
+		}, 100);
 	}
 
 	const camera = new CameraController(store, getViewport);
@@ -555,6 +587,8 @@ export function createCanvasController(
 				proposal = update.proposal;
 				proposalMessage = update.message ?? null;
 			});
+			unsubscribeAgentContext = store.subscribe(scheduleAgentContext);
+			scheduleAgentContext();
 		}
 		unsubscribeFileMenu =
 			platformSession.subscribeFileMenu?.((action) => {
@@ -613,6 +647,8 @@ export function createCanvasController(
 		renderer?.dispose();
 		inputAdapter?.dispose();
 		unsubscribeProposal?.();
+		unsubscribeAgentContext?.();
+		if (agentContextTimer) clearTimeout(agentContextTimer);
 		unsubscribeFileMenu?.();
 		platformSession?.dispose?.();
 		if (platform === 'desktop') {

@@ -5,7 +5,7 @@ use super::{ApplyArgs, CliError, EXIT_INPUT, EXIT_INVALID, Path, Read, Result, T
 pub fn apply_transaction(args: &ApplyArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
     let transaction = read_transaction(&args.transaction)?;
     let mut file = open_document(&args.path)?;
-    commit_mutation(&mut file, transaction, args.dry_run, json_output, stdout)
+    commit_mutation(&mut file, transaction, args.dry_run, None, json_output, stdout)
 }
 
 /// Reads one transaction from a JSON file or standard input for file and live modes.

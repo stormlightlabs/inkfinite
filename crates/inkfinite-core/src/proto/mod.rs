@@ -15,7 +15,7 @@ use ts_rs::TS;
 pub const PROTOCOL_ID: &str = "inkfinite.protocol";
 
 /// Current transport-independent protocol version.
-pub const PROTOCOL_VERSION: u32 = 1;
+pub const PROTOCOL_VERSION: u32 = 2;
 
 /// Stable identifier for a transaction.
 #[derive(Clone, Debug, Eq, Hash, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS)]
@@ -307,6 +307,22 @@ pub enum RecordId {
     Asset(AssetId),
 }
 
+/// Complete materialized record returned by a detailed query.
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case", tag = "kind", content = "record")]
+pub enum QueryRecord {
+    /// Page record.
+    Page(Box<PageRecord>),
+    /// Layer record.
+    Layer(Box<LayerRecord>),
+    /// Shape record.
+    Shape(Box<ShapeRecord>),
+    /// Binding record.
+    Binding(Box<BindingRecord>),
+    /// Asset record.
+    Asset(Box<AssetRecord>),
+}
+
 /// Materialized patch returned after a successful commit.
 #[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct DocumentPatch {
@@ -400,6 +416,12 @@ pub struct Query {
     pub parent_id: Option<String>,
     /// Restrict shapes to those intersecting these document bounds.
     pub bounds: Option<Bounds>,
+    /// Include complete matching records in the response.
+    #[serde(default)]
+    pub include_records: bool,
+    /// Return at most this many matches after deterministic sorting.
+    #[serde(default)]
+    pub limit: Option<u32>,
 }
 
 /// Materialized query result suitable for machine clients.
@@ -411,6 +433,15 @@ pub struct QueryResult {
     pub records: Vec<RecordId>,
     /// Bounds for matching shapes, in the same order as their shape records.
     pub bounds: BTreeMap<ShapeId, Bounds>,
+    /// Complete records when the query requested them.
+    #[serde(default)]
+    pub details: Vec<QueryRecord>,
+    /// Number of matches before applying the requested limit.
+    #[serde(default)]
+    pub total: usize,
+    /// Whether the result omitted matches because of the requested limit.
+    #[serde(default)]
+    pub truncated: bool,
 }
 
 /// Result of saving an open document session.
