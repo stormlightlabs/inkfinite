@@ -76,7 +76,9 @@ export function createCanvasController(
 	let desktopRepo: DesktopDocumentRepo | null = null;
 	let proposal = $state<LiveProposal | null>(null);
 	let proposalMessage = $state<string | null>(null);
+	let agentAccess = $state<'review' | 'direct'>('review');
 	let unsubscribeProposal: (() => void) | null = null;
+	let unsubscribeLiveDocument: (() => void) | null = null;
 	let unsubscribeFileMenu: (() => void) | null = null;
 	let unsubscribeAgentContext: (() => void) | null = null;
 	let agentContextTimer: ReturnType<typeof setTimeout> | null = null;
@@ -182,6 +184,7 @@ export function createCanvasController(
 		agentContextTimer = setTimeout(() => {
 			agentContextTimer = null;
 			if (!desktopRepo) return;
+			agentAccess = desktopRepo.getAgentAccess();
 			const state = store.getState();
 			const viewport = getViewport();
 			const width = viewport.width / state.camera.zoom;
@@ -582,11 +585,13 @@ export function createCanvasController(
 		persistenceStatusStore = platformSession.status;
 		desktopRepo = platformSession.desktop ?? null;
 		if (desktopRepo) {
+			agentAccess = desktopRepo.getAgentAccess();
 			proposal = desktopRepo.getProposal();
 			unsubscribeProposal = desktopRepo.subscribeProposal((update) => {
 				proposal = update.proposal;
 				proposalMessage = update.message ?? null;
 			});
+			unsubscribeLiveDocument = desktopRepo.subscribeLiveDocument(applyLoadedDoc);
 			unsubscribeAgentContext = store.subscribe(scheduleAgentContext);
 			scheduleAgentContext();
 		}
@@ -647,6 +652,7 @@ export function createCanvasController(
 		renderer?.dispose();
 		inputAdapter?.dispose();
 		unsubscribeProposal?.();
+		unsubscribeLiveDocument?.();
 		unsubscribeAgentContext?.();
 		if (agentContextTimer) clearTimeout(agentContextTimer);
 		unsubscribeFileMenu?.();
@@ -698,9 +704,11 @@ export function createCanvasController(
 			if (!desktopRepo || !proposal) return Promise.reject(new Error('No proposal is open'));
 			return desktopRepo.rejectProposal(proposal.id);
 		},
-		authorizeApply: () => {
+		agentAccess: () => agentAccess,
+		setAgentAccess: async (mode: 'review' | 'direct') => {
 			if (!desktopRepo) return Promise.reject(new Error('No desktop session is open'));
-			return desktopRepo.authorizeApply();
+			const status = await desktopRepo.setAgentAccess(mode);
+			agentAccess = status.agent_access;
 		},
 		insertStencil,
 		commitLayerState,

@@ -79,7 +79,7 @@ impl StructuredMutationTarget {
         })
     }
 
-    /// Applies a file mutation or submits a live proposal.
+    /// Applies a file mutation or submits a live edit using the desktop access mode.
     pub fn finish(
         self, transaction: TransactionDraft, options: &MutationOptions, json_output: bool, stdout: &mut dyn Write,
     ) -> Result<()> {
@@ -93,7 +93,7 @@ impl StructuredMutationTarget {
                 stdout,
             ),
             Self::App { session_id, .. } => {
-                super::app::propose_transaction(transaction, Some(session_id), json_output, stdout)
+                super::app::mutate_transaction(transaction, Some(session_id), json_output, stdout)
             }
         }
     }

@@ -228,6 +228,7 @@ fn dispatch_request(
         | AppRequest::Inspect { session_id }
         | AppRequest::Query { session_id, .. }
         | AppRequest::Propose { session_id, .. }
+        | AppRequest::Mutate { session_id, .. }
         | AppRequest::ProposalStatus { session_id, .. }
         | AppRequest::Apply { session_id, .. } => session_id.clone(),
         AppRequest::Status | AppRequest::Focus => None,

@@ -5,7 +5,7 @@
 
 # Agent workflows
 
-Use Inkfinite's command-line and proposal tools to make reviewable document changes.
+Use Inkfinite's command-line tools to inspect documents and make either reviewed or direct changes.
 
 <h2 id="workflow">Workflow</h2>
 
@@ -24,12 +24,16 @@ matches multiple shapes, narrow it with an exact ID. Do not guess which one the 
 <h2 id="proposals">Proposals</h2>
 
 For a document open in the desktop app, add `--app` to a structured `shape`, `connect`, or `layout`
-command instead of changing its file. Use `app propose` only when those commands cannot express the
-edit. The app shows created, changed, and deleted records as a ghost preview.
+command instead of changing its file. The command follows the document's **Agent access** setting.
 
-The user accepts all or selected operations, or rejects the proposal, in the desktop UI. The agent
-can observe the result with `app proposal status` or wait with `app proposal wait`; it cannot make
-the review decision through IPC.
+In **Review changes** mode, the app shows created, changed, and deleted records as a ghost preview.
+The user accepts all or selected operations, or rejects the proposal. The agent can observe the
+result with `app proposal status` or wait with `app proposal wait`; it cannot make the review
+decision through IPC.
+
+In **Apply directly** mode, validated `--app` edits commit immediately. This mode is useful when a
+human has asked an agent to work independently. It lasts only for the open document and returns to
+Review the next time the document opens. Only the desktop UI can change the mode.
 
 Partial acceptance creates a transaction from the approved operations and validates it again. A
 stale proposal may need a refreshed preview after another edit changes the document. Review the
@@ -41,8 +45,8 @@ Locks and `agent_editable` metadata are document boundaries. An agent must not w
 layer, locked shape, or record marked `agent_editable: false` by editing a child or bypassing the
 CLI. Report the boundary and ask the human to make or authorize the change.
 
-Direct `app apply` requires a one-time token issued by the desktop UI. The token authorizes a single
-live action; it is not a reusable credential and never belongs in a transaction file.
+Raw `app apply` works only in Direct mode. Use `app propose` to force a review regardless of the
+current mode.
 
 <h2 id="conflicts">Conflicts</h2>
 
@@ -67,4 +71,4 @@ INKFINITE_CLI="$PWD/target/debug/inkfinite" \
 ```
 
 The fixture server used by those examples tests the protocol. It does not replace a real desktop
-session or authorize direct apply.
+session and cannot enable Direct access.

@@ -17,17 +17,14 @@ describe('ProposalReview', () => {
 	it('exposes review, partial acceptance, and rejection through accessible controls', async () => {
 		const accept = vi.fn(async () => undefined);
 		const reject = vi.fn(async () => undefined);
-		const authorize = vi.fn(async () => ({
-			token: 'one-time-token',
-			session_id: 'session:1',
-			expires_at: 1
-		}));
+		const setAgentAccess = vi.fn(async () => undefined);
 		const screen = render(ProposalReview, {
 			proposal,
 			message: null,
+			agentAccess: 'review',
 			onAccept: accept,
 			onReject: reject,
-			onAuthorize: authorize
+			onAgentAccessChange: setAgentAccess
 		});
 
 		await expect
@@ -38,21 +35,22 @@ describe('ProposalReview', () => {
 
 		await screen.getByRole('checkbox', { name: 'Select operation 2' }).click();
 		await screen.getByRole('button', { name: 'Accept selected' }).click();
-		await screen.getByRole('button', { name: 'Authorize direct apply' }).click();
+		await screen.getByRole('combobox', { name: 'Agent access' }).selectOptions('direct');
 		await screen.getByRole('button', { name: 'Reject' }).click();
 
 		expect(accept).toHaveBeenCalledWith([1]);
 		expect(reject).toHaveBeenCalledOnce();
-		expect(authorize).toHaveBeenCalledOnce();
-		await expect.element(screen.getByText('one-time-token')).toBeInTheDocument();
+		expect(setAgentAccess).toHaveBeenCalledWith('direct');
 	});
 
 	it('announces a cleared proposal conflict', async () => {
 		const screen = render(ProposalReview, {
 			proposal: null,
 			message: 'The document changed while this proposal was open. Review it again.',
+			agentAccess: 'review',
 			onAccept: vi.fn(async () => undefined),
-			onReject: vi.fn(async () => undefined)
+			onReject: vi.fn(async () => undefined),
+			onAgentAccessChange: vi.fn(async () => undefined)
 		});
 
 		await expect
@@ -60,5 +58,26 @@ describe('ProposalReview', () => {
 			.toHaveTextContent(
 				'The document changed while this proposal was open. Review it again.'
 			);
+	});
+
+	it('keeps Review selected when the desktop rejects a mode change', async () => {
+		const screen = render(ProposalReview, {
+			proposal: null,
+			message: null,
+			agentAccess: 'review',
+			onAccept: vi.fn(async () => undefined),
+			onReject: vi.fn(async () => undefined),
+			onAgentAccessChange: vi.fn(async () => {
+				throw new Error('No desktop session is open');
+			})
+		});
+		const select = screen.getByRole('combobox', { name: 'Agent access' });
+
+		await select.selectOptions('direct');
+
+		await expect.element(select).toHaveValue('review');
+		await expect
+			.element(screen.getByRole('alert'))
+			.toHaveTextContent('No desktop session is open');
 	});
 });

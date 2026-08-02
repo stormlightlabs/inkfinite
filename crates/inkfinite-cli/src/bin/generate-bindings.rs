@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use inkfinite_core::proto::{
-    AffectedRegion, ApplyAuthorization, AssetPatch, Bounds, CommitResult, DocumentPatch, DocumentPath, InverseMetadata,
+    AffectedRegion, AgentAccessMode, AssetPatch, Bounds, CommitResult, DocumentPatch, DocumentPath, InverseMetadata,
     LayerContentsDisposition, LayerPatch, LayoutAxis, Operation, Proposal, ProposalId, ProtocolError, Query,
     QueryRecord, QueryResult, RecordId, Request, Response, SaveResult, SessionId, ShapeAlignment, ShapePatch,
     TransactionDraft, TransactionId, Warning,
@@ -210,10 +210,10 @@ fn protocol_bindings() -> String {
         "import type { CommitResult, DocumentPath, Proposal, ProposalId, Query, QueryResult, SaveResult, TransactionDraft } from \"./transaction.js\";\n\n",
     );
     append_declaration::<SessionId>(&mut output, &config);
-    append_declaration::<ApplyAuthorization>(&mut output, &config);
-    append_declaration::<Request>(&mut output, &config);
-    append_declaration::<Response>(&mut output, &config);
-    append_declaration::<ProtocolError>(&mut output, &config);
+    append_declaration::<AgentAccessMode>(&mut output, &config);
+    append_clean_declaration::<Request>(&mut output, &config);
+    append_clean_declaration::<Response>(&mut output, &config);
+    append_clean_declaration::<ProtocolError>(&mut output, &config);
     output
 }
 

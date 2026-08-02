@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use inkfinite_core::proto::{
-    ApplyAuthorization, Bounds, DocumentPath, Proposal, ProposalId, ProtocolError, Query, QueryResult, SessionId,
+    AgentAccessMode, Bounds, DocumentPath, Proposal, ProposalId, ProtocolError, Query, QueryResult, SessionId,
     TransactionDraft,
 };
 use inkfinite_core::session::{
@@ -241,11 +241,13 @@ pub fn reject_proposal(state: State<'_, DesktopState>, session_id: String, propo
         .map_err(to_protocol_error)
 }
 
-/// Issues a one-time authorization for a direct live agent apply.
+/// Changes how authenticated agents may edit this desktop session.
 #[tauri::command]
-pub fn authorize_apply(state: State<'_, DesktopState>, session_id: String) -> Result<ApplyAuthorization> {
+pub fn set_agent_access(
+    state: State<'_, DesktopState>, session_id: String, agent_access: AgentAccessMode,
+) -> Result<SessionStatus> {
     lock_service(&state)?
-        .authorize_apply(&SessionId(session_id))
+        .set_agent_access(&SessionId(session_id), agent_access)
         .map_err(to_protocol_error)
 }
 

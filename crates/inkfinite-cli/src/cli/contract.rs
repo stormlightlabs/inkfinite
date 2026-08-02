@@ -56,7 +56,9 @@ pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(
             "commands": ["status", "context", "inspect", "query", "focus", "propose", "proposal status", "proposal wait", "apply"],
             "proposal_review": true,
             "proposal_decisions": "desktop_ui_only",
-            "direct_apply_requires_one_time_authorization": true,
+            "agent_access_modes": ["review", "direct"],
+            "agent_access_is_session_scoped": true,
+            "agent_access_is_desktop_controlled": true,
             "transport": "authenticated_local_socket",
             "tcp_or_http": false
         },
@@ -65,7 +67,7 @@ pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(
             "connect": ["--binding-id", "--source", "--source-role", "--target", "--target-role", "--dry-run", "--transaction-out", "--app"],
             "layout": ["align", "distribute"],
             "shape": ["create", "patch", "delete", "kinds", "describe"],
-            "structured_targets": ["file", "app_proposal"]
+            "structured_targets": ["file", "app_current_access_mode"]
         },
         "path_format": "forward_slashes",
         "protocol": { "id": PROTOCOL_ID, "version": PROTOCOL_VERSION },

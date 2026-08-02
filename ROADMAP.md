@@ -311,21 +311,21 @@ visual review boundary, not desktop UI automation.
 
 The CLI connects to the running desktop app for `app status`, `app inspect`,
 `app query`, and `app focus`. It can also propose a transaction for review with
-`app propose`, accept all or selected operations with `app accept`, reject it with
-`app reject`, or apply a transaction directly only with a one-time authorization
-issued by the desktop UI via `app apply`.
+`app propose` or submit a structured live edit that follows the document's
+desktop-controlled Agent access mode. Review mode creates a proposal; Direct
+mode applies validated edits immediately.
 
 `app propose` is the default agent path. Rust validates it and the UI shows a
 ghost preview plus created, changed, and deleted IDs. Rejection changes nothing.
 Partial acceptance creates a new transaction from the selected operations and
-revalidates it against current heads. `app apply` requires explicit user
-authorization.
+revalidates it against current heads. Direct access is session-scoped, defaults
+to Review, and can only be enabled from the desktop UI.
 
 V2-17 and V2-18 use a per-user Unix-domain socket or Windows named pipe, a
 protected per-session token, protocol versions, length-prefixed messages, and
 strict size limits. Proposals are bounded and expire; partial acceptance creates
-and revalidates a new transaction, while direct apply consumes a short-lived,
-one-time authorization grant. The server does not expose public TCP or local
+and revalidates a new transaction, while direct apply requires the session's
+desktop-controlled Direct mode. The server does not expose public TCP or local
 HTTP. The Tauri process owns the server and removes its discovery record when it
 exits; vNext has no background daemon.
 

@@ -30,18 +30,20 @@ the native document as saved elsewhere.
 
 The desktop backend uses file locks, recovery data, and atomic replacement for canonical writes.
 Do not edit the same file with a file-mode CLI command while it is open in the desktop app. Use the
-live proposal workflow instead.
+live CLI workflow instead.
 
 <h2 id="local-control">Local CLI access</h2>
 
 The desktop app exposes authenticated IPC to the local `inkfinite` CLI. Read-only commands can list
-sessions, report the active page, selection, and viewport, inspect the open document, query records,
-or focus the window. Structured mutation commands create a proposal that appears as a ghost preview
-for human review.
+sessions, report the active page, selection, viewport, and agent access mode, inspect the open
+document, query records, or focus the window.
 
-Only the desktop UI can accept or reject a proposal. The CLI can poll the outcome, which lets an
-agent wait for a decision without gaining review authority.
+Each document starts with **Agent access** set to **Review changes**. Structured live commands then
+open a ghost preview. Only the desktop UI can accept or reject it, while the CLI can poll the
+outcome.
 
-Direct live apply requires a one-time authorization token issued by the desktop UI. Discovery and
-authentication remain local to the current user account. See [Agent workflows](/docs/reference/agents/)
-for the review process and [Command-line interface](/docs/reference/cli/) for commands.
+Switch **Agent access** to **Apply directly** when you want an agent to work independently. Validated
+live edits then commit without repeated prompts. The setting belongs to the open document session,
+resets when it closes, and cannot be enabled through the CLI. Discovery and authentication remain
+local to the current user account. See [Agent workflows](/docs/reference/agents/) for both modes and
+[Command-line interface](/docs/reference/cli/) for commands.

@@ -15,7 +15,7 @@ use ts_rs::TS;
 pub const PROTOCOL_ID: &str = "inkfinite.protocol";
 
 /// Current transport-independent protocol version.
-pub const PROTOCOL_VERSION: u32 = 2;
+pub const PROTOCOL_VERSION: u32 = 3;
 
 /// Stable identifier for a transaction.
 #[derive(Clone, Debug, Eq, Hash, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS)]
@@ -32,15 +32,15 @@ pub struct SessionId(pub String);
 #[serde(transparent)]
 pub struct ProposalId(pub String);
 
-/// One-time user authorization for a direct live agent apply.
-#[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
-pub struct ApplyAuthorization {
-    /// Opaque single-use token issued by the desktop UI.
-    pub token: String,
-    /// Session for which the authorization was issued.
-    pub session_id: SessionId,
-    /// Wall-clock expiry retained for clients and diagnostics.
-    pub expires_at: Timestamp,
+/// How authenticated agents may change one open desktop document.
+#[derive(Clone, Copy, Debug, Default, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentAccessMode {
+    /// Show every agent change as a proposal that requires desktop review.
+    #[default]
+    Review,
+    /// Apply validated agent changes immediately for this desktop session.
+    Direct,
 }
 
 /// Cross-platform serialized document path used at file-service boundaries.
@@ -507,19 +507,12 @@ pub enum Request {
         /// Transaction to preview.
         transaction: TransactionDraft,
     },
-    /// Issue a one-time authorization for a direct live apply.
-    AuthorizeApply {
-        /// Open session to authorize.
-        session_id: SessionId,
-    },
-    /// Apply a transaction directly after explicit desktop authorization.
+    /// Apply a transaction directly when the desktop session allows it.
     Apply {
         /// Open session to change.
         session_id: SessionId,
         /// Transaction to validate and apply.
         transaction: TransactionDraft,
-        /// One-time authorization issued by the desktop UI.
-        authorization: ApplyAuthorization,
     },
     /// Accept all or selected operations from a proposal and revalidate at current heads.
     AcceptProposal {
@@ -598,8 +591,6 @@ pub enum Response {
     Committed(CommitResult),
     /// A transaction was validated and held for user review.
     Proposed(Proposal),
-    /// A one-time direct-apply authorization was issued.
-    ApplyAuthorized(ApplyAuthorization),
     /// A proposal was rejected and removed.
     ProposalRejected,
     /// A document was persisted.

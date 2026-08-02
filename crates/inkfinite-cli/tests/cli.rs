@@ -19,7 +19,7 @@ use inkfinite_core::{
     ActorId, DocumentId, Opacity, Origin, Provenance, RecordVersion, SemanticMetadata, ShapeId, ShapeKind, ShapeParent,
     ShapeRecord, ShapeStyle, SiblingAnchor, Timestamp, Transform, Vec2, blank_document,
 };
-use serde_json::Value;
+use serde_json::{Value, json};
 
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 #[cfg(unix)]
@@ -285,6 +285,15 @@ fn schemas_and_capabilities_match_checked_in_contracts() {
     assert_eq!(capabilities_json["live_mode"]["tcp_or_http"], false);
     assert_eq!(capabilities_json["live_mode"]["proposal_decisions"], "desktop_ui_only");
     assert_eq!(
+        capabilities_json["live_mode"]["agent_access_modes"],
+        json!(["review", "direct"])
+    );
+    assert_eq!(capabilities_json["live_mode"]["agent_access_is_session_scoped"], true);
+    assert_eq!(
+        capabilities_json["live_mode"]["agent_access_is_desktop_controlled"],
+        true
+    );
+    assert_eq!(
         capabilities_json["query_options"],
         serde_json::json!(["detail", "limit"])
     );
@@ -413,6 +422,10 @@ fn structured_create_can_be_validated_reopened_and_rendered() {
         "rect",
         "--layer",
         "layer:document:render:1",
+        "--x",
+        "-20",
+        "--y",
+        "-15",
         "--properties",
         "{\"width\":40,\"height\":30}",
         "--role",
@@ -698,6 +711,7 @@ fn live_commands_read_shared_records_from_the_authenticated_local_server() {
                     AppRequest::Focus => AppResponse::Focused,
                     AppRequest::Context { .. }
                     | AppRequest::Propose { .. }
+                    | AppRequest::Mutate { .. }
                     | AppRequest::ProposalStatus { .. }
                     | AppRequest::Apply { .. } => {
                         panic!("proposal requests are outside this IPC fixture")
@@ -745,7 +759,7 @@ fn live_commands_read_shared_records_from_the_authenticated_local_server() {
 #[cfg(unix)]
 #[test]
 #[allow(clippy::too_many_lines)]
-fn live_structured_proposal_review_status_and_authorized_apply_round_trip() {
+fn live_structured_edits_follow_desktop_agent_access_mode() {
     use std::os::unix::fs::FileTypeExt;
     use std::os::unix::net::{UnixListener, UnixStream};
     use std::sync::mpsc;
@@ -791,8 +805,6 @@ fn live_structured_proposal_review_status_and_authorized_apply_round_trip() {
             Some(inkfinite_core::proto::Bounds { x: -50.0, y: -25.0, width: 100.0, height: 50.0 }),
         )
         .unwrap();
-    let authorization = service.authorize_apply(&session_id).unwrap();
-    let authorization_token = authorization.token;
 
     let previous_discovery = ipc::read_discovery(&ipc::discovery_path()).ok();
     let discovery = DiscoveryRecord {
@@ -812,16 +824,22 @@ fn live_structured_proposal_review_status_and_authorized_apply_round_trip() {
         runtime.block_on(async move {
             let listener = tokio::net::UnixListener::from_std(listener).unwrap();
             let mut guard = RequestGuard::new(server_token);
-            for _ in 0..6 {
+            for _ in 0..9 {
                 let (mut stream, _) = listener.accept().await.unwrap();
                 let request = ipc::read_frame::<RequestEnvelope>(&mut stream).await.unwrap();
                 guard.validate(&request).unwrap();
                 let request_id = request.request_id;
+                let enable_direct_after_response = matches!(&request.request, AppRequest::Inspect { .. });
                 let result: Result<AppResponse, ProtocolError> = ipc::dispatch(&mut service, request.request);
                 if let Ok(AppResponse::Proposal(proposal)) = &result {
                     service
                         .accept_proposal(&session_id, &proposal.id, None)
                         .expect("desktop review fixture should accept the proposal");
+                }
+                if enable_direct_after_response {
+                    service
+                        .set_agent_access(&session_id, inkfinite_core::proto::AgentAccessMode::Direct)
+                        .expect("desktop fixture should enable direct access");
                 }
                 ipc::write_frame(&mut stream, &ResponseEnvelope { request_id, result })
                     .await
@@ -851,8 +869,15 @@ fn live_structured_proposal_review_status_and_authorized_apply_round_trip() {
     ]);
     assert_success(&proposed);
     let proposed_json = parse_stdout(&proposed);
-    assert_eq!(proposed_json["id"], "proposal:1");
-    assert_eq!(proposed_json["preview"]["created"].as_array().unwrap().len(), 1);
+    assert_eq!(proposed_json["outcome"], "proposed");
+    assert_eq!(proposed_json["proposal"]["id"], "proposal:1");
+    assert_eq!(
+        proposed_json["proposal"]["preview"]["created"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
 
     let proposal_status = run([
         "app",
@@ -871,17 +896,39 @@ fn live_structured_proposal_review_status_and_authorized_apply_round_trip() {
     assert_success(&context);
     let context_json = parse_stdout(&context);
     assert_eq!(context_json["page_id"], page_id.as_str());
+    assert_eq!(context_json["agent_access"], "review");
     assert_eq!(context_json["viewport"]["width"], 100.0);
 
     let accepted = run(["app", "inspect", "--session-id", "session:1", "--json"]);
     assert_success(&accepted);
-    let accepted_json = parse_stdout(&accepted);
-    let accepted_heads = accepted_json["heads"].clone();
+
+    let direct_shape = run([
+        "shape",
+        "create",
+        "--app",
+        "--session-id",
+        "session:1",
+        "--kind",
+        "ellipse",
+        "--layer",
+        layer_id.as_str(),
+        "--role",
+        "architecture.database",
+        "--json",
+    ]);
+    assert_success(&direct_shape);
+    let direct_shape_json = parse_stdout(&direct_shape);
+    assert_eq!(direct_shape_json["outcome"], "committed");
+    assert_eq!(direct_shape_json["commit"]["status"]["agent_access"], "direct");
+
+    let direct_state = run(["app", "inspect", "--session-id", "session:1", "--json"]);
+    assert_success(&direct_state);
+    let direct_heads = parse_stdout(&direct_state)["heads"].clone();
     let direct_transaction = TransactionDraft {
         id: TransactionId("transaction:authorized".into()),
         actor_id: actor,
         origin: Origin::Agent,
-        base_heads: serde_json::from_value(accepted_heads).unwrap(),
+        base_heads: serde_json::from_value(direct_heads).unwrap(),
         description: "authorized direct edit".into(),
         operations: vec![Operation::RenamePage { page_id, name: "Applied".into(), expected_version: None }],
         timestamp: Timestamp(11),
@@ -899,8 +946,6 @@ fn live_structured_proposal_review_status_and_authorized_apply_round_trip() {
         "session:1",
         "--transaction",
         path(&transaction_path),
-        "--authorization",
-        &authorization_token,
         "--json",
     ]);
     assert_success(&applied);
@@ -914,6 +959,12 @@ fn live_structured_proposal_review_status_and_authorized_apply_round_trip() {
             .document
             .shapes
             .contains_key(&ShapeId::from("shape:rect:1"))
+    );
+    assert!(
+        final_snapshot
+            .document
+            .shapes
+            .contains_key(&ShapeId::from("shape:ellipse:1"))
     );
     let mut reopened = DocumentFile::open(&document_path, ActorId::from("actor:verify")).unwrap();
     assert_eq!(

@@ -1,5 +1,5 @@
 import { PageRecord, ShapeRecord, type BoardExport, type DesktopFileOps, type FileHandle } from '@inkfinite/core';
-import type { ApplyAuthorization, ChangeHash, DocumentSnapshot, Proposal, TransactionDraft } from '@inkfinite/bindings';
+import type { ChangeHash, DocumentSnapshot, Proposal, TransactionDraft } from '@inkfinite/bindings';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
 	createDesktopSessionRepo,
@@ -74,6 +74,7 @@ function createFakeSessionApi() {
 				session_id: sessionId,
 				path: args.path,
 				actor_id: args.actor_id,
+				agent_access: 'review',
 				snapshot,
 				dirty: false,
 				lock_held: true,
@@ -95,6 +96,7 @@ function createFakeSessionApi() {
 				session_id: sessionId,
 				path: args.path,
 				actor_id: args.actor_id,
+				agent_access: 'review',
 				snapshot: structuredClone(stored),
 				dirty: false,
 				lock_held: true,
@@ -170,8 +172,11 @@ function createFakeSessionApi() {
 			throw new Error('Proposals are not part of this fake session');
 		},
 
-		async authorizeApply(_args: Parameters<SessionApi['authorizeApply']>[0]): Promise<ApplyAuthorization> {
-			throw new Error('Apply authorization is not part of this fake session');
+		async setAgentAccess(args: Parameters<SessionApi['setAgentAccess']>[0]): Promise<SessionStatus> {
+			const session = sessions.get(args.session_id);
+			if (!session) throw new Error('Missing fake session');
+			session.status = { ...session.status, agent_access: args.agent_access };
+			return statusFor(args.session_id, session);
 		},
 
 		async undo(args: Parameters<SessionApi['undo']>[0]): Promise<SessionCommit> {

@@ -208,7 +208,7 @@ pub struct MutationOptions {
     #[arg(long, value_name = "FILE")]
     pub transaction_out: Option<PathBuf>,
 
-    /// Propose this structured edit to the running desktop app instead of changing a file.
+    /// Submit this edit to the running desktop app using its Review or Direct access mode.
     #[arg(long)]
     pub app: bool,
 
@@ -236,13 +236,13 @@ pub struct ShapeCreateArgs {
     #[arg(long, value_name = "SHAPE_ID")]
     pub parent_shape: Option<String>,
     /// Horizontal position in parent coordinates.
-    #[arg(long, default_value_t = 0.0)]
+    #[arg(long, default_value_t = 0.0, allow_hyphen_values = true)]
     pub x: f64,
     /// Vertical position in parent coordinates.
-    #[arg(long, default_value_t = 0.0)]
+    #[arg(long, default_value_t = 0.0, allow_hyphen_values = true)]
     pub y: f64,
     /// Clockwise rotation in radians.
-    #[arg(long, default_value_t = 0.0)]
+    #[arg(long, default_value_t = 0.0, allow_hyphen_values = true)]
     pub rotation: f64,
     /// Kind-specific properties as a JSON object.
     #[arg(long, default_value = "{}", value_name = "JSON")]
@@ -512,10 +512,10 @@ pub enum AppCommand {
     /// Observe a proposal without accepting or rejecting it.
     #[command(subcommand)]
     Proposal(AppProposalCommand),
-    /// Apply an agent transaction using a one-time authorization issued by the desktop UI.
+    /// Apply an agent transaction when Direct access is enabled in the desktop UI.
     #[command(after_help = "Example:
 
-    inkfinite app apply --transaction transaction.json --authorization TOKEN --json
+    inkfinite app apply --transaction transaction.json --json
 ")]
     Apply(AppApplyArgs),
     /// Ask the desktop frontend to focus its main window.
@@ -619,9 +619,6 @@ pub struct AppApplyArgs {
     /// Transaction JSON file, or - to read standard input.
     #[arg(long, value_name = "TRANSACTION")]
     pub transaction: PathBuf,
-    /// One-time authorization copied from the desktop review surface.
-    #[arg(long, value_name = "TOKEN")]
-    pub authorization: String,
     /// Apply in this session, or the only open session when omitted.
     #[arg(long, value_name = "SESSION_ID")]
     pub session_id: Option<String>,

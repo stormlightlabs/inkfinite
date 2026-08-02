@@ -73,7 +73,7 @@ describe('desktop workspace adapter', () => {
 				rejectProposal: async () => {
 					throw new Error('not used');
 				},
-				authorizeApply: async () => {
+				setAgentAccess: async () => {
 					throw new Error('not used');
 				},
 				undo: async () => {

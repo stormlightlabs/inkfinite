@@ -5,29 +5,6 @@
       "description": "Stable identifier for a human, agent, or system actor.",
       "type": "string"
     },
-    "ApplyAuthorization": {
-      "description": "One-time user authorization for a direct live agent apply.",
-      "properties": {
-        "expires_at": {
-          "$ref": "#/$defs/Timestamp",
-          "description": "Wall-clock expiry retained for clients and diagnostics."
-        },
-        "session_id": {
-          "$ref": "#/$defs/SessionId",
-          "description": "Session for which the authorization was issued."
-        },
-        "token": {
-          "description": "Opaque single-use token issued by the desktop UI.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "token",
-        "session_id",
-        "expires_at"
-      ],
-      "type": "object"
-    },
     "AssetId": {
       "description": "Stable identifier for an embedded or linked asset.",
       "type": "string"
@@ -2047,30 +2024,8 @@
       "type": "object"
     },
     {
-      "description": "Issue a one-time authorization for a direct live apply.",
+      "description": "Apply a transaction directly when the desktop session allows it.",
       "properties": {
-        "session_id": {
-          "$ref": "#/$defs/SessionId",
-          "description": "Open session to authorize."
-        },
-        "type": {
-          "const": "authorize_apply",
-          "type": "string"
-        }
-      },
-      "required": [
-        "type",
-        "session_id"
-      ],
-      "type": "object"
-    },
-    {
-      "description": "Apply a transaction directly after explicit desktop authorization.",
-      "properties": {
-        "authorization": {
-          "$ref": "#/$defs/ApplyAuthorization",
-          "description": "One-time authorization issued by the desktop UI."
-        },
         "session_id": {
           "$ref": "#/$defs/SessionId",
           "description": "Open session to change."
@@ -2087,8 +2042,7 @@
       "required": [
         "type",
         "session_id",
-        "transaction",
-        "authorization"
+        "transaction"
       ],
       "type": "object"
     },

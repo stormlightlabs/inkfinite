@@ -302,12 +302,15 @@
 		y={contextMenuPoint.y}
 		onOpenChange={(value) => (contextMenuOpen = value)}
 		onSelect={handleContextMenuAction} />
-	<ProposalReview
-		proposal={liveProposal}
-		message={proposalMessage}
-		onAccept={c.acceptProposal}
-		onReject={c.rejectProposal}
-		onAuthorize={c.authorizeApply} />
+	{#if c.platform() === 'desktop'}
+		<ProposalReview
+			proposal={liveProposal}
+			message={proposalMessage}
+			agentAccess={c.agentAccess()}
+			onAccept={c.acceptProposal}
+			onReject={c.rejectProposal}
+			onAgentAccessChange={c.setAgentAccess} />
+	{/if}
 	<HistoryViewer store={c.store} bind:open={historyViewerOpen} onClose={c.history.handleClose} />
 	<StatusBar
 		store={c.store}

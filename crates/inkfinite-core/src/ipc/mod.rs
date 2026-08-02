@@ -19,7 +19,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use crate::DocumentSnapshot;
 use crate::engine::EngineError;
 use crate::file::FileError;
-use crate::proto::{ApplyAuthorization, PROTOCOL_ID, PROTOCOL_VERSION, Proposal, Query, QueryResult, SessionId};
+use crate::proto::{AgentAccessMode, PROTOCOL_ID, PROTOCOL_VERSION, Proposal, Query, QueryResult, SessionId};
 use crate::session::{ProposalStatus, SessionCommit, SessionContext, SessionError, SessionService, SessionStatus};
 
 pub use crate::engine::{CommitResult, TransactionDraft};
@@ -83,6 +83,13 @@ pub enum AppRequest {
         /// Agent transaction to validate and preview.
         transaction: TransactionDraft,
     },
+    /// Submit an agent transaction using the desktop session's current access mode.
+    Mutate {
+        /// Session to change, or the only open session when omitted.
+        session_id: Option<SessionId>,
+        /// Agent transaction to propose or apply directly.
+        transaction: TransactionDraft,
+    },
     /// Read a proposal outcome without changing its review state.
     ProposalStatus {
         /// Session owning the proposal, or the only open session when omitted.
@@ -90,14 +97,12 @@ pub enum AppRequest {
         /// Proposal whose review state should be returned.
         proposal_id: crate::proto::ProposalId,
     },
-    /// Apply an agent transaction after consuming explicit desktop authorization.
+    /// Apply an agent transaction when direct access is enabled.
     Apply {
         /// Session to change, or the only open session when omitted.
         session_id: Option<SessionId>,
         /// Agent transaction to validate and apply.
         transaction: TransactionDraft,
-        /// One-time authorization issued by the desktop UI.
-        authorization: ApplyAuthorization,
     },
     /// Ask the desktop frontend to bring its main window forward.
     Focus,
@@ -437,6 +442,26 @@ pub fn dispatch(service: &mut SessionService, request: AppRequest) -> Result<App
                 Err(error) => Err(session_protocol_error_with_heads(service, &session_id, &error)),
             }
         }
+        AppRequest::Mutate { session_id, transaction } => {
+            let session_id = service
+                .resolve_session_id(session_id.as_ref())
+                .map_err(|error| session_protocol_error(&error))?;
+            let agent_access = service
+                .status(&session_id)
+                .map_err(|error| session_protocol_error(&error))?
+                .agent_access;
+            if agent_access == AgentAccessMode::Direct {
+                match service.apply_direct(&session_id, transaction) {
+                    Ok(commit) => Ok(AppResponse::Committed(Box::new(commit))),
+                    Err(error) => Err(session_protocol_error_with_heads(service, &session_id, &error)),
+                }
+            } else {
+                match service.propose(&session_id, transaction) {
+                    Ok(proposal) => Ok(AppResponse::Proposal(proposal)),
+                    Err(error) => Err(session_protocol_error_with_heads(service, &session_id, &error)),
+                }
+            }
+        }
         AppRequest::ProposalStatus { session_id, proposal_id } => {
             let session_id = service
                 .resolve_session_id(session_id.as_ref())
@@ -446,11 +471,11 @@ pub fn dispatch(service: &mut SessionService, request: AppRequest) -> Result<App
                 .map(AppResponse::ProposalStatus)
                 .map_err(|error| session_protocol_error(&error))
         }
-        AppRequest::Apply { session_id, transaction, authorization } => {
+        AppRequest::Apply { session_id, transaction } => {
             let session_id = service
                 .resolve_session_id(session_id.as_ref())
                 .map_err(|error| session_protocol_error(&error))?;
-            match service.apply_authorized(&session_id, &authorization, transaction) {
+            match service.apply_direct(&session_id, transaction) {
                 Ok(commit) => Ok(AppResponse::Committed(Box::new(commit))),
                 Err(error) => Err(session_protocol_error_with_heads(service, &session_id, &error)),
             }
@@ -491,10 +516,7 @@ pub fn session_protocol_error(error: &SessionError) -> ProtocolError {
         SessionError::ProposalStale { .. } => "proposal_stale",
         SessionError::ProposalConflict { .. } => "proposal_conflict",
         SessionError::InvalidProposalSelection(_) => "invalid_proposal_selection",
-        SessionError::AuthorizationRequired => "authorization_required",
-        SessionError::InvalidAuthorization => "invalid_authorization",
-        SessionError::AuthorizationExpired => "authorization_expired",
-        SessionError::AuthorizationUnavailable(_) => "authorization_unavailable",
+        SessionError::DirectApplyDisabled => "direct_apply_disabled",
         SessionError::AlreadyOpen { .. } => "document_already_open",
         SessionError::File(file_error) => match file_error {
             FileError::Locked { .. } => "document_locked",

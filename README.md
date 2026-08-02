@@ -127,12 +127,15 @@ Run `inkfinite --help` for examples and the complete command reference.
 ### Live desktop control
 
 With the desktop app running, use `app status`, `app context`, `app inspect`, and
-`app query` to read current state. `app context` includes the active page,
-selection, viewport, actor, and heads. Add `--app` to a structured mutation to
-open a ghost preview instead of changing a file. The user accepts or rejects
-that proposal in the desktop UI; agent-facing IPC cannot make the decision.
-Use `app proposal status` for one check or `app proposal wait` to wait for the
-result.
+`app query` to read current state. Status and context report the current agent
+access mode alongside the active page, selection, viewport, actor, and heads.
+
+The desktop starts each document in **Review changes** mode. Add `--app` to a
+structured mutation and the app opens a ghost preview for the user to accept or
+reject. The user can switch **Agent access** to **Apply directly** for a solo
+agent session; the same `--app` command then commits immediately. Direct access
+ends when the document closes or the user switches back. The CLI cannot enable
+it.
 
 ```sh
 inkfinite app status --json
@@ -144,12 +147,12 @@ inkfinite shape patch --app --role architecture.service \
   --patch '@service-patch.json' --json
 inkfinite app propose --transaction transaction.json --json
 inkfinite app proposal wait --proposal-id proposal:1 --json
-inkfinite app apply --transaction transaction.json --authorization TOKEN --json
+inkfinite app apply --transaction transaction.json --json
 ```
 
-`app propose` remains available for operations that the structured commands do
-not cover. Direct `app apply` requires a one-time authorization token issued by
-the desktop UI.
+`app propose` always opens a review, even in Direct mode, and remains available
+for operations that the structured commands do not cover. `app apply` works
+only while Direct mode is enabled.
 
 The desktop publishes a per-user Unix-domain socket on Unix-like systems or a
 per-user named pipe on Windows. A protected discovery file carries a random

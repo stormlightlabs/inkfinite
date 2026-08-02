@@ -18,7 +18,6 @@ import type {
 import { createId } from '@inkfinite/core';
 import type {
 	BindingRecord as SnapshotBindingRecord,
-	ApplyAuthorization,
 	ChangeHash,
 	CommitResult,
 	ContainerLayout,
@@ -42,6 +41,7 @@ export type SessionStatus = {
 	session_id: string;
 	path: string;
 	actor_id: string;
+	agent_access: 'review' | 'direct';
 	snapshot: DocumentSnapshot;
 	dirty: boolean;
 	lock_held: boolean;
@@ -130,7 +130,7 @@ export interface SessionApi {
 		operation_positions?: number[];
 	}): Promise<SessionCommit>;
 	rejectProposal(args: { session_id: string; proposal_id: string }): Promise<void>;
-	authorizeApply(args: { session_id: string }): Promise<ApplyAuthorization>;
+	setAgentAccess(args: { session_id: string; agent_access: 'review' | 'direct' }): Promise<SessionStatus>;
 	undo(args: { session_id: string; actor_id: string }): Promise<SessionCommit>;
 	redo(args: { session_id: string; actor_id: string }): Promise<SessionCommit>;
 	save(args: { session_id: string; expected_heads: ChangeHash[] }): Promise<SessionSaved>;
@@ -181,7 +181,11 @@ function createSessionApi(): SessionApi {
 			}),
 		rejectProposal: (args) =>
 			invokeSession<void>('reject_proposal', { sessionId: args.session_id, proposalId: args.proposal_id }),
-		authorizeApply: (args) => invokeSession<ApplyAuthorization>('authorize_apply', { sessionId: args.session_id }),
+		setAgentAccess: (args) =>
+			invokeSession<SessionStatus>('set_agent_access', {
+				sessionId: args.session_id,
+				agentAccess: args.agent_access
+			}),
 		undo: (args) => invokeSession<SessionCommit>('undo', { sessionId: args.session_id, actorId: args.actor_id }),
 		redo: (args) => invokeSession<SessionCommit>('redo', { sessionId: args.session_id, actorId: args.actor_id }),
 		save: (args) =>
@@ -253,11 +257,13 @@ export type DesktopSessionRepo = PersistentDocRepo & {
 	query(query: Query): Promise<QueryResult>;
 	validate(): Promise<SessionStatus>;
 	getSessionStatus(): SessionStatus | null;
+	getAgentAccess(): 'review' | 'direct';
 	getProposal(): Proposal | null;
 	subscribeProposal(listener: (update: ProposalUpdate) => void): () => void;
+	subscribeLiveDocument(listener: (doc: LoadedDoc) => void): () => void;
 	acceptProposal(proposalId: string, operationPositions?: number[]): Promise<LoadedDoc>;
 	rejectProposal(proposalId: string): Promise<void>;
-	authorizeApply(): Promise<ApplyAuthorization>;
+	setAgentAccess(agentAccess: 'review' | 'direct'): Promise<SessionStatus>;
 	/** Publishes editor-only context for read-only agent queries. */
 	updateAgentContext(context: {
 		pageId: string | null;
@@ -286,6 +292,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 	let currentProposal: Proposal | null = null;
 	let proposalExpiryTimer: ReturnType<typeof setTimeout> | null = null;
 	const proposalListeners = new Set<(update: ProposalUpdate) => void>();
+	const liveDocumentListeners = new Set<(doc: LoadedDoc) => void>();
 	const liveUnlisteners: Array<() => void> = [];
 	const boardFiles = new Map<string, FileHandle>();
 
@@ -317,6 +324,11 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		return true;
 	}
 
+	function notifyLiveDocument() {
+		if (!currentDoc) return;
+		for (const listener of liveDocumentListeners) listener(currentDoc);
+	}
+
 	function eventBelongsToCurrentSession(sessionId?: string | null): boolean {
 		return Boolean(currentStatus && (!sessionId || sessionId === currentStatus.session_id));
 	}
@@ -336,17 +348,21 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 			.catch(() => undefined);
 		void listen<LiveCommitEvent>('inkfinite-live-commit', (event) => {
 			if (!eventBelongsToCurrentSession(event.payload.session_id)) return;
+			const hadProposal = currentProposal !== null;
 			updateStatus(event.payload.commit.status);
-			notifyProposal({
-				proposal: null,
-				message: 'The document changed while this proposal was open. Review it again.'
-			});
+			notifyLiveDocument();
+			notifyProposal(
+				hadProposal
+					? { proposal: null, message: 'The document changed while this proposal was open. Review it again.' }
+					: { proposal: null }
+			);
 		})
 			.then((stop) => liveUnlisteners.push(stop))
 			.catch(() => undefined);
 		void listen<LiveSyncEvent>('inkfinite-sync', (event) => {
 			if (!eventBelongsToCurrentSession(event.payload.session_id)) return;
 			updateStatus(event.payload.sync.status);
+			notifyLiveDocument();
 		})
 			.then((stop) => liveUnlisteners.push(stop))
 			.catch(() => undefined);
@@ -677,6 +693,11 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		return () => proposalListeners.delete(listener);
 	}
 
+	function subscribeLiveDocument(listener: (doc: LoadedDoc) => void): () => void {
+		liveDocumentListeners.add(listener);
+		return () => liveDocumentListeners.delete(listener);
+	}
+
 	async function acceptProposal(proposalId: string, operationPositions?: number[]): Promise<LoadedDoc> {
 		if (!currentStatus) throw new Error('No board loaded');
 		if (clearExpiredProposal(proposalId)) {
@@ -702,9 +723,11 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		notifyProposal({ proposal: null });
 	}
 
-	async function authorizeApply(): Promise<ApplyAuthorization> {
+	async function setAgentAccess(agentAccess: 'review' | 'direct'): Promise<SessionStatus> {
 		if (!currentStatus) throw new Error('No board loaded');
-		return api.authorizeApply({ session_id: currentStatus.session_id });
+		const status = await api.setAgentAccess({ session_id: currentStatus.session_id, agent_access: agentAccess });
+		updateStatus(status);
+		return status;
 	}
 
 	async function updateAgentContext(context: {
@@ -771,11 +794,13 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		query,
 		validate,
 		getSessionStatus: () => currentStatus,
+		getAgentAccess: () => currentStatus?.agent_access ?? 'review',
 		getProposal,
 		subscribeProposal,
+		subscribeLiveDocument,
 		acceptProposal,
 		rejectProposal,
-		authorizeApply,
+		setAgentAccess,
 		updateAgentContext,
 		syncConnect,
 		syncDisconnect,

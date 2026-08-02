@@ -2,7 +2,7 @@
 """
 ==============================================================================
 DESCRIPTION: Serves an authenticated Unix-socket test double for the Inkfinite
-             CLI proposal and partial-acceptance examples.
+             CLI proposal and review-status example.
 AUTHOR:      Owais <info@stormlightlabs.org>
 VERSION:     0.0.0
 USAGE:       python3 live-fixture-server.py --snapshot SNAPSHOT --ready READY
@@ -29,7 +29,7 @@ from typing import Any
 
 
 PROTOCOL_ID = "inkfinite.protocol"
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 3
 SESSION_ID = "session:fixture"
 TOKEN = "inkfinite-agent-fixture-token"
 
@@ -139,6 +139,9 @@ def response_for(
             "heads": snapshot["heads"],
             "records": query_records(snapshot, role),
             "bounds": {},
+            "details": [],
+            "total": len(query_records(snapshot, role)),
+            "truncated": False,
         }
         return {"type": "query_result", "value": result}, proposal, sequence
     if command_type == "propose":
@@ -152,40 +155,25 @@ def response_for(
             "warnings": [],
             "expires_at": 4102444800000,
         }
-        return {"type": "proposal", "value": proposal}, proposal, sequence
-    if command_type == "accept_proposal":
-        if proposal is None or command["proposal_id"] != proposal["id"]:
-            raise RuntimeError("fixture received an unknown proposal")
-        positions = command.get("operation_positions")
-        if positions is None:
-            selected = proposal["transaction"]["operations"]
-        else:
-            selected = [
-                proposal["transaction"]["operations"][position]
-                for position in positions
-            ]
-        selected_ids = record_ids(selected)
-        snapshot = deepcopy(snapshot)
-        apply_operations(snapshot, selected)
+        # The fixture simulates a human accepting the first operation in the
+        # desktop UI. Agent-facing IPC can observe this decision but cannot
+        # make it.
+        apply_operations(snapshot, transaction["operations"][:1])
         sequence += 1
         snapshot["heads"] = [f"fixture-head-{sequence}"]
-        commit = {
-            "transaction_id": proposal["transaction"]["id"],
-            "heads": snapshot["heads"],
-            "patch": {"created": [], "changed": selected_ids, "deleted": []},
-            "affected_ids": selected_ids,
-            "affected_regions": [],
-            "inverse": {
-                "actor_id": proposal["transaction"]["actor_id"],
-                "operations": [],
-            },
-            "warnings": [],
-        }
-        proposal = None
+        return {"type": "proposal", "value": proposal}, proposal, sequence
+    if command_type == "proposal_status":
+        if proposal is None or command["proposal_id"] != proposal["id"]:
+            raise RuntimeError("fixture received an unknown proposal")
         return (
             {
-                "type": "committed",
-                "value": {"commit": commit, "status": status(snapshot, True)},
+                "type": "proposal_status",
+                "value": {
+                    "proposal_id": proposal["id"],
+                    "state": "accepted",
+                    "heads": snapshot["heads"],
+                    "proposal": None,
+                },
             },
             proposal,
             sequence,
@@ -239,8 +227,6 @@ def main() -> int:
                 result, proposal, sequence = response_for(
                     request, snapshot, proposal, sequence
                 )
-                if result["type"] == "committed":
-                    snapshot = result["value"]["status"]["snapshot"]
                 write_frame(
                     connection,
                     {"request_id": request["request_id"], "result": {"Ok": result}},

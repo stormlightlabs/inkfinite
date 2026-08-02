@@ -3,7 +3,7 @@
 use std::time::{Duration, Instant};
 
 use inkfinite_core::ipc::{self, AppRequest, AppResponse, IpcError};
-use inkfinite_core::proto::{ApplyAuthorization, ProposalId, Query, RecordId, SessionId};
+use inkfinite_core::proto::{ProposalId, Query, RecordId, SessionId};
 use inkfinite_core::session::{ProposalReviewState, ProposalStatus};
 use inkfinite_core::{LayerId, PageId};
 
@@ -43,6 +43,7 @@ fn context(args: AppInspectArgs, json_output: bool, stdout: &mut dyn Write) -> R
         context.page_id.as_ref().map_or("none", PageId::as_str)
     )
     .map_err(map_output_error)?;
+    writeln!(stdout, "Agent access: {:?}", context.agent_access).map_err(map_output_error)?;
     writeln!(stdout, "Selection: {}", context.selection_ids.len()).map_err(map_output_error)?;
     if let Some(viewport) = context.viewport {
         writeln!(
@@ -119,10 +120,11 @@ fn status(json_output: bool, stdout: &mut dyn Write) -> Result<()> {
     for status in statuses {
         writeln!(
             stdout,
-            "session\t{}\t{}\t{}",
+            "session\t{}\t{}\t{}\t{:?}",
             status.session_id.0,
             status.path.0,
-            if status.dirty { "dirty" } else { "saved" }
+            if status.dirty { "dirty" } else { "saved" },
+            status.agent_access
         )
         .map_err(map_output_error)?;
         write_heads(stdout, &status.snapshot.heads)?;
@@ -233,15 +235,37 @@ pub fn propose_transaction(
     writeln!(stdout, "Affected regions: {}", proposal.affected_regions.len()).map_err(map_output_error)
 }
 
+/// Submits a structured edit using the desktop session's current agent access mode.
+pub fn mutate_transaction(
+    transaction: inkfinite_core::proto::TransactionDraft, session_id: Option<SessionId>, json_output: bool,
+    stdout: &mut dyn Write,
+) -> Result<()> {
+    let response = send(AppRequest::Mutate { session_id, transaction })?;
+    match response {
+        AppResponse::Proposal(proposal) => {
+            if json_output {
+                write_json(stdout, &json!({ "outcome": "proposed", "proposal": proposal }))
+            } else {
+                writeln!(stdout, "Agent access: review").map_err(map_output_error)?;
+                writeln!(stdout, "Proposal: {}", proposal.id.0).map_err(map_output_error)
+            }
+        }
+        AppResponse::Committed(commit) => {
+            if json_output {
+                write_json(stdout, &json!({ "outcome": "committed", "commit": commit }))
+            } else {
+                writeln!(stdout, "Agent access: direct").map_err(map_output_error)?;
+                write_commit(&commit, false, stdout)
+            }
+        }
+        _ => unexpected_response("mutate"),
+    }
+}
+
 fn apply(args: AppApplyArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
     let transaction = read_transaction(&args.transaction)?;
     let session_id = resolve_session_id(args.session_id)?;
-    let authorization = ApplyAuthorization {
-        token: args.authorization,
-        session_id: session_id.clone(),
-        expires_at: inkfinite_core::Timestamp(0),
-    };
-    let response = send(AppRequest::Apply { session_id: Some(session_id), transaction, authorization })?;
+    let response = send(AppRequest::Apply { session_id: Some(session_id), transaction })?;
     let AppResponse::Committed(commit) = response else {
         return unexpected_response("apply");
     };
@@ -304,9 +328,7 @@ fn send(request: AppRequest) -> Result<AppResponse> {
             "proposal_stale"
             | "proposal_conflict"
             | "stale_heads"
-            | "authorization_required"
-            | "invalid_authorization"
-            | "authorization_expired"
+            | "direct_apply_disabled"
             | "actor_mismatch"
             | "document_engine_error" => EXIT_CONFLICT,
             _ => EXIT_INVALID,
@@ -317,14 +339,21 @@ fn send(request: AppRequest) -> Result<AppResponse> {
                 | "stale_heads"
                 | "precondition_failed"
                 | "session_selection_required"
+                | "direct_apply_disabled"
                 | "desktop_unavailable"
         );
+        let direct_apply_disabled = error.code == "direct_apply_disabled";
         let mut diagnostic = CliError::new(exit_code, anyhow!(error.message)).with_code(error.code);
         if let Some(details) = error.details {
             diagnostic = diagnostic.with_details(details);
         }
         if retryable {
-            diagnostic = diagnostic.retryable("Refresh desktop status and current heads before retrying.");
+            let suggestion = if direct_apply_disabled {
+                "Switch Agent access to Apply directly in Inkfinite Desktop, or use app propose for review."
+            } else {
+                "Refresh desktop status and current heads before retrying."
+            };
+            diagnostic = diagnostic.retryable(suggestion);
         }
         diagnostic
     })

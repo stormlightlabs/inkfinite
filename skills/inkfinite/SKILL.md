@@ -22,29 +22,30 @@ Follow this order for every change:
 1. Inspect the current heads.
 2. Query only the records relevant to the requested change.
 3. Describe the smallest transaction that satisfies the request.
-4. Build it with a structured command or a `TransactionDraft` from the
-   transaction schema.
-5. Run the same change with `--dry-run`.
+4. Build it with a structured command. Use a raw `TransactionDraft` only when
+   the structured commands cannot express the change.
+5. In file mode, run the same change with `--dry-run`.
 6. Resolve any stale head, selector, lock, or permission error by inspecting
    again and rebuilding the transaction from current state.
-7. Use file-mode `apply` for a closed file, or use `app propose` for a live
-   desktop session.
+7. Apply the file-mode change, or add `--app` to follow the desktop session's
+   current Review or Direct access mode.
 8. Validate the resulting document and render the affected view or role.
 
-In short: inspect heads → narrow query → minimal transaction → dry-run →
-resolve → apply/propose → validate → render.
+In short: inspect heads → narrow query → minimal transaction → dry-run in file
+mode → resolve → submit → validate → render.
 
 Start with machine-readable output:
 
 ```sh
 inkfinite capabilities --json
-inkfinite inspect board.inkfinite --json
-inkfinite query board.inkfinite --role architecture.service --json
+inkfinite inspect board.inkfinite --summary --json
+inkfinite query board.inkfinite --role architecture.service --detail --limit 20 --json
 ```
 
-The live equivalents are `app status`, `app inspect`, and `app query`. Keep
-the `heads` returned by the inspect or query that informed the transaction.
-Those heads are a precondition, not decoration.
+The live equivalents are `app status`, `app context`, `app inspect`, and
+`app query`. `app context` reports the active page, selection, viewport, actor,
+access mode, and heads. Keep the heads returned by the read that informed the
+transaction. They are a precondition, not decoration.
 
 ## Rules for safe edits
 
@@ -63,21 +64,21 @@ Those heads are a precondition, not decoration.
   layout operation with many unrelated coordinate patches.
 - Keep one coherent user request in one transaction. Do not bundle unrelated
   cleanup into an otherwise small proposal.
-- A dry run must pass before a durable apply or proposal. A dry run changes no
-  canonical bytes.
-- `app propose` is the default live path. The user reviews its ghost preview
-  and created, changed, and deleted IDs before acceptance.
-- Use `app reject` when the user declines a proposal; rejection changes nothing.
-- For live commands, `app propose` is the validation and preview boundary; the
-  desktop app has no separate `--dry-run` flag.
-- `app apply` is different from proposal acceptance: it requires a one-time
-  authorization token explicitly issued by the desktop UI. Never invent,
-  reuse, or request a token through a document file.
+- A dry run must pass before a durable file apply. A dry run changes no
+  canonical bytes. Use `--transaction-out FILE` when another tool or person
+  needs the validated transaction without changing the document.
+- For a live document, add `--app` to `shape`, `connect`, or `layout`. Review
+  mode opens a ghost preview; Direct mode commits the validated edit
+  immediately.
+- Proposal decisions belong to the desktop UI. Use `app proposal status` for
+  one check or `app proposal wait` to wait for the user's decision.
+- Only the desktop UI can enable Direct mode. Never try to change or bypass the
+  mode through IPC. Use `app propose` to force review in either mode.
 
 ## Heads and conflicts
 
-When file-mode `apply` returns exit code `5`, or live acceptance reports a
-stale proposal, discard the stale transaction as a commit candidate. Inspect
+When a file mutation returns exit code `5`, or a live proposal becomes stale,
+discard the stale transaction as a commit candidate. Inspect
 the current heads, query the affected records again, and rebuild the smallest
 safe transaction. Re-run `--dry-run` before applying or proposing it. A stale
 proposal may be refreshed by the desktop; review the refreshed preview rather
@@ -96,13 +97,16 @@ at the point of use instead of copying a complete option table into this skill:
 inkfinite --help
 inkfinite <command> --help
 inkfinite capabilities --json
+inkfinite shape kinds --json
+inkfinite shape describe rect --json
 inkfinite schema document
 inkfinite schema transaction
 inkfinite schema protocol
 ```
 
-Use `--json` for machine output. Keep stdout machine-readable and treat stderr
-as diagnostics. Stable exit codes are reported by `capabilities --json`.
+Use `--json` for machine output. Successful data stays on stdout. Failures use
+structured JSON on stderr with `code`, `message`, `details`, `retryable`, and
+`suggestion`. Stable exit codes are reported by `capabilities --json`.
 
 ## Worked fixtures
 
@@ -128,5 +132,5 @@ INKFINITE_CLI="$PWD/target/debug/inkfinite" \
 ```
 
 The fixture server is a test double for protocol verification. It is not a
-desktop session, does not authorize direct apply, and must never be used as a
+desktop session, cannot enable Direct access, and must never be used as a
 replacement for user review.

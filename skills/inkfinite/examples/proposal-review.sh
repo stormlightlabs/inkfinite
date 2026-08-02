@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # DESCRIPTION: Drives a live proposal fixture through inspect, narrow query,
-#              proposal review, and one-operation partial acceptance.
+#              proposal creation, and review-status polling.
 # AUTHOR:      Owais <info@stormlightlabs.org>
 # VERSION:     0.0.0
 # USAGE:       INKFINITE_SESSION_ID=session:1 ./proposal-review.sh DOCUMENT OUTPUT_DIR
@@ -22,7 +22,7 @@ mkdir -p "$OUTPUT_DIR"
 INSPECT="$OUTPUT_DIR/live-inspect.json"
 TRANSACTION="$OUTPUT_DIR/proposal.transaction.json"
 PROPOSAL="$OUTPUT_DIR/proposal.json"
-ACCEPTED="$OUTPUT_DIR/partial-accept.json"
+STATUS="$OUTPUT_DIR/proposal-status.json"
 
 "$CLI" app inspect "${SESSION_ARGS[@]}" --json >"$INSPECT"
 "$CLI" app query "${SESSION_ARGS[@]}" --role architecture.service --json >"$OUTPUT_DIR/live-query.json"
@@ -40,20 +40,19 @@ print(json.load(open(sys.argv[1], encoding="utf-8"))["id"])
 PY
 )"
 
-"$CLI" app accept "${SESSION_ARGS[@]}" --proposal-id "$PROPOSAL_ID" \
-  --operation-position 0 --json >"$ACCEPTED"
+"$CLI" app proposal status "${SESSION_ARGS[@]}" --proposal-id "$PROPOSAL_ID" --json >"$STATUS"
 "$CLI" app inspect "${SESSION_ARGS[@]}" --json >"$OUTPUT_DIR/live-after-accept.json"
 
-python3 - "$PROPOSAL" "$ACCEPTED" <<'PY'
+python3 - "$PROPOSAL" "$STATUS" <<'PY'
 import json
 import sys
 
 proposal = json.load(open(sys.argv[1], encoding="utf-8"))
-accepted = json.load(open(sys.argv[2], encoding="utf-8"))
+status = json.load(open(sys.argv[2], encoding="utf-8"))
 assert len(proposal["transaction"]["operations"]) == 2
 assert proposal["preview"]["changed"]
-assert accepted["commit"]["transaction_id"] == proposal["transaction"]["id"]
-assert accepted["commit"]["patch"]["changed"] == [{"kind": "page", "id": "page:document:agent-skill:1"}]
+assert status["proposal_id"] == proposal["id"]
+assert status["state"] == "accepted"
 PY
 
-printf 'proposal fixture: %s partially accepted in %s\n' "$PROPOSAL_ID" "$DOC"
+printf 'proposal fixture: %s reviewed in %s\n' "$PROPOSAL_ID" "$DOC"

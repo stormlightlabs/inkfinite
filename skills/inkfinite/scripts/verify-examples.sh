@@ -55,7 +55,9 @@ import sys
 capabilities = json.load(open(sys.argv[1], encoding="utf-8"))
 assert {"inspect", "query", "apply", "connect", "layout", "render", "schema"}.issubset(capabilities["commands"])
 assert capabilities["live_mode"]["proposal_review"] is True
-assert capabilities["live_mode"]["direct_apply_requires_one_time_authorization"] is True
+assert capabilities["live_mode"]["agent_access_modes"] == ["review", "direct"]
+assert capabilities["live_mode"]["agent_access_is_session_scoped"] is True
+assert capabilities["live_mode"]["agent_access_is_desktop_controlled"] is True
 for path in sys.argv[2:]:
     assert isinstance(json.load(open(path, encoding="utf-8")), dict), path
 PY

@@ -7,7 +7,13 @@ const tauri = vi.hoisted(() => ({ invoke: vi.fn(), listen: vi.fn(async () => () 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: tauri.invoke }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: tauri.listen }));
 
-import { createDesktopSessionRepo, type SessionOpened, type SessionSaved } from './desktop-session';
+import {
+	createDesktopSessionRepo,
+	type SessionCommit,
+	type SessionOpened,
+	type SessionSaved,
+	type SessionStatus
+} from './desktop-session';
 
 function snapshot(documentId: string): DocumentSnapshot {
 	const pageId = `page:${documentId}:1`;
@@ -64,7 +70,7 @@ describe('Tauri desktop session command boundary', () => {
 		tauri.listen.mockClear();
 	});
 
-	it('uses camelCase command arguments for New Board and Save As', async () => {
+	it('uses camelCase command arguments for files and agent access', async () => {
 		const files = fileOps();
 		let currentPath = '/tmp/Untitled.inkfinite';
 		const document = snapshot('board:test');
@@ -83,6 +89,7 @@ describe('Tauri desktop session command boundary', () => {
 						session_id: 'session:1',
 						path: currentPath,
 						actor_id: 'actor:desktop',
+						agent_access: 'review',
 						snapshot: document,
 						dirty: false,
 						lock_held: true,
@@ -107,6 +114,7 @@ describe('Tauri desktop session command boundary', () => {
 						session_id: 'session:1',
 						path: currentPath,
 						actor_id: 'actor:desktop',
+						agent_access: 'review',
 						snapshot: document,
 						dirty: false,
 						lock_held: true,
@@ -117,6 +125,22 @@ describe('Tauri desktop session command boundary', () => {
 					}
 				} satisfies SessionSaved;
 			}
+			if (command === 'set_agent_access') {
+				expect(args).toEqual({ sessionId: 'session:1', agentAccess: 'direct' });
+				return {
+					session_id: 'session:1',
+					path: currentPath,
+					actor_id: 'actor:desktop',
+					agent_access: 'direct',
+					snapshot: document,
+					dirty: false,
+					lock_held: true,
+					recovery_available: false,
+					can_undo: false,
+					can_redo: false,
+					sync: { status: 'disabled' }
+				};
+			}
 			throw new Error(`Unexpected command: ${command}`);
 		});
 
@@ -124,9 +148,11 @@ describe('Tauri desktop session command boundary', () => {
 		await repo.createBoard('Untitled');
 		files.setSavePath('/tmp/Renamed.inkfinite');
 		await repo.saveAs();
+		await repo.setAgentAccess('direct');
 
 		expect(tauri.invoke).toHaveBeenCalledWith('create_document', expect.any(Object));
 		expect(tauri.invoke).toHaveBeenCalledWith('save_as', expect.any(Object));
+		expect(repo.getAgentAccess()).toBe('direct');
 	});
 
 	it('turns structured Tauri failures into readable errors', async () => {
@@ -144,6 +170,58 @@ describe('Tauri desktop session command boundary', () => {
 		});
 	});
 
+	it('publishes live CLI commits to mounted editor subscribers', async () => {
+		const files = fileOps();
+		const document = snapshot('board:live-commit');
+		const status: SessionStatus = {
+			session_id: 'session:1',
+			path: '/tmp/Untitled.inkfinite',
+			actor_id: 'actor:desktop',
+			agent_access: 'direct',
+			snapshot: document,
+			dirty: false,
+			lock_held: true,
+			recovery_available: false,
+			can_undo: true,
+			can_redo: false,
+			sync: { status: 'disabled' }
+		};
+		tauri.invoke.mockImplementation(async (command: string) => {
+			if (command !== 'create_document') throw new Error(`Unexpected command: ${command}`);
+			return { session_id: 'session:1', status } satisfies SessionOpened;
+		});
+		const repo = createDesktopSessionRepo(files.ops);
+		await repo.createBoard('Untitled');
+		const onDocument = vi.fn();
+		repo.subscribeLiveDocument(onDocument);
+		const listenCalls = tauri.listen.mock.calls as unknown as Array<
+			[string, (event: { payload: { session_id: string; commit: SessionCommit } }) => void]
+		>;
+		const commitListener = listenCalls.find(([event]) => event === 'inkfinite-live-commit')?.[1];
+		expect(commitListener).toBeTypeOf('function');
+
+		commitListener?.({
+			payload: {
+				session_id: 'session:1',
+				commit: {
+					commit: {
+						transaction_id: 'transaction:live',
+						heads: document.heads,
+						patch: { created: [], changed: [], deleted: [] },
+						affected_ids: [],
+						affected_regions: [],
+						inverse: { actor_id: 'actor:desktop', operations: [] },
+						warnings: []
+					},
+					status
+				}
+			}
+		});
+
+		expect(onDocument).toHaveBeenCalledOnce();
+		expect(Object.keys(onDocument.mock.calls[0][0].pages)).toEqual(document.document.page_ids);
+	});
+
 	it('clears a live proposal when its review window expires', async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(1_000);
@@ -158,6 +236,7 @@ describe('Tauri desktop session command boundary', () => {
 						session_id: 'session:1',
 						path: '/tmp/Untitled.inkfinite',
 						actor_id: 'actor:desktop',
+						agent_access: 'review',
 						snapshot: document,
 						dirty: false,
 						lock_held: true,

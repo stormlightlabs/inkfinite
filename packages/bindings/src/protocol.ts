@@ -10,146 +10,126 @@ import type { CommitResult, DocumentPath, Proposal, ProposalId, Query, QueryResu
 export type SessionId = string;
 
 /**
- * One-time user authorization for a direct live agent apply.
+ * How authenticated agents may change one open desktop document.
  */
-export type ApplyAuthorization = { 
-/**
- * Opaque single-use token issued by the desktop UI.
- */
-token: string, 
-/**
- * Session for which the authorization was issued.
- */
-session_id: SessionId, 
-/**
- * Wall-clock expiry retained for clients and diagnostics.
- */
-expires_at: Timestamp, };
+export type AgentAccessMode = "review" | "direct";
 
 /**
  * Transport-independent request accepted by desktop commands, IPC, or CLI adapters.
  */
-export type Request = { "type": "create_document", 
+export type Request = { "type": "create_document",
 /**
  * Stable identity for the new document.
  */
-document_id: DocumentId, 
+document_id: DocumentId,
 /**
  * Actor that will own the session's local changes.
  */
-actor_id: ActorId, } | { "type": "open_document", 
+actor_id: ActorId, } | { "type": "open_document",
 /**
  * File to open.
  */
-path: DocumentPath, 
+path: DocumentPath,
 /**
  * Actor that will own the session's local changes.
  */
-actor_id: ActorId, } | { "type": "snapshot", 
+actor_id: ActorId, } | { "type": "snapshot",
 /**
  * Open session to inspect.
  */
-session_id: SessionId, } | { "type": "commit", 
+session_id: SessionId, } | { "type": "commit",
 /**
  * Open session to change.
  */
-session_id: SessionId, 
+session_id: SessionId,
 /**
  * Transaction to validate and apply.
  */
-transaction: TransactionDraft, } | { "type": "propose", 
+transaction: TransactionDraft, } | { "type": "propose",
 /**
  * Open session against which to validate.
  */
-session_id: SessionId, 
+session_id: SessionId,
 /**
  * Transaction to preview.
  */
-transaction: TransactionDraft, } | { "type": "authorize_apply", 
-/**
- * Open session to authorize.
- */
-session_id: SessionId, } | { "type": "apply", 
+transaction: TransactionDraft, } | { "type": "apply",
 /**
  * Open session to change.
  */
-session_id: SessionId, 
+session_id: SessionId,
 /**
  * Transaction to validate and apply.
  */
-transaction: TransactionDraft, 
-/**
- * One-time authorization issued by the desktop UI.
- */
-authorization: ApplyAuthorization, } | { "type": "accept_proposal", 
+transaction: TransactionDraft, } | { "type": "accept_proposal",
 /**
  * Open session to change.
  */
-session_id: SessionId, 
+session_id: SessionId,
 /**
  * Proposal to accept.
  */
-proposal_id: ProposalId, 
+proposal_id: ProposalId,
 /**
  * Zero-based operation positions to accept, or all operations when absent.
  */
-operation_positions: Array<number> | null, } | { "type": "reject_proposal", 
+operation_positions: Array<number> | null, } | { "type": "reject_proposal",
 /**
  * Open session that owns the proposal.
  */
-session_id: SessionId, 
+session_id: SessionId,
 /**
  * Proposal to discard.
  */
-proposal_id: ProposalId, } | { "type": "undo", 
+proposal_id: ProposalId, } | { "type": "undo",
 /**
  * Open session to change.
  */
-session_id: SessionId, 
+session_id: SessionId,
 /**
  * Actor whose transaction should be compensated.
  */
-actor_id: ActorId, } | { "type": "save", 
+actor_id: ActorId, } | { "type": "save",
 /**
  * Open session to persist.
  */
-session_id: SessionId, 
+session_id: SessionId,
 /**
  * Heads the caller expects to save.
  */
-expected_heads: Array<ChangeHash>, } | { "type": "save_as", 
+expected_heads: Array<ChangeHash>, } | { "type": "save_as",
 /**
  * Open session to persist.
  */
-session_id: SessionId, 
+session_id: SessionId,
 /**
  * Replacement path.
  */
-path: DocumentPath, 
+path: DocumentPath,
 /**
  * Heads the caller expects to save.
  */
-expected_heads: Array<ChangeHash>, } | { "type": "query", 
+expected_heads: Array<ChangeHash>, } | { "type": "query",
 /**
  * Open session to inspect.
  */
-session_id: SessionId, 
+session_id: SessionId,
 /**
  * Filters to apply.
  */
-query: Query, } | { "type": "redo", 
+query: Query, } | { "type": "redo",
 /**
  * Open session to change.
  */
-session_id: SessionId, 
+session_id: SessionId,
 /**
  * Actor whose transaction should be restored.
  */
-actor_id: ActorId, } | { "type": "validate", 
+actor_id: ActorId, } | { "type": "validate",
 /**
  * Open session to validate.
  */
-session_id: SessionId, } | { "type": "close", 
+session_id: SessionId, } | { "type": "close",
 /**
  * Session to close.
  */
@@ -158,20 +138,20 @@ session_id: SessionId, };
 /**
  * Successful transport-independent response.
  */
-export type Response = { "type": "session_opened", "value": SessionId } | { "type": "snapshot", "value": DocumentSnapshot } | { "type": "committed", "value": CommitResult } | { "type": "proposed", "value": Proposal } | { "type": "apply_authorized", "value": ApplyAuthorization } | { "type": "proposal_rejected" } | { "type": "saved", "value": SaveResult } | { "type": "query_result", "value": QueryResult } | { "type": "valid" } | { "type": "closed" };
+export type Response = { "type": "session_opened", "value": SessionId } | { "type": "snapshot", "value": DocumentSnapshot } | { "type": "committed", "value": CommitResult } | { "type": "proposed", "value": Proposal } | { "type": "proposal_rejected" } | { "type": "saved", "value": SaveResult } | { "type": "query_result", "value": QueryResult } | { "type": "valid" } | { "type": "closed" };
 
 /**
  * Stable protocol error returned across all adapters.
  */
-export type ProtocolError = { 
+export type ProtocolError = {
 /**
  * Stable machine-readable error code.
  */
-code: string, 
+code: string,
 /**
  * Human-readable error detail.
  */
-message: string, 
+message: string,
 /**
  * Optional structured context for machine clients.
  */

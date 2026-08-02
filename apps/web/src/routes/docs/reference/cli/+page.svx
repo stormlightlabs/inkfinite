@@ -18,7 +18,7 @@ commands are:
 | `inspect` | Print a document summary or materialized snapshot |
 | `query` | Find records by semantic, structural, kind, or bounds filters |
 | `validate` | Load and validate a canonical document |
-| `shape`, `connect`, `layout` | Build a structured file edit or desktop proposal |
+| `shape`, `connect`, `layout` | Build a structured file or live desktop edit |
 | `apply` | Validate and apply a transaction draft from JSON |
 | `render` | Write a deterministic SVG of a document or filtered view |
 | `app` | Inspect or work with a running desktop session |
@@ -68,7 +68,7 @@ discover shape contracts.
 
 With the desktop app running, use `app status`, `app context`, `app inspect`, and `app query` for
 read-only access. Context reports the active page, selection, viewport, actor, and current heads.
-Add `--app` to a structured mutation to open a reviewable ghost preview:
+Add `--app` to a structured mutation to use the open document's **Agent access** setting:
 
 ```sh
 inkfinite app status --json
@@ -80,13 +80,15 @@ inkfinite app propose --transaction transaction.json --json
 inkfinite app proposal wait --proposal-id proposal:1 --json
 ```
 
-The user accepts all or selected operations, or rejects the proposal, in the desktop UI.
-Agent-facing IPC can observe that decision with `app proposal status` or `app proposal wait`, but it
-cannot make the decision. Use raw `app propose` only when the structured commands cannot express
-the edit.
+Each document starts in **Review changes** mode, where the command opens a ghost preview. The user
+accepts all or selected operations, or rejects the proposal, in the desktop UI. The CLI can observe
+that decision with `app proposal status` or `app proposal wait`, but it cannot make the decision.
 
-`app apply` bypasses proposal review only when the desktop UI has issued a one-time authorization
-token for that action. Do not store that token in a document or script.
+For a solo agent session, the user can switch **Agent access** to **Apply directly**. The same
+structured command then commits immediately. The setting lasts only while that document is open,
+and the CLI cannot enable it. `app propose` always requests review, even in Direct mode.
+
+`app apply` sends a prepared transaction directly and works only while **Apply directly** is enabled.
 
 <h2 id="output-format">Output format</h2>
 
