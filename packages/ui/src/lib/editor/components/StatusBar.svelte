@@ -237,7 +237,11 @@
 	</div>
 </div>
 
-<Dialog bind:open={infoOpen} onClose={() => (infoOpen = false)} title="About Inkfinite">
+<Dialog
+	bind:open={infoOpen}
+	onClose={() => (infoOpen = false)}
+	title="About Inkfinite"
+	class="about-dialog">
 	<section class="about">
 		<h1>About Inkfinite</h1>
 		<p>
@@ -384,6 +388,10 @@
 	.about {
 		max-width: 480px;
 		padding: var(--ink-space-5);
+	}
+
+	:global(.about-dialog) {
+		--ink-dialog-radius: 1rem;
 	}
 
 	.about h1 {

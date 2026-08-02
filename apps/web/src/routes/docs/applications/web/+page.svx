@@ -1,16 +1,34 @@
 <svelte:head>
 	<title>Web editor · Inkfinite documentation</title>
-	<meta name="description" content="An outline for running and deploying the Inkfinite web editor." />
+	<meta name="description" content="Run the Inkfinite web editor and understand its browser storage." />
 </svelte:head>
 
 # Web editor
 
-Run Inkfinite in the browser.
+The web editor provides the full canvas interface without access to native `.inkfinite` files.
 
-<h2 id="run-locally">Web App</h2>
+<h2 id="open-the-editor">Open the editor</h2>
 
-*todo*
+The hosted editor lives at [`/app`](/app). To run it from a source checkout:
 
-<h2 id="browser-storage">Storage & Backups</h2>
+```sh
+pnpm install
+pnpm dev:web
+```
 
-*todo*
+Open the local URL printed by Vite and add `/app` to its path. The site root contains this
+documentation.
+
+<h2 id="browser-storage">Storage and backups</h2>
+
+The web editor stores boards in IndexedDB for the current origin and browser profile. It does not
+write canonical files to your filesystem, and another browser or deployment origin has a separate
+database.
+
+Export work that you cannot afford to lose. Browser storage may disappear when you clear site data,
+remove a profile, or use private browsing. Use the desktop app when you want a canonical
+`.inkfinite` file that can be copied, versioned, or changed by the CLI.
+
+Excalidraw and Obsidian Canvas exports preserve supported editable content but may omit features
+that the target format cannot represent. PNG and SVG exports are presentation copies. See
+[File format](/docs/reference/file-format/) before relying on an export as a backup.

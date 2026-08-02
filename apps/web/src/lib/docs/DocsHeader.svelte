@@ -6,8 +6,8 @@
 
 	import DocsSearch from './DocsSearch.svelte';
 
-	type Props = { sidebarOpen: boolean; toggleSidebar: () => void };
-	let { sidebarOpen, toggleSidebar }: Props = $props();
+	type Props = { sidebarOpen: boolean; toggleSidebar: () => void; landing?: boolean };
+	let { sidebarOpen, toggleSidebar, landing = false }: Props = $props();
 </script>
 
 <header class="docs-header">
@@ -21,11 +21,13 @@
 			onclick={toggleSidebar}>
 			<Icon name={sidebarOpen ? 'close' : 'menu'} size={20} />
 		</button>
-		<a class="brand" href={resolve('/docs/')}>
+		<a class="brand" href={resolve('/')}>
 			<img src={favicon} alt="" />
 			<span>Inkfinite</span>
 		</a>
-		<span class="section-label">Docs</span>
+		{#if !landing}
+			<span class="section-label">Docs</span>
+		{/if}
 	</div>
 
 	<div class="header-actions">

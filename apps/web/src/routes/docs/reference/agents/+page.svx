@@ -1,28 +1,66 @@
 <svelte:head>
 	<title>Agent workflows · Inkfinite documentation</title>
-	<meta name="description" content="An outline of reviewable Inkfinite workflows for coding agents." />
+	<meta name="description" content="Safe, reviewable Inkfinite document changes for coding agents." />
 </svelte:head>
 
-# Agentic Workflows
+# Agent workflows
 
 Use Inkfinite's command-line and proposal tools to make reviewable document changes.
 
 <h2 id="workflow">Workflow</h2>
 
-*todo*
+For a saved file, follow the same sequence for every change:
+
+1. Run `inspect --json` and keep the returned heads.
+2. Use `query --json` to read only the relevant records.
+3. Build the smallest transaction that satisfies the request.
+4. Run the mutation with `--dry-run --json`.
+5. Apply it only after the dry run passes.
+6. Validate the document and render the affected page, role, or selection.
+
+Prefer semantic roles, names, and tags over coordinates when they identify one record. If a selector
+matches multiple shapes, narrow it with an exact ID. Do not guess which one the human meant.
 
 <h2 id="proposals">Proposals</h2>
 
-*todo*
+For a document open in the desktop app, use `app propose` instead of changing its file. The app
+shows created, changed, and deleted records as a ghost preview. The human can accept all operations,
+accept selected operations, or reject the proposal.
+
+Partial acceptance creates a transaction from the approved operations and validates it again. A
+stale proposal may need a refreshed preview after another edit changes the document. Review the
+refresh rather than accepting an outdated result.
 
 <h2 id="permissions">Permissions</h2>
 
-*todo*
+Locks and `agent_editable` metadata are document boundaries. An agent must not work around a locked
+layer, locked shape, or record marked `agent_editable: false` by editing a child or bypassing the
+CLI. Report the boundary and ask the human to make or authorize the change.
+
+Direct `app apply` requires a one-time token issued by the desktop UI. The token authorizes a single
+live action; it is not a reusable credential and never belongs in a transaction file.
 
 <h2 id="conflicts">Conflicts</h2>
 
-*todo*
+Document heads are preconditions. If a file mutation exits with code `5`, inspect the current heads,
+query the affected records again, and rebuild the transaction from that state. Do not remove lock
+files, copy an older document over the current file, or silently drop intervening edits.
+
+Record-version preconditions protect individual objects in the same way. A failed version check
+means the object changed after the agent inspected it.
 
 <h2 id="skills">Skills</h2>
 
-*todo*
+The repository includes an installable agent skill at `skills/inkfinite`. It documents the safe
+workflow and includes runnable examples for file edits, proposal review, partial acceptance, and
+stale-head recovery.
+
+After building the CLI, verify the examples from the repository root:
+
+```sh
+INKFINITE_CLI="$PWD/target/debug/inkfinite" \
+  bash skills/inkfinite/scripts/verify-examples.sh
+```
+
+The fixture server used by those examples tests the protocol. It does not replace a real desktop
+session or authorize direct apply.

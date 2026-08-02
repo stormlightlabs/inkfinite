@@ -1,6 +1,6 @@
 <svelte:head>
 	<title>Command-line interface · Inkfinite documentation</title>
-	<meta name="description" content="An outline of the Inkfinite CLI." />
+	<meta name="description" content="Use the Inkfinite CLI with saved files and live desktop sessions." />
 </svelte:head>
 
 # Command-line interface
@@ -9,16 +9,86 @@ Inspect, change, validate, and render Inkfinite documents from a terminal.
 
 <h2 id="command-overview">Command overview</h2>
 
-*todo*
+Run `inkfinite --help` or `inkfinite <command> --help` for the complete option reference. The main
+commands are:
+
+| Command | Purpose |
+| --- | --- |
+| `new` | Create a blank canonical document |
+| `inspect` | Print a document summary or materialized snapshot |
+| `query` | Find records by semantic, structural, kind, or bounds filters |
+| `validate` | Load and validate a canonical document |
+| `shape`, `connect`, `layout` | Build and apply structured transactions |
+| `apply` | Validate and apply a transaction draft from JSON |
+| `render` | Write a deterministic SVG of a document or filtered view |
+| `app` | Inspect or work with a running desktop session |
+| `schema`, `capabilities` | Print machine-readable contracts for integrations |
+
+During development, build the binary with:
+
+```sh
+cargo build -p inkfinite-cli --bin inkfinite
+```
 
 <h2 id="file-mode">File mode</h2>
 
-*todo*
+File-mode commands operate on a closed `.inkfinite` file. Start by inspecting its heads and querying
+only the records you need:
+
+```sh
+inkfinite inspect architecture.inkfinite --json
+inkfinite query architecture.inkfinite --role architecture.service --json
+```
+
+Prefer `shape create`, `shape patch`, `shape delete`, `connect`, and `layout` when one of them
+expresses the edit. Use `apply` for a transaction with operations that the structured commands do
+not cover. Test mutations with `--dry-run` before saving:
+
+```sh
+inkfinite shape patch architecture.inkfinite \
+  --role architecture.service \
+  --patch '@service-patch.json' \
+  --dry-run --json
+
+inkfinite apply architecture.inkfinite \
+  --transaction transaction.json \
+  --dry-run --json
+```
+
+File commands never prompt. Close the desktop editor before changing its file; a lock or stale-head
+error is a signal to inspect current state, not a reason to overwrite the file.
 
 <h2 id="live-mode">Live mode</h2>
 
-*todo*
+With the desktop app running, use `app status`, `app inspect`, and `app query` for read-only access.
+`app propose` sends a transaction to the canvas as a reviewable ghost preview:
 
-<h2 id="output-format">Output Format</h2>
+```sh
+inkfinite app status --json
+inkfinite app query --role architecture.service --json
+inkfinite app propose --transaction transaction.json --json
+```
 
-*todo*
+The human can accept the whole proposal or selected operations, or reject it without changing the
+document. `app apply` bypasses proposal review only when the desktop UI has issued a one-time
+authorization token for that action. Do not store that token in a document or script.
+
+<h2 id="output-format">Output format</h2>
+
+Pass `--json` for deterministic machine-readable output. Successful mutations report the previous
+and current heads, transaction ID, created, updated, and deleted records, repairs, and warnings.
+Diagnostics go to standard error so standard output remains safe to pipe into another program.
+
+`capabilities --json` reports supported commands and stable exit codes. Current exit codes are:
+
+| Code | Meaning |
+| ---: | --- |
+| `0` | Success |
+| `2` | Invalid command usage |
+| `3` | File or input error |
+| `4` | Invalid document or data |
+| `5` | Existing file, lock, or state conflict |
+
+Use `schema document`, `schema transaction`, and `schema protocol` instead of inferring JSON shapes
+from examples. Global `--json` and `--non-interactive` options may appear before or after a
+subcommand.

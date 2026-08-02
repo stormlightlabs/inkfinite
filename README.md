@@ -34,6 +34,8 @@ Start the browser app:
 pnpm dev:web
 ```
 
+Open the printed local URL for the documentation site, or add `/app` to open the editor.
+
 Start the desktop app:
 
 ```sh

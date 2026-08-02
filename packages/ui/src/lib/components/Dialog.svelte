@@ -98,8 +98,8 @@
 	.dialog__content {
 		background-color: var(--ink-surface-raised);
 		color: var(--ink-text);
-		border: var(--ink-line-width) solid var(--ink-border-strong);
-		border-radius: var(--ink-radius-panel);
+		border: 0.75px solid var(--ink-border-strong);
+		border-radius: var(--ink-dialog-radius, var(--ink-radius-panel));
 		box-shadow: var(--ink-shadow-panel);
 		max-width: 90vw;
 		max-height: 90vh;

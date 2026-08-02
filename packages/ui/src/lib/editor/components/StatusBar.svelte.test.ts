@@ -84,8 +84,8 @@ describe('StatusBar', () => {
 
 		expect(onOpenBrowser).toHaveBeenCalledOnce();
 		expect(onHistoryClick).toHaveBeenCalledOnce();
-		await expect
-			.element(screen.getByRole('dialog', { name: 'About Inkfinite' }))
-			.toBeInTheDocument();
+		const dialog = screen.getByRole('dialog', { name: 'About Inkfinite' });
+		await expect.element(dialog).toBeInTheDocument();
+		expect(window.getComputedStyle(dialog.element()).borderRadius).toBe('16px');
 	});
 });

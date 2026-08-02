@@ -27,7 +27,8 @@ command-line tools use file locks, atomic replacement, and recovery data to prot
 
 <h2 id="ways-to-work">Ways to work</h2>
 
-- Use the [web editor](/docs/applications/web/) for a browser-based canvas.
+- Open the [web editor](/app) for a browser-based canvas, or read its
+  [storage guide](/docs/applications/web/).
 - Use the [desktop editor](/docs/applications/desktop/) for native files and desktop menus.
 - Use the [command-line interface](/docs/reference/cli/) to inspect, edit, validate, or render a
   document from a script.

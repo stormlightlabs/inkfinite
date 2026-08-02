@@ -7,12 +7,12 @@
 
 	let { children }: { children: Snippet } = $props();
 	let sidebarOpen = $state(false);
-	let landing = $derived(page.url.pathname === '/docs' || page.url.pathname === '/docs/');
+	let landing = $derived(page.url.pathname === '/');
 </script>
 
 <div class="docs-shell">
 	<a class="skip-link" href="#docs-content">Skip to content</a>
-	<DocsHeader {sidebarOpen} toggleSidebar={() => (sidebarOpen = !sidebarOpen)} />
+	<DocsHeader {landing} {sidebarOpen} toggleSidebar={() => (sidebarOpen = !sidebarOpen)} />
 
 	{#if sidebarOpen}
 		<button

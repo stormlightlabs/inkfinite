@@ -1,20 +1,43 @@
 <svelte:head>
 	<title>Desktop editor · Inkfinite documentation</title>
-	<meta name="description" content="An outline for building and using the Inkfinite desktop editor." />
+	<meta name="description" content="Build the Inkfinite desktop app and work safely with native files." />
 </svelte:head>
 
 # Desktop editor
 
-Build and use Inkfinite as a native desktop application.
+The desktop editor combines the shared canvas interface with native file handling and authenticated
+local CLI access.
 
 <h2 id="run-locally">Run locally</h2>
 
-*todo*
+Install Node.js 18 or newer, pnpm, Rust 1.89, and the
+[Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) for your operating system. From
+the repository root, run:
 
-<h2 id="document-sessions">Document Sessions</h2>
+```sh
+pnpm install
+pnpm tauri dev
+```
 
-*todo*
+This starts the web frontend and native Tauri shell in development mode.
 
-<h2 id="local-control">Local Control</h2>
+<h2 id="document-sessions">Document sessions</h2>
 
-*todo*
+Use **Open** to load a canonical `.inkfinite` file. New documents remain drafts in the app's local
+data directory until you choose **Save As**. The app tracks the current native path separately from
+imports and exports, so exporting a PNG, SVG, Excalidraw file, or Obsidian Canvas file does not mark
+the native document as saved elsewhere.
+
+The desktop backend uses file locks, recovery data, and atomic replacement for canonical writes.
+Do not edit the same file with a file-mode CLI command while it is open in the desktop app. Use the
+live proposal workflow instead.
+
+<h2 id="local-control">Local CLI access</h2>
+
+The desktop app exposes authenticated IPC to the local `inkfinite` CLI. Read-only commands can list
+sessions, inspect the open document, query records, or focus the window. Mutation commands normally
+create a proposal that appears as a ghost preview for human review.
+
+Direct live apply requires a one-time authorization token issued by the desktop UI. Discovery and
+authentication remain local to the current user account. See [Agent workflows](/docs/reference/agents/)
+for the review process and [Command-line interface](/docs/reference/cli/) for commands.

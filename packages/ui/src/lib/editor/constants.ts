@@ -3,7 +3,7 @@ import type { IconName } from '../icons';
 
 export const HELP_LINKS = [
 	{ label: 'README', href: 'https://github.com/stormlightlabs/inkfinite', external: true },
-	{ label: 'Read the Docs', href: '/docs', external: true },
+	{ label: 'Read the Docs', href: '/', external: false },
 	{
 		label: 'Issue Tracker',
 		href: 'https://github.com/stormlightlabs/inkfinite/issues',
