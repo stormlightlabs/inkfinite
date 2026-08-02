@@ -1,4 +1,4 @@
-import type { DesktopFileOps, FileHandle } from '@inkfinite/core';
+import { PageRecord, ShapeRecord, type BoardExport, type DesktopFileOps, type FileHandle } from '@inkfinite/core';
 import type { ApplyAuthorization, ChangeHash, DocumentSnapshot, Proposal, TransactionDraft } from '@inkfinite/bindings';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -135,6 +135,15 @@ function createFakeSessionApi() {
 						page.name = operation.name;
 						page.version += 1;
 					}
+				} else if (operation.type === 'create_shape') {
+					next.document.shapes[operation.shape.id] = structuredClone(operation.shape);
+					if (operation.shape.parent.kind === 'layer') {
+						next.document.layers[operation.shape.parent.id]?.shape_ids.push(operation.shape.id);
+					} else {
+						next.document.shapes[operation.shape.parent.id]?.child_ids.push(operation.shape.id);
+					}
+				} else if (operation.type === 'create_binding') {
+					next.document.bindings[operation.binding.id] = structuredClone(operation.binding);
 				}
 			}
 			session.undo.push(structuredClone(session.status.snapshot));
@@ -505,5 +514,41 @@ describe('Rust-backed desktop session repository', () => {
 
 		expect(committed.pages[pageId].name).toBe('Accepted proposal');
 		expect((await repo.loadDoc(opened.boardId)).pages[pageId].name).toBe('Accepted proposal');
+	});
+
+	it('imports editable canvas content into the Rust-backed canonical document', async () => {
+		fileOps.setSavePath('/tmp/imported.inkfinite');
+		const page = PageRecord.create('Imported canvas', 'page:imported');
+		const shape = ShapeRecord.createRect(
+			page.id,
+			12,
+			24,
+			{ w: 160, h: 90, fill: '#ffffff', stroke: '#111827', radius: 8 },
+			'shape:imported'
+		);
+		const snapshot: BoardExport = {
+			board: { id: 'board:source', name: 'Imported board', createdAt: 1, updatedAt: 1 },
+			doc: {
+				pages: { [page.id]: { ...page, shapeIds: [shape.id] } },
+				shapes: { [shape.id]: shape },
+				bindings: {}
+			},
+			order: { pageIds: [page.id], shapeOrder: { [page.id]: [shape.id] } }
+		};
+		const repo = createDesktopSessionRepo(fileOps.ops, { api: session.api });
+
+		const boardId = await repo.importBoard(snapshot);
+		const imported = await repo.loadDoc(boardId);
+		const importedPageId = imported.order.pageIds[0];
+
+		expect(imported.pages[importedPageId].name).toBe('Imported canvas');
+		expect(imported.shapes[shape.id]).toMatchObject({
+			id: shape.id,
+			pageId: importedPageId,
+			x: 12,
+			y: 24,
+			type: 'rect'
+		});
+		expect(session.files.get('/tmp/imported.inkfinite')?.document.shapes[shape.id]).toBeDefined();
 	});
 });

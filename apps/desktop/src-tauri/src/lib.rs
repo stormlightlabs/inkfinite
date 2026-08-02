@@ -47,6 +47,8 @@ pub fn run() {
             files::read_directory,
             files::pick_open_document,
             files::pick_save_document,
+            files::pick_interchange_document,
+            files::save_interchange_document,
             files::rename_file,
             files::delete_file,
             files::pick_workspace_directory,

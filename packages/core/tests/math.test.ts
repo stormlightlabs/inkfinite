@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { Box2, Mat3, Vec2 } from "../src/math";
+import { Box2, clamp, Mat3, Vec2 } from "../src/math";
+
+describe("clamp", () => {
+  it("constrains values to an inclusive range", () => {
+    expect(clamp(-1, 0, 10)).toBe(0);
+    expect(clamp(4, 0, 10)).toBe(4);
+    expect(clamp(11, 0, 10)).toBe(10);
+  });
+});
 
 describe("Vec2", () => {
   describe("add", () => {
@@ -64,6 +72,15 @@ describe("Vec2", () => {
       { description: "should handle fractional scalars", v: { x: 10, y: 20 }, scalar: 0.5, expected: { x: 5, y: 10 } },
     ])("$description", ({ v, scalar, expected }) => {
       expect(Vec2.mulScalar(v, scalar)).toEqual(expected);
+    });
+  });
+
+  describe("rotate", () => {
+    it("rotates a vector counterclockwise around the origin", () => {
+      const rotated = Vec2.rotate({ x: 3, y: 0 }, Math.PI / 2);
+
+      expect(rotated.x).toBeCloseTo(0);
+      expect(rotated.y).toBeCloseTo(3);
     });
   });
 

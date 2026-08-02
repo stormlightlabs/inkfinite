@@ -16,6 +16,15 @@ export function createDesktopPlatformAdapter(): EditorPlatformAdapter {
 				desktop: repo,
 				sink: createDesktopPersistenceSink(repo, status),
 				status,
+				interchange: {
+					pickImport: () => invoke<{ name: string; contents: string } | null>('pick_interchange_document'),
+					saveExport: (file, defaultStem) =>
+						invoke<boolean>('save_interchange_document', {
+							defaultName: `${defaultStem}.${file.extension}`,
+							extension: file.extension,
+							contents: file.contents
+						})
+				},
 				subscribeFileMenu(listener) {
 					let active = true;
 					let stop: (() => void) | undefined;

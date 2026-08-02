@@ -1,6 +1,7 @@
 import type {
 	BoardInspectorData,
 	FileHandle,
+	InterchangeExport,
 	PersistenceSink,
 	PersistenceStatus,
 	PersistentDocRepo
@@ -31,7 +32,22 @@ export type LiveProposal = {
 export type ProposalUpdate = { proposal: LiveProposal | null; message?: string };
 
 /** File command selected from a desktop application's native menu. */
-export type NativeFileMenuAction = 'new' | 'open' | 'save-as';
+export type NativeFileMenuAction =
+	| 'new'
+	| 'open'
+	| 'save-as'
+	| 'import'
+	| 'export-excalidraw'
+	| 'export-json-canvas';
+
+/** User-selected external editable document. */
+export type InterchangeSourceFile = { name: string; contents: string };
+
+/** Platform file operations used by shared editable-format import and export. */
+export interface InterchangeFileAccess {
+	pickImport(): Promise<InterchangeSourceFile | null>;
+	saveExport(file: InterchangeExport, defaultStem: string): Promise<boolean>;
+}
 
 /**
  * Desktop-only capabilities consumed by the shared editor.
@@ -69,6 +85,7 @@ export type EditorPlatformSession = {
 	repo: PersistentDocRepo;
 	sink: PersistenceSink;
 	status: StatusStore;
+	interchange?: InterchangeFileAccess;
 	desktop?: DesktopDocumentRepo;
 	inspectBoard?: (boardId: string) => Promise<BoardInspectorData>;
 	setActiveBoard?: (boardId: string | null) => void;

@@ -4,6 +4,8 @@ export type {
 	EditorPlatform,
 	EditorPlatformAdapter,
 	EditorPlatformSession,
+	InterchangeFileAccess,
+	InterchangeSourceFile,
 	NativeFileMenuAction
 } from './platform';
 export { createStatusStore } from './status';

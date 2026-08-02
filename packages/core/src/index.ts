@@ -4,6 +4,7 @@ export * from './cursor';
 export * from './export';
 export * from './geom';
 export * from './history';
+export * from './interchange';
 export * from './layers';
 export * from './math';
 export * from './model';

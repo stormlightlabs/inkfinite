@@ -19,6 +19,8 @@ import {
 	getInteractiveShapesOnCurrentPage,
 	LineTool,
 	LayerRecord,
+	exportInterchange,
+	importInterchange,
 	MarkdownTool,
 	PageRecord,
 	PenTool,
@@ -31,6 +33,8 @@ import {
 } from '@inkfinite/core';
 import type {
 	Box2,
+	InterchangeFormat,
+	InterchangeWarning,
 	LoadedDoc,
 	PersistenceSink,
 	PersistentDocRepo,
@@ -76,6 +80,13 @@ export function createCanvasController(
 	let unsubscribeFileMenu: (() => void) | null = null;
 	let removeBeforeUnload: (() => void) | null = null;
 	let stencilPaletteOpen = $state(false);
+	let interchangeBusy = $state(false);
+	let interchangeNotice = $state<{
+		title: string;
+		message: string;
+		warnings: InterchangeWarning[];
+		error: boolean;
+	} | null>(null);
 	let overlayViewport = $state<Viewport>({ width: 1, height: 1 });
 	let renderer: Renderer | null = null;
 	let inputAdapter: InputAdapter | null = null;
@@ -344,6 +355,71 @@ export function createCanvasController(
 		);
 	}
 
+	async function importEditableCanvas() {
+		if (!repo || !sink || !platformSession?.interchange) return;
+		interchangeBusy = true;
+		try {
+			const source = await platformSession.interchange.pickImport();
+			if (!source) return;
+			const imported = importInterchange(source.contents, source.name);
+			await sink.flush();
+			const boardId = await repo.importBoard(imported.snapshot);
+			const doc = await repo.loadDoc(boardId);
+			setActiveBoardId(boardId);
+			applyLoadedDoc(doc);
+			await desktop.markImported();
+			interchangeNotice = {
+				title: 'Import complete',
+				message: `${source.name} is now an Inkfinite document.`,
+				warnings: imported.warnings,
+				error: false
+			};
+		} catch (error) {
+			interchangeNotice = {
+				title: 'Import failed',
+				message: error instanceof Error ? error.message : String(error),
+				warnings: [],
+				error: true
+			};
+		} finally {
+			interchangeBusy = false;
+		}
+	}
+
+	async function exportEditableCanvas(format: InterchangeFormat) {
+		if (!activeBoardId || !repo || !sink || !platformSession?.interchange) return;
+		interchangeBusy = true;
+		try {
+			await sink.flush();
+			const snapshot = await repo.exportBoard(activeBoardId);
+			const exported = exportInterchange(
+				snapshot,
+				format,
+				store.getState().ui.currentPageId ?? undefined
+			);
+			const saved = await platformSession.interchange.saveExport(
+				exported,
+				snapshot.board.name
+			);
+			if (!saved) return;
+			interchangeNotice = {
+				title: 'Export complete',
+				message: `${snapshot.board.name}.${exported.extension} was saved.`,
+				warnings: exported.warnings,
+				error: false
+			};
+		} catch (error) {
+			interchangeNotice = {
+				title: 'Export failed',
+				message: error instanceof Error ? error.message : String(error),
+				warnings: [],
+				error: true
+			};
+		} finally {
+			interchangeBusy = false;
+		}
+	}
+
 	function handleCanvasDoubleClick(event: MouseEvent) {
 		if (!canvas) {
 			return;
@@ -492,6 +568,15 @@ export function createCanvasController(
 					case 'save-as':
 						void desktop.handleSaveAs(() => (sink ? sink.flush() : Promise.resolve()));
 						break;
+					case 'import':
+						void importEditableCanvas();
+						break;
+					case 'export-excalidraw':
+						void exportEditableCanvas('excalidraw');
+						break;
+					case 'export-json-canvas':
+						void exportEditableCanvas('json-canvas');
+						break;
 				}
 			}) ?? null;
 
@@ -583,6 +668,11 @@ export function createCanvasController(
 		},
 		insertStencil,
 		commitLayerState,
+		importEditableCanvas,
+		exportEditableCanvas,
+		interchangeBusy: () => interchangeBusy,
+		interchangeNotice: () => interchangeNotice,
+		closeInterchangeNotice: () => (interchangeNotice = null),
 		get stencilPaletteOpen() {
 			return stencilPaletteOpen;
 		},

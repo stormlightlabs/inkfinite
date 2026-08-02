@@ -70,7 +70,7 @@ function rectBounds(shape: RectShape): Box2 {
 		{ x: w, y: h },
 		{ x: 0, y: h }
 	];
-	const rotatedCorners = corners.map((corner) => rotatePoint(corner, rot));
+	const rotatedCorners = corners.map((corner) => Vec2Ops.rotate(corner, rot));
 	const translatedCorners = rotatedCorners.map((corner) => ({ x: corner.x + x, y: corner.y + y }));
 	return Box2Ops.fromPoints(translatedCorners);
 }
@@ -92,7 +92,7 @@ function ellipseBounds(shape: EllipseShape): Box2 {
 		{ x: w, y: h },
 		{ x: 0, y: h }
 	];
-	const rotatedCorners = corners.map((corner) => rotatePoint(corner, rot));
+	const rotatedCorners = corners.map((corner) => Vec2Ops.rotate(corner, rot));
 	const translatedCorners = rotatedCorners.map((corner) => ({ x: corner.x + x, y: corner.y + y }));
 	return Box2Ops.fromPoints(translatedCorners);
 }
@@ -111,7 +111,7 @@ function lineBounds(shape: LineShape): Box2 {
 		return Box2Ops.fromPoints(translatedPoints);
 	}
 
-	const rotatedPoints = points.map((p) => rotatePoint(p, rot));
+	const rotatedPoints = points.map((p) => Vec2Ops.rotate(p, rot));
 	const translatedPoints = rotatedPoints.map((p) => ({ x: p.x + x, y: p.y + y }));
 	return Box2Ops.fromPoints(translatedPoints);
 }
@@ -129,7 +129,7 @@ function arrowBounds(shape: ArrowShape): Box2 {
 		return Box2Ops.fromPoints(translatedPoints);
 	}
 
-	const rotatedPoints = points.map((p) => rotatePoint(p, rot));
+	const rotatedPoints = points.map((p) => Vec2Ops.rotate(p, rot));
 	const translatedPoints = rotatedPoints.map((p) => ({ x: p.x + x, y: p.y + y }));
 	return Box2Ops.fromPoints(translatedPoints);
 }
@@ -155,7 +155,7 @@ function textBounds(shape: TextShape): Box2 {
 		{ x: 0, y: height }
 	];
 
-	const rotatedCorners = corners.map((corner) => rotatePoint(corner, rot));
+	const rotatedCorners = corners.map((corner) => Vec2Ops.rotate(corner, rot));
 	const translatedCorners = rotatedCorners.map((corner) => ({ x: corner.x + x, y: corner.y + y }));
 	return Box2Ops.fromPoints(translatedCorners);
 }
@@ -180,7 +180,7 @@ function markdownBounds(shape: MarkdownShape): Box2 {
 		{ x: width, y: height },
 		{ x: 0, y: height }
 	];
-	const rotatedCorners = corners.map((corner) => rotatePoint(corner, rot));
+	const rotatedCorners = corners.map((corner) => Vec2Ops.rotate(corner, rot));
 	const translatedCorners = rotatedCorners.map((corner) => ({ x: corner.x + x, y: corner.y + y }));
 	return Box2Ops.fromPoints(translatedCorners);
 }
@@ -271,12 +271,6 @@ function strokeBounds(shape: StrokeShape): Box2 {
  * @param theta - Rotation angle in radians
  * @returns Rotated point
  */
-function rotatePoint(p: Vec2, theta: number): Vec2 {
-	const cos = Math.cos(theta);
-	const sin = Math.sin(theta);
-	return { x: p.x * cos - p.y * sin, y: p.x * sin + p.y * cos };
-}
-
 /**
  * Check if a point is inside a rectangle shape
  *
@@ -468,7 +462,7 @@ function worldToLocal(p: Vec2, shapeX: number, shapeY: number, shapeRot: number)
 		return translated;
 	}
 
-	return rotatePoint(translated, -shapeRot);
+	return Vec2Ops.rotate(translated, -shapeRot);
 }
 
 /**

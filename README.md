@@ -10,6 +10,7 @@ diagramming. It runs in the browser or as a desktop app.
 - Pan, zoom, select, resize, reorder, undo, and redo directly on the canvas.
 - Store documents in your browser (`idb`) or work with local `.inkfinite` files in the
   desktop app.
+- Import and export editable Excalidraw and Obsidian Canvas documents in either app.
 - Inspect, edit, validate, and render `.inkfinite` files from scripts with the CLI.
 
 Inkfinite is under active development. [TODO.md](TODO.md) shows what is being
@@ -155,6 +156,10 @@ compact Automerge format.
 The desktop app and CLI protect canonical writes with file locks, atomic
 replacement, and recovery data. A rejected or interrupted CLI mutation leaves
 the original canonical file unchanged.
+
+Excalidraw and Obsidian Canvas import and export are intentionally lossy. See the
+[file format guide](apps/web/src/routes/docs/reference/file-format/+page.svx) for
+the supported mappings and omitted features.
 
 ## Repository layout
 

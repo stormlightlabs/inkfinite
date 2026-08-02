@@ -35,6 +35,58 @@ describe('Editor Toolbar', () => {
 			.toHaveStyle({ flexWrap: 'nowrap' });
 	});
 
+	it('offers editable canvas import and export actions', async () => {
+		const onImportEditable = vi.fn();
+		const onExportEditable = vi.fn();
+		const screen = render(Toolbar, {
+			currentTool: 'select',
+			onToolChange: vi.fn(),
+			store: new Store(),
+			brushStore: createBrushStore(),
+			onImportEditable,
+			onExportEditable
+		});
+
+		(
+			screen
+				.getByRole('button', { name: 'Import Excalidraw or Obsidian Canvas document' })
+				.element() as HTMLButtonElement
+		).click();
+		expect(onImportEditable).toHaveBeenCalledOnce();
+
+		(
+			screen.getByRole('button', { name: 'Export drawing' }).element() as HTMLButtonElement
+		).click();
+		await expect
+			.element(
+				screen.getByRole('menuitem', { name: 'Export as Excalidraw editable document' })
+			)
+			.toBeInTheDocument();
+		(
+			screen
+				.getByRole('menuitem', { name: 'Export as Excalidraw editable document' })
+				.element() as HTMLButtonElement
+		).click();
+		expect(onExportEditable).toHaveBeenCalledWith('excalidraw');
+
+		(
+			screen.getByRole('button', { name: 'Export drawing' }).element() as HTMLButtonElement
+		).click();
+		await expect
+			.element(
+				screen.getByRole('menuitem', {
+					name: 'Export as Obsidian Canvas editable document'
+				})
+			)
+			.toBeInTheDocument();
+		(
+			screen
+				.getByRole('menuitem', { name: 'Export as Obsidian Canvas editable document' })
+				.element() as HTMLButtonElement
+		).click();
+		expect(onExportEditable).toHaveBeenCalledWith('json-canvas');
+	});
+
 	it('anchors pen settings directly below the pen tool', async () => {
 		const screen = render(Toolbar, {
 			currentTool: 'pen',

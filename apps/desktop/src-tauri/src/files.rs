@@ -3,11 +3,22 @@ use std::path::Path;
 use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 
+const MAX_INTERCHANGE_BYTES: usize = 16 * 1024 * 1024;
+
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct FileEntry {
     pub path: String,
     pub name: String,
     pub is_dir: bool,
+}
+
+/// UTF-8 contents selected from an external editable canvas file.
+#[derive(serde::Serialize)]
+pub struct InterchangeFile {
+    /// File name shown to the user.
+    pub name: String,
+    /// Complete JSON source.
+    pub contents: String,
 }
 
 /// Read directory contents and return matching files
@@ -135,6 +146,61 @@ pub async fn pick_save_document(app: AppHandle, default_name: Option<String>) ->
         None => log::info!("native Save dialog was cancelled"),
     }
     Ok(path)
+}
+
+/// Opens an external editable canvas document and returns its UTF-8 contents.
+#[tauri::command]
+pub async fn pick_interchange_document(app: AppHandle) -> Result<Option<InterchangeFile>, String> {
+    let Some(selected) = app
+        .dialog()
+        .file()
+        .add_filter("Editable Canvas Files", &["excalidraw", "canvas"])
+        .blocking_pick_file()
+    else {
+        return Ok(None);
+    };
+    let path = selected
+        .into_path()
+        .map_err(|error| format!("Failed to resolve selected import path: {error}"))?;
+    let metadata = fs::metadata(&path).map_err(|error| format!("Failed to inspect selected import: {error}"))?;
+    if metadata.len() > MAX_INTERCHANGE_BYTES as u64 {
+        return Err("The selected file is larger than the 16 MB import limit.".into());
+    }
+    let contents =
+        fs::read_to_string(&path).map_err(|error| format!("Failed to read selected import as UTF-8 JSON: {error}"))?;
+    let name = path
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "Imported canvas".into());
+    Ok(Some(InterchangeFile { name, contents }))
+}
+
+/// Saves an external editable canvas export without changing the canonical document path.
+#[tauri::command]
+pub async fn save_interchange_document(
+    app: AppHandle, default_name: String, extension: String, contents: String,
+) -> Result<bool, String> {
+    let allowed = matches!(extension.as_str(), "excalidraw" | "canvas");
+    if !allowed {
+        return Err(format!("Unsupported export extension: {extension}"));
+    }
+    let Some(selected) = app
+        .dialog()
+        .file()
+        .add_filter("Editable Canvas File", &[extension.as_str()])
+        .set_file_name(default_name)
+        .blocking_save_file()
+    else {
+        return Ok(false);
+    };
+    let mut path = selected
+        .into_path()
+        .map_err(|error| format!("Failed to resolve selected export path: {error}"))?;
+    if path.extension().is_none() {
+        path.set_extension(&extension);
+    }
+    fs::write(&path, contents).map_err(|error| format!("Failed to save editable canvas export: {error}"))?;
+    Ok(true)
 }
 
 /// Pick a workspace directory using the system folder picker

@@ -541,17 +541,29 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 	}
 
 	async function importBoard(snapshot: BoardExport): Promise<string> {
-		if (!currentStatus || !currentBoard) throw new Error('No board loaded');
 		const path = await fileOps.showSaveDialog(`${safeFileStem(snapshot.board.name)}.inkfinite`);
 		if (!path) throw new Error('Save cancelled');
-		const saveAs = currentIsDraft ? api.saveDraftAs : api.saveAs;
-		const saved = await saveAs({
-			session_id: currentStatus.session_id,
+		if (currentStatus) {
+			if (currentStatus.dirty) await saveCurrentSession();
+			await closeCurrentSession();
+		}
+		const opened = await api.createDocument({
 			path,
-			expected_heads: currentStatus.snapshot.heads
+			document_id: createId('board'),
+			actor_id: ACTOR_ID,
+			page_name: snapshot.doc.pages[snapshot.order.pageIds[0]]?.name ?? 'Page 1'
 		});
-		updateStatus(saved.status);
-		currentIsDraft = false;
+		setCurrentState(opened.status, snapshot.board.name);
+		if (!currentBoard || !currentDoc) throw new Error('Failed to create the imported Inkfinite document');
+		const imported = rebaseImportedDocument(snapshot, currentDoc);
+		await applyDocPatch(currentBoard.id, {
+			upserts: {
+				pages: Object.values(imported.pages),
+				shapes: Object.values(imported.shapes),
+				bindings: Object.values(imported.bindings)
+			},
+			order: imported.order
+		});
 		currentBoard = { ...currentBoard, name: snapshot.board.name, updatedAt: Date.now() };
 		if (currentFile) await fileOps.addRecentFile(currentFile);
 		return currentBoard.id;
@@ -938,6 +950,59 @@ function applyPatch(doc: LoadedDoc, patch: DocPatch): LoadedDoc {
 		next.order.layers = structuredClone(patch.order.layers);
 	}
 	return next;
+}
+
+function rebaseImportedDocument(snapshot: BoardExport, destination: LoadedDoc): LoadedDoc {
+	const sourcePageId = snapshot.order.pageIds[0] ?? Object.keys(snapshot.doc.pages)[0];
+	const destinationPageId = destination.order.pageIds[0] ?? Object.keys(destination.pages)[0];
+	const destinationPage = destination.pages[destinationPageId];
+	const destinationLayerId = destinationPage?.layerIds?.[0] ?? Object.keys(destination.layers ?? {})[0];
+	if (!sourcePageId || !destinationPageId || !destinationPage || !destinationLayerId) {
+		throw new Error('Imported and destination documents must each contain a page and layer');
+	}
+	const sourcePage = snapshot.doc.pages[sourcePageId];
+	const sourceShapeIds = snapshot.order.shapeOrder?.[sourcePageId] ?? sourcePage?.shapeIds ?? [];
+	const shapes = Object.fromEntries(
+		sourceShapeIds.flatMap((id) => {
+			const shape = snapshot.doc.shapes[id];
+			return shape
+				? [[id, { ...structuredClone(shape), pageId: destinationPageId, layerId: destinationLayerId }]]
+				: [];
+		})
+	) as LoadedDoc['shapes'];
+	const bindings = Object.fromEntries(
+		Object.entries(snapshot.doc.bindings).filter(
+			([, binding]) => shapes[binding.fromShapeId] && shapes[binding.toShapeId]
+		)
+	);
+	const layer: EditorLayerRecord = {
+		...(destination.layers?.[destinationLayerId] ?? {
+			id: destinationLayerId,
+			pageId: destinationPageId,
+			name: 'Imported',
+			visible: true,
+			locked: false,
+			opacity: 1
+		}),
+		shapeIds: sourceShapeIds.filter((id) => Boolean(shapes[id]))
+	};
+	const page: EditorPageRecord = {
+		...destinationPage,
+		name: sourcePage?.name ?? destinationPage.name,
+		shapeIds: [...layer.shapeIds],
+		layerIds: [destinationLayerId]
+	};
+	return {
+		pages: { [destinationPageId]: page },
+		layers: { [destinationLayerId]: layer },
+		shapes,
+		bindings,
+		order: {
+			pageIds: [destinationPageId],
+			shapeOrder: { [destinationPageId]: [...layer.shapeIds] },
+			layers: { [destinationLayerId]: layer }
+		}
+	};
 }
 
 function documentFromLoadedDoc(doc: LoadedDoc, current: DocumentSnapshot, actor: string): DocumentSnapshot {

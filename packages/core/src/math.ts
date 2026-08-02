@@ -1,5 +1,10 @@
 export type Vec2 = { x: number; y: number };
 
+/** Constrain a number to an inclusive range. */
+export function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
 export const Vec2 = {
   /**
    * Add two vectors
@@ -20,6 +25,15 @@ export const Vec2 = {
    */
   mulScalar(v: Vec2, s: number): Vec2 {
     return { x: v.x * s, y: v.y * s };
+  },
+
+  /**
+   * Rotate a vector around the origin using the standard 2D rotation matrix.
+   */
+  rotate(v: Vec2, radians: number): Vec2 {
+    const cos = Math.cos(radians);
+    const sin = Math.sin(radians);
+    return { x: v.x * cos - v.y * sin, y: v.x * sin + v.y * cos };
   },
 
   /**

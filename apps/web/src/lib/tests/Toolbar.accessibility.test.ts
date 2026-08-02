@@ -41,6 +41,10 @@ describe('Toolbar accessibility', () => {
 		expect(exportButton?.getAttribute('aria-label')).toBe('Export drawing');
 		expect(exportButton?.getAttribute('aria-haspopup')).toBe('true');
 		expect(exportButton?.getAttribute('aria-expanded')).toBe('false');
+		const importButton = container.querySelector('.toolbar__import-button');
+		expect(importButton?.getAttribute('aria-label')).toBe(
+			'Import Excalidraw or Obsidian Canvas document'
+		);
 	});
 
 	it('should have proper menu roles when export menu is open', async () => {
@@ -59,7 +63,7 @@ describe('Toolbar accessibility', () => {
 		expect(exportMenu?.getAttribute('aria-label')).toBe('Export options');
 
 		const menuItems = container.querySelectorAll('.toolbar__export-menu .toolbar__menu-item');
-		expect(menuItems.length).toBe(3);
+		expect(menuItems.length).toBe(5);
 		menuItems.forEach((item) => {
 			expect(item.getAttribute('role')).toBe('menuitem');
 			expect(item.getAttribute('aria-label')).toBeTruthy();

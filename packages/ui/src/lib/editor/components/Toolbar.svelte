@@ -7,6 +7,7 @@
 		EditorState as EditorStateType,
 		EllipseShape,
 		LineShape,
+		InterchangeFormat,
 		MarkdownShape,
 		RectShape,
 		ShapeRecord,
@@ -32,10 +33,22 @@
 		canvas?: HTMLCanvasElement;
 		brushStore: BrushStore;
 		onStencilsClick?: () => void;
+		onImportEditable?: () => void;
+		onExportEditable?: (format: InterchangeFormat) => void;
+		interchangeBusy?: boolean;
 	};
 
-	let { currentTool, onToolChange, store, canvas, brushStore, onStencilsClick }: Props =
-		$props();
+	let {
+		currentTool,
+		onToolChange,
+		store,
+		canvas,
+		brushStore,
+		onStencilsClick,
+		onImportEditable,
+		onExportEditable,
+		interchangeBusy = false
+	}: Props = $props();
 
 	let editorState = $derived<EditorStateType>(store.getState());
 	let exportMenuOpen = $state(false);
@@ -198,6 +211,11 @@
 		const svg = exportToSVG(editorState, { selectedOnly: true });
 		downloadText(svg, 'selection.svg');
 		exportMenuOpen = false;
+	}
+
+	function exportEditable(format: InterchangeFormat) {
+		exportMenuOpen = false;
+		onExportEditable?.(format);
 	}
 
 	function downloadBlob(blob: Blob, filename: string) {
@@ -583,6 +601,14 @@
 
 	<div class="toolbar__divider"></div>
 
+	<button
+		class="toolbar__import-button"
+		disabled={interchangeBusy}
+		onclick={() => onImportEditable?.()}
+		aria-label="Import Excalidraw or Obsidian Canvas document">
+		{interchangeBusy ? 'Working…' : 'Import'}
+	</button>
+
 	<div class="toolbar__export">
 		<button
 			class="toolbar__export-button"
@@ -590,7 +616,8 @@
 			onclick={() => (exportMenuOpen = !exportMenuOpen)}
 			aria-label="Export drawing"
 			aria-haspopup="true"
-			aria-expanded={exportMenuOpen}>
+			aria-expanded={exportMenuOpen}
+			disabled={interchangeBusy}>
 			Export
 		</button>
 
@@ -600,6 +627,21 @@
 				bind:this={exportMenuEl}
 				role="menu"
 				aria-label="Export options">
+				<button
+					class="toolbar__menu-item"
+					role="menuitem"
+					aria-label="Export as Excalidraw editable document"
+					onclick={() => exportEditable('excalidraw')}>
+					Excalidraw
+				</button>
+				<button
+					class="toolbar__menu-item"
+					role="menuitem"
+					aria-label="Export as Obsidian Canvas editable document"
+					onclick={() => exportEditable('json-canvas')}>
+					Obsidian Canvas
+				</button>
+				<div class="toolbar__menu-separator" role="separator"></div>
 				<button
 					class="toolbar__menu-item"
 					role="menuitem"
@@ -785,6 +827,7 @@
 	}
 
 	.toolbar__tool-button:active,
+	.toolbar__import-button:active,
 	.toolbar__export-button:active {
 		transform: scale(0.96);
 	}
@@ -827,6 +870,7 @@
 		position: relative;
 	}
 
+	.toolbar__import-button,
 	.toolbar__export-button {
 		border: 1px solid var(--ink-border);
 		background: var(--ink-canvas);
@@ -841,9 +885,16 @@
 		transition-duration: 0.2s;
 	}
 
+	.toolbar__import-button:hover,
 	.toolbar__export-button:hover {
 		background: var(--ink-surface-hover);
 		border-color: var(--ink-text-muted);
+	}
+
+	.toolbar__import-button:disabled,
+	.toolbar__export-button:disabled {
+		cursor: wait;
+		opacity: 0.55;
 	}
 
 	.toolbar__export-menu {
@@ -885,6 +936,12 @@
 	.toolbar__menu-item:focus {
 		outline: 2px solid var(--ink-accent);
 		outline-offset: -2px;
+	}
+
+	.toolbar__menu-separator {
+		height: 1px;
+		margin: 0.25rem 0;
+		background: var(--ink-border);
 	}
 
 	.toolbar__brand {

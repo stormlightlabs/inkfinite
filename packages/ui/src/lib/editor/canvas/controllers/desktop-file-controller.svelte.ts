@@ -103,6 +103,11 @@ export class DesktopFileController {
 		}
 	};
 
+	markImported = async () => {
+		this.isDraft = false;
+		await this.refreshBoards();
+	};
+
 	handleRecentSelect = async (boardId: string) => {
 		const repo = this.getRepo();
 		const desktopRepo = this.getDesktopRepo();

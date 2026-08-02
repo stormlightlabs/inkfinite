@@ -1,32 +1,67 @@
 <svelte:head>
 	<title>File Format · Inkfinite documentation</title>
-	<meta name="description" content="An outline of Inkfinite's native files and stable exports." />
+	<meta
+		name="description"
+		content="Inkfinite native files, editable canvas interchange, compatibility limits, and lossless exports." />
 </svelte:head>
 
-# File Format
+# File format
 
-Understand native `.inkfinite` files and the formats Inkfinite can export.
+Inkfinite uses `.inkfinite` as its native document format. The editor can also import and export Excalidraw and Obsidian Canvas files when you need to move editable content between applications.
 
 <h2 id="native-files">Native files</h2>
 
-*todo*
+A canonical `.inkfinite` file contains the document and its Automerge change history. Keep this file as the source of truth when you expect to continue editing in Inkfinite.
 
-<h2 id="versions-and-compatibility">Versions and compatibility</h2>
+The desktop app protects native writes with a file lock, atomic replacement, and recovery data. The web app stores the same editor projection in IndexedDB.
 
-*todo*
+Opening and saving native files is separate from editable-format import and export. Importing an external file creates a new Inkfinite document. Exporting does not change the current document's native path or saved state.
 
-<h2 id="exports">exports</h2>
+<h2 id="editable-interchange">Editable interchange</h2>
 
-*todo*
+Use **Import** in the editor toolbar to select an Excalidraw `.excalidraw` file or an Obsidian Canvas `.canvas` file. Use **Export** to write the current page in either format. The desktop app offers the same commands in its File menu.
 
-<h3 id="json-exports">JSON</h3>
+Imports are limited to 16 MB of UTF-8 JSON. Inkfinite rejects malformed geometry and duplicate identifiers instead of guessing at corrupt data. It omits edges and bindings that refer to missing or unsupported shapes and includes them in the conversion notes.
 
-*todo*
+Both formats describe one canvas, so Inkfinite imports them as a one-page document and exports only the selected page. An export reports this when the source document contains more than one page.
 
-<h3 id="svg-exports">SVG</h3>
+<h2 id="excalidraw">Excalidraw</h2>
 
-*todo*
+Inkfinite reads and writes Excalidraw v2 scene JSON. The converter handles rectangles, ellipses, lines, arrows, text, freehand strokes, groups, frames, arrow bindings, and arrow labels.
 
-<h2 id="recovery">Recovery</h2>
+| Excalidraw content               | Inkfinite result                                     |
+| -------------------------------- | ---------------------------------------------------- |
+| Rectangle, ellipse, text         | Matching editable shape                              |
+| Line or arrow                    | Matching line or arrow; extra line vertices are lost |
+| Bound arrow and label            | Arrow bindings and label                             |
+| Freedraw                         | Freehand stroke                                      |
+| Group or frame                   | Flat Inkfinite group                                 |
+| Embeddable URL                   | Markdown link card                                   |
+| Markdown exported from Inkfinite | Literal Excalidraw text                              |
+| Image, iframe, or diamond        | Omitted with a conversion note                       |
 
-*todo*
+Excalidraw's rough rendering, fill patterns, canvas settings, nested group hierarchy, some arrowhead styles, and exact font metrics do not have Inkfinite equivalents. Inkfinite converts rotation around Excalidraw's center-based origin into its own top-left transform so rotated supported shapes keep their placement.
+
+Embedded Excalidraw images remain unsupported until Inkfinite has an editable image shape. The importer reports both omitted image elements and embedded file data.
+
+<h2 id="obsidian-canvas">Obsidian Canvas</h2>
+
+Inkfinite implements the JSON Canvas 1.0 structure used by Obsidian `.canvas` files.
+
+| JSON Canvas content | Inkfinite result                                    |
+| ------------------- | --------------------------------------------------- |
+| Text node           | Markdown card                                       |
+| File node           | Markdown wiki link                                  |
+| Link node           | Markdown link                                       |
+| Group node          | Flat Inkfinite group; label and background are lost |
+| Edge between nodes  | Bound Inkfinite arrow                               |
+
+JSON Canvas does not represent general drawing primitives, freehand strokes, layers, rotation, or free-floating arrows. When exporting, Inkfinite writes text and Markdown as cards, bound arrows as edges, and groups around supported cards. Other drawing shapes are omitted and listed in the conversion notes. Rotated cards use their axis-aligned bounds.
+
+File nodes refer to paths in an Obsidian vault. Inkfinite preserves those references as Markdown links but does not copy or resolve the target attachments.
+
+<h2 id="image-and-svg-exports">Image and SVG exports</h2>
+
+PNG and SVG are presentation exports rather than editable interchange formats. PNG captures the current viewport. SVG can export the selected shapes or all shapes on the current page.
+
+Use `.inkfinite`, `.excalidraw`, or `.canvas` when another editor needs to continue working with individual objects.

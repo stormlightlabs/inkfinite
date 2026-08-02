@@ -1,4 +1,4 @@
-import { Vec2 } from "./math";
+import { clamp, Vec2 } from "./math";
 
 /**
  * Camera represents the viewport into the infinite canvas
@@ -108,7 +108,7 @@ export const Camera = {
    * @returns Camera with clamped zoom
    */
   clampZoom(camera: Camera, minZoom = 0.1, maxZoom = 10): Camera {
-    const clampedZoom = Math.max(minZoom, Math.min(maxZoom, camera.zoom));
+    const clampedZoom = clamp(camera.zoom, minZoom, maxZoom);
 
     if (clampedZoom === camera.zoom) {
       return camera;

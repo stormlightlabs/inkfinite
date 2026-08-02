@@ -7,7 +7,7 @@ import {
 	resolveArrowEndpoints,
 	shapeBounds
 } from '../geom';
-import { Box2, type Vec2, Vec2 as Vec2Ops } from '../math';
+import { Box2, clamp, type Vec2, Vec2 as Vec2Ops } from '../math';
 import { BindingRecord, ShapeRecord } from '../model';
 import { EditorState, getCurrentPage, getInteractiveShapesOnCurrentPage, type ToolId } from '../reactivity';
 import type { Tool } from './base';
@@ -652,44 +652,43 @@ export class SelectTool implements Tool {
 		let minY = bounds.min.y;
 		let maxY = bounds.max.y;
 
-		const clampX = (value: number) => Math.min(Math.max(value, -1e6), 1e6);
-		const clampY = (value: number) => Math.min(Math.max(value, -1e6), 1e6);
+		const clampCoordinate = (value: number) => clamp(value, -1e6, 1e6);
 
 		switch (handle) {
 			case 'nw': {
-				minX = Math.min(clampX(pointer.x), maxX - MIN_RESIZE_SIZE);
-				minY = Math.min(clampY(pointer.y), maxY - MIN_RESIZE_SIZE);
+				minX = Math.min(clampCoordinate(pointer.x), maxX - MIN_RESIZE_SIZE);
+				minY = Math.min(clampCoordinate(pointer.y), maxY - MIN_RESIZE_SIZE);
 				break;
 			}
 			case 'n': {
-				minY = Math.min(clampY(pointer.y), maxY - MIN_RESIZE_SIZE);
+				minY = Math.min(clampCoordinate(pointer.y), maxY - MIN_RESIZE_SIZE);
 				break;
 			}
 			case 'ne': {
-				maxX = Math.max(clampX(pointer.x), minX + MIN_RESIZE_SIZE);
-				minY = Math.min(clampY(pointer.y), maxY - MIN_RESIZE_SIZE);
+				maxX = Math.max(clampCoordinate(pointer.x), minX + MIN_RESIZE_SIZE);
+				minY = Math.min(clampCoordinate(pointer.y), maxY - MIN_RESIZE_SIZE);
 				break;
 			}
 			case 'e': {
-				maxX = Math.max(clampX(pointer.x), minX + MIN_RESIZE_SIZE);
+				maxX = Math.max(clampCoordinate(pointer.x), minX + MIN_RESIZE_SIZE);
 				break;
 			}
 			case 'se': {
-				maxX = Math.max(clampX(pointer.x), minX + MIN_RESIZE_SIZE);
-				maxY = Math.max(clampY(pointer.y), minY + MIN_RESIZE_SIZE);
+				maxX = Math.max(clampCoordinate(pointer.x), minX + MIN_RESIZE_SIZE);
+				maxY = Math.max(clampCoordinate(pointer.y), minY + MIN_RESIZE_SIZE);
 				break;
 			}
 			case 's': {
-				maxY = Math.max(clampY(pointer.y), minY + MIN_RESIZE_SIZE);
+				maxY = Math.max(clampCoordinate(pointer.y), minY + MIN_RESIZE_SIZE);
 				break;
 			}
 			case 'sw': {
-				minX = Math.min(clampX(pointer.x), maxX - MIN_RESIZE_SIZE);
-				maxY = Math.max(clampY(pointer.y), minY + MIN_RESIZE_SIZE);
+				minX = Math.min(clampCoordinate(pointer.x), maxX - MIN_RESIZE_SIZE);
+				maxY = Math.max(clampCoordinate(pointer.y), minY + MIN_RESIZE_SIZE);
 				break;
 			}
 			case 'w': {
-				minX = Math.min(clampX(pointer.x), maxX - MIN_RESIZE_SIZE);
+				minX = Math.min(clampCoordinate(pointer.x), maxX - MIN_RESIZE_SIZE);
 				break;
 			}
 		}

@@ -8,7 +8,7 @@
 	import ProposalReview from '../components/ProposalReview.svelte';
 	import ProposalGhostLayer from '../components/ProposalGhostLayer.svelte';
 	import NavigationControls from './NavigationControls.svelte';
-	import { ContextMenu, type ContextMenuEntry } from '../../index';
+	import { Button, ContextMenu, Dialog, type ContextMenuEntry } from '../../index';
 	import { createCanvasController } from './canvas-store.svelte';
 	import { draggingStencil, endDrag } from '../dnd.svelte';
 	import type { EditorPlatformAdapter } from '../platform';
@@ -41,6 +41,7 @@
 	let marqueeRect = $derived(c.marqueeRect());
 	let liveProposal = $derived(c.proposal());
 	let proposalMessage = $derived(c.proposalMessage());
+	let interchangeNotice = $derived(c.interchangeNotice());
 
 	$effect(() => {
 		c.setCanvasRef(canvasEl);
@@ -190,7 +191,10 @@
 		onStencilsClick={handleStencilsClick}
 		store={c.store}
 		canvas={canvasEl ?? undefined}
-		brushStore={c.brushStore} />
+		brushStore={c.brushStore}
+		onImportEditable={c.importEditableCanvas}
+		onExportEditable={c.exportEditableCanvas}
+		interchangeBusy={c.interchangeBusy()} />
 	<div
 		class="canvas-container"
 		ondragover={(e) => {
@@ -329,6 +333,30 @@
 		bind:open={c.stencilPaletteOpen}
 		onClose={() => (c.stencilPaletteOpen = false)}
 		onStencilClick={handleInsertStencilAtCenter} />
+	<Dialog
+		open={Boolean(interchangeNotice)}
+		onClose={c.closeInterchangeNotice}
+		title={interchangeNotice?.title}>
+		{#if interchangeNotice}
+			<div class="interchange-notice" data-error={interchangeNotice.error}>
+				<h2>{interchangeNotice.title}</h2>
+				<p>{interchangeNotice.message}</p>
+				{#if interchangeNotice.warnings.length > 0}
+					<h3>Conversion notes</h3>
+					<ul>
+						{#each interchangeNotice.warnings as warning (warning.code)}
+							<li>
+								{warning.message}{warning.count > 1 ? ` (${warning.count})` : ''}
+							</li>
+						{/each}
+					</ul>
+				{/if}
+				<div class="interchange-notice__actions">
+					<Button variant="primary" onclick={c.closeInterchangeNotice}>Close</Button>
+				</div>
+			</div>
+		{/if}
+	</Dialog>
 </div>
 
 <style>
@@ -356,6 +384,41 @@
 			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M4 2.75 22.2 16.1l-8.05 1.15 4.2 7.25-4.2 2.4-4.05-7.2-5.35 6.1z' fill='%23171928' stroke='%2388edc4' stroke-width='2.25' stroke-linejoin='round'/%3E%3C/svg%3E")
 				4 3,
 			default;
+	}
+
+	.interchange-notice {
+		width: min(32rem, calc(100vw - 3rem));
+		padding: var(--ink-space-6);
+	}
+
+	.interchange-notice h2,
+	.interchange-notice h3 {
+		margin: 0;
+	}
+
+	.interchange-notice h2 {
+		font: 700 var(--ink-type-xl) / 1.15 var(--ink-font-body);
+	}
+
+	.interchange-notice h3 {
+		margin-top: var(--ink-space-5);
+		font: 700 var(--ink-type-sm) / 1.3 var(--ink-font-body);
+	}
+
+	.interchange-notice p,
+	.interchange-notice li {
+		line-height: 1.5;
+	}
+
+	.interchange-notice ul {
+		margin: var(--ink-space-2) 0 0;
+		padding-left: 1.25rem;
+	}
+
+	.interchange-notice__actions {
+		display: flex;
+		justify-content: flex-end;
+		margin-top: var(--ink-space-6);
 	}
 
 	.canvas-text-editor {

@@ -8,6 +8,9 @@ pub const FILE_MENU_EVENT: &str = "inkfinite-file-menu";
 const NEW_BOARD: &str = "file.new-board";
 const OPEN_BOARD: &str = "file.open-board";
 const SAVE_BOARD_AS: &str = "file.save-board-as";
+const IMPORT_CANVAS: &str = "file.import-canvas";
+const EXPORT_EXCALIDRAW: &str = "file.export-excalidraw";
+const EXPORT_JSON_CANVAS: &str = "file.export-json-canvas";
 
 /// Builds the platform-standard menu with Inkfinite document commands added to File.
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
@@ -20,9 +23,26 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     if let Some(file_menu) = file_menu {
         let new_board = MenuItem::with_id(app, NEW_BOARD, "New Board", true, Some("CmdOrCtrl+N"))?;
         let open_board = MenuItem::with_id(app, OPEN_BOARD, "Open…", true, Some("CmdOrCtrl+O"))?;
+        let import_canvas = MenuItem::with_id(app, IMPORT_CANVAS, "Import Editable Canvas…", true, None::<&str>)?;
         let save_board_as = MenuItem::with_id(app, SAVE_BOARD_AS, "Save As…", true, Some("CmdOrCtrl+Shift+S"))?;
+        let export_excalidraw = MenuItem::with_id(app, EXPORT_EXCALIDRAW, "Export as Excalidraw…", true, None::<&str>)?;
+        let export_json_canvas = MenuItem::with_id(
+            app,
+            EXPORT_JSON_CANVAS,
+            "Export as Obsidian Canvas…",
+            true,
+            None::<&str>,
+        )?;
         let separator = PredefinedMenuItem::separator(app)?;
-        let items: [&dyn IsMenuItem<R>; 4] = [&new_board, &open_board, &save_board_as, &separator];
+        let items: [&dyn IsMenuItem<R>; 7] = [
+            &new_board,
+            &open_board,
+            &import_canvas,
+            &save_board_as,
+            &export_excalidraw,
+            &export_json_canvas,
+            &separator,
+        ];
         file_menu.insert_items(&items, 0)?;
         log::info!("installed native File menu commands");
     } else {
@@ -39,6 +59,9 @@ pub fn handle_event<R: Runtime>(app: &AppHandle<R>, event: tauri::menu::MenuEven
         NEW_BOARD => "new",
         OPEN_BOARD => "open",
         SAVE_BOARD_AS => "save-as",
+        IMPORT_CANVAS => "import",
+        EXPORT_EXCALIDRAW => "export-excalidraw",
+        EXPORT_JSON_CANVAS => "export-json-canvas",
         _ => return,
     };
     log::info!("native File menu selected: id={menu_id}, action={action}");
