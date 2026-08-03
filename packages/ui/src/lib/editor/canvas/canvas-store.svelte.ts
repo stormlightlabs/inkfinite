@@ -100,6 +100,7 @@ export function createCanvasController(
 	const initialLayer = LayerRecord.create(initialPage.id, 'Default');
 	const handleResize = () => {
 		overlayViewport = measureViewport(canvas);
+		camera.refit();
 		if (marqueeBounds) {
 			updateMarquee(marqueeBounds);
 		}
@@ -270,7 +271,7 @@ export function createCanvasController(
 		platformSession?.setActiveBoard?.(boardId);
 	}
 
-	function applyLoadedDoc(doc: LoadedDoc) {
+	function applyLoadedDoc(doc: LoadedDoc, fitDrawing = false) {
 		const firstPageId = doc.order.pageIds[0] ?? Object.keys(doc.pages)[0] ?? null;
 		store.setState((state) => ({
 			...state,
@@ -282,6 +283,9 @@ export function createCanvasController(
 			},
 			ui: { ...state.ui, currentPageId: firstPageId, selectionIds: [] }
 		}));
+		if (fitDrawing) {
+			camera.fitAll();
+		}
 	}
 
 	const handleMarqueeChange = (bounds: Box2 | null) => void updateMarquee(bounds);
@@ -346,7 +350,7 @@ export function createCanvasController(
 		() => desktopRepo,
 		(boardId, doc) => {
 			setActiveBoardId(boardId);
-			applyLoadedDoc(doc);
+			applyLoadedDoc(doc, true);
 		},
 		() => sink?.flush() ?? Promise.resolve()
 	);
@@ -354,7 +358,7 @@ export function createCanvasController(
 		() => repo,
 		(boardId, doc) => {
 			setActiveBoardId(boardId);
-			applyLoadedDoc(doc);
+			applyLoadedDoc(doc, true);
 		},
 		() => platformSession?.inspectBoard,
 		() => sink?.flush() ?? Promise.resolve()
@@ -411,6 +415,13 @@ export function createCanvasController(
 		if (camera.handleAction(action)) {
 			return;
 		}
+		if (
+			action.type === 'pointer-down' &&
+			(action.button === 1 ||
+				(action.button === 0 && runtime.getInteractionState().spaceHeld))
+		) {
+			camera.cancelFit();
+		}
 
 		runtime.handleAction(action);
 	}
@@ -436,7 +447,7 @@ export function createCanvasController(
 			const boardId = await repo.importBoard(imported.snapshot);
 			const doc = await repo.loadDoc(boardId);
 			setActiveBoardId(boardId);
-			applyLoadedDoc(doc);
+			applyLoadedDoc(doc, true);
 			await desktop.markImported();
 			interchangeNotice = {
 				title: 'Import complete',
@@ -628,6 +639,7 @@ export function createCanvasController(
 			});
 			unsubscribeLiveDocument = desktopRepo.subscribeLiveDocument(applyLoadedDoc);
 			unsubscribeAgentUi = desktopRepo.subscribeAgentUi((control) => {
+				if (control.camera) camera.cancelFit();
 				store.setState((state) => ({
 					...state,
 					camera: control.camera ?? state.camera,
@@ -740,6 +752,7 @@ export function createCanvasController(
 		persistenceStatusStore: () => persistenceStatusStore,
 		snapStore,
 		brushStore,
+		viewport: () => overlayViewport,
 		setCanvasRef,
 		marqueeRect: () => marqueeRect,
 		proposal: () => proposal,

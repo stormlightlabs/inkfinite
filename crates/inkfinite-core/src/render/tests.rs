@@ -666,3 +666,11 @@ fn invalid_page_and_region_are_typed_errors() {
         Err(SvgRenderError::InvalidRegion)
     );
 }
+
+#[test]
+fn wrapped_text_preserves_explicit_and_blank_lines() {
+    assert_eq!(
+        wrap_text("Overview\n\nIncidents", 200.0, 16.0),
+        ["Overview", "", "Incidents"]
+    );
+}

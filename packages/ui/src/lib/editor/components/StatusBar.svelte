@@ -4,9 +4,10 @@
 		CursorStore,
 		EditorState,
 		PersistenceStatus,
-		Store
+		Store,
+		Viewport
 	} from '@inkfinite/core';
-	import { EditorState as EditorStateOps, buildStatusBarVM } from '@inkfinite/core';
+	import { Camera, EditorState as EditorStateOps, buildStatusBarVM } from '@inkfinite/core';
 	import Dialog from '../../components/Dialog.svelte';
 	import Icon from '../../components/Icon.svelte';
 	import { HELP_LINKS, KEYBOARD_TIPS } from '../constants';
@@ -19,6 +20,7 @@
 		cursor: CursorStore;
 		persistence: StatusStore;
 		snap: SnapStore;
+		viewport?: Viewport;
 		platform?: EditorPlatform;
 		draft?: boolean;
 		onOpenBrowser?: () => void;
@@ -30,6 +32,7 @@
 		cursor,
 		persistence,
 		snap,
+		viewport = { width: 1, height: 1 },
 		platform = 'web',
 		draft = false,
 		onOpenBrowser,
@@ -39,6 +42,7 @@
 	let infoOpen = $state(false);
 
 	let editorSnapshot: EditorState = EditorStateOps.create();
+	let cameraSnapshot = $state(Camera.create());
 	let cursorSnapshot: CursorState = { cursorWorld: { x: 0, y: 0 }, lastMoveAt: Date.now() };
 	let persistenceSnapshot: PersistenceStatus = {
 		backend: 'indexeddb',
@@ -59,9 +63,11 @@
 	$effect(() => {
 		const currentStore = store;
 		editorSnapshot = currentStore.getState();
+		cameraSnapshot = { ...editorSnapshot.camera };
 		updateVm();
 		const unsubscribe = currentStore.subscribe((state) => {
 			editorSnapshot = state;
+			cameraSnapshot = { ...state.camera };
 			updateVm();
 		});
 		return () => unsubscribe();
@@ -102,6 +108,10 @@
 
 	function formatCursorCoord(value: number): string {
 		return Math.round(value).toString();
+	}
+
+	function viewportOrigin(): { x: number; y: number } {
+		return Camera.getViewportBounds(cameraSnapshot, viewport).min;
 	}
 
 	function formatSelection(): string {
@@ -164,6 +174,15 @@
 			{formatCursorCoord(statusVm.cursorWorld.x)}, {formatCursorCoord(
 				statusVm.cursorWorld.y
 			)}
+		</span>
+	</div>
+
+	<div
+		class="status-bar__section"
+		title="World-space viewport origin. Pan with a trackpad, middle-drag, or Space-drag.">
+		<span class="status-bar__label">Viewport</span>
+		<span class="status-bar__value">
+			{formatCursorCoord(viewportOrigin().x)}, {formatCursorCoord(viewportOrigin().y)}
 		</span>
 	</div>
 
@@ -274,7 +293,7 @@
 <style>
 	.status-bar {
 		display: grid;
-		grid-template-columns: repeat(4, minmax(120px, 1fr)) auto auto;
+		grid-template-columns: repeat(5, minmax(110px, 1fr)) auto auto;
 		gap: 1.5rem;
 		padding: 0.5rem 0.75rem;
 		background: var(--ink-surface-raised);

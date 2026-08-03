@@ -64,11 +64,6 @@
 	});
 
 	function handleDrop(e: DragEvent) {
-		console.log('[Canvas] Drop event detected', {
-			clientX: e.clientX,
-			clientY: e.clientY,
-			dataTransferTypes: e.dataTransfer?.types
-		});
 		e.preventDefault();
 
 		let stencil = draggingStencil.current;
@@ -76,15 +71,11 @@
 		if (!stencil && e.dataTransfer) {
 			const stencilId = e.dataTransfer.getData('application/x-inkfinite-stencil');
 			if (stencilId) {
-				console.log('[Canvas] Recovering stencil from dataTransfer:', stencilId);
 				stencil = stencils.registry.get(stencilId) ?? null;
 			}
 		}
 
-		console.log('[Canvas] Dragging stencil state:', stencil);
-
 		if (!stencil || !canvasEl) {
-			console.warn('[Canvas] Drop ignored - missing stencil or canvas ref');
 			return;
 		}
 
@@ -93,7 +84,6 @@
 		const viewport = c.getViewport();
 		const world = Camera.screenToWorld(c.store.getState().camera, screen, viewport);
 
-		console.log('[Canvas] Inserting stencil at:', world);
 		c.insertStencil(stencil, world);
 		endDrag();
 	}
@@ -104,7 +94,6 @@
 
 	// TODO: close palette on click? Users might want to add multiple.
 	function handleInsertStencilAtCenter(stencil: stencils.Stencil) {
-		console.log('[Canvas] Click insert stencil:', stencil.id);
 		const viewport = c.getViewport();
 		const screen = { x: viewport.width / 2, y: viewport.height / 2 };
 		const world = Camera.screenToWorld(c.store.getState().camera, screen, viewport);
@@ -317,6 +306,7 @@
 		cursor={c.cursorStore}
 		persistence={persistenceStatusStore}
 		snap={c.snapStore}
+		viewport={c.viewport()}
 		platform={platformKind}
 		draft={c.desktop.isDraft}
 		onOpenBrowser={c.fileBrowser.handleOpen}

@@ -29,7 +29,8 @@ Follow this order for every change:
    again and rebuilding the transaction from current state.
 7. Apply the file-mode change, or add `--app` to follow the desktop session's
    current Review or Direct access mode.
-8. Validate the resulting document and render the affected view or role.
+8. Validate the resulting document and render the affected view or role. Use
+   PNG when the agent needs to inspect the result visually.
 
 In short: inspect heads → narrow query → minimal transaction → dry-run in file
 mode → resolve → submit → validate → render.
@@ -77,8 +78,8 @@ precondition, not decoration.
 - Proposal decisions belong to the desktop UI. Use `app proposal status` for
   one check or `app proposal wait` to wait for the user's decision.
 - Use `app proposal renew` when a still-valid proposal needs a fresh review
-  window. Use `app render` to compare current and proposed SVGs without applying
-  the transaction.
+  window. Use `app render` with a `.svg` or `.png` output to compare the current
+  and proposed result without applying the transaction.
 - Use `app ui` only for transient page, layer, selection, or camera navigation.
   It does not authorize a document edit.
 - Only the desktop UI can enable Direct mode. Never try to change or bypass the

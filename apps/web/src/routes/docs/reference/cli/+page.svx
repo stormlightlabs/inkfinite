@@ -20,7 +20,7 @@ commands are:
 | `validate` | Load and validate a canonical document |
 | `shape`, `connect`, `layout` | Build a structured file or live desktop edit |
 | `apply` | Validate and apply a transaction draft from JSON |
-| `render` | Write a deterministic SVG of a document or filtered view |
+| `render` | Write an SVG or PNG of a document or filtered view |
 | `app` | Inspect or work with a running desktop session |
 | `schema`, `capabilities` | Print machine-readable contracts for integrations |
 
@@ -89,6 +89,20 @@ structured command then commits immediately. The setting lasts only while that d
 and the CLI cannot enable it. `app propose` always requests review, even in Direct mode.
 
 `app apply` sends a prepared transaction directly and works only while **Apply directly** is enabled.
+
+<h2 id="rendering">Rendering</h2>
+
+The output extension selects SVG or PNG. The same options work for a closed file and a live desktop
+session:
+
+```sh
+inkfinite render architecture.inkfinite --output architecture.svg
+inkfinite render architecture.inkfinite --output architecture.png
+inkfinite app render --output current.png
+```
+
+Use `--region x,y,width,height` for an exact world-space crop. Live rendering can also write a
+proposed result with `--transaction` and `--proposed-output` without changing the open document.
 
 <h2 id="output-format">Output format</h2>
 

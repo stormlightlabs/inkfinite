@@ -12,6 +12,7 @@ use super::args::{
     AppApplyArgs, AppCommand, AppInspectArgs, AppProposalCommand, AppProposalWaitArgs, AppProposeArgs, AppQueryArgs,
     AppRenderArgs, AppUiArgs,
 };
+use super::render::render_output_bytes;
 use super::support::{map_output_error, portable_path, write_heads, write_json};
 use super::{CliError, EXIT_CONFLICT, EXIT_INPUT, EXIT_INVALID, Result, Write, anyhow, fs, json};
 
@@ -107,9 +108,9 @@ fn render(args: AppRenderArgs, json_output: bool, stdout: &mut dyn Write) -> Res
     let AppResponse::Rendered(rendered) = response else {
         return unexpected_response("render");
     };
-    write_svg_output(&args.output, &rendered.current_svg)?;
+    write_render_output(&args.output, &rendered.current_svg)?;
     if let (Some(path), Some(svg)) = (args.proposed_output.as_deref(), rendered.proposed_svg.as_deref()) {
-        write_svg_output(path, svg)?;
+        write_render_output(path, svg)?;
     }
     if json_output {
         write_json(
@@ -132,7 +133,8 @@ fn render(args: AppRenderArgs, json_output: bool, stdout: &mut dyn Write) -> Res
     }
 }
 
-fn write_svg_output(path: &std::path::Path, svg: &str) -> Result<()> {
+fn write_render_output(path: &std::path::Path, svg: &str) -> Result<()> {
+    let bytes = render_output_bytes(path, svg)?;
     let mut file = fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -145,7 +147,7 @@ fn write_svg_output(path: &std::path::Path, svg: &str) -> Result<()> {
             .with_code("render_output_error")
             .context(format!("could not create {}", portable_path(path)))
         })?;
-    file.write_all(svg.as_bytes()).map_err(|error| {
+    file.write_all(&bytes).map_err(|error| {
         CliError::new(EXIT_INPUT, error)
             .with_code("render_output_error")
             .context(format!("could not write {}", portable_path(path)))

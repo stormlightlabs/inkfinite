@@ -132,7 +132,7 @@
 		currentTool !== 'pen' && (getSelectedShapes(editorState).length > 0 || hasArrowSelection)
 	);
 
-	let position = $state({ x: 20, y: 20 });
+	let position = $state({ x: 12, y: 12 });
 	let isDragging = $state(false);
 	let dragOffset = $state({ x: 0, y: 0 });
 	let toolbarEl = $state<HTMLElement | null>(null);
@@ -157,6 +157,7 @@
 	});
 
 	function handleDragStart(event: PointerEvent) {
+		if (event.button !== 0) return;
 		isDragging = true;
 		dragOffset = { x: event.clientX - position.x, y: event.clientY - position.y };
 
@@ -167,20 +168,42 @@
 
 	function handleDragMove(event: PointerEvent) {
 		if (!isDragging) return;
+		moveToolbar(event.clientX - dragOffset.x, event.clientY - dragOffset.y);
+	}
+
+	function moveToolbar(x: number, y: number) {
 		const width = toolbarEl?.offsetWidth ?? 0;
 		const height = toolbarEl?.offsetHeight ?? 0;
 		const maxX = Math.max(8, window.innerWidth - width - 8);
 		const maxY = Math.max(8, window.innerHeight - height - 8);
-		position = {
-			x: Math.min(maxX, Math.max(8, event.clientX - dragOffset.x)),
-			y: Math.min(maxY, Math.max(8, event.clientY - dragOffset.y))
-		};
+		position = { x: Math.min(maxX, Math.max(8, x)), y: Math.min(maxY, Math.max(8, y)) };
 	}
 
 	function handleDragEnd(event: PointerEvent) {
+		if (!isDragging) return;
 		isDragging = false;
 		if (typeof document !== 'undefined') document.body.style.userSelect = '';
-		(event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+		const handle = event.currentTarget as HTMLElement;
+		if (handle.hasPointerCapture(event.pointerId))
+			handle.releasePointerCapture(event.pointerId);
+	}
+
+	function handleDragKeyDown(event: KeyboardEvent) {
+		const distance = event.shiftKey ? 10 : 1;
+		if (event.key === 'Home') {
+			position = { x: 12, y: 12 };
+		} else if (event.key === 'ArrowLeft') {
+			moveToolbar(position.x - distance, position.y);
+		} else if (event.key === 'ArrowRight') {
+			moveToolbar(position.x + distance, position.y);
+		} else if (event.key === 'ArrowUp') {
+			moveToolbar(position.x, position.y - distance);
+		} else if (event.key === 'ArrowDown') {
+			moveToolbar(position.x, position.y + distance);
+		} else {
+			return;
+		}
+		event.preventDefault();
 	}
 
 	function handleToolClick(toolId: ToolId) {
@@ -468,7 +491,10 @@
 		onpointerdown={handleDragStart}
 		onpointermove={handleDragMove}
 		onpointerup={handleDragEnd}
+		onpointercancel={handleDragEnd}
+		onkeydown={handleDragKeyDown}
 		aria-label="Drag toolbar"
+		title="Move toolbar (arrow keys; Home resets)"
 		role="button"
 		tabindex="0">
 		<Icon name="grip-vertical" size={16} />
@@ -491,7 +517,7 @@
 				rel="noreferrer">Stormlight Labs</a>
 		</div>
 	</div>
-	<div class="toolbar__divider"></div>
+	<div class="toolbar__divider toolbar__brand-divider"></div>
 	{#each TOOLS as tool (`${tool.id}:${tool.label}`)}
 		<div class="toolbar__tool-slot">
 			<button
@@ -676,10 +702,10 @@
 		gap: var(--ink-space-2);
 		width: max-content;
 		max-width: calc(100vw - 2.5rem);
-		padding: var(--ink-space-2);
+		padding: 0.375rem;
 		background: color-mix(in srgb, var(--ink-surface-raised) 94%, transparent);
 		border: 1px solid color-mix(in srgb, var(--ink-border) 64%, transparent);
-		border-radius: var(--ink-radius-panel);
+		border-radius: 0.75rem;
 		align-items: center;
 		box-shadow:
 			0 1px 0 color-mix(in srgb, white 9%, transparent) inset,
@@ -704,8 +730,9 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 32px;
+		width: 28px;
 		min-height: 40px;
+		border-radius: 0.4rem;
 		cursor: grab;
 		color: var(--ink-text-muted);
 		opacity: 0.5;
@@ -716,6 +743,13 @@
 	.toolbar__drag-handle:hover {
 		opacity: 1;
 		color: var(--ink-text);
+		background: var(--ink-surface-hover);
+	}
+
+	.toolbar__drag-handle:focus-visible {
+		opacity: 1;
+		outline: 2px solid var(--ink-focus);
+		outline-offset: 1px;
 	}
 
 	.toolbar[data-dragging='true'] .toolbar__drag-handle {
@@ -1016,30 +1050,70 @@
 	}
 
 	@media (max-width: 1320px) {
+		.toolbar__brand,
+		.toolbar__brand-divider,
 		.toolbar__tool-label,
 		.toolbar__tagline {
 			display: none;
 		}
 
 		.toolbar__tool-button {
-			min-width: 44px;
-			min-height: 44px;
-			padding: var(--ink-space-2);
+			min-width: 42px;
+			min-height: 42px;
+			padding: var(--ink-space-1);
 			justify-content: center;
 		}
 
 		.toolbar__context-panel {
 			left: 0;
-			overflow-x: auto;
+			width: min(22rem, calc(100vw - 1rem));
+			max-width: none;
+			align-items: stretch;
+			flex-direction: column;
+			gap: var(--ink-space-2);
+			padding: var(--ink-space-2);
 			translate: 0 0;
 		}
 
-		.toolbar__brand {
-			margin-right: 0;
+		.toolbar__colors {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: var(--ink-space-2);
+		}
+
+		.toolbar__color-control,
+		.toolbar__opacity-control {
+			display: grid;
+			grid-template-columns: auto 1fr auto;
+			align-items: center;
+			gap: var(--ink-space-1);
+			min-width: 0;
+			text-align: left;
+		}
+
+		.toolbar__opacity-control input {
+			min-width: 0;
+			width: 100%;
+		}
+
+		.toolbar__opacity-control output {
+			min-width: 2.4rem;
+		}
+
+		.toolbar__agent-control {
+			min-height: 2rem;
+			padding: 0;
 		}
 
 		.toolbar {
 			gap: var(--ink-space-1);
+		}
+
+		.toolbar__import-button,
+		.toolbar__export-button {
+			height: 42px;
+			min-width: 60px;
+			padding: 0 var(--ink-space-2);
 		}
 	}
 

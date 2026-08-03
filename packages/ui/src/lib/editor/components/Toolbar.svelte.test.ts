@@ -35,6 +35,23 @@ describe('Editor Toolbar', () => {
 			.toHaveStyle({ flexWrap: 'nowrap' });
 	});
 
+	it('moves the floating toolbar from its accessible drag handle', async () => {
+		const screen = render(Toolbar, {
+			currentTool: 'select',
+			onToolChange: vi.fn(),
+			store: new Store(),
+			brushStore: createBrushStore()
+		});
+		const toolbar = screen.getByRole('toolbar', { name: 'Drawing tools' }).element();
+		const handle = screen.getByRole('button', { name: 'Drag toolbar' }).element();
+
+		handle.dispatchEvent(
+			new KeyboardEvent('keydown', { key: 'ArrowLeft', shiftKey: true, bubbles: true })
+		);
+
+		await vi.waitFor(() => expect(toolbar.style.left).toBe('8px'));
+	});
+
 	it('offers editable canvas import and export actions', async () => {
 		const onImportEditable = vi.fn();
 		const onExportEditable = vi.fn();

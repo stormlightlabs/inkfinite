@@ -428,4 +428,15 @@
 		background: transparent;
 		color: color-mix(in srgb, var(--ink-text) 68%, transparent);
 	}
+
+	@media (max-width: 120rem) {
+		.agent-access {
+			top: 7.25rem;
+		}
+
+		.proposal-panel,
+		.proposal-message {
+			top: 14rem;
+		}
+	}
 </style>

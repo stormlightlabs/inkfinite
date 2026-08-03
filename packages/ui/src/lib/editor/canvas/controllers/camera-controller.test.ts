@@ -78,4 +78,34 @@ describe('CameraController', () => {
 
 		expect(store.getState().camera).toEqual({ x: 300, y: 300, zoom: 1.8 });
 	});
+
+	it('keeps a fitted drawing framed when the viewport changes size', () => {
+		const page = PageRecord.create('Page', 'page');
+		const shape = ShapeRecord.createRect(
+			page.id,
+			100,
+			200,
+			{ w: 400, h: 200, fill: '#fff', stroke: '#000', radius: 0 },
+			'shape'
+		);
+		const store = new Store();
+		store.setState((state) => ({
+			...state,
+			doc: {
+				...state.doc,
+				pages: { [page.id]: { ...page, shapeIds: [shape.id] } },
+				shapes: { [shape.id]: shape }
+			},
+			ui: { ...state.ui, currentPageId: page.id }
+		}));
+		const fittedViewport = { ...viewport };
+		const controller = new CameraController(store, () => fittedViewport);
+		controller.fitAll();
+
+		fittedViewport.width = 400;
+		fittedViewport.height = 300;
+		controller.refit();
+
+		expect(store.getState().camera).toEqual({ x: 300, y: 300, zoom: 0.8 });
+	});
 });

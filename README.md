@@ -104,6 +104,7 @@ Render a document or a filtered view without opening the desktop app:
 
 ```sh
 inkfinite render architecture.inkfinite --output architecture.svg
+inkfinite render architecture.inkfinite --output architecture.png
 inkfinite render architecture.inkfinite --output services.svg \
   --role architecture.service
 ```
@@ -150,7 +151,7 @@ inkfinite app propose --transaction transaction.json --json
 inkfinite app proposal wait --proposal-id proposal:1 --json
 inkfinite app proposal renew --proposal-id proposal:1 --json
 inkfinite app render --output current.svg --transaction transaction.json \
-  --proposed-output proposed.svg --json
+  --proposed-output proposed.png --json
 inkfinite app ui --page page:1 --layer layer:1 --select shape:service \
   --camera 640,360,1.25 --json
 inkfinite app apply --transaction transaction.json --json
@@ -160,7 +161,8 @@ inkfinite app apply --transaction transaction.json --json
 for operations that the structured commands do not cover. `app apply` works
 only while Direct mode is enabled. `shape create` accepts semantic relative
 placement through `--relative-id`, `--relative-name`, or `--relative-role` with
-`--placement`. Live SVG rendering previews a transaction without changing the
+`--placement`. File and live rendering infer SVG or PNG from the output file
+extension. Live rendering can preview a transaction without changing the
 document. UI control changes only transient editor navigation; it does not edit
 the document or change Agent access.
 

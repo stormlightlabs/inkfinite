@@ -6,6 +6,24 @@ import { createSnapStore, createStatusStore } from '../status';
 import StatusBar from './StatusBar.svelte';
 
 describe('StatusBar', () => {
+	it('shows the world-space viewport origin beside the cursor position', async () => {
+		const store = new Store();
+		store.setState((state) => ({ ...state, camera: { x: 100, y: 200, zoom: 2 } }));
+		const screen = render(StatusBar, {
+			store,
+			cursor: new CursorStore(),
+			persistence: createStatusStore({
+				backend: 'indexeddb',
+				state: 'saved',
+				pendingWrites: 0
+			}),
+			snap: createSnapStore(),
+			viewport: { width: 800, height: 600 }
+		});
+
+		await expect.element(screen.getByText('-100, 50')).toBeInTheDocument();
+	});
+
 	it('updates snapping preferences from accessible controls', async () => {
 		const snap = createSnapStore();
 		const screen = render(StatusBar, {

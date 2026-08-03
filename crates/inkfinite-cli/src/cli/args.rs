@@ -90,7 +90,7 @@ pub enum Command {
     /// Align or distribute shapes through the transaction engine.
     #[command(subcommand)]
     Layout(LayoutCommand),
-    /// Render a canonical document to deterministic SVG.
+    /// Render a canonical document to SVG or PNG.
     #[command(after_help = "Examples:
 
     inkfinite render architecture.inkfinite --output architecture.svg
@@ -445,8 +445,8 @@ pub struct RenderArgs {
     /// Canonical .inkfinite document to render.
     #[arg(value_name = "FILE")]
     pub path: PathBuf,
-    /// Destination SVG file.
-    #[arg(long, value_name = "SVG_FILE")]
+    /// Destination .svg or .png file.
+    #[arg(long, value_name = "OUTPUT_FILE")]
     pub output: PathBuf,
     /// Render one page instead of the first page.
     #[arg(long, value_name = "PAGE_ID")]
@@ -571,11 +571,11 @@ pub enum AppProposalCommand {
 
 #[derive(Debug, Args)]
 pub struct AppRenderArgs {
-    /// Write the current live document SVG here.
-    #[arg(long, value_name = "SVG_FILE")]
+    /// Write the current live document to a .svg or .png file.
+    #[arg(long, value_name = "OUTPUT_FILE")]
     pub output: PathBuf,
-    /// Write the proposed result SVG here. Requires --transaction.
-    #[arg(long, value_name = "SVG_FILE", requires = "transaction")]
+    /// Write the proposed result to a .svg or .png file. Requires --transaction.
+    #[arg(long, value_name = "OUTPUT_FILE", requires = "transaction")]
     pub proposed_output: Option<PathBuf>,
     /// Transaction JSON file, or - for standard input, to preview without applying.
     #[arg(long, value_name = "TRANSACTION", requires = "proposed_output")]
@@ -583,7 +583,7 @@ pub struct AppRenderArgs {
     /// Render this page instead of the first page.
     #[arg(long, value_name = "PAGE_ID")]
     pub page: Option<String>,
-    /// Use this exact world-space SVG view box.
+    /// Use this exact world-space output region.
     #[arg(long, value_name = "X,Y,WIDTH,HEIGHT", value_parser = parse_bounds)]
     pub region: Option<Bounds>,
     /// Render this session, or the only open session when omitted.

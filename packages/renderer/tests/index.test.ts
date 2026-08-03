@@ -18,6 +18,7 @@ describe('Renderer', () => {
 			scale: vi.fn(),
 			translate: vi.fn(),
 			rotate: vi.fn(),
+			setTransform: vi.fn(),
 			clearRect: vi.fn(),
 			fillRect: vi.fn(),
 			strokeRect: vi.fn(),
@@ -105,6 +106,40 @@ describe('Renderer', () => {
 	});
 
 	describe('rendering', () => {
+		it('preserves explicit and blank lines in text shapes', async () => {
+			const scheduledFrames: FrameRequestCallback[] = [];
+			globalThis.requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+				scheduledFrames.push(callback);
+				return scheduledFrames.length;
+			});
+			const store = new Store();
+			const page = PageRecord.create('Page', 'page');
+			const text = ShapeRecord.createText(
+				page.id,
+				0,
+				0,
+				{ text: 'Overview\n\nIncidents', fontSize: 16, fontFamily: 'sans-serif', color: '#111827', w: 200 },
+				'text'
+			);
+			store.setState((state) => ({
+				...state,
+				doc: {
+					pages: { [page.id]: { ...page, shapeIds: [text.id] } },
+					shapes: { [text.id]: text },
+					bindings: {}
+				},
+				ui: { ...state.ui, currentPageId: page.id }
+			}));
+
+			const renderer = createRenderer(canvas, store);
+			scheduledFrames.shift()?.(0);
+
+			expect(context.fillText).toHaveBeenNthCalledWith(1, 'Overview', 0, 0);
+			expect(context.fillText).toHaveBeenNthCalledWith(2, '', 0, 19.2);
+			expect(context.fillText).toHaveBeenNthCalledWith(3, 'Incidents', 0, 38.4);
+			renderer.dispose();
+		});
+
 		it('renders visible layers in order with isolated opacity and skips hidden layers', () => {
 			const scheduledFrames: FrameRequestCallback[] = [];
 			globalThis.requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
@@ -237,21 +272,24 @@ describe('Renderer', () => {
 			renderer.dispose();
 		});
 
-		it('keeps backing dimensions stable until CSS size or DPR changes', () => {
+		it('resets and clears the full backing store before every frame', () => {
 			const scheduledFrames: FrameRequestCallback[] = [];
 			Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 2 });
 			globalThis.requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
 				scheduledFrames.push(callback);
 				return scheduledFrames.length;
 			});
-			const renderer = createRenderer(canvas, new Store());
+			const store = new Store();
+			const renderer = createRenderer(canvas, store);
 
 			scheduledFrames.shift()?.(0);
-			renderer.markDirty();
+			store.setState((state) => ({ ...state, camera: { x: 120, y: -80, zoom: 1.5 } }));
 			scheduledFrames.shift()?.(16);
 
-			const backingScaleCalls = vi.mocked(context.scale).mock.calls.filter(([x, y]) => x === 2 && y === 2);
-			expect(backingScaleCalls).toHaveLength(1);
+			expect(context.setTransform).toHaveBeenCalledWith(2, 0, 0, 2, 0, 0);
+			expect(context.setTransform).toHaveBeenCalledWith(1, 0, 0, 1, 0, 0);
+			expect(context.clearRect).toHaveBeenLastCalledWith(0, 0, 1600, 1200);
+			expect(context.translate).toHaveBeenCalledWith(-120, 80);
 			expect(scheduledFrames).toHaveLength(0);
 			renderer.dispose();
 		});
@@ -522,7 +560,7 @@ describe('Renderer', () => {
 			renderer.dispose();
 		});
 
-		it('should render selection outline for selected shapes', async () => {
+		it('renders a high-contrast double outline for selected shapes', async () => {
 			const store = new Store();
 
 			const page = PageRecord.create('Page 1', 'page:1');
@@ -547,6 +585,10 @@ describe('Renderer', () => {
 			const renderer = createRenderer(canvas, store);
 
 			await new Promise((resolve) => setTimeout(resolve, 50));
+			const selectionStrokes = vi
+				.mocked(context.strokeRect)
+				.mock.calls.filter(([x, y, width, height]) => x === 0 && y === 0 && width === 200 && height === 100);
+			expect(selectionStrokes).toHaveLength(2);
 
 			renderer.dispose();
 		});

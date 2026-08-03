@@ -469,6 +469,7 @@ fn structured_create_can_be_validated_reopened_and_rendered() {
     let temporary = TestDirectory::new("render");
     let document_path = temporary.path.join("render.inkfinite");
     let svg_path = temporary.path.join("render.svg");
+    let png_path = temporary.path.join("render.png");
     assert_success(&run(["new", path(&document_path), "--json"]));
     assert_success(&run([
         "shape",
@@ -517,6 +518,35 @@ fn structured_create_can_be_validated_reopened_and_rendered() {
     let svg = fs::read_to_string(&svg_path).unwrap();
     assert!(svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\""));
     assert!(svg.contains("data-shape-id=\"shape:service\""));
+
+    let rendered_png = run([
+        "render",
+        path(&document_path),
+        "--output",
+        path(&png_path),
+        "--role",
+        "architecture.service",
+        "--json",
+    ]);
+    assert_success(&rendered_png);
+    assert_eq!(
+        parse_stdout(&rendered_png)["output"],
+        png_path.to_string_lossy().replace('\\', "/")
+    );
+    let png = fs::read(&png_path).unwrap();
+    assert_eq!(&png[..8], b"\x89PNG\r\n\x1a\n");
+
+    let unsupported_path = temporary.path.join("render.pdf");
+    let unsupported = run([
+        "render",
+        path(&document_path),
+        "--output",
+        path(&unsupported_path),
+        "--json",
+    ]);
+    assert_eq!(unsupported.status.code(), Some(3));
+    assert_eq!(parse_stderr(&unsupported)["error"]["code"], "render_output_format");
+    assert!(!unsupported_path.exists());
 
     let canonical = fs::read(&document_path).unwrap();
     let same_path = run([

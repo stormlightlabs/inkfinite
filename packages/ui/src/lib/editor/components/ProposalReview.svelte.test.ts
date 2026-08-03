@@ -23,6 +23,20 @@ const proposal: LiveProposal = {
 };
 
 describe('ProposalReview', () => {
+	it('stacks desktop agent controls below the drawing toolbar', async () => {
+		const screen = render(ProposalReview, {
+			proposal: null,
+			message: null,
+			agentAccess: 'review',
+			onAccept: vi.fn(async () => undefined),
+			onReject: vi.fn(async () => undefined),
+			onAgentAccessChange: vi.fn(async () => undefined)
+		});
+		const panel = screen.getByRole('complementary', { name: 'Agent access' }).element();
+
+		expect(getComputedStyle(panel).top).toBe('116px');
+	});
+
 	it('exposes review, partial acceptance, and rejection through accessible controls', async () => {
 		const accept = vi.fn(async () => undefined);
 		const reject = vi.fn(async () => undefined);

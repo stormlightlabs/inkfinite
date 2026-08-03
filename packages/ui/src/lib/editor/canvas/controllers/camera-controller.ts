@@ -17,6 +17,8 @@ const FIT_MARGIN = 80;
 
 /** Coordinates every camera interaction exposed by the editor UI. */
 export class CameraController {
+	private fitMode: 'all' | 'selection' | null = null;
+
 	constructor(
 		private readonly store: Store,
 		private readonly getViewport: () => Viewport
@@ -40,6 +42,7 @@ export class CameraController {
 
 	/** Sets an exact zoom while preserving the current viewport center. */
 	setZoomPercent(percent: number): void {
+		this.fitMode = null;
 		const currentZoom = this.store.getState().camera.zoom;
 		if (!Number.isFinite(currentZoom) || currentZoom <= 0) {
 			this.store.setState((state) => ({
@@ -54,27 +57,52 @@ export class CameraController {
 
 	/** Restores the origin at 100% zoom. */
 	reset(): void {
+		this.fitMode = null;
 		this.store.setState((state) => ({ ...state, camera: Camera.reset() }));
 	}
 
 	/** Frames every shape on the current page, or resets an empty page. */
 	fitAll(): void {
+		this.fitMode = 'all';
+		this.fitAllNow();
+	}
+
+	/** Frames the selection, falling back to every shape on the page. */
+	fitSelection(): void {
+		this.fitMode = 'selection';
+		this.fitSelectionNow();
+	}
+
+	/** Recalculates an active fitted view after the viewport changes size. */
+	refit(): void {
+		if (this.fitMode === 'selection') {
+			this.fitSelectionNow();
+		} else if (this.fitMode === 'all') {
+			this.fitAllNow();
+		}
+	}
+
+	/** Leaves fitted mode when another interaction takes control of the camera. */
+	cancelFit(): void {
+		this.fitMode = null;
+	}
+
+	private fitAllNow(): void {
 		const shapes = getShapesOnCurrentPage(this.store.getState());
 		const bounds = this.getCombinedBounds(shapes);
 		if (bounds) {
 			this.fitBounds(bounds);
 		} else {
-			this.reset();
+			this.store.setState((state) => ({ ...state, camera: Camera.reset() }));
 		}
 	}
 
-	/** Frames the selection, falling back to every shape on the page. */
-	fitSelection(): void {
+	private fitSelectionNow(): void {
 		const bounds = this.getCombinedBounds(getSelectedShapes(this.store.getState()));
 		if (bounds) {
 			this.fitBounds(bounds);
 		} else {
-			this.fitAll();
+			this.fitAllNow();
 		}
 	}
 
@@ -124,6 +152,7 @@ export class CameraController {
 
 	private panByWheel(deltaX: number, deltaY: number): void {
 		if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY)) return;
+		this.fitMode = null;
 		this.store.setState((state) => ({
 			...state,
 			camera: Camera.pan(state.camera, { x: -deltaX, y: -deltaY })
@@ -132,6 +161,7 @@ export class CameraController {
 
 	private zoomAt(factor: number, anchor: Vec2): void {
 		if (!Number.isFinite(factor) || factor <= 0) return;
+		this.fitMode = null;
 		const viewport = this.getViewport();
 		this.store.setState((state) => {
 			const currentZoom =

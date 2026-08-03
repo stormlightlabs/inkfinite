@@ -922,17 +922,17 @@ fn push_markdown_span(output: &mut String, text: &str, bold: bool, italic: bool,
 
 fn wrap_text(text: &str, max_width: f64, font_size: f64) -> Vec<String> {
     let mut lines = Vec::new();
-    let mut current = String::new();
-    for word in text.split(' ') {
-        let candidate = if current.is_empty() { word.into() } else { format!("{current} {word}") };
-        if deterministic_text_width(&candidate, font_size) > max_width && !current.is_empty() {
-            lines.push(current);
-            current = word.into();
-        } else {
-            current = candidate;
+    for source_line in text.split('\n') {
+        let mut current = String::new();
+        for word in source_line.split(' ') {
+            let candidate = if current.is_empty() { word.into() } else { format!("{current} {word}") };
+            if deterministic_text_width(&candidate, font_size) > max_width && !current.is_empty() {
+                lines.push(current);
+                current = word.into();
+            } else {
+                current = candidate;
+            }
         }
-    }
-    if !current.is_empty() || text.is_empty() {
         lines.push(current);
     }
     lines

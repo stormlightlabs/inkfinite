@@ -187,8 +187,11 @@ function setupCanvas(canvas: HTMLCanvasElement, context: CanvasRenderingContext2
 	if (canvas.width !== width || canvas.height !== height) {
 		canvas.width = width;
 		canvas.height = height;
-		context.scale(pixelRatio, pixelRatio);
 	}
+
+	// Canvas state survives between frames. Establish the backing-store transform
+	// explicitly so a previous camera transform can never leak into the next draw.
+	context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
 
 	return { width: rect.width || 1, height: rect.height || 1 };
 }
@@ -216,7 +219,10 @@ function drawScene(
 	textMetricCache = new LruCache<string, number>(2_048),
 	markdownLayoutCache = new LruCache<string, MarkdownLine[]>(256)
 ) {
-	context.clearRect(0, 0, viewport.width, viewport.height);
+	context.save();
+	context.setTransform(1, 0, 0, 1, 0, 0);
+	context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+	context.restore();
 
 	context.save();
 
@@ -1030,28 +1036,25 @@ function wrapText(
 	const cacheKey = `${context.font}\u0000${maxWidth}\u0000${text}`;
 	const cached = layoutCache.get(cacheKey);
 	if (cached) return cached;
-	const words = text.split(' ');
 	const lines: string[] = [];
-	let currentLine = '';
+	for (const sourceLine of text.split('\n')) {
+		let currentLine = '';
+		for (const word of sourceLine.split(' ')) {
+			const testLine = currentLine ? `${currentLine} ${word}` : word;
+			const widthKey = `${context.font}\u0000${testLine}`;
+			let measuredWidth = metricCache.get(widthKey);
+			if (measuredWidth === undefined) {
+				measuredWidth = context.measureText(testLine).width;
+				metricCache.set(widthKey, measuredWidth);
+			}
 
-	for (const word of words) {
-		const testLine = currentLine ? `${currentLine} ${word}` : word;
-		const widthKey = `${context.font}\u0000${testLine}`;
-		let measuredWidth = metricCache.get(widthKey);
-		if (measuredWidth === undefined) {
-			measuredWidth = context.measureText(testLine).width;
-			metricCache.set(widthKey, measuredWidth);
+			if (measuredWidth > maxWidth && currentLine) {
+				lines.push(currentLine);
+				currentLine = word;
+			} else {
+				currentLine = testLine;
+			}
 		}
-
-		if (measuredWidth > maxWidth && currentLine) {
-			lines.push(currentLine);
-			currentLine = word;
-		} else {
-			currentLine = testLine;
-		}
-	}
-
-	if (currentLine) {
 		lines.push(currentLine);
 	}
 
@@ -1080,92 +1083,78 @@ function drawSelection(
 			context.rotate(shape.rot);
 		}
 
-		context.strokeStyle = '#0066ff';
-		context.lineWidth = 2 / state.camera.zoom;
-		context.setLineDash([4 / state.camera.zoom, 4 / state.camera.zoom]);
-
-		switch (shape.type) {
-			case 'rect': {
-				const { w, h } = shape.props;
-				context.strokeRect(0, 0, w, h);
-				break;
-			}
-			case 'ellipse': {
-				const { w, h } = shape.props;
-				context.strokeRect(0, 0, w, h);
-				break;
-			}
-			case 'line': {
-				const { a, b } = shape.props;
-				const minX = Math.min(a.x, b.x);
-				const minY = Math.min(a.y, b.y);
-				const maxX = Math.max(a.x, b.x);
-				const maxY = Math.max(a.y, b.y);
-				const padding = 5;
-				context.strokeRect(
-					minX - padding,
-					minY - padding,
-					maxX - minX + padding * 2,
-					maxY - minY + padding * 2
-				);
-				break;
-			}
-			case 'arrow': {
-				const bounds = shapeBounds(shape);
-				const localBounds = {
-					minX: bounds.min.x - shape.x,
-					minY: bounds.min.y - shape.y,
-					maxX: bounds.max.x - shape.x,
-					maxY: bounds.max.y - shape.y
-				};
-				const padding = 5;
-				context.strokeRect(
-					localBounds.minX - padding,
-					localBounds.minY - padding,
-					localBounds.maxX - localBounds.minX + padding * 2,
-					localBounds.maxY - localBounds.minY + padding * 2
-				);
-				break;
-			}
-			case 'text': {
-				const { fontSize, fontFamily, text, w } = shape.props;
-				context.font = `${fontSize}px ${fontFamily}`;
-				const metrics = context.measureText(text);
-				const width = w ?? metrics.width;
-				const height = fontSize * 1.2;
-				context.strokeRect(0, 0, width, height);
-				break;
-			}
-			case 'markdown': {
-				const { w, h, fontSize } = shape.props;
-				const width = w;
-				const height = h ?? fontSize * 10;
-				context.strokeRect(0, 0, width, height);
-				break;
-			}
-			case 'stroke': {
-				const { points } = shape.props;
-				if (points.length >= 2) {
-					const outline = getStrokeOutline(shape);
-					if (outline.length > 0) {
-						let minX = outline[0].x;
-						let maxX = outline[0].x;
-						let minY = outline[0].y;
-						let maxY = outline[0].y;
-
-						for (const point of outline) {
-							minX = Math.min(minX, point.x);
-							maxX = Math.max(maxX, point.x);
-							minY = Math.min(minY, point.y);
-							maxY = Math.max(maxY, point.y);
-						}
-
-						context.strokeRect(minX, minY, maxX - minX, maxY - minY);
-					}
+		const strokeSelectionBounds = () => {
+			switch (shape.type) {
+				case 'rect':
+				case 'ellipse': {
+					const { w, h } = shape.props;
+					context.strokeRect(0, 0, w, h);
+					break;
 				}
-				break;
+				case 'line': {
+					const { a, b } = shape.props;
+					const minX = Math.min(a.x, b.x);
+					const minY = Math.min(a.y, b.y);
+					const maxX = Math.max(a.x, b.x);
+					const maxY = Math.max(a.y, b.y);
+					const padding = 5;
+					context.strokeRect(
+						minX - padding,
+						minY - padding,
+						maxX - minX + padding * 2,
+						maxY - minY + padding * 2
+					);
+					break;
+				}
+				case 'arrow': {
+					const bounds = shapeBounds(shape);
+					const padding = 5;
+					context.strokeRect(
+						bounds.min.x - shape.x - padding,
+						bounds.min.y - shape.y - padding,
+						bounds.max.x - bounds.min.x + padding * 2,
+						bounds.max.y - bounds.min.y + padding * 2
+					);
+					break;
+				}
+				case 'text': {
+					const { fontSize, fontFamily, text, w } = shape.props;
+					context.font = `${fontSize}px ${fontFamily}`;
+					const width = w ?? context.measureText(text).width;
+					context.strokeRect(0, 0, width, fontSize * 1.2);
+					break;
+				}
+				case 'markdown': {
+					const { w, h, fontSize } = shape.props;
+					context.strokeRect(0, 0, w, h ?? fontSize * 10);
+					break;
+				}
+				case 'stroke': {
+					const outline = shape.props.points.length >= 2 ? getStrokeOutline(shape) : [];
+					if (outline.length === 0) break;
+					let minX = outline[0].x;
+					let maxX = outline[0].x;
+					let minY = outline[0].y;
+					let maxY = outline[0].y;
+					for (const point of outline) {
+						minX = Math.min(minX, point.x);
+						maxX = Math.max(maxX, point.x);
+						minY = Math.min(minY, point.y);
+						maxY = Math.max(maxY, point.y);
+					}
+					context.strokeRect(minX, minY, maxX - minX, maxY - minY);
+					break;
+				}
 			}
-		}
+		};
+
+		context.setLineDash([]);
+		context.strokeStyle = 'rgba(248, 250, 252, 0.96)';
+		context.lineWidth = 5 / state.camera.zoom;
+		strokeSelectionBounds();
+		context.strokeStyle = '#2563eb';
+		context.lineWidth = 2 / state.camera.zoom;
+		strokeSelectionBounds();
 
 		context.restore();
 
