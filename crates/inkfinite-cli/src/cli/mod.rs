@@ -10,8 +10,8 @@ use clap::{ArgGroup, Args, Parser, Subcommand, ValueEnum};
 use inkfinite_core::engine::{EngineError, validate_document};
 use inkfinite_core::file::{DocumentFile, FileError};
 use inkfinite_core::proto::{
-    Bounds, LayoutAxis, Operation, PROTOCOL_ID, PROTOCOL_VERSION, Query, RecordId, ShapeAlignment, ShapePatch,
-    TransactionDraft, TransactionId,
+    Bounds, CameraState, LayoutAxis, Operation, PROTOCOL_ID, PROTOCOL_VERSION, Query, RecordId, ShapeAlignment,
+    ShapePatch, TransactionDraft, TransactionId,
 };
 use inkfinite_core::render::{SvgRenderOptions, render_svg};
 use inkfinite_core::{
@@ -116,8 +116,8 @@ mod support;
 
 use args::{
     AlignmentArg, ApplyArgs, AxisArg, ConnectArgs, FileOutputArgs, InspectArgs, LayoutCommand, LayoutSelectionArgs,
-    MutationOptions, NewArgs, QueryArgs, RenderArgs, SchemaKind, ShapeCommand, ShapeCreateArgs, ShapeDeleteArgs,
-    ShapeDescribeArgs, ShapePatchArgs,
+    MutationOptions, NewArgs, PlacementArg, QueryArgs, RenderArgs, SchemaKind, ShapeCommand, ShapeCreateArgs,
+    ShapeDeleteArgs, ShapeDescribeArgs, ShapePatchArgs,
 };
 use support::parse_bounds;
 

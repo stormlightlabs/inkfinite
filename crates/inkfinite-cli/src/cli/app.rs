@@ -2,17 +2,18 @@
 
 use std::time::{Duration, Instant};
 
-use inkfinite_core::ipc::{self, AppRequest, AppResponse, IpcError};
+use inkfinite_core::ipc::{self, AppRequest, AppResponse, IpcError, UiControl};
 use inkfinite_core::proto::{ProposalId, Query, RecordId, SessionId};
 use inkfinite_core::session::{ProposalReviewState, ProposalStatus};
-use inkfinite_core::{LayerId, PageId};
+use inkfinite_core::{LayerId, PageId, ShapeId};
 
 use super::apply::read_transaction;
 use super::args::{
     AppApplyArgs, AppCommand, AppInspectArgs, AppProposalCommand, AppProposalWaitArgs, AppProposeArgs, AppQueryArgs,
+    AppRenderArgs, AppUiArgs,
 };
-use super::support::{map_output_error, write_heads, write_json};
-use super::{CliError, EXIT_CONFLICT, EXIT_INPUT, EXIT_INVALID, Result, Write, anyhow, json};
+use super::support::{map_output_error, portable_path, write_heads, write_json};
+use super::{CliError, EXIT_CONFLICT, EXIT_INPUT, EXIT_INVALID, Result, Write, anyhow, fs, json};
 
 /// Runs one authenticated desktop command.
 pub fn run_app_command(command: AppCommand, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
@@ -23,6 +24,8 @@ pub fn run_app_command(command: AppCommand, json_output: bool, stdout: &mut dyn 
         AppCommand::Query(args) => query(args, json_output, stdout),
         AppCommand::Propose(args) => propose(args, json_output, stdout),
         AppCommand::Proposal(command) => proposal(command, json_output, stdout),
+        AppCommand::Render(args) => render(args, json_output, stdout),
+        AppCommand::Ui(args) => control_ui(args, json_output, stdout),
         AppCommand::Apply(args) => apply(args, json_output, stdout),
         AppCommand::Focus => focus(json_output, stdout),
     }
@@ -44,6 +47,12 @@ fn context(args: AppInspectArgs, json_output: bool, stdout: &mut dyn Write) -> R
     )
     .map_err(map_output_error)?;
     writeln!(stdout, "Agent access: {:?}", context.agent_access).map_err(map_output_error)?;
+    writeln!(
+        stdout,
+        "Active layer: {}",
+        context.active_layer_id.as_ref().map_or("none", LayerId::as_str)
+    )
+    .map_err(map_output_error)?;
     writeln!(stdout, "Selection: {}", context.selection_ids.len()).map_err(map_output_error)?;
     if let Some(viewport) = context.viewport {
         writeln!(
@@ -53,6 +62,10 @@ fn context(args: AppInspectArgs, json_output: bool, stdout: &mut dyn Write) -> R
         )
         .map_err(map_output_error)?;
     }
+    if let Some(camera) = context.camera {
+        writeln!(stdout, "Camera: {},{},{}", camera.x, camera.y, camera.zoom).map_err(map_output_error)?;
+    }
+    writeln!(stdout, "Occluded regions: {}", context.occluded_regions.len()).map_err(map_output_error)?;
     write_heads(stdout, &context.heads)
 }
 
@@ -63,6 +76,104 @@ fn proposal(command: AppProposalCommand, json_output: bool, stdout: &mut dyn Wri
             write_proposal_status(&status, json_output, stdout)
         }
         AppProposalCommand::Wait(args) => wait_for_proposal(&args, json_output, stdout),
+        AppProposalCommand::Renew(args) => renew_proposal(args, json_output, stdout),
+    }
+}
+
+fn renew_proposal(args: super::args::AppProposalStatusArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
+    let response = send(AppRequest::RenewProposal {
+        session_id: args.session_id.map(SessionId),
+        proposal_id: ProposalId(args.proposal_id),
+    })?;
+    let AppResponse::RenewedProposal(proposal) = response else {
+        return unexpected_response("proposal renew");
+    };
+    if json_output {
+        write_json(stdout, &proposal)
+    } else {
+        writeln!(stdout, "Renewed: {}", proposal.id.0).map_err(map_output_error)?;
+        writeln!(stdout, "Expires: {}", proposal.expires_at.0).map_err(map_output_error)
+    }
+}
+
+fn render(args: AppRenderArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
+    let transaction = args.transaction.as_deref().map(read_transaction).transpose()?;
+    let response = send(AppRequest::Render {
+        session_id: args.session_id.map(SessionId),
+        transaction,
+        page_id: args.page.map(PageId::from),
+        region: args.region,
+    })?;
+    let AppResponse::Rendered(rendered) = response else {
+        return unexpected_response("render");
+    };
+    write_svg_output(&args.output, &rendered.current_svg)?;
+    if let (Some(path), Some(svg)) = (args.proposed_output.as_deref(), rendered.proposed_svg.as_deref()) {
+        write_svg_output(path, svg)?;
+    }
+    if json_output {
+        write_json(
+            stdout,
+            &json!({
+                "heads": rendered.heads,
+                "current_output": portable_path(&args.output),
+                "proposed_output": args.proposed_output.as_deref().map(portable_path),
+                "preview": rendered.preview,
+                "affected_regions": rendered.affected_regions,
+                "warnings": rendered.warnings,
+            }),
+        )
+    } else {
+        writeln!(stdout, "Rendered {}", portable_path(&args.output)).map_err(map_output_error)?;
+        if let Some(path) = args.proposed_output {
+            writeln!(stdout, "Rendered proposed {}", portable_path(&path)).map_err(map_output_error)?;
+        }
+        Ok(())
+    }
+}
+
+fn write_svg_output(path: &std::path::Path, svg: &str) -> Result<()> {
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .map_err(|error| {
+            CliError::new(
+                if error.kind() == std::io::ErrorKind::AlreadyExists { EXIT_CONFLICT } else { EXIT_INPUT },
+                error,
+            )
+            .with_code("render_output_error")
+            .context(format!("could not create {}", portable_path(path)))
+        })?;
+    file.write_all(svg.as_bytes()).map_err(|error| {
+        CliError::new(EXIT_INPUT, error)
+            .with_code("render_output_error")
+            .context(format!("could not write {}", portable_path(path)))
+    })
+}
+
+fn control_ui(args: AppUiArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
+    let selection_ids = if args.clear_selection {
+        Some(Vec::new())
+    } else if args.selection.is_empty() {
+        None
+    } else {
+        Some(args.selection.into_iter().map(ShapeId::from).collect())
+    };
+    let control = UiControl {
+        page_id: args.page.map(PageId::from),
+        active_layer_id: args.layer.map(LayerId::from),
+        selection_ids,
+        camera: args.camera,
+    };
+    let response = send(AppRequest::Ui { session_id: args.session_id.map(SessionId), control })?;
+    if !matches!(response, AppResponse::UiControlled) {
+        return unexpected_response("ui");
+    }
+    if json_output {
+        write_json(stdout, &json!({ "controlled": true }))
+    } else {
+        writeln!(stdout, "Desktop UI updated").map_err(map_output_error)
     }
 }
 
@@ -84,7 +195,13 @@ fn wait_for_proposal(args: &AppProposalWaitArgs, json_output: bool, stdout: &mut
     let deadline = Instant::now() + Duration::from_secs(args.timeout_seconds);
     loop {
         let status = fetch_proposal_status(args.session_id.clone(), args.proposal_id.clone())?;
-        if status.state != ProposalReviewState::Pending {
+        if matches!(
+            status.state,
+            ProposalReviewState::Accepted
+                | ProposalReviewState::PartiallyAccepted
+                | ProposalReviewState::Rejected
+                | ProposalReviewState::Expired
+        ) {
             return write_proposal_status(&status, json_output, stdout);
         }
         if Instant::now() >= deadline {
@@ -104,6 +221,7 @@ fn write_proposal_status(status: &ProposalStatus, json_output: bool, stdout: &mu
     }
     writeln!(stdout, "Proposal: {}", status.proposal_id.0).map_err(map_output_error)?;
     writeln!(stdout, "State: {:?}", status.state).map_err(map_output_error)?;
+    writeln!(stdout, "Affected: {}", status.affected_ids.len()).map_err(map_output_error)?;
     write_heads(stdout, &status.heads)
 }
 

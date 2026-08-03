@@ -105,6 +105,14 @@ export type SessionSync = { sync: SyncApplyResult; status: SessionStatus };
 /** State update emitted when a live proposal is created, refreshed, or cleared. */
 export type ProposalUpdate = { proposal: Proposal | null; message?: string };
 
+/** Typed editor navigation emitted by the authenticated live CLI. */
+export type AgentUiControl = {
+	page_id?: string | null;
+	active_layer_id?: string | null;
+	selection_ids?: string[] | null;
+	camera?: { x: number; y: number; zoom: number } | null;
+};
+
 /** Typed command boundary used by the desktop adapter and its tests. */
 export interface SessionApi {
 	createDocument(args: {
@@ -119,8 +127,11 @@ export interface SessionApi {
 	updateContext(args: {
 		session_id: string;
 		page_id: string | null;
+		active_layer_id: string | null;
 		selection_ids: string[];
 		viewport: { x: number; y: number; width: number; height: number } | null;
+		camera: { x: number; y: number; zoom: number } | null;
+		occluded_regions: Array<{ x: number; y: number; width: number; height: number }>;
 	}): Promise<void>;
 	commit(args: { session_id: string; transaction: TransactionDraft }): Promise<SessionCommit>;
 	propose(args: { session_id: string; transaction: TransactionDraft }): Promise<Proposal>;
@@ -165,9 +176,14 @@ function createSessionApi(): SessionApi {
 		updateContext: (args) =>
 			invokeSession<void>('update_context', {
 				sessionId: args.session_id,
-				pageId: args.page_id,
-				selectionIds: args.selection_ids,
-				viewport: args.viewport
+				context: {
+					page_id: args.page_id,
+					active_layer_id: args.active_layer_id,
+					selection_ids: args.selection_ids,
+					viewport: args.viewport,
+					camera: args.camera,
+					occluded_regions: args.occluded_regions
+				}
 			}),
 		commit: (args) =>
 			invokeSession<SessionCommit>('commit', { sessionId: args.session_id, transaction: args.transaction }),
@@ -261,14 +277,18 @@ export type DesktopSessionRepo = PersistentDocRepo & {
 	getProposal(): Proposal | null;
 	subscribeProposal(listener: (update: ProposalUpdate) => void): () => void;
 	subscribeLiveDocument(listener: (doc: LoadedDoc) => void): () => void;
+	subscribeAgentUi(listener: (control: AgentUiControl) => void): () => void;
 	acceptProposal(proposalId: string, operationPositions?: number[]): Promise<LoadedDoc>;
 	rejectProposal(proposalId: string): Promise<void>;
 	setAgentAccess(agentAccess: 'review' | 'direct'): Promise<SessionStatus>;
 	/** Publishes editor-only context for read-only agent queries. */
 	updateAgentContext(context: {
 		pageId: string | null;
+		activeLayerId: string | null;
 		selectionIds: string[];
 		viewport: { x: number; y: number; width: number; height: number } | null;
+		camera: { x: number; y: number; zoom: number } | null;
+		occludedRegions: Array<{ x: number; y: number; width: number; height: number }>;
 	}): Promise<void>;
 	syncConnect(peerId: string): Promise<SessionStatus>;
 	syncDisconnect(peerId: string): Promise<SessionStatus>;
@@ -293,6 +313,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 	let proposalExpiryTimer: ReturnType<typeof setTimeout> | null = null;
 	const proposalListeners = new Set<(update: ProposalUpdate) => void>();
 	const liveDocumentListeners = new Set<(doc: LoadedDoc) => void>();
+	const agentUiListeners = new Set<(control: AgentUiControl) => void>();
 	const liveUnlisteners: Array<() => void> = [];
 	const boardFiles = new Map<string, FileHandle>();
 
@@ -300,6 +321,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 	type ProposalClearedEvent = { message?: string };
 	type LiveCommitEvent = { session_id?: string | null; commit: SessionCommit };
 	type LiveSyncEvent = { session_id?: string | null; sync: SessionSync };
+	type AgentUiEvent = { session_id?: string | null; control: AgentUiControl };
 
 	function notifyProposal(update: ProposalUpdate) {
 		if (proposalExpiryTimer) clearTimeout(proposalExpiryTimer);
@@ -363,6 +385,12 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 			if (!eventBelongsToCurrentSession(event.payload.session_id)) return;
 			updateStatus(event.payload.sync.status);
 			notifyLiveDocument();
+		})
+			.then((stop) => liveUnlisteners.push(stop))
+			.catch(() => undefined);
+		void listen<AgentUiEvent>('inkfinite-ui-control', (event) => {
+			if (!eventBelongsToCurrentSession(event.payload.session_id)) return;
+			for (const listener of agentUiListeners) listener(event.payload.control);
 		})
 			.then((stop) => liveUnlisteners.push(stop))
 			.catch(() => undefined);
@@ -698,6 +726,11 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		return () => liveDocumentListeners.delete(listener);
 	}
 
+	function subscribeAgentUi(listener: (control: AgentUiControl) => void): () => void {
+		agentUiListeners.add(listener);
+		return () => agentUiListeners.delete(listener);
+	}
+
 	async function acceptProposal(proposalId: string, operationPositions?: number[]): Promise<LoadedDoc> {
 		if (!currentStatus) throw new Error('No board loaded');
 		if (clearExpiredProposal(proposalId)) {
@@ -732,15 +765,21 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 
 	async function updateAgentContext(context: {
 		pageId: string | null;
+		activeLayerId: string | null;
 		selectionIds: string[];
 		viewport: { x: number; y: number; width: number; height: number } | null;
+		camera: { x: number; y: number; zoom: number } | null;
+		occludedRegions: Array<{ x: number; y: number; width: number; height: number }>;
 	}): Promise<void> {
 		if (!currentStatus) return;
 		await api.updateContext({
 			session_id: currentStatus.session_id,
 			page_id: context.pageId,
+			active_layer_id: context.activeLayerId,
 			selection_ids: context.selectionIds,
-			viewport: context.viewport
+			viewport: context.viewport,
+			camera: context.camera,
+			occluded_regions: context.occludedRegions
 		});
 	}
 
@@ -798,6 +837,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		getProposal,
 		subscribeProposal,
 		subscribeLiveDocument,
+		subscribeAgentUi,
 		acceptProposal,
 		rejectProposal,
 		setAgentAccess,

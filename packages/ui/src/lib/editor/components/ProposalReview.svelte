@@ -79,14 +79,18 @@
 		}
 	}
 
-	function operationLabel(operation: unknown): string {
-		if (typeof operation !== 'object' || operation === null) return 'unknown operation';
-		const type = (operation as { type?: unknown }).type;
-		return typeof type === 'string' ? type.replaceAll('_', ' ') : 'document operation';
+	function operationLabel(position: number): string {
+		return proposal?.operation_previews?.[position]?.label ?? `Operation ${position + 1}`;
+	}
+
+	function geometryLabel(position: number): string {
+		const bounds = proposal?.operation_previews?.[position]?.bounds ?? [];
+		if (bounds.length === 0) return 'No shape geometry';
+		return bounds.map((box) => `${box.x},${box.y} ${box.width}×${box.height}`).join(' → ');
 	}
 </script>
 
-<aside class="agent-access" data-mode={agentAccess} aria-label="Agent access">
+<aside class="agent-access" data-mode={agentAccess} aria-label="Agent access" data-agent-occlusion>
 	<label for="agent-access-mode">Agent access</label>
 	<select
 		id="agent-access-mode"
@@ -105,7 +109,7 @@
 </aside>
 
 {#if proposal}
-	<aside class="proposal-panel" aria-label="Agent review">
+	<aside class="proposal-panel" aria-label="Agent review" data-agent-occlusion>
 		<div class="proposal-heading">
 			<div>
 				<p class="eyebrow">Agent review</p>
@@ -129,15 +133,15 @@
 		{#if operationCount() > 1}
 			<fieldset class="operations">
 				<legend>Review operations</legend>
-				{#each proposal.transaction.operations as operation, position}
+				{#each proposal.transaction.operations as _operation, position}
 					<label class="operation-row">
 						<input
 							type="checkbox"
 							checked={selected.includes(position)}
 							onchange={() => toggleOperation(position)}
 							aria-label={`Select operation ${position + 1}`} />
-						<span>Operation {position + 1}</span>
-						<code>{operationLabel(operation)}</code>
+						<span>{operationLabel(position)}</span>
+						<code>{geometryLabel(position)}</code>
 					</label>
 				{/each}
 			</fieldset>

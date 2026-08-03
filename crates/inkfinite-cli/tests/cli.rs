@@ -15,6 +15,8 @@ use inkfinite_core::ipc::{
     self, AppRequest, AppResponse, DiscoveryRecord, RequestEnvelope, RequestGuard, ResponseEnvelope,
 };
 use inkfinite_core::proto::{Operation, TransactionDraft, TransactionId};
+#[cfg(unix)]
+use inkfinite_core::session::EditorContextUpdate;
 use inkfinite_core::{
     ActorId, DocumentId, Opacity, Origin, Provenance, RecordVersion, SemanticMetadata, ShapeId, ShapeKind, ShapeParent,
     ShapeRecord, ShapeStyle, SiblingAnchor, Timestamp, Transform, Vec2, blank_document,
@@ -407,6 +409,62 @@ fn apply_dry_run_then_save_validate_reopen_and_render_is_atomic() {
 }
 
 #[test]
+fn shape_create_places_new_shapes_relative_to_semantic_targets() {
+    let temporary = TestDirectory::new("semantic-placement");
+    let document_path = temporary.path.join("placement.inkfinite");
+    assert_success(&run(["new", path(&document_path), "--json"]));
+    assert_success(&run([
+        "shape",
+        "create",
+        path(&document_path),
+        "--shape-id",
+        "shape:target",
+        "--kind",
+        "rect",
+        "--layer",
+        "layer:document:placement:1",
+        "--x",
+        "10",
+        "--y",
+        "20",
+        "--properties",
+        r#"{"width":40,"height":20}"#,
+        "--role",
+        "layout.target",
+        "--json",
+    ]));
+    let placed = run([
+        "shape",
+        "create",
+        path(&document_path),
+        "--shape-id",
+        "shape:placed",
+        "--kind",
+        "rect",
+        "--properties",
+        r#"{"width":20,"height":10}"#,
+        "--relative-role",
+        "layout.target",
+        "--placement",
+        "below",
+        "--gap",
+        "12",
+        "--json",
+    ]);
+    assert_success(&placed);
+
+    let snapshot = parse_stdout(&run(["inspect", path(&document_path), "--json"]));
+    assert_eq!(
+        snapshot["document"]["shapes"]["shape:placed"]["transform"]["translation"],
+        json!({ "x": 10.0, "y": 52.0 })
+    );
+    assert_eq!(
+        snapshot["document"]["shapes"]["shape:placed"]["parent"],
+        json!({ "kind": "layer", "id": "layer:document:placement:1" })
+    );
+}
+
+#[test]
 fn structured_create_can_be_validated_reopened_and_rendered() {
     let temporary = TestDirectory::new("render");
     let document_path = temporary.path.join("render.inkfinite");
@@ -713,6 +771,9 @@ fn live_commands_read_shared_records_from_the_authenticated_local_server() {
                     | AppRequest::Propose { .. }
                     | AppRequest::Mutate { .. }
                     | AppRequest::ProposalStatus { .. }
+                    | AppRequest::RenewProposal { .. }
+                    | AppRequest::Render { .. }
+                    | AppRequest::Ui { .. }
                     | AppRequest::Apply { .. } => {
                         panic!("proposal requests are outside this IPC fixture")
                     }
@@ -784,6 +845,7 @@ fn live_structured_edits_follow_desktop_agent_access_mode() {
     let temporary = TestDirectory::new("live-proposals");
     let document_path = temporary.path.join("live.inkfinite");
     let transaction_path = temporary.path.join("transaction.json");
+    let live_svg_path = temporary.path.join("live.svg");
     let document_id = DocumentId::from("document:live-proposals");
     let actor = ActorId::from("actor:live-proposals");
     let document = blank_document(&document_id, Some("Live proposals"));
@@ -800,9 +862,14 @@ fn live_structured_edits_follow_desktop_agent_access_mode() {
     service
         .update_context(
             &session_id,
-            Some(page_id.clone()),
-            Vec::new(),
-            Some(inkfinite_core::proto::Bounds { x: -50.0, y: -25.0, width: 100.0, height: 50.0 }),
+            EditorContextUpdate {
+                page_id: Some(page_id.clone()),
+                active_layer_id: Some(layer_id.clone()),
+                selection_ids: Vec::new(),
+                viewport: Some(inkfinite_core::proto::Bounds { x: -50.0, y: -25.0, width: 100.0, height: 50.0 }),
+                camera: None,
+                occluded_regions: Vec::new(),
+            },
         )
         .unwrap();
 
@@ -824,7 +891,7 @@ fn live_structured_edits_follow_desktop_agent_access_mode() {
         runtime.block_on(async move {
             let listener = tokio::net::UnixListener::from_std(listener).unwrap();
             let mut guard = RequestGuard::new(server_token);
-            for _ in 0..9 {
+            for _ in 0..11 {
                 let (mut stream, _) = listener.accept().await.unwrap();
                 let request = ipc::read_frame::<RequestEnvelope>(&mut stream).await.unwrap();
                 guard.validate(&request).unwrap();
@@ -896,8 +963,38 @@ fn live_structured_edits_follow_desktop_agent_access_mode() {
     assert_success(&context);
     let context_json = parse_stdout(&context);
     assert_eq!(context_json["page_id"], page_id.as_str());
+    assert_eq!(context_json["active_layer_id"], layer_id.as_str());
     assert_eq!(context_json["agent_access"], "review");
     assert_eq!(context_json["viewport"]["width"], 100.0);
+
+    let rendered = run([
+        "app",
+        "render",
+        "--session-id",
+        "session:1",
+        "--output",
+        path(&live_svg_path),
+        "--json",
+    ]);
+    assert_success(&rendered);
+    assert!(fs::read_to_string(&live_svg_path).unwrap().starts_with("<svg"));
+
+    let controlled = run([
+        "app",
+        "ui",
+        "--session-id",
+        "session:1",
+        "--page",
+        page_id.as_str(),
+        "--layer",
+        layer_id.as_str(),
+        "--clear-selection",
+        "--camera",
+        "10,20,1.5",
+        "--json",
+    ]);
+    assert_success(&controlled);
+    assert_eq!(parse_stdout(&controlled)["controlled"], true);
 
     let accepted = run(["app", "inspect", "--session-id", "session:1", "--json"]);
     assert_success(&accepted);

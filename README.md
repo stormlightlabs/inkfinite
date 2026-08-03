@@ -127,8 +127,9 @@ Run `inkfinite --help` for examples and the complete command reference.
 ### Live desktop control
 
 With the desktop app running, use `app status`, `app context`, `app inspect`, and
-`app query` to read current state. Status and context report the current agent
-access mode alongside the active page, selection, viewport, actor, and heads.
+`app query` to read current state. Context reports the active page and layer,
+selection, camera, visible world bounds, floating-UI occlusions, actor, access
+mode, and heads.
 
 The desktop starts each document in **Review changes** mode. Add `--app` to a
 structured mutation and the app opens a ghost preview for the user to accept or
@@ -147,12 +148,21 @@ inkfinite shape patch --app --role architecture.service \
   --patch '@service-patch.json' --json
 inkfinite app propose --transaction transaction.json --json
 inkfinite app proposal wait --proposal-id proposal:1 --json
+inkfinite app proposal renew --proposal-id proposal:1 --json
+inkfinite app render --output current.svg --transaction transaction.json \
+  --proposed-output proposed.svg --json
+inkfinite app ui --page page:1 --layer layer:1 --select shape:service \
+  --camera 640,360,1.25 --json
 inkfinite app apply --transaction transaction.json --json
 ```
 
 `app propose` always opens a review, even in Direct mode, and remains available
 for operations that the structured commands do not cover. `app apply` works
-only while Direct mode is enabled.
+only while Direct mode is enabled. `shape create` accepts semantic relative
+placement through `--relative-id`, `--relative-name`, or `--relative-role` with
+`--placement`. Live SVG rendering previews a transaction without changing the
+document. UI control changes only transient editor navigation; it does not edit
+the document or change Agent access.
 
 The desktop publishes a per-user Unix-domain socket on Unix-like systems or a
 per-user named pipe on Windows. A protected discovery file carries a random

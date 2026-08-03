@@ -79,6 +79,7 @@ export function createCanvasController(
 	let agentAccess = $state<'review' | 'direct'>('review');
 	let unsubscribeProposal: (() => void) | null = null;
 	let unsubscribeLiveDocument: (() => void) | null = null;
+	let unsubscribeAgentUi: (() => void) | null = null;
 	let unsubscribeFileMenu: (() => void) | null = null;
 	let unsubscribeAgentContext: (() => void) | null = null;
 	let agentContextTimer: ReturnType<typeof setTimeout> | null = null;
@@ -189,15 +190,49 @@ export function createCanvasController(
 			const viewport = getViewport();
 			const width = viewport.width / state.camera.zoom;
 			const height = viewport.height / state.camera.zoom;
+			const canvasRect = canvas?.getBoundingClientRect();
+			const occludedRegions =
+				typeof document === 'undefined' || !canvasRect
+					? []
+					: [...document.querySelectorAll<HTMLElement>('[data-agent-occlusion]')]
+							.filter((element) => element.offsetParent !== null)
+							.map((element) => {
+								const rect = element.getBoundingClientRect();
+								const min = Camera.screenToWorld(
+									state.camera,
+									{
+										x: rect.left - canvasRect.left,
+										y: rect.top - canvasRect.top
+									},
+									viewport
+								);
+								const max = Camera.screenToWorld(
+									state.camera,
+									{
+										x: rect.right - canvasRect.left,
+										y: rect.bottom - canvasRect.top
+									},
+									viewport
+								);
+								return {
+									x: min.x,
+									y: min.y,
+									width: max.x - min.x,
+									height: max.y - min.y
+								};
+							});
 			const context = {
 				pageId: state.ui.currentPageId,
+				activeLayerId: state.ui.activeLayerId ?? null,
 				selectionIds: [...state.ui.selectionIds],
 				viewport: {
 					x: state.camera.x - width / 2,
 					y: state.camera.y - height / 2,
 					width,
 					height
-				}
+				},
+				camera: { ...state.camera },
+				occludedRegions
 			};
 			const serialized = JSON.stringify(context);
 			if (serialized === lastAgentContext) return;
@@ -592,6 +627,19 @@ export function createCanvasController(
 				proposalMessage = update.message ?? null;
 			});
 			unsubscribeLiveDocument = desktopRepo.subscribeLiveDocument(applyLoadedDoc);
+			unsubscribeAgentUi = desktopRepo.subscribeAgentUi((control) => {
+				store.setState((state) => ({
+					...state,
+					camera: control.camera ?? state.camera,
+					ui: {
+						...state.ui,
+						currentPageId: control.page_id ?? state.ui.currentPageId,
+						activeLayerId: control.active_layer_id ?? state.ui.activeLayerId,
+						selectionIds: control.selection_ids ?? state.ui.selectionIds
+					}
+				}));
+				renderer?.markDirty();
+			});
 			unsubscribeAgentContext = store.subscribe(scheduleAgentContext);
 			scheduleAgentContext();
 		}
@@ -653,6 +701,7 @@ export function createCanvasController(
 		inputAdapter?.dispose();
 		unsubscribeProposal?.();
 		unsubscribeLiveDocument?.();
+		unsubscribeAgentUi?.();
 		unsubscribeAgentContext?.();
 		if (agentContextTimer) clearTimeout(agentContextTimer);
 		unsubscribeFileMenu?.();

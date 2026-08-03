@@ -29,7 +29,7 @@ from typing import Any
 
 
 PROTOCOL_ID = "inkfinite.protocol"
-PROTOCOL_VERSION = 3
+PROTOCOL_VERSION = 4
 SESSION_ID = "session:fixture"
 TOKEN = "inkfinite-agent-fixture-token"
 
@@ -151,6 +151,7 @@ def response_for(
             "id": "proposal:fixture",
             "transaction": transaction,
             "preview": {"created": [], "changed": changed, "deleted": []},
+            "operation_previews": [],
             "affected_regions": [],
             "warnings": [],
             "expires_at": 4102444800000,
@@ -172,6 +173,7 @@ def response_for(
                     "proposal_id": proposal["id"],
                     "state": "accepted",
                     "heads": snapshot["heads"],
+                    "affected_ids": proposal["preview"]["changed"],
                     "proposal": None,
                 },
             },

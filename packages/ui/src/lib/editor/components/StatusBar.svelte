@@ -151,7 +151,7 @@
 	}
 </script>
 
-<div class="status-bar">
+<div class="status-bar" data-agent-occlusion>
 	<div class="status-bar__section">
 		<span class="status-bar__label">Tool</span>
 		<span class="status-bar__value">{statusVm.toolId}</span>

@@ -55,7 +55,7 @@
 	}
 </script>
 
-<nav class="navigation-controls" aria-label="Canvas navigation">
+<nav class="navigation-controls" aria-label="Canvas navigation" data-agent-occlusion>
 	<button
 		type="button"
 		onclick={() => camera.zoomOut()}

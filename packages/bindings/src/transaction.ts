@@ -355,6 +355,23 @@ width: number,
 height: number, };
 
 /**
+ * Camera state reported by or requested from the desktop editor.
+ */
+export type CameraState = {
+/**
+ * World-space horizontal coordinate at the viewport center.
+ */
+x: number,
+/**
+ * World-space vertical coordinate at the viewport center.
+ */
+y: number,
+/**
+ * Screen pixels per world-space unit.
+ */
+zoom: number, };
+
+/**
  * Region that a renderer should consider dirty after a transaction.
  */
 export type AffectedRegion = { 
@@ -527,29 +544,54 @@ heads: Array<ChangeHash>, };
 export type ProposalId = string;
 
 /**
+ * Review metadata for one operation in a proposal.
+ */
+export type ProposalOperationPreview = {
+/**
+ * Zero-based position used by partial acceptance.
+ */
+position: number,
+/**
+ * Stable human-readable operation label.
+ */
+label: string,
+/**
+ * Records named directly by this operation.
+ */
+record_ids: Array<RecordId>,
+/**
+ * Geometry attributable to this operation before or after the proposal.
+ */
+bounds: Array<Bounds>, };
+
+/**
  * Validated transaction held for explicit user review.
  */
-export type Proposal = { 
+export type Proposal = {
 /**
  * Stable proposal identifier.
  */
-id: ProposalId, 
+id: ProposalId,
 /**
  * Transaction validated against the listed heads.
  */
-transaction: TransactionDraft, 
+transaction: TransactionDraft,
 /**
  * Preview patch shown by the UI.
  */
-preview: DocumentPatch, 
+preview: DocumentPatch,
 /**
  * Document-coordinate regions affected by the proposed geometry.
  */
-affected_regions: Array<AffectedRegion>, 
+affected_regions: Array<AffectedRegion>,
+/**
+ * Human-readable, independently selectable operation previews.
+ */
+operation_previews: Array<ProposalOperationPreview>,
 /**
  * Validation or repair warnings shown before acceptance.
  */
-warnings: Array<Warning>, 
+warnings: Array<Warning>,
 /**
  * Wall-clock expiry retained for clients and diagnostics.
  */

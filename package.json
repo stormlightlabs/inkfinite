@@ -14,6 +14,7 @@
 		"dev:web": "pnpm --filter @inkfinite/web dev",
 		"format": "pnpm -r --if-present format",
 		"format:check": "pnpm -r --if-present format:check",
+		"lint": "pnpm -r --if-present lint",
 		"check": "pnpm bindings:check && pnpm -r --if-present check && pnpm -r --if-present typecheck && pnpm -r --if-present lint",
 		"test": "pnpm -r --if-present test",
 		"performance:capture": "node scripts/capture-performance.mjs --output fixtures/native/performance/rendering-budget.json",

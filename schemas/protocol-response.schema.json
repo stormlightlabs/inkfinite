@@ -1397,6 +1397,13 @@
           "$ref": "#/$defs/ProposalId",
           "description": "Stable proposal identifier."
         },
+        "operation_previews": {
+          "description": "Human-readable, independently selectable operation previews.",
+          "items": {
+            "$ref": "#/$defs/ProposalOperationPreview"
+          },
+          "type": "array"
+        },
         "preview": {
           "$ref": "#/$defs/DocumentPatch",
           "description": "Preview patch shown by the UI."
@@ -1418,6 +1425,7 @@
         "transaction",
         "preview",
         "affected_regions",
+        "operation_previews",
         "warnings",
         "expires_at"
       ],
@@ -1426,6 +1434,42 @@
     "ProposalId": {
       "description": "Stable identifier for a transaction proposal awaiting user review.",
       "type": "string"
+    },
+    "ProposalOperationPreview": {
+      "description": "Review metadata for one operation in a proposal.",
+      "properties": {
+        "bounds": {
+          "description": "Geometry attributable to this operation before or after the proposal.",
+          "items": {
+            "$ref": "#/$defs/Bounds"
+          },
+          "type": "array"
+        },
+        "label": {
+          "description": "Stable human-readable operation label.",
+          "type": "string"
+        },
+        "position": {
+          "description": "Zero-based position used by partial acceptance.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "record_ids": {
+          "description": "Records named directly by this operation.",
+          "items": {
+            "$ref": "#/$defs/RecordId"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "position",
+        "label",
+        "record_ids",
+        "bounds"
+      ],
+      "type": "object"
     },
     "Provenance": {
       "description": "Attribution retained with durable content.",

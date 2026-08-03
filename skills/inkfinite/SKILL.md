@@ -43,9 +43,10 @@ inkfinite query board.inkfinite --role architecture.service --detail --limit 20 
 ```
 
 The live equivalents are `app status`, `app context`, `app inspect`, and
-`app query`. `app context` reports the active page, selection, viewport, actor,
-access mode, and heads. Keep the heads returned by the read that informed the
-transaction. They are a precondition, not decoration.
+`app query`. `app context` reports the active page and layer, selection, camera,
+visible world bounds, floating-UI occlusions, actor, access mode, and heads.
+Keep the heads returned by the read that informed the transaction. They are a
+precondition, not decoration.
 
 ## Rules for safe edits
 
@@ -62,6 +63,9 @@ transaction. They are a precondition, not decoration.
   human-only boundary; report it and ask for a human change.
 - Use layout operations for alignment and distribution. Do not approximate a
   layout operation with many unrelated coordinate patches.
+- Use `shape create` with `--relative-role`, `--relative-name`, or
+  `--relative-id` and `--placement` for semantic placement. Read the operation
+  preview bounds before describing the proposed composition.
 - Keep one coherent user request in one transaction. Do not bundle unrelated
   cleanup into an otherwise small proposal.
 - A dry run must pass before a durable file apply. A dry run changes no
@@ -72,6 +76,11 @@ transaction. They are a precondition, not decoration.
   immediately.
 - Proposal decisions belong to the desktop UI. Use `app proposal status` for
   one check or `app proposal wait` to wait for the user's decision.
+- Use `app proposal renew` when a still-valid proposal needs a fresh review
+  window. Use `app render` to compare current and proposed SVGs without applying
+  the transaction.
+- Use `app ui` only for transient page, layer, selection, or camera navigation.
+  It does not authorize a document edit.
 - Only the desktop UI can enable Direct mode. Never try to change or bypass the
   mode through IPC. Use `app propose` to force review in either mode.
 

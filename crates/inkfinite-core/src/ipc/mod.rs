@@ -19,8 +19,13 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use crate::DocumentSnapshot;
 use crate::engine::EngineError;
 use crate::file::FileError;
-use crate::proto::{AgentAccessMode, PROTOCOL_ID, PROTOCOL_VERSION, Proposal, Query, QueryResult, SessionId};
-use crate::session::{ProposalStatus, SessionCommit, SessionContext, SessionError, SessionService, SessionStatus};
+use crate::proto::{
+    AgentAccessMode, Bounds, CameraState, PROTOCOL_ID, PROTOCOL_VERSION, Proposal, Query, QueryResult, SessionId,
+};
+use crate::session::{
+    LiveSvgPreview, ProposalStatus, SessionCommit, SessionContext, SessionError, SessionService, SessionStatus,
+};
+use crate::{LayerId, PageId, ShapeId};
 
 pub use crate::engine::{CommitResult, TransactionDraft};
 pub use crate::proto::{ProtocolError, Request, Response};
@@ -50,6 +55,19 @@ pub struct DiscoveryRecord {
     pub endpoint: String,
     /// Random token scoped to this desktop process.
     pub token: String,
+}
+
+/// Typed editor navigation requested by an authenticated local agent.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct UiControl {
+    /// Page to show, when the current page should change.
+    pub page_id: Option<PageId>,
+    /// Layer to activate, when the active layer should change.
+    pub active_layer_id: Option<LayerId>,
+    /// Replacement selection, when the selection should change.
+    pub selection_ids: Option<Vec<ShapeId>>,
+    /// Replacement camera, when the viewport should move or zoom.
+    pub camera: Option<CameraState>,
 }
 
 /// Agent-facing operation accepted by the desktop server.
@@ -97,6 +115,31 @@ pub enum AppRequest {
         /// Proposal whose review state should be returned.
         proposal_id: crate::proto::ProposalId,
     },
+    /// Revalidate a pending or recently expired proposal and renew its review window.
+    RenewProposal {
+        /// Session owning the proposal, or the only open session when omitted.
+        session_id: Option<SessionId>,
+        /// Proposal to renew.
+        proposal_id: crate::proto::ProposalId,
+    },
+    /// Render the current live document and an optional proposed result.
+    Render {
+        /// Session to render, or the only open session when omitted.
+        session_id: Option<SessionId>,
+        /// Transaction to preview without applying.
+        transaction: Option<TransactionDraft>,
+        /// Page to render, or the first page when omitted.
+        page_id: Option<PageId>,
+        /// Exact world-space render bounds.
+        region: Option<Bounds>,
+    },
+    /// Ask the desktop editor to change its page, layer, selection, or camera.
+    Ui {
+        /// Session to control, or the only open session when omitted.
+        session_id: Option<SessionId>,
+        /// Typed editor state change.
+        control: UiControl,
+    },
     /// Apply an agent transaction when direct access is enabled.
     Apply {
         /// Session to change, or the only open session when omitted.
@@ -140,10 +183,16 @@ pub enum AppResponse {
     Proposal(Proposal),
     /// Current or retained proposal review state.
     ProposalStatus(ProposalStatus),
+    /// A proposal was revalidated and returned to review.
+    RenewedProposal(Proposal),
+    /// Current and proposed deterministic SVG projections.
+    Rendered(Box<LiveSvgPreview>),
     /// A directly authorized transaction was committed.
     Committed(Box<SessionCommit>),
     /// The focus notification was emitted.
     Focused,
+    /// The desktop accepted a typed UI navigation request.
+    UiControlled,
 }
 
 /// Response frame correlated with one request.
@@ -471,6 +520,37 @@ pub fn dispatch(service: &mut SessionService, request: AppRequest) -> Result<App
                 .map(AppResponse::ProposalStatus)
                 .map_err(|error| session_protocol_error(&error))
         }
+        AppRequest::RenewProposal { session_id, proposal_id } => {
+            let session_id = service
+                .resolve_session_id(session_id.as_ref())
+                .map_err(|error| session_protocol_error(&error))?;
+            service
+                .renew_proposal(&session_id, &proposal_id)
+                .map(AppResponse::RenewedProposal)
+                .map_err(|error| session_protocol_error_with_heads(service, &session_id, &error))
+        }
+        AppRequest::Render { session_id, transaction, page_id, region } => {
+            let session_id = service
+                .resolve_session_id(session_id.as_ref())
+                .map_err(|error| session_protocol_error(&error))?;
+            service
+                .render_live(&session_id, transaction.as_ref(), page_id, region)
+                .map(|preview| AppResponse::Rendered(Box::new(preview)))
+                .map_err(|error| session_protocol_error_with_heads(service, &session_id, &error))
+        }
+        AppRequest::Ui { session_id, control } => {
+            let session_id = service
+                .resolve_session_id(session_id.as_ref())
+                .map_err(|error| session_protocol_error(&error))?;
+            let status = service
+                .status(&session_id)
+                .map_err(|error| session_protocol_error(&error))?;
+            let context = service
+                .context(&session_id)
+                .map_err(|error| session_protocol_error(&error))?;
+            validate_ui_control(&status.snapshot, &context, &control)?;
+            Ok(AppResponse::UiControlled)
+        }
         AppRequest::Apply { session_id, transaction } => {
             let session_id = service
                 .resolve_session_id(session_id.as_ref())
@@ -482,6 +562,84 @@ pub fn dispatch(service: &mut SessionService, request: AppRequest) -> Result<App
         }
         AppRequest::Focus => Ok(AppResponse::Focused),
     }
+}
+
+fn validate_ui_control(
+    snapshot: &DocumentSnapshot, context: &SessionContext, control: &UiControl,
+) -> Result<(), ProtocolError> {
+    if control.page_id.is_none()
+        && control.active_layer_id.is_none()
+        && control.selection_ids.is_none()
+        && control.camera.is_none()
+    {
+        return Err(protocol_error(
+            "invalid_ui_control",
+            "at least one UI field is required",
+        ));
+    }
+    if let Some(page_id) = &control.page_id
+        && !snapshot.document.pages.contains_key(page_id)
+    {
+        return Err(protocol_error(
+            "invalid_ui_control",
+            format!("page {page_id} does not exist"),
+        ));
+    }
+    if let Some(layer_id) = &control.active_layer_id
+        && !snapshot.document.layers.contains_key(layer_id)
+    {
+        return Err(protocol_error(
+            "invalid_ui_control",
+            format!("layer {layer_id} does not exist"),
+        ));
+    }
+    let effective_page = control.page_id.as_ref().or(context.page_id.as_ref());
+    let effective_layer = control.active_layer_id.as_ref().or(context.active_layer_id.as_ref());
+    if let (Some(page_id), Some(layer_id)) = (effective_page, effective_layer)
+        && snapshot.document.layers[layer_id].page_id != *page_id
+    {
+        return Err(protocol_error(
+            "invalid_ui_control",
+            format!("layer {layer_id} is not on page {page_id}"),
+        ));
+    }
+    if let Some(selection_ids) = &control.selection_ids
+        && let Some(shape_id) = selection_ids
+            .iter()
+            .find(|shape_id| !snapshot.document.shapes.contains_key(*shape_id))
+    {
+        return Err(protocol_error(
+            "invalid_ui_control",
+            format!("shape {shape_id} does not exist"),
+        ));
+    }
+    if let (Some(page_id), Some(selection_ids)) = (effective_page, &control.selection_ids) {
+        for selected_shape_id in selection_ids {
+            let mut shape_id = selected_shape_id;
+            let layer_id = loop {
+                let shape = &snapshot.document.shapes[shape_id];
+                match &shape.parent {
+                    crate::ShapeParent::Layer(layer_id) => break layer_id,
+                    crate::ShapeParent::Shape(parent_id) => shape_id = parent_id,
+                }
+            };
+            if snapshot.document.layers[layer_id].page_id != *page_id {
+                return Err(protocol_error(
+                    "invalid_ui_control",
+                    format!("shape {selected_shape_id} is not on page {page_id}"),
+                ));
+            }
+        }
+    }
+    if control.camera.is_some_and(|camera| {
+        !camera.x.is_finite() || !camera.y.is_finite() || !camera.zoom.is_finite() || camera.zoom <= 0.0
+    }) {
+        return Err(protocol_error(
+            "invalid_ui_control",
+            "camera coordinates must be finite and zoom must be positive",
+        ));
+    }
+    Ok(())
 }
 
 fn session_protocol_error_with_heads(
@@ -505,6 +663,7 @@ pub fn session_protocol_error(error: &SessionError) -> ProtocolError {
         SessionError::SessionSelectionRequired { open_sessions: 0 } => "app_session_unavailable",
         SessionError::SessionSelectionRequired { .. } => "session_selection_required",
         SessionError::InvalidContext(_) => "invalid_context",
+        SessionError::Render(_) => "render_error",
         SessionError::ActorMismatch { .. } => "actor_mismatch",
         SessionError::StaleHeads => "stale_heads",
         SessionError::ProposalLimit(_)
@@ -697,7 +856,8 @@ mod tests {
     use tokio::io::AsyncWriteExt as _;
 
     use super::*;
-    use crate::proto::Query;
+    use crate::proto::{Operation, Query, TransactionId};
+    use crate::{Origin, Timestamp};
 
     static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -824,6 +984,50 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(query, AppResponse::QueryResult(result) if result.heads == opened.status.snapshot.heads));
+        let render_transaction = TransactionDraft {
+            id: TransactionId("transaction:render-preview".into()),
+            actor_id: opened.status.actor_id.clone(),
+            origin: Origin::Agent,
+            base_heads: opened.status.snapshot.heads.clone(),
+            description: "preview page rename".into(),
+            operations: vec![Operation::RenamePage {
+                page_id: opened.status.snapshot.document.page_ids[0].clone(),
+                name: "Proposed".into(),
+                expected_version: None,
+            }],
+            timestamp: Timestamp(1),
+        };
+        let rendered = dispatch(
+            &mut service,
+            AppRequest::Render { session_id: None, transaction: Some(render_transaction), page_id: None, region: None },
+        )
+        .unwrap();
+        assert!(matches!(
+            rendered,
+            AppResponse::Rendered(rendered)
+                if rendered.current_svg.starts_with("<svg")
+                    && rendered.proposed_svg.is_some()
+                    && rendered.preview.is_some()
+        ));
+        assert_eq!(
+            service.status(&opened.session_id).unwrap().snapshot,
+            opened.status.snapshot
+        );
+        let page_id = opened.status.snapshot.document.page_ids[0].clone();
+        let controlled = dispatch(
+            &mut service,
+            AppRequest::Ui {
+                session_id: None,
+                control: UiControl {
+                    page_id: Some(page_id),
+                    active_layer_id: None,
+                    selection_ids: Some(Vec::new()),
+                    camera: Some(CameraState { x: 10.0, y: 20.0, zoom: 1.5 }),
+                },
+            },
+        )
+        .unwrap();
+        assert_eq!(controlled, AppResponse::UiControlled);
 
         service.close(&opened.session_id).unwrap();
         let error = dispatch(&mut service, AppRequest::Inspect { session_id: None }).unwrap_err();

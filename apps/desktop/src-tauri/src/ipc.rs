@@ -19,6 +19,8 @@ pub const PROPOSAL_EVENT: &str = "inkfinite-proposal";
 pub const PROPOSAL_CLEARED_EVENT: &str = "inkfinite-proposal-cleared";
 /// Tauri event carrying a commit made by a live client.
 pub const COMMIT_EVENT: &str = "inkfinite-live-commit";
+/// Tauri event carrying typed page, layer, selection, and camera control.
+pub const UI_CONTROL_EVENT: &str = "inkfinite-ui-control";
 /// Tauri event carrying a remote synchronization result.
 pub const SYNC_EVENT: &str = "inkfinite-sync";
 
@@ -223,6 +225,10 @@ async fn handle_connection<S>(
 fn dispatch_request(
     app: &AppHandle, service: &Arc<Mutex<SessionService>>, request: AppRequest,
 ) -> Result<AppResponse, ProtocolError> {
+    let ui_control = match &request {
+        AppRequest::Ui { control, .. } => Some(control.clone()),
+        _ => None,
+    };
     let requested_session = match &request {
         AppRequest::Context { session_id }
         | AppRequest::Inspect { session_id }
@@ -230,6 +236,9 @@ fn dispatch_request(
         | AppRequest::Propose { session_id, .. }
         | AppRequest::Mutate { session_id, .. }
         | AppRequest::ProposalStatus { session_id, .. }
+        | AppRequest::RenewProposal { session_id, .. }
+        | AppRequest::Render { session_id, .. }
+        | AppRequest::Ui { session_id, .. }
         | AppRequest::Apply { session_id, .. } => session_id.clone(),
         AppRequest::Status | AppRequest::Focus => None,
     };
@@ -260,8 +269,22 @@ fn dispatch_request(
             )
         })?;
     }
+    if matches!(&response, AppResponse::UiControlled) {
+        if let Some(control) = ui_control {
+            app.emit(
+                UI_CONTROL_EVENT,
+                json!({ "session_id": requested_session, "control": control }),
+            )
+            .map_err(|error| {
+                protocol_error(
+                    "ui_control_notification_failed",
+                    format!("could not notify the desktop frontend: {error}"),
+                )
+            })?;
+        }
+    }
     match &response {
-        AppResponse::Proposal(proposal) => app
+        AppResponse::Proposal(proposal) | AppResponse::RenewedProposal(proposal) => app
             .emit(
                 PROPOSAL_EVENT,
                 json!({ "session_id": requested_session, "proposal": proposal }),
@@ -288,7 +311,9 @@ fn dispatch_request(
         | AppResponse::Snapshot(_)
         | AppResponse::QueryResult(_)
         | AppResponse::ProposalStatus(_)
-        | AppResponse::Focused => {}
+        | AppResponse::Rendered(_)
+        | AppResponse::Focused
+        | AppResponse::UiControlled => {}
     }
     Ok(response)
 }

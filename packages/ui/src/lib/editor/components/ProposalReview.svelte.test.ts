@@ -9,6 +9,15 @@ const proposal: LiveProposal = {
 	transaction: { operations: [{ type: 'rename_page' }, { type: 'patch_shape' }] },
 	preview: { created: ['shape:new'], changed: ['shape:changed'], deleted: ['shape:deleted'] },
 	affected_regions: [{ page_id: 'page:one', bounds: { x: 10, y: 20, width: 80, height: 40 } }],
+	operation_previews: [
+		{ position: 0, label: 'Rename page “Overview”', record_ids: [], bounds: [] },
+		{
+			position: 1,
+			label: 'Update shape:service (architecture.service)',
+			record_ids: [],
+			bounds: [{ x: 10, y: 20, width: 80, height: 40 }]
+		}
+	],
 	warnings: [],
 	expires_at: Date.now() + 60_000
 };
@@ -32,6 +41,10 @@ describe('ProposalReview', () => {
 			.toBeInTheDocument();
 		await expect.element(screen.getByText('proposal:1')).toBeInTheDocument();
 		await expect.element(screen.getByText('created')).toBeInTheDocument();
+		await expect
+			.element(screen.getByText('Update shape:service (architecture.service)'))
+			.toBeInTheDocument();
+		await expect.element(screen.getByText('10,20 80×40')).toBeInTheDocument();
 
 		await screen.getByRole('checkbox', { name: 'Select operation 2' }).click();
 		await screen.getByRole('button', { name: 'Accept selected' }).click();

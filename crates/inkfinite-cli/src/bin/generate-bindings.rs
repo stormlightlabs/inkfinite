@@ -6,10 +6,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use inkfinite_core::proto::{
-    AffectedRegion, AgentAccessMode, AssetPatch, Bounds, CommitResult, DocumentPatch, DocumentPath, InverseMetadata,
-    LayerContentsDisposition, LayerPatch, LayoutAxis, Operation, Proposal, ProposalId, ProtocolError, Query,
-    QueryRecord, QueryResult, RecordId, Request, Response, SaveResult, SessionId, ShapeAlignment, ShapePatch,
-    TransactionDraft, TransactionId, Warning,
+    AffectedRegion, AgentAccessMode, AssetPatch, Bounds, CameraState, CommitResult, DocumentPatch, DocumentPath,
+    InverseMetadata, LayerContentsDisposition, LayerPatch, LayoutAxis, Operation, Proposal, ProposalId,
+    ProposalOperationPreview, ProtocolError, Query, QueryRecord, QueryResult, RecordId, Request, Response, SaveResult,
+    SessionId, ShapeAlignment, ShapePatch, TransactionDraft, TransactionId, Warning,
 };
 use inkfinite_core::{
     ActorId, AssetId, AssetRecord, AssetSource, BindingAnchor, BindingId, BindingKind, BindingRecord, ChangeHash,
@@ -188,6 +188,7 @@ fn transaction_bindings() -> String {
     append_clean_declaration::<QueryRecord>(&mut output, &config);
     append_declaration::<DocumentPatch>(&mut output, &config);
     append_declaration::<Bounds>(&mut output, &config);
+    append_clean_declaration::<CameraState>(&mut output, &config);
     append_declaration::<AffectedRegion>(&mut output, &config);
     append_declaration::<InverseMetadata>(&mut output, &config);
     append_declaration::<Warning>(&mut output, &config);
@@ -196,7 +197,8 @@ fn transaction_bindings() -> String {
     append_clean_declaration::<QueryResult>(&mut output, &config);
     append_declaration::<SaveResult>(&mut output, &config);
     append_declaration::<ProposalId>(&mut output, &config);
-    append_declaration::<Proposal>(&mut output, &config);
+    append_clean_declaration::<ProposalOperationPreview>(&mut output, &config);
+    append_clean_declaration::<Proposal>(&mut output, &config);
     output
 }
 

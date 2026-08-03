@@ -159,7 +159,11 @@
 	}
 </script>
 
-<aside class="layer-panel" class:layer-panel--collapsed={collapsed} aria-label="Layers">
+<aside
+	class="layer-panel"
+	class:layer-panel--collapsed={collapsed}
+	aria-label="Layers"
+	data-agent-occlusion>
 	<header class="layer-panel__header">
 		<div class="layer-panel__title">
 			{#if !collapsed}<Icon name="layers" size="1rem" />{/if}

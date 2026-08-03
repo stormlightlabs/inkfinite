@@ -458,6 +458,7 @@
 	class="toolbar"
 	role="toolbar"
 	aria-label="Drawing tools"
+	data-agent-occlusion
 	bind:this={toolbarEl}
 	style="position: fixed; left: {position.x}px; top: {position.y}px;"
 	data-dragging={isDragging}>

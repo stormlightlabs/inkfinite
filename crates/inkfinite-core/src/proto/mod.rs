@@ -15,7 +15,7 @@ use ts_rs::TS;
 pub const PROTOCOL_ID: &str = "inkfinite.protocol";
 
 /// Current transport-independent protocol version.
-pub const PROTOCOL_VERSION: u32 = 3;
+pub const PROTOCOL_VERSION: u32 = 4;
 
 /// Stable identifier for a transaction.
 #[derive(Clone, Debug, Eq, Hash, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS)]
@@ -347,6 +347,17 @@ pub struct Bounds {
     pub height: f64,
 }
 
+/// Camera state reported by or requested from the desktop editor.
+#[derive(Clone, Copy, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+pub struct CameraState {
+    /// World-space horizontal coordinate at the viewport center.
+    pub x: f64,
+    /// World-space vertical coordinate at the viewport center.
+    pub y: f64,
+    /// Screen pixels per world-space unit.
+    pub zoom: f64,
+}
+
 /// Region that a renderer should consider dirty after a transaction.
 #[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct AffectedRegion {
@@ -464,10 +475,25 @@ pub struct Proposal {
     pub preview: DocumentPatch,
     /// Document-coordinate regions affected by the proposed geometry.
     pub affected_regions: Vec<AffectedRegion>,
+    /// Human-readable, independently selectable operation previews.
+    pub operation_previews: Vec<ProposalOperationPreview>,
     /// Validation or repair warnings shown before acceptance.
     pub warnings: Vec<Warning>,
     /// Wall-clock expiry retained for clients and diagnostics.
     pub expires_at: Timestamp,
+}
+
+/// Review metadata for one operation in a proposal.
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+pub struct ProposalOperationPreview {
+    /// Zero-based position used by partial acceptance.
+    pub position: u32,
+    /// Stable human-readable operation label.
+    pub label: String,
+    /// Records named directly by this operation.
+    pub record_ids: Vec<RecordId>,
+    /// Geometry attributable to this operation before or after the proposal.
+    pub bounds: Vec<Bounds>,
 }
 
 /// Transport-independent request accepted by desktop commands, IPC, or CLI adapters.

@@ -433,18 +433,34 @@ describe('Rust-backed desktop session repository', () => {
 
 	it('publishes editor context only after a desktop session is open', async () => {
 		const repo = createDesktopSessionRepo(fileOps.ops, { api: session.api });
-		await repo.updateAgentContext({ pageId: 'page:none', selectionIds: [], viewport: null });
+		await repo.updateAgentContext({
+			pageId: 'page:none',
+			activeLayerId: null,
+			selectionIds: [],
+			viewport: null,
+			camera: null,
+			occludedRegions: []
+		});
 		expect(session.agentContexts).toEqual([]);
 
 		const opened = await repo.openDraft();
 		const pageId = opened.doc.order.pageIds[0];
 		await repo.updateAgentContext({
 			pageId,
+			activeLayerId: 'layer:active',
 			selectionIds: [],
-			viewport: { x: -100, y: -50, width: 200, height: 100 }
+			viewport: { x: -100, y: -50, width: 200, height: 100 },
+			camera: { x: 0, y: 0, zoom: 2 },
+			occludedRegions: [{ x: -100, y: -50, width: 20, height: 100 }]
 		});
 
-		expect(session.agentContexts.at(-1)).toMatchObject({ page_id: pageId, viewport: { width: 200, height: 100 } });
+		expect(session.agentContexts.at(-1)).toMatchObject({
+			page_id: pageId,
+			active_layer_id: 'layer:active',
+			viewport: { width: 200, height: 100 },
+			camera: { zoom: 2 },
+			occluded_regions: [{ width: 20 }]
+		});
 	});
 
 	it('lists native document paths without reading document bytes in the frontend', async () => {

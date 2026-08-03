@@ -5,14 +5,14 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use inkfinite_core::proto::{
-    AgentAccessMode, Bounds, DocumentPath, Proposal, ProposalId, ProtocolError, Query, QueryResult, SessionId,
-    TransactionDraft,
+    AgentAccessMode, DocumentPath, Proposal, ProposalId, ProtocolError, Query, QueryResult, SessionId, TransactionDraft,
 };
 use inkfinite_core::session::{
-    SessionCommit, SessionError, SessionOpened, SessionSaved, SessionService, SessionStatus, SessionSync,
+    EditorContextUpdate, SessionCommit, SessionError, SessionOpened, SessionSaved, SessionService, SessionStatus,
+    SessionSync,
 };
 use inkfinite_core::sync::SyncMessage;
-use inkfinite_core::{ActorId, ChangeHash, DocumentId, PageId, ShapeId};
+use inkfinite_core::{ActorId, ChangeHash, DocumentId};
 use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -171,17 +171,9 @@ pub fn snapshot(state: State<'_, DesktopState>, session_id: String) -> Result<Se
 
 /// Records editor-only state used by agent context queries.
 #[tauri::command]
-pub fn update_context(
-    state: State<'_, DesktopState>, session_id: String, page_id: Option<String>, selection_ids: Vec<String>,
-    viewport: Option<Bounds>,
-) -> Result<()> {
+pub fn update_context(state: State<'_, DesktopState>, session_id: String, context: EditorContextUpdate) -> Result<()> {
     lock_service(&state)?
-        .update_context(
-            &SessionId(session_id),
-            page_id.map(PageId::from),
-            selection_ids.into_iter().map(ShapeId::from).collect(),
-            viewport,
-        )
+        .update_context(&SessionId(session_id), context)
         .map_err(to_protocol_error)
 }
 

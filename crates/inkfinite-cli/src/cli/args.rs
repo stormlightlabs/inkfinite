@@ -1,4 +1,4 @@
-use super::{ArgGroup, Args, Bounds, Parser, PathBuf, Subcommand, ValueEnum, parse_bounds};
+use super::{ArgGroup, Args, Bounds, CameraState, Parser, PathBuf, Subcommand, ValueEnum, parse_bounds};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -218,7 +218,8 @@ pub struct MutationOptions {
 }
 
 #[derive(Debug, Args)]
-#[command(group(ArgGroup::new("parent").required(true).args(["layer", "parent_shape"])))]
+#[command(group(ArgGroup::new("parent").args(["layer", "parent_shape"])))]
+#[command(group(ArgGroup::new("relative_target").args(["relative_id", "relative_name", "relative_role"])))]
 pub struct ShapeCreateArgs {
     /// Canonical document to change. Omit when using --app.
     #[arg(value_name = "FILE")]
@@ -235,6 +236,21 @@ pub struct ShapeCreateArgs {
     /// Parent container shape ID.
     #[arg(long, value_name = "SHAPE_ID")]
     pub parent_shape: Option<String>,
+    /// Place relative to this exact shape ID.
+    #[arg(long, value_name = "SHAPE_ID")]
+    pub relative_id: Option<String>,
+    /// Place relative to the uniquely named shape.
+    #[arg(long)]
+    pub relative_name: Option<String>,
+    /// Place relative to the shape with this unique semantic role.
+    #[arg(long)]
+    pub relative_role: Option<String>,
+    /// Spatial relationship to the selected target.
+    #[arg(long, value_enum, requires = "relative_target")]
+    pub placement: Option<PlacementArg>,
+    /// Space between the new shape and its semantic target.
+    #[arg(long, default_value_t = 24.0, allow_hyphen_values = true)]
+    pub gap: f64,
     /// Horizontal position in parent coordinates.
     #[arg(long, default_value_t = 0.0, allow_hyphen_values = true)]
     pub x: f64,
@@ -411,6 +427,19 @@ pub enum AxisArg {
     Vertical,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+pub enum PlacementArg {
+    Inside,
+    Below,
+    RightOf,
+    AlignLeft,
+    AlignCenter,
+    AlignRight,
+    AlignTop,
+    AlignMiddle,
+    AlignBottom,
+}
+
 #[derive(Debug, Args)]
 pub struct RenderArgs {
     /// Canonical .inkfinite document to render.
@@ -512,6 +541,10 @@ pub enum AppCommand {
     /// Observe a proposal without accepting or rejecting it.
     #[command(subcommand)]
     Proposal(AppProposalCommand),
+    /// Render the current live document and an optional proposed result without applying it.
+    Render(AppRenderArgs),
+    /// Change the desktop page, active layer, selection, or camera.
+    Ui(AppUiArgs),
     /// Apply an agent transaction when Direct access is enabled in the desktop UI.
     #[command(after_help = "Example:
 
@@ -532,6 +565,52 @@ pub enum AppProposalCommand {
     Status(AppProposalStatusArgs),
     /// Wait until desktop review accepts, rejects, or expires the proposal.
     Wait(AppProposalWaitArgs),
+    /// Revalidate the proposal and start a fresh review window.
+    Renew(AppProposalStatusArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct AppRenderArgs {
+    /// Write the current live document SVG here.
+    #[arg(long, value_name = "SVG_FILE")]
+    pub output: PathBuf,
+    /// Write the proposed result SVG here. Requires --transaction.
+    #[arg(long, value_name = "SVG_FILE", requires = "transaction")]
+    pub proposed_output: Option<PathBuf>,
+    /// Transaction JSON file, or - for standard input, to preview without applying.
+    #[arg(long, value_name = "TRANSACTION", requires = "proposed_output")]
+    pub transaction: Option<PathBuf>,
+    /// Render this page instead of the first page.
+    #[arg(long, value_name = "PAGE_ID")]
+    pub page: Option<String>,
+    /// Use this exact world-space SVG view box.
+    #[arg(long, value_name = "X,Y,WIDTH,HEIGHT", value_parser = parse_bounds)]
+    pub region: Option<Bounds>,
+    /// Render this session, or the only open session when omitted.
+    #[arg(long, value_name = "SESSION_ID")]
+    pub session_id: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct AppUiArgs {
+    /// Show this page.
+    #[arg(long, value_name = "PAGE_ID")]
+    pub page: Option<String>,
+    /// Activate this layer.
+    #[arg(long, value_name = "LAYER_ID")]
+    pub layer: Option<String>,
+    /// Replace the selection with this shape. May be repeated; pass no --select to preserve it.
+    #[arg(long = "select", value_name = "SHAPE_ID")]
+    pub selection: Vec<String>,
+    /// Clear the current selection.
+    #[arg(long, conflicts_with = "selection")]
+    pub clear_selection: bool,
+    /// Set camera center and zoom as x,y,zoom.
+    #[arg(long, value_name = "X,Y,ZOOM", value_parser = parse_camera)]
+    pub camera: Option<CameraState>,
+    /// Control this session, or the only open session when omitted.
+    #[arg(long, value_name = "SESSION_ID")]
+    pub session_id: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -555,6 +634,22 @@ pub struct AppProposalWaitArgs {
     /// Maximum number of seconds to wait.
     #[arg(long, default_value_t = 300, value_parser = clap::value_parser!(u64).range(1..))]
     pub timeout_seconds: u64,
+}
+
+fn parse_camera(value: &str) -> std::result::Result<CameraState, String> {
+    let values = value
+        .split(',')
+        .map(str::trim)
+        .map(str::parse::<f64>)
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(|error| format!("invalid camera: {error}"))?;
+    let [x, y, zoom] = values.as_slice() else {
+        return Err("camera must contain x,y,zoom".into());
+    };
+    if !x.is_finite() || !y.is_finite() || !zoom.is_finite() || *zoom <= 0.0 {
+        return Err("camera coordinates must be finite and zoom must be positive".into());
+    }
+    Ok(CameraState { x: *x, y: *y, zoom: *zoom })
 }
 
 #[derive(Debug, Args)]

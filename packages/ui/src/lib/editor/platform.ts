@@ -24,6 +24,12 @@ export type LiveProposal = {
 		page_id: string;
 		bounds: { x: number; y: number; width: number; height: number };
 	}>;
+	operation_previews?: Array<{
+		position: number;
+		label: string;
+		record_ids: readonly unknown[];
+		bounds: Array<{ x: number; y: number; width: number; height: number }>;
+	}>;
 	warnings: Array<{ code: string; message: string }>;
 	expires_at: number;
 };
@@ -34,8 +40,19 @@ export type ProposalUpdate = { proposal: LiveProposal | null; message?: string }
 /** Editor-only state shared with read-only agent context queries. */
 export type AgentEditorContext = {
 	pageId: string | null;
+	activeLayerId: string | null;
 	selectionIds: string[];
 	viewport: { x: number; y: number; width: number; height: number } | null;
+	camera: { x: number; y: number; zoom: number } | null;
+	occludedRegions: Array<{ x: number; y: number; width: number; height: number }>;
+};
+
+/** Typed page, layer, selection, and camera control received from the live CLI. */
+export type AgentUiControl = {
+	page_id?: string | null;
+	active_layer_id?: string | null;
+	selection_ids?: string[] | null;
+	camera?: { x: number; y: number; zoom: number } | null;
 };
 
 /** File command selected from a desktop application's native menu. */
@@ -84,6 +101,8 @@ export interface DesktopDocumentRepo extends PersistentDocRepo {
 	subscribeLiveDocument(
 		listener: (doc: import('@inkfinite/core').LoadedDoc) => void
 	): () => void;
+	/** Receives authenticated live CLI navigation without changing document history. */
+	subscribeAgentUi(listener: (control: AgentUiControl) => void): () => void;
 	acceptProposal(
 		proposalId: string,
 		operationPositions?: number[]
