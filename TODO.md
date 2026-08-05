@@ -173,7 +173,7 @@ Verification:
   used the real CLI framing and an authenticated Unix-socket fixture server;
   no UI automation or canonical-file byte edits were used.
 
-### V2-22: Collapse to one native Inkfinite model — complete
+### V2-22: Collapse to one native Inkfinite model
 
 The current document model and file flow are the only supported
 Inkfinite model. Removed the temporary predecessor/current split, retained only
@@ -234,8 +234,7 @@ Verification:
 What to build: Assemble release evidence and close every roadmap success
 criterion against the native release candidate without adding new architecture.
 
-Blocked by: V2-11, V2-12, V2-13, V2-14, V2-16, V2-18, V2-19, V2-20, V2-22,
-V2-23
+Blocked by: V2-11 to 14, V2-16, V2-18 to 20, V2-22, V2-23
 
 Acceptance criteria:
 
@@ -254,6 +253,41 @@ Acceptance criteria:
 
 ## Parking Lot
 
-- How should bundling/packaging work?
+- The web app could be made into a PWA.
+    1. add webmanifest
+    2. add a _kit_ service worker
+    3. make it offline-first
+
+### Fixtures
+
+- Fixtures should live in an unpublished fixtures crate (sort of like lectito),
+  that acts as an executable performance corpus
+
+### Features
+
+- SVG Editing
+- MCP (see below)
+
+### Bundling/Packaging
+
+- How should this work?
+    - CLI & core to crates.io
+    - Applications to GH releases
+
+### Skill
+
+- Does the skill really need fixtures? Could those live in the above mentioned
+  fixture crate?
+- Can/should the skill be split up?
+- If/when SVG editing is added, we maybe should make multiple skills for drawing,
+  wireframing, svg editing, etc. Pixijs, Remotion, and Cloudflare do a good job
+  of separating skills.
+
+### MCP
+
+- The CLI should probably be more permissive and permissioned usage should
+  stick with the MCP. That would give a developer more flexibility to choose
+  how an agent interacts with documents.
+    - Permissions pollute the CLI's signature and make its scriptability tedious
 
 ### QA

@@ -155,8 +155,9 @@ rules where specified, and validated before the session adopts them.
 
 The canonical file is Automerge's compact binary form with the `.inkfinite`
 extension. JSON is a deterministic inspection projection, not a second file
-format or CRDT round-trip. [docs/file-format.md](docs/file-format.md) defines
-the current file behavior. The CLI supplies JSON inspection for repositories and
+format or CRDT round-trip. The
+[file format reference](apps/web/src/routes/docs/reference/file-format/+page.svx)
+defines the current file behavior. The CLI supplies JSON inspection for repositories and
 CI and produces deterministic SVG.
 
 ## Document contract

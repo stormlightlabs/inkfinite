@@ -227,4 +227,4 @@ pnpm dev:ui
 
 ## License
 
-Inkfinite is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+Inkfinite is licensed under the [Apache-2.0](LICENSE).
