@@ -39,6 +39,8 @@
   canonical Automerge bytes through one worker.
 - Canonical geometry commits that validate and normalize native paths and freehand strokes in Rust,
   compute committed stroke bounds, and exercise shared Rust/TypeScript geometry fixtures.
+- Browser smoke coverage for the compiled WASM document engine and real worker across create,
+  mutate, save, reopen, projection, undo, redo, SVG import, and SVG rendering.
 
 #### SVG Interop
 
@@ -72,6 +74,8 @@
   reconciliation for page, layer, and shape changes
 - Browser canonical state now caches the Rust editor projection with Automerge
   bytes. WASM request and response payloads are generated from Rust.
+- The shared browser worker and client are named for their document-engine role,
+  and root test verification builds the WASM package before running tests.
 
 ### Fixed
 

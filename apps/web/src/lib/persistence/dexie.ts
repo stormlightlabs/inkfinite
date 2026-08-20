@@ -19,8 +19,8 @@ import type { EditorPlatformAdapter, EditorPlatformSession } from '@inkfinite/ui
 import { liveQuery } from 'dexie';
 import { InkfiniteDB } from './database';
 import { createDexieDocRepo, createPersistenceSink, getBoardInspectorData } from './repository';
-import { getSharedSvgImportWorker, renderSvgInWorker } from './svg-import';
-import type { BrowserDocumentState } from './svg-import';
+import { getSharedDocumentEngineWorker, renderSvgInWorker } from './document-engine';
+import type { BrowserDocumentState } from './document-engine';
 import type { PersistenceSinkOptions } from './repository';
 import type { LoadedDoc } from '@inkfinite/core';
 
@@ -56,7 +56,7 @@ export function createDexieSession(
 	const liveQueryFactory = opts.liveQueryFn ?? liveQuery;
 	let activeBoardId: string | null = null;
 	let subscription: { unsubscribe(): void } | null = null;
-	let documentWorker: ReturnType<typeof getSharedSvgImportWorker> | null = null;
+	let documentWorker: ReturnType<typeof getSharedDocumentEngineWorker> | null = null;
 	let documentBoardId: string | null = null;
 	let documentReady: Promise<LoadedDoc | null> | null = null;
 	let documentQueue: Promise<void> = Promise.resolve();
@@ -86,7 +86,7 @@ export function createDexieSession(
 
 	function ensureDocumentWorker() {
 		if (!canonicalEnabled) return null;
-		documentWorker ??= getSharedSvgImportWorker();
+		documentWorker ??= getSharedDocumentEngineWorker();
 		return documentWorker;
 	}
 

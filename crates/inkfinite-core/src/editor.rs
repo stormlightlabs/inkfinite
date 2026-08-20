@@ -516,12 +516,7 @@ pub fn reconcile_editor_patches(
                 reconcile_shape(
                     document,
                     shape_id,
-                    transform,
-                    properties,
-                    metadata,
-                    style,
-                    parent.as_ref(),
-                    anchor,
+                    ReconcileShapeOptions { transform, properties, metadata, style, parent: parent.as_ref(), anchor },
                     &created_layers,
                     &mut operations,
                 )?;
@@ -603,13 +598,20 @@ pub fn reconcile_editor_patches(
     })
 }
 
-// FIXME: this function signature is AWFUL
-#[allow(clippy::too_many_arguments)]
+struct ReconcileShapeOptions<'a> {
+    transform: Option<EditorTransform>,
+    properties: Option<ShapeProperties>,
+    metadata: Option<SemanticMetadata>,
+    style: Option<ShapeStyle>,
+    parent: Option<&'a ShapeParent>,
+    anchor: Option<SiblingAnchor<ShapeId>>,
+}
+
 fn reconcile_shape(
-    document: &Document, shape_id: ShapeId, transform: Option<EditorTransform>, properties: Option<ShapeProperties>,
-    metadata: Option<SemanticMetadata>, style: Option<ShapeStyle>, parent: Option<&ShapeParent>,
-    anchor: Option<SiblingAnchor<ShapeId>>, created_layers: &BTreeSet<LayerId>, operations: &mut Vec<Operation>,
+    document: &Document, shape_id: ShapeId, options: ReconcileShapeOptions<'_>, created_layers: &BTreeSet<LayerId>,
+    operations: &mut Vec<Operation>,
 ) -> Result<(), EditorReconciliationError> {
+    let ReconcileShapeOptions { transform, properties, metadata, style, parent, anchor } = options;
     let shape = document
         .shapes
         .get(&shape_id)

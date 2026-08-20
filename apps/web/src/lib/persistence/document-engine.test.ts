@@ -1,6 +1,6 @@
 import type { DocumentSnapshot } from '@inkfinite/wasm';
 import { describe, expect, it } from 'vitest';
-import { SvgImportWorkerClient } from './svg-import';
+import { DocumentEngineWorkerClient } from './document-engine';
 
 type Listener = (event: { data: unknown; message?: string }) => void;
 
@@ -109,10 +109,10 @@ class FakeWorker {
 	}
 }
 
-describe('SVG import worker client', () => {
+describe('document engine worker client', () => {
 	it('transfers bytes and resolves the normalized worker response', async () => {
 		const worker = new FakeWorker();
-		const client = new SvgImportWorkerClient(worker as unknown as Worker);
+		const client = new DocumentEngineWorkerClient(worker as unknown as Worker);
 		const source = new Uint8Array([60, 115, 118, 103]);
 
 		const result = await client.import(source);
@@ -133,7 +133,7 @@ describe('SVG import worker client', () => {
 
 	it('routes document SVG imports through the worker-owned session', async () => {
 		const worker = new FakeWorker();
-		const client = new SvgImportWorkerClient(worker as unknown as Worker);
+		const client = new DocumentEngineWorkerClient(worker as unknown as Worker);
 
 		const state = await client.importDocumentSvg(
 			new Uint8Array([60, 115, 118, 103]),
@@ -154,7 +154,7 @@ describe('SVG import worker client', () => {
 
 	it('routes projection and reconciliation requests through the same worker', async () => {
 		const worker = new FakeWorker();
-		const client = new SvgImportWorkerClient(worker as unknown as Worker);
+		const client = new DocumentEngineWorkerClient(worker as unknown as Worker);
 
 		const projection = await client.project({} as DocumentSnapshot);
 		expect(worker.lastMessage).toMatchObject({ type: 'project' });
@@ -168,7 +168,7 @@ describe('SVG import worker client', () => {
 
 	it('routes canonical render requests through the same worker', async () => {
 		const worker = new FakeWorker();
-		const client = new SvgImportWorkerClient(worker as unknown as Worker);
+		const client = new DocumentEngineWorkerClient(worker as unknown as Worker);
 
 		const result = await client.render({} as DocumentSnapshot, { page_id: 'page:one' });
 

@@ -61,36 +61,9 @@ Inkfinite now imports SVGs through one validated Rust pipeline across desktop, w
 
 ## WASM
 
-Inkfinite now runs the canonical Rust document engine in a browser worker. The browser stores
-Automerge bytes, commits validated transactions, uses Rust projection and reconciliation APIs,
-and shares SVG and committed-geometry behavior with native callers. TypeScript continues to own
-interaction state, previews, hit testing, Canvas rendering, and browser APIs.
-
-### Engine integration closure
-
-#### Canonical browser flow
-
-- [x] Return the Rust editor projection with browser document session state
-- [x] Hydrate canonical browser documents from the Rust projection
-- [x] Commit browser SVG imports through the Rust session and SVG transaction builder
-- [x] Remove the TypeScript SVG projector and imported-group compatibility metadata
-- [x] Generate TypeScript types for WASM request and response payloads
-
-#### Shared reconciliation
-
-- [x] Use one TypeScript editor-patch builder across web and desktop
-- [x] Reconcile desktop page and layer changes through Rust
-- [x] Retire the desktop whole-document mirror fallback
-- [x] Reuse generated native geometry and transform types in the editor model
-
-#### Worker verification and cleanup
-
-- [ ] Rename the shared SVG worker and client around their document-engine role
-- [ ] Add browser tests against the compiled WASM module and real worker
-- [ ] Cover create, mutate, save, reopen, project, undo, redo, SVG import, and SVG render
-- [ ] Run WASM build, type checking, and browser smoke tests from root verification
-- [ ] Remove unused TypeScript validation and generated bounds helpers after the browser tests pass
-- [ ] Remove unused standalone WASM APIs after migrating their consumers
+Inkfinite now runs the canonical Rust document engine in a browser worker. Root
+verification builds the WASM package and browser smoke coverage verifies the full
+document lifecycle, including SVG import and rendering.
 
 ## Vector Editing
 

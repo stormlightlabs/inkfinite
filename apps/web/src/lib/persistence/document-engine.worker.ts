@@ -12,7 +12,7 @@ import {
 	projectEditorInWorkerRuntime,
 	reconcileEditorPatchesInWorkerRuntime,
 	renderSvgInWorkerRuntime
-} from './svg-import';
+} from './document-engine';
 
 type Request =
 	| { type: 'import'; id: number; source: ArrayBuffer }

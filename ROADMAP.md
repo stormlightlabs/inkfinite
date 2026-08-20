@@ -13,134 +13,31 @@ implementation work lives in [TODO.md](TODO.md).
 
 ### SVG interoperability
 
-Make SVG a first-class interchange format.
+Inkfinite uses SVG as a first-class interchange format. Rust owns native path
+geometry, import, export, validation, and transaction construction across the
+desktop, web app, and CLI. Unsupported visual content retains an opaque fallback
+when possible.
 
-Inkfinite should be able to import useful SVG content into its native document
-model, edit that content as ordinary shapes, and export deterministic SVG
-without introducing an SVG-specific document model.
-
-SVG import should map supported elements onto native Inkfinite concepts:
-
-- groups become containers
-- basic primitives become existing shape kinds
-- arbitrary vector geometry becomes native paths
-- transforms become parent-relative Inkfinite transforms
-- fills, strokes, opacity, and other supported styles become native style data
-- embedded images become assets
-
-The original SVG source is retained as an asset for provenance, future
-re-import, and fallback handling.
-
-Desktop file-menu imports and the CLI already use the Rust importer and shared
-SVG transaction builder. Browser file selection, drop, and pasted markup still
-use a separate TypeScript parser, which supports a smaller SVG subset and can
-produce different geometry, hierarchy, style, warning, and asset results. The
-browser importer should be replaced rather than extended in parallel.
-
-A small browser-facing WASM crate should call the importer in
-`inkfinite-core`. The WASM API should expose a serializable normalized tree,
-source and embedded assets, structured warnings and errors, and omitted-image
-counts. TypeScript bindings should be generated or checked from that result
-schema so the browser does not acquire another handwritten importer contract.
-The core parser and normalization logic remain in Rust; the WASM crate is only
-the browser adapter.
-
-The web app should initialize and run WASM in a dedicated worker. It should
-lazy-load the module, reuse one initialized worker across imports, and transfer
-file bytes rather than parse on the main thread. The worker must enforce the
-same 16 MB input limit and report failures without leaving the editor in a busy
-state. Excalidraw and JSON Canvas imports should not wait for SVG WASM to load.
-
-The browser projects the normalized Rust result into its local document model,
-preserving groups, local transforms, styles, fill rules, warnings, and assets.
-Each completed import is committed as one document transaction and one undo
-step. Once file selection, drag-and-drop, and pasted markup use this path, the
-handwritten TypeScript SVG parser can be removed.
-
-The Bootstrap `filetype-svg` icon is the regression fixture for the original
-browser failure. It combines inherited `currentColor`, `evenodd`, relative
-commands, horizontal and vertical commands, arcs, and a compound path. Native
-and browser-WASM tests should compare normalized geometry, hierarchy, styles,
-warnings, source assets, and bounds. The imported result should be one editable
-path, resolve `currentColor` to concrete SVG paint, normalize arcs to cubic
-segments, retain `evenodd`, and match the artwork in its 16×16 viewBox. Canvas
-output should also agree visually with deterministic Rust SVG output; malformed,
-oversized, unsupported-feature, and embedded-image inputs must cross the worker
-boundary with the same outcomes as native import.
-
-Desktop imports into the active layer; browser imports create a new local board
-using the browser persistence adapter; CLI imports can target a file or a live
-desktop session.
-
-Unsupported SVG features should be reported explicitly and preserve a path to
-opaque fallback rather than silently disappearing.
-
-The importer has a checked-in fixture corpus under
-[`fixtures/svg-import`](fixtures/svg-import/). It includes Iconify-derived
-icons and logos, nested groups, compound paths, unsupported features, and
-malformed inputs. Rust and browser-WASM tests should exercise this corpus rather
-than maintain separate fixtures. They must validate native mappings, warning
-coverage, geometry semantics, and failure behavior as the supported SVG subset
-grows.
-
-SVG interoperability must use the same transaction, persistence, undo/redo,
-CRDT, desktop, and CLI paths as content created directly in Inkfinite.
+Remaining work focuses on round-trip workflows: save and reopen, undo and redo,
+CRDT merge, CLI inspection and mutation, deterministic transforms and compound
+fills, and visual stability for opaque fallback content. The checked-in fixture
+corpus under [`fixtures/svg-import`](fixtures/svg-import/) is shared across native
+and browser tests.
 
 The [native path geometry guide](apps/web/src/content/docs/internals/native-path-geometry.md)
-documents the native representation, fill rules, validation, exact bounds,
-rendering, hit testing, and fixture coverage used by later import and editing work.
+documents the representation and geometry semantics used by import and editing.
 
 ### WASM
 
-WebAssembly brings Inkfinite's Rust document engine to the browser. A persistent
-worker session opens, mutates, undoes, redoes, and saves the canonical Automerge
-document used by native entry points. IndexedDB stores canonical bytes rather
-than maintaining another shape graph. SVG parsing and export, committed
-geometry, editor projection, and editor reconciliation call the Rust
-implementations.
+The web app runs the canonical Rust document engine in a dedicated worker. The
+worker owns Automerge state, validated commits, projection, reconciliation,
+undo/redo, SVG import, and deterministic SVG rendering. IndexedDB stores canonical
+bytes and the Rust projection. TypeScript continues to own interaction previews,
+hit testing, Canvas rendering, and browser APIs.
 
-The browser still has a TypeScript editor model for low-latency interaction and
-browser APIs. Pointer movement, hover, selection, camera state, drag previews,
-snap guides, hit testing, Canvas rendering, PNG export, and DOM/Svelte work do
-not cross the WASM interface. TypeScript creates semantic editor patches; Rust
-reconciles them into validated parent-relative transactions. Rust owns committed
-path geometry, exact bounds, hierarchy transforms, reparenting, topology, arc
-conversion, validation, and final freehand normalization.
-
-Canonical browser documents load their editor state from the Rust projection
-returned with each session response. The projection is cached with canonical
-IndexedDB state so reopening a board does not rebuild the editor view from a
-second hierarchy representation. Browser SVG imports pass bytes to the worker;
-the Rust session parses the source, builds the shared SVG transaction, commits it,
-and returns the updated snapshot, projection, assets, and diagnostics. SVG group
-compatibility metadata and the TypeScript SVG projector are no longer part of the
-browser document model.
-
-Desktop reconciliation uses the same TypeScript before-and-after patch
-builder as the web editor. Page, layer, and shape changes become semantic
-patches, then Rust reconciles and commits them through the native transaction
-engine.
-
-The WASM request and response payloads now use generated TypeScript types, and
-native editor types are reused where the representations match. The shared worker
-and client still need names that describe their document-engine role rather than
-SVG import. Standalone projection or reconciliation exports can be removed when
-the stateful session covers their use cases.
-
-Root verification should build and type-check the WASM package and run a browser
-smoke test against the compiled module and real worker. The test should create a
-document, commit a transaction, save and reopen its bytes, project editor state,
-exercise undo and redo, import a representative SVG, render SVG, and verify the
-canonical state after each operation. Remove fallback implementations only after
-this path is covered.
-
-This cleanup does not move the frame-by-frame editor loop into WASM. TypeScript
-keeps responsive previews, cached bounds, hit testing, selection geometry, and
-ephemeral history. Shared fixtures compare those approximations with committed
-Rust results. Legacy Dexie migration may still build an initial canonical
-snapshot in TypeScript, and Excalidraw and JSON Canvas conversion can remain in
-TypeScript until another native entry point needs them. Add batched WASM geometry
-queries only when profiling identifies a browser geometry bottleneck.
+Browser smoke coverage exercises the compiled module and worker through document
+creation, mutation, save and reopen, projection, undo and redo, SVG import, and
+SVG rendering. Root verification builds the WASM package before running tests.
 
 ### Vector editing
 

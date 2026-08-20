@@ -84,7 +84,7 @@ type WorkerResponseValue =
 	| BrowserSvgImportState;
 
 /** A worker boundary that keeps Rust parsing, rendering, and document state off the UI thread. */
-export class SvgImportWorkerClient {
+export class DocumentEngineWorkerClient {
 	private nextRequestId = 0;
 	private readonly pending = new Map<
 		number,
@@ -197,7 +197,7 @@ export class SvgImportWorkerClient {
 		this.worker.removeEventListener('message', this.handleMessage);
 		this.worker.removeEventListener('error', this.handleError);
 		this.worker.terminate();
-		this.rejectPending(new Error('The SVG worker was stopped.'));
+		this.rejectPending(new Error('The document engine worker was stopped.'));
 	}
 
 	private request<T extends WorkerResponseValue>(
@@ -232,35 +232,35 @@ export class SvgImportWorkerClient {
 	}
 }
 
-let sharedClient: SvgImportWorkerClient | null = null;
+let sharedClient: DocumentEngineWorkerClient | null = null;
 
-/** Returns the one SVG worker shared by browser file, drop, markup, and export actions. */
-export function getSharedSvgImportWorker(): SvgImportWorkerClient {
+/** Returns the one document engine worker shared by browser persistence, import, and export actions. */
+export function getSharedDocumentEngineWorker(): DocumentEngineWorkerClient {
 	if (typeof Worker === 'undefined')
-		throw new Error('SVG workers are unavailable in this environment.');
-	sharedClient ??= new SvgImportWorkerClient(
-		new Worker(new URL('./svg-import.worker.ts', import.meta.url), {
+		throw new Error('document engine workers are unavailable in this environment.');
+	sharedClient ??= new DocumentEngineWorkerClient(
+		new Worker(new URL('./document-engine.worker.ts', import.meta.url), {
 			type: 'module',
-			name: 'inkfinite-svg'
+			name: 'inkfinite-document-engine'
 		})
 	);
 	return sharedClient;
 }
 
 /** Allows browser tests and hot reload teardown to release the shared worker. */
-export function resetSharedSvgImportWorker() {
+export function resetSharedDocumentEngineWorker() {
 	sharedClient?.dispose();
 	sharedClient = null;
 }
 
 /** Imports SVG bytes through the shared worker. */
 export function importSvgInWorker(source: Uint8Array) {
-	return getSharedSvgImportWorker().import(source);
+	return getSharedDocumentEngineWorker().import(source);
 }
 
 /** Projects a canonical snapshot through the shared worker. */
 export function projectEditorInWorker(snapshot: DocumentSnapshot) {
-	return getSharedSvgImportWorker().project(snapshot);
+	return getSharedDocumentEngineWorker().project(snapshot);
 }
 
 /** Reconciles semantic editor patches through the shared worker. */
@@ -268,12 +268,12 @@ export function reconcileEditorPatchesInWorker(
 	snapshot: DocumentSnapshot,
 	request: EditorReconciliationRequest
 ) {
-	return getSharedSvgImportWorker().reconcile(snapshot, request);
+	return getSharedDocumentEngineWorker().reconcile(snapshot, request);
 }
 
 /** Renders a canonical snapshot through the shared worker. */
 export function renderSvgInWorker(snapshot: DocumentSnapshot, options: SvgRenderOptions = {}) {
-	return getSharedSvgImportWorker().render(snapshot, options);
+	return getSharedDocumentEngineWorker().render(snapshot, options);
 }
 
 /** Used by the worker entry point to run the generated Rust/WASM bindings. */
