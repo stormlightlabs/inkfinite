@@ -14,11 +14,13 @@ use thiserror::Error;
 use ts_rs::TS;
 
 use crate::engine::geometry::{Affine, world_transform};
-use crate::proto::{LayerPatch, Operation, ShapePatch as NativeShapePatch, TransactionDraft, TransactionId};
+use crate::proto::{
+    LayerContentsDisposition, LayerPatch, Operation, ShapePatch as NativeShapePatch, TransactionDraft, TransactionId,
+};
 use crate::{
     ActorId, BindingAnchor, BindingRecord, CONTAINER_KIND, ContainerLayout, Document, DocumentSnapshot, LayerId,
-    Opacity, Origin, PageId, Provenance, RecordVersion, SemanticMetadata, ShapeId, ShapeKind, ShapeParent,
-    ShapeProperties, ShapeRecord, ShapeStyle, SiblingAnchor, Timestamp, Transform, Vec2,
+    LayerRecord, Opacity, Origin, PageId, PageRecord, Provenance, RecordVersion, SemanticMetadata, ShapeId, ShapeKind,
+    ShapeParent, ShapeProperties, ShapeRecord, ShapeStyle, SiblingAnchor, Timestamp, Transform, Vec2,
 };
 
 /// Full affine transform used by the editor projection.
@@ -209,6 +211,32 @@ pub enum EditorPatch {
         parent: Option<ShapeParent>,
         /// Replacement sibling placement.
         anchor: Option<SiblingAnchor<ShapeId>>,
+    },
+    /// Create a page and its later layer records.
+    CreatePage {
+        /// New page record.
+        page: PageRecord,
+        /// Placement relative to an existing page.
+        anchor: SiblingAnchor<PageId>,
+    },
+    /// Delete a page and all records it owns.
+    DeletePage {
+        /// Page to delete.
+        page_id: PageId,
+    },
+    /// Create an empty layer.
+    CreateLayer {
+        /// New layer record.
+        layer: LayerRecord,
+        /// Placement relative to an existing layer.
+        anchor: SiblingAnchor<LayerId>,
+    },
+    /// Delete a layer and handle its children explicitly.
+    DeleteLayer {
+        /// Layer to delete.
+        layer_id: LayerId,
+        /// Handling for shapes owned by the layer.
+        contents: LayerContentsDisposition,
     },
     /// Create one shape from editor-owned semantic fields.
     CreateShape {
@@ -457,6 +485,22 @@ pub fn reconcile_editor_patches(
 
     for patch in request.patches {
         match patch {
+            EditorPatch::CreatePage { page, anchor } => operations.push(Operation::CreatePage { page, anchor }),
+            EditorPatch::DeletePage { page_id } => {
+                let page = document
+                    .pages
+                    .get(&page_id)
+                    .ok_or_else(|| EditorReconciliationError::UnknownPage(page_id.clone()))?;
+                operations.push(Operation::DeletePage { page_id, expected_version: Some(page.version) });
+            }
+            EditorPatch::CreateLayer { layer, anchor } => operations.push(Operation::CreateLayer { layer, anchor }),
+            EditorPatch::DeleteLayer { layer_id, contents } => {
+                let layer = document
+                    .layers
+                    .get(&layer_id)
+                    .ok_or_else(|| EditorReconciliationError::UnknownLayer(layer_id.clone()))?;
+                operations.push(Operation::DeleteLayer { layer_id, contents, expected_version: Some(layer.version) });
+            }
             EditorPatch::Shape { shape_id, transform, properties, metadata, style, parent, anchor } => {
                 reconcile_shape(
                     document,
@@ -541,6 +585,7 @@ pub fn reconcile_editor_patches(
     })
 }
 
+// FIXME: this function signature is AWFUL
 #[allow(clippy::too_many_arguments)]
 fn reconcile_shape(
     document: &Document, shape_id: ShapeId, transform: Option<EditorTransform>, properties: Option<ShapeProperties>,

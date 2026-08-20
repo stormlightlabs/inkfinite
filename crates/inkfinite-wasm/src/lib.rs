@@ -11,10 +11,14 @@ use inkfinite_core::editor::{
     EditorProjection, EditorReconciliationError, EditorReconciliationRequest, project_editor as project_native,
     reconcile_editor_patches as reconcile_native,
 };
-use inkfinite_core::proto::Bounds;
+use inkfinite_core::engine::{EngineError, TransactionEngine};
+use inkfinite_core::proto::{Bounds, CommitResult, TransactionDraft};
 use inkfinite_core::render::{SvgRenderError, SvgRenderOptions, SvgRenderWarning, render_svg as render_native_svg};
 use inkfinite_core::svg_import::{SvgImport, SvgImportError, SvgImportNode, import_svg as parse_svg};
-use inkfinite_core::{AssetId, DocumentSnapshot, LayerId, PageId, ShapeId};
+use inkfinite_core::{
+    ActorId, AssetId, DocumentId, DocumentSnapshot, INKFINITE_FORMAT_ID, INKFINITE_FORMAT_VERSION, LayerId, PageId,
+    ShapeId,
+};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -70,6 +74,173 @@ pub struct SvgRenderFailure {
     pub code: &'static str,
     /// Human-readable failure detail.
     pub message: String,
+}
+
+/// A browser document session mutation result.
+#[derive(Debug, Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum DocumentMutationResponse {
+    /// A validated transaction or history compensation was committed.
+    Success {
+        /// Materialized commit metadata.
+        commit: CommitResult,
+    },
+    /// The mutation was rejected without changing the session.
+    Error {
+        /// Mutation failure details.
+        error: DocumentSessionFailure,
+    },
+}
+
+/// A stable document-session error crossing the WASM boundary.
+#[derive(Debug, Serialize)]
+pub struct DocumentSessionFailure {
+    /// Machine-readable failure category.
+    pub code: &'static str,
+    /// Human-readable failure detail.
+    pub message: String,
+}
+
+/// A stateful Rust document engine owned by one browser worker.
+///
+/// The session keeps Automerge state and actor-scoped history alive between
+/// calls. IndexedDB stores the bytes returned by [`Self::save`]; it does not
+/// participate in document mutation or validation.
+#[wasm_bindgen]
+pub struct DocumentSession {
+    engine: TransactionEngine,
+    actor_id: ActorId,
+}
+
+#[wasm_bindgen]
+impl DocumentSession {
+    /// Returns the current snapshot and actor-scoped history capabilities.
+    pub fn state_json(&mut self) -> Result<String, JsValue> {
+        let snapshot = self
+            .engine
+            .snapshot()
+            .map_err(|error| JsValue::from_str(&error.to_string()))?;
+        serialize_result(&DocumentSessionState {
+            can_undo: self.engine.can_undo(&self.actor_id),
+            can_redo: self.engine.can_redo(&self.actor_id),
+            snapshot,
+        })
+    }
+
+    /// Returns the canonical Automerge bytes for IndexedDB persistence.
+    pub fn save(&mut self) -> Result<Vec<u8>, JsValue> {
+        self.engine
+            .save()
+            .map_err(|error| JsValue::from_str(&error.to_string()))
+    }
+
+    /// Applies one validated transaction draft to the session.
+    pub fn apply_transaction(&mut self, transaction_json: &str) -> String {
+        let transaction = match serde_json::from_str::<TransactionDraft>(transaction_json) {
+            Ok(transaction) => transaction,
+            Err(error) => {
+                return serialize_response(DocumentMutationResponse::Error {
+                    error: invalid_json_failure("invalid_transaction", &error),
+                });
+            }
+        };
+        if transaction.actor_id != self.actor_id {
+            return serialize_response(DocumentMutationResponse::Error {
+                error: DocumentSessionFailure {
+                    code: "actor_mismatch",
+                    message: "transaction actor does not belong to this session".into(),
+                },
+            });
+        }
+        match self.engine.commit(transaction) {
+            Ok(commit) => serialize_response(DocumentMutationResponse::Success { commit }),
+            Err(error) => serialize_response(DocumentMutationResponse::Error { error: engine_failure(&error) }),
+        }
+    }
+
+    /// Reconciles and commits semantic editor patches against the current state.
+    pub fn apply_editor_patches(&mut self, request_json: &str) -> String {
+        let request = match serde_json::from_str::<EditorReconciliationRequest>(request_json) {
+            Ok(request) => request,
+            Err(error) => {
+                return serialize_response(DocumentMutationResponse::Error {
+                    error: invalid_json_failure("invalid_request", &error),
+                });
+            }
+        };
+        if request.actor_id != self.actor_id {
+            return serialize_response(DocumentMutationResponse::Error {
+                error: DocumentSessionFailure {
+                    code: "actor_mismatch",
+                    message: "editor request actor does not belong to this session".into(),
+                },
+            });
+        }
+        let snapshot = match self.engine.snapshot() {
+            Ok(snapshot) => snapshot,
+            Err(error) => return serialize_response(DocumentMutationResponse::Error { error: engine_failure(&error) }),
+        };
+        let transaction = match reconcile_native(&snapshot, request) {
+            Ok(transaction) => transaction,
+            Err(error) => {
+                return serialize_response(DocumentMutationResponse::Error {
+                    error: DocumentSessionFailure { code: "editor_reconciliation", message: error.to_string() },
+                });
+            }
+        };
+        if transaction.operations.is_empty() {
+            return serialize_response(DocumentMutationResponse::Error {
+                error: DocumentSessionFailure {
+                    code: "no_changes",
+                    message: "editor patches contain no document changes".into(),
+                },
+            });
+        }
+        match self.engine.commit(transaction) {
+            Ok(commit) => serialize_response(DocumentMutationResponse::Success { commit }),
+            Err(error) => serialize_response(DocumentMutationResponse::Error { error: engine_failure(&error) }),
+        }
+    }
+
+    /// Compensates the latest transaction committed by this session actor.
+    pub fn undo(&mut self) -> String {
+        match self.engine.undo(&self.actor_id) {
+            Ok(commit) => serialize_response(DocumentMutationResponse::Success { commit }),
+            Err(error) => serialize_response(DocumentMutationResponse::Error { error: engine_failure(&error) }),
+        }
+    }
+
+    /// Reapplies the latest transaction compensated by this session actor.
+    pub fn redo(&mut self) -> String {
+        match self.engine.redo(&self.actor_id) {
+            Ok(commit) => serialize_response(DocumentMutationResponse::Success { commit }),
+            Err(error) => serialize_response(DocumentMutationResponse::Error { error: engine_failure(&error) }),
+        }
+    }
+
+    /// Reports whether the session actor can undo its latest transaction.
+    #[must_use]
+    pub fn can_undo(&self) -> bool {
+        self.engine.can_undo(&self.actor_id)
+    }
+
+    /// Reports whether the session actor can redo its latest compensated transaction.
+    #[must_use]
+    pub fn can_redo(&self) -> bool {
+        self.engine.can_redo(&self.actor_id)
+    }
+}
+
+/// The result of opening or creating a browser document session.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct DocumentSessionState {
+    /// Current canonical materialized snapshot.
+    pub snapshot: DocumentSnapshot,
+    /// Whether the session actor can compensate its latest transaction.
+    pub can_undo: bool,
+    /// Whether the session actor can reapply its latest compensated transaction.
+    pub can_redo: bool,
 }
 
 /// The result envelope exchanged for editor projection.
@@ -161,6 +332,39 @@ impl From<SvgRenderOptionsInput> for SvgRenderOptions {
                 .collect::<BTreeSet<_>>(),
         }
     }
+}
+
+/// Creates a stateful browser session from a canonical materialized snapshot.
+#[wasm_bindgen]
+pub fn create_document(snapshot_json: &str, actor_id: &str) -> Result<DocumentSession, JsValue> {
+    let snapshot = serde_json::from_str::<DocumentSnapshot>(snapshot_json)
+        .map_err(|error| JsValue::from_str(&format!("invalid snapshot: {error}")))?;
+    if snapshot.format.as_str() != INKFINITE_FORMAT_ID || snapshot.format_version != INKFINITE_FORMAT_VERSION {
+        return Err(JsValue::from_str("unsupported document format"));
+    }
+    if actor_id.trim().is_empty() {
+        return Err(JsValue::from_str("actor id must not be empty"));
+    }
+    let actor_id = ActorId::from(actor_id);
+    let engine = TransactionEngine::create(
+        DocumentId::from(snapshot.document_id.as_str()),
+        actor_id.clone(),
+        snapshot.document,
+    )
+    .map_err(|error| JsValue::from_str(&error.to_string()))?;
+    Ok(DocumentSession { engine, actor_id })
+}
+
+/// Opens a stateful browser session from canonical Automerge bytes.
+#[wasm_bindgen]
+pub fn open_document(bytes: &[u8], actor_id: &str) -> Result<DocumentSession, JsValue> {
+    if actor_id.trim().is_empty() {
+        return Err(JsValue::from_str("actor id must not be empty"));
+    }
+    let actor_id = ActorId::from(actor_id);
+    let engine =
+        TransactionEngine::load(bytes, actor_id.clone()).map_err(|error| JsValue::from_str(&error.to_string()))?;
+    Ok(DocumentSession { engine, actor_id })
 }
 
 /// Imports UTF-8 SVG bytes and returns the serialized response envelope.
@@ -277,6 +481,34 @@ pub fn render_svg_json(snapshot_json: &str, options_json: &str) -> String {
         }),
         Err(error) => serialize_response(SvgRenderResponse::Error { error: render_failure(&error) }),
     }
+}
+
+fn serialize_result<T: Serialize>(value: &T) -> Result<String, JsValue> {
+    serde_json::to_string(value).map_err(|error| JsValue::from_str(&error.to_string()))
+}
+
+fn invalid_json_failure(code: &'static str, error: &serde_json::Error) -> DocumentSessionFailure {
+    DocumentSessionFailure { code, message: error.to_string() }
+}
+
+fn engine_failure(error: &EngineError) -> DocumentSessionFailure {
+    let code = match error {
+        EngineError::Crdt(_) => "crdt",
+        EngineError::Sync(_) => "sync",
+        EngineError::Schema(_) => "schema",
+        EngineError::StaleHeads => "stale_heads",
+        EngineError::Precondition(_) => "precondition",
+        EngineError::Permission(_) => "permission",
+        EngineError::Invariant(_) => "invariant",
+        EngineError::EmptyHistory { action, .. } => {
+            if *action == "undo" {
+                "empty_undo"
+            } else {
+                "empty_redo"
+            }
+        }
+    };
+    DocumentSessionFailure { code, message: error.to_string() }
 }
 
 fn serialize_response<T: Serialize>(response: T) -> String {
@@ -509,5 +741,50 @@ mod tests {
             Some(1)
         );
         assert_eq!(reconciled["transaction"]["base_heads"][0], "head:one");
+    }
+
+    #[test]
+    fn stateful_session_commits_saves_and_replays_history() {
+        let snapshot = serde_json::json!({
+            "format": "inkfinite.document",
+            "format_version": 2,
+            "document_id": "document:session",
+            "heads": [],
+            "document": {
+                "pages": {"page:one": {"id": "page:one", "name": "Page 1", "layer_ids": ["layer:one"], "version": 1}},
+                "page_ids": ["page:one"],
+                "layers": {"layer:one": {"id": "layer:one", "page_id": "page:one", "name": "Default", "shape_ids": [], "visible": true, "locked": false, "opacity": 1, "version": 1}},
+                "shapes": {}, "bindings": {}, "assets": {}
+            }
+        });
+        let mut session = create_document(&snapshot.to_string(), "browser").expect("session should open");
+        let request = serde_json::json!({
+            "patches": [{
+                "type": "create_shape",
+                "shape": {"id": "shape:rect", "kind": "rect", "properties": {"w": 20, "h": 10}, "metadata": null, "style": {"opacity": 1, "fill_opacity": null, "stroke_opacity": null}, "layout": null},
+                "parent": {"kind": "layer", "id": "layer:one"},
+                "transform": {"a": 1, "b": 0, "c": 0, "d": 1, "e": 4, "f": 5},
+                "anchor": {"position": "last"}
+            }],
+            "actor_id": "browser", "origin": "human", "transaction_id": "transaction:create", "description": "Create rectangle", "timestamp": 1
+        });
+        let response: Value =
+            serde_json::from_str(&session.apply_editor_patches(&request.to_string())).expect("commit response");
+        assert_eq!(response["status"], "success");
+        let state: Value =
+            serde_json::from_str(&session.state_json().expect("state should serialize")).expect("state JSON");
+        assert!(state["snapshot"]["document"]["shapes"]["shape:rect"].is_object());
+        assert!(session.can_undo());
+        let saved = session.save().expect("session should save");
+        let mut reopened = open_document(&saved, "browser").expect("saved bytes should reopen");
+        assert!(serde_json::from_str::<Value>(&reopened.state_json().expect("reopened state"))
+            .expect("state JSON")["snapshot"]["document"]["shapes"]["shape:rect"]
+            .is_object());
+        let undo: Value = serde_json::from_str(&session.undo()).expect("undo response");
+        assert_eq!(undo["status"], "success");
+        assert!(!session.can_undo());
+        let redo: Value = serde_json::from_str(&session.redo()).expect("redo response");
+        assert_eq!(redo["status"], "success");
+        assert!(session.can_undo());
     }
 }

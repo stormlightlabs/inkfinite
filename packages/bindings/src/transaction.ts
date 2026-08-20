@@ -9,8 +9,6 @@ import type {
 	BindingRecord,
 	ChangeHash,
 	ContainerLayout,
-	DocumentId,
-	DocumentSnapshot,
 	LayerId,
 	LayerRecord,
 	Opacity,
@@ -26,8 +24,7 @@ import type {
 	ShapeStyle,
 	SiblingAnchor,
 	Timestamp,
-	Transform,
-	JsonValue
+	Transform
 } from './model.js';
 
 /**

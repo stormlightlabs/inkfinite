@@ -1,6 +1,6 @@
 import type { BoardMeta } from '@inkfinite/core';
 import Dexie from 'dexie';
-import type { BindingRow, MetaRow, PageRow, ShapeRow } from './repository';
+import type { BindingRow, CanonicalRow, MetaRow, PageRow, ShapeRow } from './repository';
 
 /** Default IndexedDB database name for the static web application. */
 export const DB_NAME = 'inkfinite';
@@ -14,6 +14,7 @@ export class InkfiniteDB extends Dexie {
 	shapes!: Dexie.Table<ShapeRow, [string, string]>;
 	bindings!: Dexie.Table<BindingRow, [string, string]>;
 	meta!: Dexie.Table<MetaRow, string>;
+	canonical!: Dexie.Table<CanonicalRow, string>;
 
 	constructor(name = DB_NAME) {
 		super(name);
@@ -25,5 +26,6 @@ export class InkfiniteDB extends Dexie {
 			bindings: '[boardId+id], boardId, type, updatedAt',
 			meta: 'key'
 		});
+		this.version(3).stores({ canonical: 'boardId, updatedAt' });
 	}
 }

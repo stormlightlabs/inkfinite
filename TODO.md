@@ -79,14 +79,14 @@ Inkfinite now imports SVGs through one validated Rust pipeline across desktop, w
 
 ### Browser document engine
 
-- [ ] Add a stateful WASM document session
-- [ ] Open and save canonical Automerge document bytes
-- [ ] Apply validated Rust transactions in the browser
-- [ ] Use Rust undo and redo for durable changes
-- [ ] Persist canonical document state to IndexedDB
-- [ ] Migrate existing browser documents to canonical state
-- [ ] Retire the Dexie shape graph as the browser source of truth
-- [ ] Keep ephemeral editor history in TypeScript
+- [x] Add a stateful WASM document session
+- [x] Open and save canonical Automerge document bytes
+- [x] Apply validated Rust transactions in the browser
+- [x] Use Rust undo and redo for durable changes
+- [x] Persist canonical document state to IndexedDB
+- [x] Migrate existing browser documents to canonical state
+- [x] Retire the Dexie shape graph as the browser source of truth
+- [x] Keep ephemeral editor history in TypeScript
 
 ### Canonical geometry
 

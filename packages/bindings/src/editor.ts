@@ -9,9 +9,11 @@ import type {
 	BindingRecord,
 	ContainerLayout,
 	LayerId,
+	LayerRecord,
 	Opacity,
 	Origin,
 	PageId,
+	PageRecord,
 	SemanticMetadata,
 	ShapeId,
 	ShapeKind,
@@ -21,7 +23,7 @@ import type {
 	SiblingAnchor,
 	Timestamp
 } from './model.js';
-import type { LayerPatch, TransactionId } from './transaction.js';
+import type { LayerContentsDisposition, LayerPatch, TransactionId } from './transaction.js';
 
 /**
  * Full affine transform used by the editor projection.
@@ -316,6 +318,46 @@ export type EditorPatch =
 			 * Replacement sibling placement.
 			 */
 			anchor: SiblingAnchor<ShapeId> | null;
+	  }
+	| {
+			type: 'create_page';
+			/**
+			 * New page record.
+			 */
+			page: PageRecord;
+			/**
+			 * Placement relative to an existing page.
+			 */
+			anchor: SiblingAnchor<PageId>;
+	  }
+	| {
+			type: 'delete_page';
+			/**
+			 * Page to delete.
+			 */
+			page_id: PageId;
+	  }
+	| {
+			type: 'create_layer';
+			/**
+			 * New layer record.
+			 */
+			layer: LayerRecord;
+			/**
+			 * Placement relative to an existing layer.
+			 */
+			anchor: SiblingAnchor<LayerId>;
+	  }
+	| {
+			type: 'delete_layer';
+			/**
+			 * Layer to delete.
+			 */
+			layer_id: LayerId;
+			/**
+			 * Handling for shapes owned by the layer.
+			 */
+			contents: LayerContentsDisposition;
 	  }
 	| {
 			type: 'create_shape';

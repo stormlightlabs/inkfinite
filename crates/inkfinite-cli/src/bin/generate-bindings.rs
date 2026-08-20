@@ -218,9 +218,9 @@ fn transaction_bindings() -> String {
     let mut output = GENERATED_TS_HEADER.to_owned();
     output.push_str("import type {\n");
     output.push_str("  ActorId, AssetId, AssetRecord, BindingId, BindingRecord, ChangeHash, ContainerLayout,\n");
-    output.push_str("  DocumentId, DocumentSnapshot, LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord,\n");
+    output.push_str("  LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord,\n");
     output.push_str("  RecordVersion, SemanticMetadata, ShapeId, ShapeParent, ShapeProperties, ShapeRecord,\n");
-    output.push_str("  ShapeStyle, SiblingAnchor, Timestamp, Transform, JsonValue\n");
+    output.push_str("  ShapeStyle, SiblingAnchor, Timestamp, Transform\n");
     output.push_str("} from \"./model.js\";\n\n");
 
     append_declaration::<TransactionId>(&mut output, &config);
@@ -300,9 +300,9 @@ fn editor_bindings() -> String {
     let config = ts_config();
     let mut output = GENERATED_TS_HEADER.to_owned();
     output.push_str(
-        "import type { ActorId, BindingAnchor, BindingId, BindingKind, BindingRecord, ContainerLayout, LayerId, Opacity, Origin, PageId, SemanticMetadata, ShapeId, ShapeKind, ShapeParent, ShapeProperties, ShapeStyle, SiblingAnchor, Timestamp } from './model.js';\n",
+        "import type { ActorId, BindingAnchor, BindingId, BindingKind, BindingRecord, ContainerLayout, LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord, SemanticMetadata, ShapeId, ShapeKind, ShapeParent, ShapeProperties, ShapeStyle, SiblingAnchor, Timestamp } from './model.js';\n",
     );
-    output.push_str("import type { LayerPatch, TransactionId } from './transaction.js';\n\n");
+    output.push_str("import type { LayerContentsDisposition, LayerPatch, TransactionId } from './transaction.js';\n\n");
     append_declaration::<EditorTransform>(&mut output, &config);
     append_declaration::<EditorShape>(&mut output, &config);
     append_declaration::<EditorShapeDraft>(&mut output, &config);

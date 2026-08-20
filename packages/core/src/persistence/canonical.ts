@@ -1,3 +1,4 @@
+import type { EditorPatch, EditorReconciliationRequest, EditorTransform } from '@inkfinite/bindings/editor';
 import type {
 	AssetRecord as NativeAssetRecord,
 	BindingRecord as NativeBindingRecord,
@@ -7,11 +8,13 @@ import type {
 	PageRecord as NativePageRecord,
 	Provenance,
 	SemanticMetadata,
+	ShapeParent,
 	ShapeRecord as NativeShapeRecord,
 	ShapeStyle,
-	ShapeProperties
+	ShapeProperties,
+	Transform
 } from '@inkfinite/bindings/model';
-import type { BoardExport, DocOrder } from './document';
+import type { BoardExport, DocOrder, LoadedDoc } from './document';
 import { ensureDocumentLayers, type Document, type LayerRecord, type ShapeRecord } from '../model';
 
 const FORMAT_ID = 'inkfinite.document';
@@ -115,6 +118,436 @@ export function toCanonicalDocumentSnapshot(
 		document_id: documentId,
 		heads: [...(options?.heads ?? [])],
 		document: nativeDocument
+	};
+}
+
+/**
+ * Projects a canonical Rust snapshot back into the editor's flat document.
+ *
+ * The canonical snapshot remains authoritative. This conversion only creates
+ * the low-latency TypeScript projection used by the existing canvas runtime.
+ */
+export function fromCanonicalDocumentSnapshot(snapshot: NativeDocumentSnapshot): LoadedDoc {
+	const pages: Record<string, import('../model').PageRecord> = {};
+	const layers: Record<string, LayerRecord> = {};
+	const shapes: Record<string, ShapeRecord> = {};
+	const bindings: Record<string, import('../model').BindingRecord> = {};
+
+	for (const pageId of snapshot.document.page_ids) {
+		const page = snapshot.document.pages[pageId];
+		if (!page) continue;
+		pages[page.id] = { id: page.id, name: page.name, shapeIds: [], layerIds: [...page.layer_ids] };
+		for (const layerId of page.layer_ids) {
+			const layer = snapshot.document.layers[layerId];
+			if (!layer) continue;
+			const layerShapeIds: string[] = [];
+			const walk = (shapeId: string, parent: string | undefined, transform: Affine) => {
+				const native = snapshot.document.shapes[shapeId];
+				if (!native) return;
+				const world = multiplyAffine(transform, transformFromNative(native.transform));
+				if (native.kind !== 'container') {
+					const shape = editorShape(native, page.id, layer.id, parent, world);
+					shapes[shape.id] = shape;
+					layerShapeIds.push(shape.id);
+					pages[page.id]!.shapeIds.push(shape.id);
+				}
+				for (const childId of native.child_ids)
+					walk(childId, native.kind === 'container' ? native.id : parent, world);
+			};
+			for (const shapeId of layer.shape_ids) walk(shapeId, undefined, identityAffine());
+			layers[layer.id] = {
+				id: layer.id,
+				pageId: layer.page_id,
+				name: layer.name,
+				shapeIds: layerShapeIds,
+				visible: layer.visible,
+				locked: layer.locked,
+				opacity: layer.opacity
+			};
+		}
+	}
+
+	for (const binding of Object.values(snapshot.document.bindings)) {
+		bindings[binding.id] = {
+			id: binding.id,
+			type: binding.kind as import('../model').BindingType,
+			fromShapeId: binding.source_shape_id,
+			toShapeId: binding.target_shape_id,
+			handle: binding.source_handle as import('../model').BindingHandle,
+			anchor:
+				binding.anchor.kind === 'center'
+					? { kind: 'center' }
+					: { kind: 'edge', nx: binding.anchor.x, ny: binding.anchor.y }
+		};
+	}
+
+	const assets = Object.fromEntries(
+		Object.values(snapshot.document.assets).flatMap((asset) =>
+			asset.source.kind === 'embedded'
+				? [
+						[
+							asset.id,
+							{
+								id: asset.id,
+								name: asset.name,
+								mediaType: asset.media_type,
+								digest: asset.digest,
+								bytes: [...asset.source.bytes]
+							}
+						]
+					]
+				: []
+		)
+	);
+	const order: DocOrder = {
+		pageIds: [...snapshot.document.page_ids],
+		shapeOrder: Object.fromEntries(Object.values(pages).map((page) => [page.id, [...page.shapeIds]])),
+		layers
+	};
+	return { pages, layers, shapes, bindings, ...(Object.keys(assets).length > 0 ? { assets } : {}), order };
+}
+
+/** Builds one semantic Rust reconciliation request from an editor document change. */
+export function createEditorReconciliationRequest(
+	before: Document,
+	after: Document,
+	options: Omit<EditorReconciliationRequest, 'patches'>
+): EditorReconciliationRequest {
+	const previous = ensureDocumentLayers(before);
+	const next = ensureDocumentLayers(after);
+	const patches: EditorPatch[] = [];
+	const previousShapes = previous.shapes;
+	const nextShapes = next.shapes;
+	const deletedPages = new Set(Object.keys(previous.pages).filter((id) => !next.pages[id]));
+	const deletedLayerDestinations = deletedLayerMoves(previous, next);
+
+	for (const page of Object.values(next.pages)) {
+		if (!previous.pages[page.id]) {
+			patches.push({
+				type: 'create_page',
+				page: { id: page.id, name: page.name, layer_ids: [], version: 1 },
+				anchor: orderAnchorFor(page.id, Object.keys(next.pages))
+			});
+		}
+	}
+	for (const layer of Object.values(next.layers ?? {})) {
+		if (!previous.layers?.[layer.id]) {
+			patches.push({
+				type: 'create_layer',
+				layer: nativeLayer(layer),
+				anchor: orderAnchorFor(layer.id, next.pages[layer.pageId]?.layerIds ?? [])
+			});
+		}
+	}
+
+	for (const shapeId of Object.keys(previousShapes)) {
+		if (!nextShapes[shapeId] && !deletedPages.has(previousShapes[shapeId]!.pageId)) {
+			patches.push({ type: 'delete_shape', shape_id: shapeId });
+		}
+	}
+	for (const shape of Object.values(nextShapes)) {
+		const old = previousShapes[shape.id];
+		if (!old) {
+			patches.push({
+				type: 'create_shape',
+				shape: {
+					id: shape.id,
+					kind: shape.type,
+					properties: cloneProperties(shape.props),
+					metadata: null,
+					style: shapeStyle(shape),
+					layout: null
+				},
+				parent: shapeParent(shape, next),
+				transform: editorTransform(shape),
+				anchor: { position: 'last' }
+			});
+			continue;
+		}
+		const patch = shapePatch(old, shape, previous, next, deletedLayerDestinations.has(old.layerId ?? ''));
+		if (patch) patches.push(patch);
+	}
+
+	for (const page of Object.values(next.pages)) {
+		const old = previous.pages[page.id];
+		if (old && old.name !== page.name) patches.push({ type: 'rename_page', page_id: page.id, name: page.name });
+	}
+	for (const layer of Object.values(next.layers ?? {})) {
+		const old = previous.layers?.[layer.id];
+		if (!old) continue;
+		const patch = {
+			name: old.name === layer.name ? null : layer.name,
+			visible: old.visible === layer.visible ? null : layer.visible,
+			locked: old.locked === layer.locked ? null : layer.locked,
+			opacity: old.opacity === layer.opacity ? null : clampOpacity(layer.opacity)
+		};
+		if (patch.name !== null || patch.visible !== null || patch.locked !== null || patch.opacity !== null) {
+			patches.push({ type: 'patch_layer', layer_id: layer.id, patch });
+		}
+		if (old && JSON.stringify(old.pageId) === JSON.stringify(layer.pageId)) {
+			const beforeIds = previous.pages[layer.pageId]?.layerIds ?? [];
+			const afterIds = next.pages[layer.pageId]?.layerIds ?? [];
+			if (JSON.stringify(beforeIds) !== JSON.stringify(afterIds) && beforeIds.includes(layer.id)) {
+				patches.push({ type: 'reorder_layer', layer_id: layer.id, anchor: orderAnchorFor(layer.id, afterIds) });
+			}
+		}
+	}
+	for (const layerId of Object.keys(previous.layers ?? {})) {
+		const layer = previous.layers![layerId]!;
+		if (!deletedPages.has(layer.pageId) && !next.layers?.[layerId]) {
+			const destination = deletedLayerDestinations.get(layerId);
+			patches.push({
+				type: 'delete_layer',
+				layer_id: layerId,
+				contents: destination ? { kind: 'move_to', destination_layer_id: destination } : { kind: 'delete' }
+			});
+		}
+	}
+	for (const pageId of Object.keys(previous.pages)) {
+		if (deletedPages.has(pageId)) patches.push({ type: 'delete_page', page_id: pageId });
+	}
+
+	for (const binding of Object.values(previous.bindings)) {
+		if (!next.bindings[binding.id] && next.shapes[binding.fromShapeId] && next.shapes[binding.toShapeId]) {
+			patches.push({ type: 'delete_binding', binding_id: binding.id });
+		}
+	}
+	for (const binding of Object.values(next.bindings)) {
+		const old = previous.bindings[binding.id];
+		if (!old) {
+			patches.push({ type: 'create_binding', binding: nativeBinding(binding) });
+		} else if (JSON.stringify(old) !== JSON.stringify(binding)) {
+			patches.push({ type: 'delete_binding', binding_id: binding.id });
+			patches.push({ type: 'create_binding', binding: nativeBinding(binding) });
+		}
+	}
+	return { ...options, patches };
+}
+
+type Affine = EditorTransform;
+
+function identityAffine(): Affine {
+	return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+}
+
+function transformFromNative(transform: Transform): Affine {
+	const cos = Math.cos(transform.rotation);
+	const sin = Math.sin(transform.rotation);
+	return {
+		a: cos * transform.scale_x,
+		b: sin * transform.scale_x,
+		c: -sin * transform.scale_y,
+		d: cos * transform.scale_y,
+		e: transform.translation.x,
+		f: transform.translation.y
+	};
+}
+
+function multiplyAffine(parent: Affine, child: Affine): Affine {
+	return {
+		a: parent.a * child.a + parent.c * child.b,
+		b: parent.b * child.a + parent.d * child.b,
+		c: parent.a * child.c + parent.c * child.d,
+		d: parent.b * child.c + parent.d * child.d,
+		e: parent.a * child.e + parent.c * child.f + parent.e,
+		f: parent.b * child.e + parent.d * child.f + parent.f
+	};
+}
+
+function editorShape(
+	native: NativeShapeRecord,
+	pageId: string,
+	layerId: string,
+	groupId: string | undefined,
+	transform: Affine
+): ShapeRecord {
+	return {
+		id: native.id,
+		type: native.kind as ShapeRecord['type'],
+		pageId,
+		x: transform.e,
+		y: transform.f,
+		rot: Math.atan2(transform.b, transform.a),
+		editorTransform: transform,
+		groupId,
+		layerId,
+		opacity: native.style.opacity,
+		...(native.style.fill_opacity === null ? {} : { fillOpacity: native.style.fill_opacity }),
+		...(native.style.stroke_opacity === null ? {} : { strokeOpacity: native.style.stroke_opacity }),
+		agentEditable: native.metadata.agent_editable,
+		props: editorProperties(native.properties)
+	} as ShapeRecord;
+}
+
+function editorProperties(properties: ShapeProperties): ShapeProperties {
+	const result = JSON.parse(JSON.stringify(properties)) as ShapeProperties;
+	if ('width' in result) {
+		result.w = result.width;
+		delete result.width;
+	}
+	if ('height' in result) {
+		result.h = result.height;
+		delete result.height;
+	}
+	return result;
+}
+
+function cloneProperties(properties: ShapeRecord['props']): ShapeProperties {
+	return JSON.parse(JSON.stringify(properties)) as ShapeProperties;
+}
+
+function shapeStyle(shape: ShapeRecord): ShapeStyle {
+	return {
+		opacity: clampOpacity(shape.opacity),
+		fill_opacity: shape.fillOpacity === undefined ? null : clampOpacity(shape.fillOpacity),
+		stroke_opacity: shape.strokeOpacity === undefined ? null : clampOpacity(shape.strokeOpacity)
+	};
+}
+
+function shapeParent(shape: ShapeRecord, document: Document): ShapeParent {
+	return shape.groupId
+		? { kind: 'shape', id: shape.groupId }
+		: { kind: 'layer', id: shape.layerId ?? findShapeLayer(shape.id, document) };
+}
+
+function findShapeLayer(shapeId: string, document: Document): string {
+	for (const layer of Object.values(document.layers ?? {})) {
+		if (layer.shapeIds.includes(shapeId)) return layer.id;
+	}
+	throw new Error(`Shape ${shapeId} has no owning layer`);
+}
+
+function nativeLayer(layer: LayerRecord): NativeLayerRecord {
+	return {
+		id: layer.id,
+		page_id: layer.pageId,
+		name: layer.name,
+		shape_ids: [],
+		visible: layer.visible,
+		locked: layer.locked,
+		opacity: clampOpacity(layer.opacity),
+		version: 1
+	};
+}
+
+function deletedLayerMoves(before: Document, after: Document): Map<string, string> {
+	const destinations = new Map<string, string>();
+	for (const layer of Object.values(before.layers ?? {})) {
+		if (after.layers?.[layer.id]) continue;
+		const movedShapes = layer.shapeIds
+			.map((shapeId) => after.shapes[shapeId]?.layerId)
+			.filter((layerId): layerId is string => Boolean(layerId));
+		if (movedShapes.length === layer.shapeIds.length && movedShapes.length > 0 && new Set(movedShapes).size === 1) {
+			destinations.set(layer.id, movedShapes[0]!);
+		}
+	}
+	return destinations;
+}
+
+function orderAnchorFor(id: string, ids: string[]) {
+	const index = ids.indexOf(id);
+	return index <= 0
+		? ({ position: 'first' } as const)
+		: ({ position: 'after', sibling_id: ids[index - 1]! } as const);
+}
+
+function shapePatch(
+	before: ShapeRecord,
+	after: ShapeRecord,
+	beforeDocument: Document,
+	afterDocument: Document,
+	skipDeletedLayerParent: boolean
+): Extract<EditorPatch, { type: 'shape' }> | null {
+	const parentBefore = shapeParent(before, beforeDocument);
+	const parentAfter = shapeParent(after, afterDocument);
+	const transformChanged =
+		JSON.stringify(editorTransform(before, before)) !== JSON.stringify(editorTransform(after, before));
+	const propertiesChanged = JSON.stringify(before.props) !== JSON.stringify(after.props);
+	const styleChanged = JSON.stringify(shapeStyle(before)) !== JSON.stringify(shapeStyle(after));
+	const orderChanged = skipDeletedLayerParent
+		? false
+		: siblingOrderChanged(before.id, parentBefore, parentAfter, beforeDocument, afterDocument);
+	const parentChanged = JSON.stringify(parentBefore) !== JSON.stringify(parentAfter);
+	if (
+		!transformChanged &&
+		!propertiesChanged &&
+		!styleChanged &&
+		(!parentChanged || skipDeletedLayerParent) &&
+		!orderChanged
+	)
+		return null;
+	return {
+		type: 'shape',
+		shape_id: after.id,
+		transform: transformChanged ? editorTransform(after, before) : null,
+		properties: propertiesChanged ? cloneProperties(after.props) : null,
+		metadata: null,
+		style: styleChanged ? shapeStyle(after) : null,
+		parent: !parentChanged || skipDeletedLayerParent ? null : parentAfter,
+		anchor: orderChanged ? orderAnchor(after.id, parentAfter, afterDocument) : null
+	};
+}
+
+function editorTransform(shape: ShapeRecord, previous?: ShapeRecord): EditorTransform {
+	const current = shape.editorTransform ? { ...shape.editorTransform } : transformFromRotation(shape.rot, 1, 1);
+	if (previous && Math.abs(shape.rot - previous.rot) > 1e-9) {
+		const previousTransform = previous.editorTransform ?? transformFromRotation(previous.rot, 1, 1);
+		const scaleX = Math.hypot(previousTransform.a, previousTransform.b);
+		const determinant = previousTransform.a * previousTransform.d - previousTransform.b * previousTransform.c;
+		const scaleY = scaleX > Number.EPSILON ? determinant / scaleX : 1;
+		const cos = Math.cos(shape.rot);
+		const sin = Math.sin(shape.rot);
+		return { a: cos * scaleX, b: sin * scaleX, c: -sin * scaleY, d: cos * scaleY, e: shape.x, f: shape.y };
+	}
+	return { ...current, e: shape.x, f: shape.y };
+}
+
+function transformFromRotation(rotation: number, scaleX: number, scaleY: number): EditorTransform {
+	const cos = Math.cos(rotation);
+	const sin = Math.sin(rotation);
+	return { a: cos * scaleX, b: sin * scaleX, c: -sin * scaleY, d: cos * scaleY, e: 0, f: 0 };
+}
+
+function siblingOrderChanged(
+	shapeId: string,
+	beforeParent: ShapeParent,
+	afterParent: ShapeParent,
+	before: Document,
+	after: Document
+): boolean {
+	if (JSON.stringify(beforeParent) !== JSON.stringify(afterParent)) return true;
+	const beforeSiblings = siblings(beforeParent, before);
+	const afterSiblings = siblings(afterParent, after);
+	return JSON.stringify(beforeSiblings) !== JSON.stringify(afterSiblings) && afterSiblings.includes(shapeId);
+}
+
+function siblings(parent: ShapeParent, document: Document): string[] {
+	if (parent.kind === 'layer') return document.layers?.[parent.id]?.shapeIds ?? [];
+	return Object.values(document.shapes)
+		.filter((shape) => shape.groupId === parent.id)
+		.map((shape) => shape.id);
+}
+
+function orderAnchor(shapeId: string, parent: ShapeParent, document: Document) {
+	const ids = siblings(parent, document).filter((id) => id !== shapeId);
+	const index = siblings(parent, document).indexOf(shapeId);
+	return index <= 0
+		? { position: 'first' as const }
+		: { position: 'after' as const, sibling_id: ids[index - 1] ?? ids.at(-1)! };
+}
+
+function nativeBinding(binding: import('../model').BindingRecord): NativeBindingRecord {
+	return {
+		id: binding.id,
+		kind: binding.type,
+		source_shape_id: binding.fromShapeId,
+		target_shape_id: binding.toShapeId,
+		source_handle: binding.handle,
+		anchor:
+			binding.anchor.kind === 'center'
+				? { kind: 'center' }
+				: { kind: 'edge', x: binding.anchor.nx, y: binding.anchor.ny },
+		version: 1
 	};
 }
 

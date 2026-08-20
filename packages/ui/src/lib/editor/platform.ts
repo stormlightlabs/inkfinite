@@ -144,6 +144,8 @@ export type EditorPlatformSession = {
 	desktop?: DesktopDocumentRepo;
 	inspectBoard?: (boardId: string) => Promise<BoardInspectorData>;
 	setActiveBoard?: (boardId: string | null) => void;
+	/** Supplies the current editor projection to a Rust-backed browser session. */
+	setActiveDocument?: (boardId: string, doc: import('@inkfinite/core').LoadedDoc) => void;
 	subscribeFileMenu?: (listener: (action: NativeFileMenuAction) => void) => () => void;
 	dispose?: () => void;
 };

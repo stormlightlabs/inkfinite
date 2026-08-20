@@ -8,7 +8,8 @@ import {
 	PageRecord,
 	SetSelectionCommand,
 	ShapeRecord,
-	Store
+	Store,
+	type CanonicalDocumentState
 } from '@inkfinite/core';
 import Dexie from 'dexie';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -128,6 +129,52 @@ describe('DocRepo (Dexie)', () => {
 		expect(await database.table('pages').toArray()).toHaveLength(0);
 		expect(await database.table('shapes').toArray()).toHaveLength(0);
 		expect(await database.table('bindings').toArray()).toHaveLength(0);
+	});
+
+	it('canonical state replaces legacy graph rows and round-trips through loadDoc', async () => {
+		const database = createTestDb();
+		const repo = createDexieDocRepo(database);
+		const boardId = await repo.createBoard('Canonical');
+		const snapshot = {
+			format: 'inkfinite.document',
+			format_version: 2,
+			document_id: boardId,
+			heads: [],
+			document: {
+				pages: {
+					'page:canonical': {
+						id: 'page:canonical',
+						name: 'Canonical page',
+						layer_ids: ['layer:canonical'],
+						version: 1
+					}
+				},
+				page_ids: ['page:canonical'],
+				layers: {
+					'layer:canonical': {
+						id: 'layer:canonical',
+						page_id: 'page:canonical',
+						name: 'Default',
+						shape_ids: [],
+						visible: true,
+						locked: false,
+						opacity: 1,
+						version: 1
+					}
+				},
+				shapes: {},
+				bindings: {},
+				assets: {}
+			}
+		} satisfies CanonicalDocumentState['snapshot'];
+
+		await repo.saveCanonical?.(boardId, { bytes: new Uint8Array([1, 2, 3]), snapshot });
+		const loaded = await repo.loadDoc(boardId);
+
+		expect(loaded.pages['page:canonical']?.name).toBe('Canonical page');
+		expect(await database.pages.count()).toBe(0);
+		expect(await database.canonical.get(boardId)).toMatchObject({ boardId });
+		expect([...((await repo.loadCanonical?.(boardId))?.bytes ?? [])]).toEqual([1, 2, 3]);
 	});
 
 	it('exportBoard + importBoard round-trip doc + metadata', async () => {

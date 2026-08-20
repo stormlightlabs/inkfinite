@@ -11,7 +11,8 @@ import type {
 	SvgImportResponse,
 	SvgRenderOptions,
 	SvgRenderResponse,
-	TransactionDraft
+	TransactionDraft,
+	DocumentSessionState
 } from '@inkfinite/wasm';
 import type { SvgImportResult } from '@inkfinite/core';
 
@@ -28,6 +29,13 @@ export class SvgImportWorkerError extends Error {
 
 type WorkerRequestBody =
 	| { type: 'import'; source: ArrayBuffer }
+	| { type: 'open_document'; source: ArrayBuffer; actorId: string }
+	| { type: 'create_document'; snapshot: DocumentSnapshot; actorId: string }
+	| { type: 'document_state' }
+	| { type: 'apply_transaction'; transaction: TransactionDraft }
+	| { type: 'apply_editor_patches'; request: EditorReconciliationRequest }
+	| { type: 'undo_document' }
+	| { type: 'redo_document' }
 	| { type: 'project'; snapshot: DocumentSnapshot }
 	| { type: 'reconcile'; snapshot: DocumentSnapshot; request: EditorReconciliationRequest }
 	| { type: 'render'; snapshot: DocumentSnapshot; options: SvgRenderOptions };
@@ -36,16 +44,27 @@ type WorkerRequestBody =
 type WorkerRequest = WorkerRequestBody & { id: number };
 
 type WorkerResponse =
-	| { id: number; response: SvgImportResponse | SvgRenderResponse }
+	| {
+			id: number;
+			response:
+				| SvgImportResponse
+				| SvgRenderResponse
+				| BrowserDocumentState
+				| EditorProjection
+				| TransactionDraft;
+	  }
 	| { id: number; error: string };
+
+export type BrowserDocumentState = DocumentSessionState & { bytes: Uint8Array };
 
 type WorkerResponseValue =
 	| SvgImportResponse
 	| SvgRenderResponse
 	| EditorProjection
-	| TransactionDraft;
+	| TransactionDraft
+	| BrowserDocumentState;
 
-/** A worker boundary that keeps SVG decoding, parsing, and rendering off the UI thread. */
+/** A worker boundary that keeps Rust parsing, rendering, and document state off the UI thread. */
 export class SvgImportWorkerClient {
 	private nextRequestId = 0;
 	private readonly pending = new Map<
@@ -70,6 +89,45 @@ export class SvgImportWorkerClient {
 			throw new SvgImportWorkerError(response.error.code, response.error.message);
 		}
 		return { ...response.import, omitted_image_count: response.omitted_image_count };
+	}
+
+	/** Opens canonical bytes in the worker-owned Rust document session. */
+	openDocument(source: Uint8Array, actorId: string): Promise<BrowserDocumentState> {
+		const transferable = source.slice();
+		return this.request<BrowserDocumentState>(
+			{ type: 'open_document', source: transferable.buffer, actorId },
+			[transferable.buffer]
+		);
+	}
+
+	/** Creates a Rust document session from a migrated materialized snapshot. */
+	createDocument(snapshot: DocumentSnapshot, actorId: string): Promise<BrowserDocumentState> {
+		return this.request<BrowserDocumentState>({ type: 'create_document', snapshot, actorId });
+	}
+
+	/** Returns the worker session state and fresh canonical bytes. */
+	documentState(): Promise<BrowserDocumentState> {
+		return this.request<BrowserDocumentState>({ type: 'document_state' });
+	}
+
+	/** Applies one prepared transaction through the worker-owned Rust engine. */
+	applyTransaction(transaction: TransactionDraft): Promise<BrowserDocumentState> {
+		return this.request<BrowserDocumentState>({ type: 'apply_transaction', transaction });
+	}
+
+	/** Reconciles semantic editor patches through the worker-owned Rust engine. */
+	applyEditorPatches(request: EditorReconciliationRequest): Promise<BrowserDocumentState> {
+		return this.request<BrowserDocumentState>({ type: 'apply_editor_patches', request });
+	}
+
+	/** Compensates the latest document transaction in Rust. */
+	undoDocument(): Promise<BrowserDocumentState> {
+		return this.request<BrowserDocumentState>({ type: 'undo_document' });
+	}
+
+	/** Reapplies the latest compensated document transaction in Rust. */
+	redoDocument(): Promise<BrowserDocumentState> {
+		return this.request<BrowserDocumentState>({ type: 'redo_document' });
 	}
 
 	/** Projects one canonical snapshot into the shared flat editor view. */

@@ -1,20 +1,27 @@
 import {
-	toCanonicalDocumentSnapshot,
-	type BoardExport,
-	type DocPatch,
-	type InterchangeExport,
-	type PersistenceSink,
-	type PersistentDocRepo,
-	type SvgExport,
-	type SvgExportOptions
+	createEditorReconciliationRequest,
+	diffDoc,
+	toCanonicalDocumentSnapshot
+} from '@inkfinite/core';
+import type {
+	BoardExport,
+	DocPatch,
+	EditorDocumentChange,
+	InterchangeExport,
+	PersistenceSink,
+	PersistentDocRepo,
+	SvgExport,
+	SvgExportOptions
 } from '@inkfinite/core';
 import { createStatusStore } from '@inkfinite/ui/editor';
 import type { EditorPlatformAdapter, EditorPlatformSession } from '@inkfinite/ui/editor';
 import { liveQuery } from 'dexie';
 import { InkfiniteDB } from './database';
 import { createDexieDocRepo, createPersistenceSink, getBoardInspectorData } from './repository';
-import { importSvgInWorker, renderSvgInWorker } from './svg-import';
+import { getSharedSvgImportWorker, importSvgInWorker, renderSvgInWorker } from './svg-import';
+import type { BrowserDocumentState } from './svg-import';
 import type { PersistenceSinkOptions } from './repository';
+import type { LoadedDoc } from '@inkfinite/core';
 
 type LiveQueryFactory = typeof liveQuery;
 
@@ -48,6 +55,15 @@ export function createDexieSession(
 	const liveQueryFactory = opts.liveQueryFn ?? liveQuery;
 	let activeBoardId: string | null = null;
 	let subscription: { unsubscribe(): void } | null = null;
+	let documentWorker: ReturnType<typeof getSharedSvgImportWorker> | null = null;
+	let documentBoardId: string | null = null;
+	let documentReady: Promise<void> | null = null;
+	let documentQueue: Promise<void> = Promise.resolve();
+	let transactionNumber = 0;
+	const canonicalEnabled =
+		typeof Worker !== 'undefined' &&
+		typeof repo.loadCanonical === 'function' &&
+		typeof repo.saveCanonical === 'function';
 
 	function markSaved(timestamp?: number) {
 		status.update((current) => ({
@@ -67,6 +83,99 @@ export function createDexieSession(
 		}));
 	}
 
+	function ensureDocumentWorker() {
+		if (!canonicalEnabled) return null;
+		documentWorker ??= getSharedSvgImportWorker();
+		return documentWorker;
+	}
+
+	function loadedDocument(doc: LoadedDoc) {
+		return {
+			pages: doc.pages,
+			...(doc.layers ? { layers: doc.layers } : {}),
+			...(doc.assets ? { assets: doc.assets } : {}),
+			...(doc.svgGroups ? { svgGroups: doc.svgGroups } : {}),
+			shapes: doc.shapes,
+			bindings: doc.bindings
+		};
+	}
+
+	function openCanonicalDocument(boardId: string, doc: LoadedDoc): Promise<void> {
+		const worker = ensureDocumentWorker();
+		if (!worker || !repo.loadCanonical || !repo.saveCanonical) return Promise.resolve();
+		documentBoardId = boardId;
+		return (async () => {
+			const canonical = await repo.loadCanonical!(boardId);
+			const state = canonical
+				? await worker.openDocument(canonical.bytes, 'browser')
+				: await worker.createDocument(
+						toCanonicalDocumentSnapshot(loadedDocument(doc), { documentId: boardId }),
+						'browser'
+					);
+			if (!canonical) await repo.saveCanonical!(boardId, state);
+		})();
+	}
+
+	function setActiveDocument(boardId: string, doc: LoadedDoc) {
+		if (!canonicalEnabled) return;
+		if (documentBoardId === boardId && documentReady) return;
+		documentReady = openCanonicalDocument(boardId, doc).catch((error) => {
+			documentBoardId = null;
+			throw error;
+		});
+	}
+
+	function enqueueEditorChange(change: EditorDocumentChange) {
+		if (!canonicalEnabled || !repo.saveCanonical) {
+			sink.enqueueDocPatch(change.boardId, diffDoc(change.before, change.after));
+			return;
+		}
+		status.update((current) => ({
+			...current,
+			pendingWrites: (current.pendingWrites ?? 0) + 1,
+			state: 'saving',
+			errorMsg: undefined
+		}));
+		const run = async () => {
+			setActiveDocument(change.boardId, {
+				pages: change.before.pages,
+				layers: change.before.layers,
+				assets: change.before.assets,
+				svgGroups: change.before.svgGroups,
+				shapes: change.before.shapes,
+				bindings: change.before.bindings,
+				order: { pageIds: Object.keys(change.before.pages), layers: change.before.layers }
+			});
+			await documentReady;
+			const worker = ensureDocumentWorker();
+			if (!worker) throw new Error('The browser document worker is unavailable.');
+			let state;
+			if (change.op === 'undo') {
+				state = await worker.undoDocument();
+			} else if (change.op === 'redo') {
+				state = await worker.redoDocument();
+			} else {
+				const request = createEditorReconciliationRequest(change.before, change.after, {
+					actor_id: 'browser',
+					origin: 'human',
+					transaction_id: `transaction:browser:${++transactionNumber}`,
+					description: change.description,
+					timestamp: Date.now()
+				});
+				if (request.patches.length === 0) return;
+				state = await worker.applyEditorPatches(request);
+			}
+			await repo.saveCanonical!(change.boardId, state);
+		};
+		documentQueue = documentQueue
+			.catch(() => {})
+			.then(run)
+			.catch((error) => {
+				markError(error);
+				throw error;
+			});
+	}
+
 	const trackedSink: PersistenceSink = {
 		enqueueDocPatch(boardId, patch) {
 			if (hasPatchChanges(patch)) {
@@ -79,8 +188,11 @@ export function createDexieSession(
 			}
 			sink.enqueueDocPatch(boardId, patch);
 		},
+		enqueueEditorChange,
 		async flush() {
 			try {
+				await documentReady;
+				await documentQueue;
 				await sink.flush();
 			} catch (error) {
 				markError(error);
@@ -93,7 +205,12 @@ export function createDexieSession(
 		repo,
 		sink: trackedSink,
 		status,
-		interchange: createBrowserInterchangeFiles(),
+		interchange: createBrowserInterchangeFiles(async (boardId) => {
+			if (!documentWorker || documentBoardId !== boardId) return null;
+			await documentReady;
+			await documentQueue;
+			return (await documentWorker.documentState()).snapshot;
+		}),
 		inspectBoard: (boardId) => getBoardInspectorData(database, boardId),
 		setActiveBoard(boardId) {
 			if (activeBoardId === boardId) return;
@@ -109,6 +226,7 @@ export function createDexieSession(
 				error: markError
 			});
 		},
+		setActiveDocument,
 		dispose() {
 			subscription?.unsubscribe();
 			subscription = null;
@@ -117,7 +235,9 @@ export function createDexieSession(
 }
 
 /** Creates browser-backed file selection and download operations. */
-export function createBrowserInterchangeFiles() {
+export function createBrowserInterchangeFiles(
+	getCanonicalSnapshot?: (boardId: string) => Promise<BrowserDocumentState['snapshot'] | null>
+) {
 	function pickTextFile(accept: string): Promise<{ name: string; contents: string } | null> {
 		return new Promise((resolve, reject) => {
 			const input = document.createElement('input');
@@ -210,7 +330,9 @@ export function createBrowserInterchangeFiles() {
 			snapshot: BoardExport,
 			options: SvgExportOptions = {}
 		): Promise<SvgExport> {
-			const canonical = toCanonicalDocumentSnapshot(snapshot);
+			const canonical =
+				(await getCanonicalSnapshot?.(snapshot.board.id)) ??
+				toCanonicalDocumentSnapshot(snapshot);
 			if (options.selectionOnly && !(options.selectionIds?.length ?? 0)) {
 				canonical.document = {
 					...canonical.document,

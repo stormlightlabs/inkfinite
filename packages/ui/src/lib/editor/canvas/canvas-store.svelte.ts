@@ -138,6 +138,16 @@ export function createCanvasController(
 				if (!activeBoardId || event.kind !== 'doc' || !sink) {
 					return;
 				}
+				if (sink.enqueueEditorChange) {
+					sink.enqueueEditorChange({
+						boardId: activeBoardId,
+						before: event.beforeState.doc,
+						after: event.afterState.doc,
+						op: event.op,
+						description: event.command.name
+					});
+					return;
+				}
 				const patch = diffDoc(event.beforeState.doc, event.afterState.doc);
 				sink.enqueueDocPatch(activeBoardId, patch);
 			}
@@ -287,6 +297,7 @@ export function createCanvasController(
 			},
 			ui: { ...state.ui, currentPageId: firstPageId, selectionIds: [] }
 		}));
+		if (activeBoardId) platformSession?.setActiveDocument?.(activeBoardId, doc);
 		if (fitDrawing) {
 			camera.fitAll();
 		}
@@ -373,9 +384,9 @@ export function createCanvasController(
 		selectionTool: selectTool,
 		getSnapSettings: () => snapStore.get(),
 		onTransactionDraft: ({ name, kind, before, after }) => {
-			// Tool movement renders `after` as a local preview. Restore the durable
-			// mirror before executing the command so history and persistence receive
-			// the real before/after pair exactly once.
+			// Tool movement renders `after` as a local preview. We want restore the
+			// committed mirror before executing the command so history and persistence
+			// receive the real before/after pair exactly once.
 			store.setState(() => before);
 			store.executeCommand(new SnapshotCommand(name, kind, before, after));
 			syncHandleState();
@@ -887,6 +898,23 @@ export function createCanvasController(
 		persistenceStatusStore = fallbackStatusStore;
 	});
 
+	function insertStencil(stencil: Stencil, worldPos: { x: number; y: number }) {
+		const state = store.getState();
+		const nextState = stencils.insertStencil(state, stencil, worldPos, snapStore.get());
+
+		runtime.commit(
+			state,
+			nextState,
+			'Insert Stencil',
+			Action.keyDown('InsertStencil', 'InsertStencil', {
+				ctrl: false,
+				shift: false,
+				alt: false,
+				meta: false
+			})
+		);
+	}
+
 	return {
 		platform: () => platform,
 		desktop,
@@ -944,21 +972,4 @@ export function createCanvasController(
 			stencilPaletteOpen = val;
 		}
 	};
-
-	function insertStencil(stencil: Stencil, worldPos: { x: number; y: number }) {
-		const state = store.getState();
-		const nextState = stencils.insertStencil(state, stencil, worldPos, snapStore.get());
-
-		runtime.commit(
-			state,
-			nextState,
-			'Insert Stencil',
-			Action.keyDown('InsertStencil', 'InsertStencil', {
-				ctrl: false,
-				shift: false,
-				alt: false,
-				meta: false
-			})
-		);
-	}
 }

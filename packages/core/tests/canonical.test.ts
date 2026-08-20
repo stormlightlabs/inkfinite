@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { toCanonicalDocumentSnapshot } from '../src/persistence/canonical';
-import { PageRecord, ShapeRecord } from '../src/model';
+import { createEditorReconciliationRequest, toCanonicalDocumentSnapshot } from '../src/persistence/canonical';
+import { PageRecord, ShapeRecord, type Document } from '../src/model';
 
 describe('toCanonicalDocumentSnapshot', () => {
 	it('projects browser shapes into the canonical renderer input', () => {
@@ -31,6 +31,35 @@ describe('toCanonicalDocumentSnapshot', () => {
 			parent: { kind: 'layer', id: 'layer:page:one:default' },
 			transform: { translation: { x: 10, y: 20 }, rotation: 0 },
 			properties: { w: 40, h: 20, fill: 'red' }
+		});
+	});
+
+	it('turns editor moves into semantic Rust reconciliation patches', () => {
+		const page = PageRecord.create('Page 1', 'page:one');
+		const rect = ShapeRecord.createRect(
+			page.id,
+			10,
+			20,
+			{ w: 40, h: 20, fill: 'red', stroke: 'none', radius: 4 },
+			'shape:rect'
+		);
+		page.shapeIds.push(rect.id);
+		const before: Document = { pages: { [page.id]: page }, shapes: { [rect.id]: rect }, bindings: {} };
+		const after: Document = { ...before, shapes: { [rect.id]: { ...rect, x: 30, y: 45 } } };
+
+		const request = createEditorReconciliationRequest(before, after, {
+			actor_id: 'browser',
+			origin: 'human',
+			transaction_id: 'transaction:test',
+			description: 'Move rectangle',
+			timestamp: 1
+		});
+
+		expect(request.patches).toHaveLength(1);
+		expect(request.patches[0]).toMatchObject({
+			type: 'shape',
+			shape_id: 'shape:rect',
+			transform: { e: 30, f: 45 }
 		});
 	});
 });

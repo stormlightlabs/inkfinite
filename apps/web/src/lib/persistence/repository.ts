@@ -2,6 +2,7 @@ import {
 	BindingRecord as BindingOps,
 	BoardStatsOps,
 	createId,
+	fromCanonicalDocumentSnapshot,
 	LayerRecord as LayerOps,
 	PageRecord as PageOps,
 	ShapeRecord as ShapeOps
@@ -12,6 +13,7 @@ import type {
 	BoardInspectorData,
 	BoardMeta,
 	BoardStats,
+	CanonicalDocumentState,
 	DocOrder,
 	DocPatch,
 	Document,
@@ -36,6 +38,14 @@ export type ShapeRow = ShapeRecord & { boardId: string; updatedAt: Timestamp };
 
 /** IndexedDB row for a binding scoped to its board. */
 export type BindingRow = BindingRecord & { boardId: string; updatedAt: Timestamp };
+
+/** Canonical Rust document bytes and its derived materialized cache. */
+export type CanonicalRow = {
+	boardId: string;
+	bytes: Uint8Array;
+	snapshot: CanonicalDocumentState['snapshot'];
+	updatedAt: Timestamp;
+};
 
 /** Key-value metadata stored alongside document rows. */
 export type MetaRow = { key: string; value: unknown };
@@ -79,6 +89,7 @@ export function createDexieDocRepo(
 	const shapes = () => database.table<ShapeRow>('shapes');
 	const bindings = () => database.table<BindingRow>('bindings');
 	const meta = () => database.table<MetaRow>('meta');
+	const canonical = () => database.table<CanonicalRow>('canonical');
 
 	async function listBoards(): Promise<BoardMeta[]> {
 		return boards().orderBy('updatedAt').reverse().toArray();
@@ -115,7 +126,7 @@ export function createDexieDocRepo(
 	async function deleteBoard(boardId: string): Promise<void> {
 		await database.transaction(
 			'rw',
-			[boards(), pages(), shapes(), bindings(), meta()],
+			[boards(), pages(), shapes(), bindings(), meta(), canonical()],
 			async () => {
 				const pageKeys = (await pages().where('boardId').equals(boardId).toArray()).map(
 					(row) => [row.boardId, row.id] as [string, string]
@@ -136,11 +147,53 @@ export function createDexieDocRepo(
 				await meta().delete(layersKey(boardId));
 				await meta().delete(assetsKey(boardId));
 				await meta().delete(svgGroupsKey(boardId));
+				await canonical().delete(boardId);
+			}
+		);
+	}
+
+	async function loadCanonical(boardId: string) {
+		const row = await canonical().get(boardId);
+		return row ? { bytes: new Uint8Array(row.bytes), snapshot: row.snapshot } : null;
+	}
+
+	async function saveCanonical(boardId: string, state: CanonicalDocumentState): Promise<void> {
+		const timestamp = now();
+		await database.transaction(
+			'rw',
+			[boards(), pages(), shapes(), bindings(), meta(), canonical()],
+			async () => {
+				await canonical().put({
+					boardId,
+					bytes: new Uint8Array(state.bytes),
+					snapshot: state.snapshot,
+					updatedAt: timestamp
+				});
+				const pageKeys = (await pages().where('boardId').equals(boardId).toArray()).map(
+					(row) => [row.boardId, row.id] as [string, string]
+				);
+				const shapeKeys = (await shapes().where('boardId').equals(boardId).toArray()).map(
+					(row) => [row.boardId, row.id] as [string, string]
+				);
+				const bindingKeys = (
+					await bindings().where('boardId').equals(boardId).toArray()
+				).map((row) => [row.boardId, row.id] as [string, string]);
+				if (pageKeys.length > 0) await pages().bulkDelete(pageKeys);
+				if (shapeKeys.length > 0) await shapes().bulkDelete(shapeKeys);
+				if (bindingKeys.length > 0) await bindings().bulkDelete(bindingKeys);
+				await meta().delete(pageOrderKey(boardId));
+				await meta().delete(shapeOrderKey(boardId));
+				await meta().delete(layersKey(boardId));
+				await meta().delete(assetsKey(boardId));
+				await meta().delete(svgGroupsKey(boardId));
+				await boards().update(boardId, { updatedAt: timestamp });
 			}
 		);
 	}
 
 	async function loadDoc(boardId: string): Promise<LoadedDoc> {
+		const canonicalRow = await canonical().get(boardId);
+		if (canonicalRow) return fromCanonicalDocumentSnapshot(canonicalRow.snapshot);
 		const pageRows = await pages().where('boardId').equals(boardId).toArray();
 		const [shapeRows, bindingRows, order, assetsRow, svgGroupsRow] = await Promise.all([
 			shapes().where('boardId').equals(boardId).toArray(),
@@ -287,9 +340,10 @@ export function createDexieDocRepo(
 
 		await database.transaction(
 			'rw',
-			[boards(), pages(), shapes(), bindings(), meta()],
+			[boards(), pages(), shapes(), bindings(), meta(), canonical()],
 			async () => {
 				await boards().put(board);
+				await canonical().delete(boardId);
 
 				const pageRows = Object.values(snapshot.doc.pages).map((page) => ({
 					...PageOps.clone(page),
@@ -346,6 +400,8 @@ export function createDexieDocRepo(
 		openBoard,
 		renameBoard,
 		deleteBoard,
+		loadCanonical,
+		saveCanonical,
 		loadDoc,
 		applyDocPatch,
 		exportBoard,

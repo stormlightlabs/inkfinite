@@ -35,6 +35,8 @@
   commit, undo, redo, save, query, and validate.
 - WASM (Rust-owned) editor projection and reconciliation bindings that handle composed
   ancestor transforms, semantic editor patches, and minimal parent-relative native transactions.
+- Stateful browser WASM document sessions that open, validate, mutate, undo, redo, and save
+  canonical Automerge bytes through one worker.
 
 #### SVG Interop
 

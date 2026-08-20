@@ -10,6 +10,7 @@ import {
 	type ImportedAsset,
 	type ImportedGroup
 } from '../model';
+import type { DocumentSnapshot as NativeDocumentSnapshot } from '@inkfinite/bindings/model';
 import type { BoardMeta, DocRepo } from './repo';
 
 /** Persisted page and shape ordering for a document. */
@@ -42,11 +43,31 @@ export type LoadedDoc = {
 /** Portable board snapshot used by import and export flows. */
 export type BoardExport = { board: BoardMeta; doc: Document; order: DocOrder };
 
-/** Receives editor patches and controls when they reach persistence. */
-export type PersistenceSink = { enqueueDocPatch(boardId: string, patch: DocPatch): void; flush(): Promise<void> };
+/** Canonical bytes and their materialized cache stored by browser adapters. */
+export type CanonicalDocumentState = { bytes: Uint8Array; snapshot: NativeDocumentSnapshot };
+
+/** One editor document change handed to a Rust-backed browser persistence adapter. */
+export type EditorDocumentChange = {
+	boardId: string;
+	before: Document;
+	after: Document;
+	op: 'do' | 'undo' | 'redo';
+	description: string;
+};
+
+/** Receives editor changes and controls when they reach persistence. */
+export type PersistenceSink = {
+	enqueueDocPatch(boardId: string, patch: DocPatch): void;
+	enqueueEditorChange?(change: EditorDocumentChange): void;
+	flush(): Promise<void>;
+};
 
 /** Platform-neutral document repository implemented by each application adapter. */
 export interface PersistentDocRepo extends DocRepo {
+	/** Loads canonical browser state when the adapter supports the Rust engine. */
+	loadCanonical?(boardId: string): Promise<CanonicalDocumentState | null>;
+	/** Atomically stores canonical bytes and the derived materialized cache. */
+	saveCanonical?(boardId: string, state: CanonicalDocumentState): Promise<void>;
 	loadDoc(boardId: string): Promise<LoadedDoc>;
 	applyDocPatch(boardId: string, patch: DocPatch): Promise<void>;
 	exportBoard(boardId: string): Promise<BoardExport>;
