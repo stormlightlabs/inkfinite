@@ -1,11 +1,10 @@
-<svelte:head>
-    <title>Internals · Inkfinite documentation</title>
-    <meta
- 	    name="description"
- 	    content="How Inkfinite's Rust document engine, TypeScript editor, desktop bridge, renderer, and CLI fit together." />
-</svelte:head>
-
-# Internals
+---
+title: Internals
+description: "How Inkfinite's Rust document engine, TypeScript editor, desktop bridge, renderer, and CLI fit together."
+section: Concepts
+group: Concepts
+order: 10
+---
 
 Inkfinite has one durable document model and a separate editor-facing projection. Rust owns the
 canonical document, transactions, Automerge state, native files, headless rendering, and desktop
@@ -15,7 +14,7 @@ The boundary between them is intentional: the editor can keep pointer movement a
 local, while completed desktop edits still commit through the same Rust transaction engine used by
 the CLI.
 
-<h2 id="architecture">Architecture</h2>
+## Architecture
 
 ```text
 Browser app ───────┐
@@ -47,7 +46,7 @@ back through Tauri.
 See [Web editor](/docs/applications/web/) and [Desktop editor](/docs/applications/desktop/) for the
 application-specific behavior.
 
-<h2 id="two-representations">Durable model and editor projection</h2>
+## Durable model and editor projection
 
 The most important internal distinction is between the Rust document contract and the TypeScript
 editor model.
@@ -70,7 +69,7 @@ and `.inkfinite` file.
 
 For the durable record structure, see [Documents](/docs/concepts/documents/).
 
-<h2 id="edit-flow">Edit flow</h2>
+## Edit flow
 
 `@inkfinite/runtime` is a framework-neutral interaction state machine. It routes normalized actions
 through camera and tool state, applies gesture previews to the editor store, and emits a transaction
@@ -110,7 +109,7 @@ modify the native document.
 Causal heads and record versions are used for optimistic concurrency. See
 [Transactions and sync](/docs/concepts/transactions-and-sync/) for the public transaction model.
 
-<h2 id="codebase">Codebase map</h2>
+## Codebase map
 
 | Unit                     | Responsibility                                                                                                            |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
@@ -129,7 +128,7 @@ Causal heads and record versions are used for optimistic concurrency. See
 The Rust workspace contains `inkfinite-core`, `inkfinite-cli`, and the Tauri crate. The pnpm
 workspace contains the shared packages plus the web and desktop application roots.
 
-<h2 id="rendering">Rendering</h2>
+## Rendering
 
 Interactive rendering is Canvas 2D. `@inkfinite/renderer` subscribes to the editor store, marks the
 canvas dirty when state changes, and draws on the next animation frame. It maps the camera into world
@@ -141,7 +140,7 @@ Headless rendering is separate. `inkfinite-core` renders the durable document di
 deterministic SVG for CLI output, fixtures, and inspection. This keeps headless output independent
 of the browser renderer.
 
-<h2 id="desktop-sessions-and-cli">Desktop sessions and CLI</h2>
+## Desktop sessions and CLI
 
 The Tauri backend owns native desktop document sessions. A session contains the Rust-owned document
 state and exposes typed commands for snapshots, commits, undo/redo, saves, queries, validation,
@@ -156,7 +155,7 @@ The current implementation also carries agent access and proposal policy through
 and transaction policy. See [Command-line interface](/docs/reference/cli/) and
 [Agent workflows](/docs/reference/agents/) for the supported commands and review flow.
 
-<h2 id="files-and-generated-contracts">Files and generated contracts</h2>
+## Files and generated contracts
 
 Canonical desktop files are Automerge-backed `.inkfinite` documents. Rust owns native reads,
 validation, file locking, recovery state, and atomic replacement. JSON is an inspection projection;

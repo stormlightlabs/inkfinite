@@ -1,21 +1,20 @@
-<svelte:head>
-	<title>File Format · Inkfinite documentation</title>
-	<meta
-		name="description"
-		content="Inkfinite native files, document contract, safe writes, editable canvas interchange, compatibility limits, and lossless exports." />
-</svelte:head>
-
-# File format
+---
+title: File format
+description: 'Inkfinite native files, document contract, safe writes, editable canvas interchange, compatibility limits, and lossless exports.'
+section: Reference
+group: Reference
+order: 8
+---
 
 Inkfinite uses `.inkfinite` as its native document format. The editor can also import and export Excalidraw and Obsidian Canvas files when you need to move editable content between applications.
 
-<h2 id="native-files">Native files</h2>
+## Native files
 
 A canonical `.inkfinite` file is Automerge's compact binary form containing the document and its change history. Keep this file as the source of truth when you expect to continue editing in Inkfinite.
 
 Opening and saving native files is separate from editable-format import and export. Importing an external file creates a new Inkfinite document. Exporting does not change the current document's native path or saved state.
 
-<h2 id="document-contract">Document contract</h2>
+## Document contract
 
 The materialized snapshot carried by a file has a stable format identifier and explicit contract version:
 
@@ -33,17 +32,17 @@ The `format` field is `"inkfinite.document"` and `format_version` is currently `
 
 The CLI can print a deterministic JSON projection for inspection and CI. That projection is not a second file format and cannot replace the Automerge history or causal heads stored in the canonical file.
 
-<h2 id="safe-writes">Safe writes</h2>
+## Safe writes
 
 `DocumentFile` holds an advisory sidecar lock for the canonical path. Every transaction is validated before it is committed. A save writes a temporary same-directory replacement, flushes and syncs it, and then replaces the canonical file. An interrupted replacement leaves bounded recovery data that can be validated and saved as a new canonical baseline.
 
 Invalid bytes, stale heads, missing references, and invalid record properties are rejected before the canonical file is changed. Recovery uses the same document validation and persistence path as a normal save.
 
-<h2 id="versioning">Versioning</h2>
+## Versioning
 
 `format_version` and protocol version fields are explicit so future releases can reject unsupported data safely. They describe the current serialized contract; they do not select between document models or file flows.
 
-<h2 id="editable-interchange">Editable interchange</h2>
+## Editable interchange
 
 Use **Import** in the editor toolbar to select an Excalidraw `.excalidraw` file or an Obsidian Canvas `.canvas` file. Use **Export** to write the current page in either format. The desktop app offers the same commands in its File menu.
 
@@ -51,7 +50,7 @@ Imports are limited to 16 MB of UTF-8 JSON. Inkfinite rejects malformed geometry
 
 Both formats describe one canvas, so Inkfinite imports them as a one-page document and exports only the selected page. An export reports this when the source document contains more than one page.
 
-<h2 id="excalidraw">Excalidraw</h2>
+## Excalidraw
 
 Inkfinite reads and writes Excalidraw v2 scene JSON. The converter handles rectangles, ellipses, lines, arrows, text, freehand strokes, groups, frames, arrow bindings, and arrow labels.
 
@@ -70,7 +69,7 @@ Excalidraw's rough rendering, fill patterns, canvas settings, nested group hiera
 
 Embedded Excalidraw images remain unsupported until Inkfinite has an editable image shape. The importer reports both omitted image elements and embedded file data.
 
-<h2 id="obsidian-canvas">Obsidian Canvas</h2>
+## Obsidian Canvas
 
 Inkfinite implements the JSON Canvas 1.0 structure used by Obsidian `.canvas` files.
 
@@ -86,7 +85,7 @@ JSON Canvas does not represent general drawing primitives, freehand strokes, lay
 
 File nodes refer to paths in an Obsidian vault. Inkfinite preserves those references as Markdown links but does not copy or resolve the target attachments.
 
-<h2 id="image-and-svg-exports">Image and SVG exports</h2>
+## Image and SVG exports
 
 PNG and SVG are presentation exports rather than editable interchange formats. PNG captures the current viewport. SVG can export the selected shapes or all shapes on the current page.
 

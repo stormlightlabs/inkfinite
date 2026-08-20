@@ -96,6 +96,9 @@ importers:
             '@eslint/js':
                 specifier: ^9.39.1
                 version: 9.39.2
+            '@fontsource-variable/google-sans':
+                specifier: ^5.3.1
+                version: 5.3.1
             '@inkfinite/runtime':
                 specifier: workspace:*
                 version: link:../../packages/runtime
@@ -998,6 +1001,12 @@ packages:
         peerDependenciesMeta:
             '@noble/hashes':
                 optional: true
+
+    '@fontsource-variable/google-sans@5.3.1':
+        resolution:
+            {
+                integrity: sha512-FLB6ZktdAtYWj49W6TtmqThHb33XL5g8l6T+oKNcvmNUXou4PPdIkstt1Z/UyD6K+g/CYjiHF+j+eRMNZxYKZg==
+            }
 
     '@fontsource-variable/ibm-plex-sans@5.2.8':
         resolution:
@@ -6259,6 +6268,8 @@ snapshots:
 
     '@exodus/bytes@1.15.1':
         optional: true
+
+    '@fontsource-variable/google-sans@5.3.1': {}
 
     '@fontsource-variable/ibm-plex-sans@5.2.8': {}
 

@@ -1,14 +1,15 @@
-<svelte:head>
-	<title>Transactions and sync · Inkfinite documentation</title>
-	<meta name="description" content="How Inkfinite validates edits, records history, and merges peer changes." />
-</svelte:head>
-
-# Transactions and sync
+---
+title: Transactions and sync
+description: 'How Inkfinite validates edits, records history, and merges peer changes.'
+section: Concepts
+group: Concepts
+order: 4
+---
 
 Inkfinite groups related operations into transactions, validates them against the current document,
 and records accepted changes in Automerge history.
 
-<h2 id="transactions">Transactions</h2>
+## Transactions
 
 A transaction has an ID, an actor, optional preconditions, and one or more operations. Operations
 create, patch, move, or delete records. Grouping a coherent edit in one transaction keeps
@@ -19,7 +20,7 @@ transaction when those expectations are stale, when a selector is ambiguous, or 
 would cross a lock or agent-editability boundary. A rejected transaction does not partially modify
 the canonical file.
 
-<h2 id="undo-and-redo">Undo and redo</h2>
+## Undo and redo
 
 The editor records transactions in its history. Undo applies the inverse of an accepted local edit;
 redo reapplies an edit that was undone. Because history belongs to the document model, both the web
@@ -28,7 +29,7 @@ and desktop editors use the same behavior.
 An edit may become impossible to undo after later changes remove or replace the records it depended
 on. Inkfinite reports the conflict instead of reconstructing an uncertain result.
 
-<h2 id="synchronization">Synchronization</h2>
+## Synchronization
 
 Automerge assigns document heads to the current causal state. Two peers can make changes from a
 shared base and merge them without choosing one entire file over the other.

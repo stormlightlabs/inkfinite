@@ -1,116 +1,168 @@
 <script lang="ts">
-	import { page } from '$app/state';
 	import type { Snippet } from 'svelte';
-	import DocsHeader from './DocsHeader.svelte';
+	import DocsBreadcrumbs from './DocsBreadcrumbs.svelte';
+	import DocsCopyCode from './DocsCopyCode.svelte';
+	import DocsCopyMarkdown from './DocsCopyMarkdown.svelte';
+	import DocsPageNavigation from './DocsPageNavigation.svelte';
+	import DocsSeo from './DocsSeo.svelte';
 	import DocsSidebar from './DocsSidebar.svelte';
+	import SiteHeader from './SiteHeader.svelte';
 	import DocsToc from './DocsToc.svelte';
+	import { getAdjacentDocs } from './content';
+	import type { Doc } from './content/types';
 
-	let { children }: { children: Snippet } = $props();
-	let sidebarOpen = $state(false);
-	let landing = $derived(page.url.pathname === '/');
+	let { doc, docs, content }: { doc: Doc; docs: Doc[]; content: Snippet } = $props();
+	const adjacent = $derived(getAdjacentDocs(doc.slug));
 </script>
 
-<div class="docs-shell">
-	<a class="skip-link" href="#docs-content">Skip to content</a>
-	<DocsHeader {landing} {sidebarOpen} toggleSidebar={() => (sidebarOpen = !sidebarOpen)} />
+<DocsSeo title={`${doc.title} · Inkfinite documentation`} description={doc.description} />
 
-	{#if sidebarOpen}
-		<button
-			class="sidebar-scrim"
-			type="button"
-			aria-label="Close navigation"
-			onclick={() => (sidebarOpen = false)}></button>
-	{/if}
+<div class="docs-site">
+	<SiteHeader {docs} currentSlug={doc.slug} />
 
-	<div class="docs-grid" class:landing>
-		{#if !landing}
-			<DocsSidebar open={sidebarOpen} close={() => (sidebarOpen = false)} />
-		{/if}
-		<main id="docs-content">
-			<article data-pagefind-body>
-				{@render children()}
+	<div class="docs-layout">
+		<aside class="sidebar" aria-label="Documentation navigation">
+			<DocsSidebar {docs} currentSlug={doc.slug} />
+		</aside>
+
+		<main id="main-content" class="docs-main">
+			<DocsBreadcrumbs {doc} />
+			<article class="doc-article" data-pagefind-body>
+				<header class="doc-heading">
+					<div class="doc-meta">
+						<span>{doc.section}</span>
+					</div>
+					<h1>{doc.title}</h1>
+					<div class="doc-meta-secondary">
+						<DocsCopyMarkdown markdown={doc.markdown} slug={doc.slug} />
+						<p class="doc-description">{doc.description}</p>
+					</div>
+				</header>
+				<div class="doc-content">
+					{@render content()}
+				</div>
+				{#key doc.slug}
+					<DocsCopyCode />
+				{/key}
 			</article>
+			<DocsPageNavigation previous={adjacent.previous} next={adjacent.next} />
 		</main>
-		{#if !landing}
-			<DocsToc />
-		{/if}
+
+		<aside class="toc-column" aria-label="Table of contents">
+			<DocsToc headings={doc.toc} />
+		</aside>
 	</div>
 </div>
 
 <style>
-	.docs-shell {
+	.docs-site {
 		min-height: 100svh;
-		background: var(--ink-canvas);
+		background: var(--docs-canvas);
+		color: var(--docs-text);
 	}
 
-	.skip-link {
-		position: fixed;
-		inset: var(--ink-space-2) auto auto var(--ink-space-2);
-		z-index: 50;
-		padding: var(--ink-space-2) var(--ink-space-3);
-		translate: 0 -150%;
-		color: var(--ink-on-accent);
-		background: var(--ink-accent);
-		border-radius: var(--ink-radius-wobbly-small);
-		font-weight: 650;
-	}
-
-	.skip-link:focus {
-		translate: 0;
-	}
-
-	.docs-grid {
+	.docs-layout {
 		display: grid;
-		grid-template-columns: minmax(14rem, 17rem) minmax(0, 1fr) minmax(11rem, 14rem);
+		grid-template-columns: 13rem minmax(0, 1fr) 13rem;
+		gap: clamp(2rem, 5vw, 5rem);
+		max-width: 1440px;
+		margin: 0 auto;
+		padding: 2.75rem 2rem 5rem;
 	}
 
-	.docs-grid.landing {
-		display: block;
-	}
-
-	main {
+	.sidebar,
+	.toc-column {
 		min-width: 0;
-		padding: var(--ink-space-6) clamp(1rem, 2.5vw, 2rem) var(--ink-space-6) var(--ink-space-4);
 	}
 
-	article {
-		max-width: 48rem;
-		margin-inline: auto;
+	.docs-main {
+		min-width: 0;
+		max-width: 52rem;
 	}
 
-	.landing main {
-		padding: 0;
+	.doc-heading {
+		padding-bottom: 2rem;
+		border-bottom: 1px solid var(--docs-border);
 	}
 
-	.landing article {
-		max-width: none;
+	.doc-meta {
+		display: flex;
+		gap: 0.55rem;
+		margin-bottom: 0.8rem;
+		color: var(--docs-accent-text);
+		font: 650 0.76rem / 1 var(--docs-font-mono);
+		text-transform: uppercase;
 	}
 
-	.sidebar-scrim {
-		position: fixed;
-		inset: 4rem 0 0;
-		z-index: 7;
-		width: 100%;
-		height: calc(100% - 4rem);
-		padding: 0;
-		background: color-mix(in srgb, var(--ink-canvas) 44%, transparent);
-		border: 0;
-		backdrop-filter: blur(2px);
+	.doc-meta-secondary {
+		display: flex;
+		gap: 1rem;
+		align-items: center;
 	}
 
-	@media (max-width: 1180px) {
-		.docs-grid {
-			grid-template-columns: minmax(14rem, 17rem) minmax(0, 1fr);
+	.doc-heading h1 {
+		max-width: 20ch;
+		margin: 0;
+		color: var(--docs-heading);
+		font-family: var(--docs-font-heading);
+		font-size: clamp(2.4rem, 5vw, 4.5rem);
+		font-weight: 650;
+		letter-spacing: -0.04em;
+		line-height: 1.02;
+	}
+
+	.doc-description {
+		max-width: 42rem;
+		margin: 1rem 0 0;
+		color: var(--docs-text-muted);
+		font-size: 1.12rem;
+		line-height: 1.55;
+	}
+
+	.doc-meta-secondary :global(.copy-markdown) {
+		margin-top: 1rem;
+	}
+
+	.doc-content {
+		padding-top: 2rem;
+	}
+
+	.doc-content :global(h2),
+	.doc-content :global(h3) {
+		scroll-margin-top: 6.5rem;
+	}
+
+	@media (max-width: 1160px) {
+		.docs-layout {
+			grid-template-columns: 12rem minmax(0, 1fr);
+			gap: 2.5rem;
+		}
+
+		.toc-column {
+			display: none;
 		}
 	}
 
-	@media (max-width: 960px) {
-		.docs-grid {
+	@media (max-width: 900px) {
+		.docs-layout {
 			display: block;
+			padding: 2rem 1.25rem 4rem;
 		}
 
-		main {
-			padding-inline: clamp(1.25rem, 7vw, 4rem);
+		.sidebar {
+			display: none;
+		}
+
+		.docs-main {
+			max-width: none;
+		}
+	}
+
+	@media (max-width: 560px) {
+		.doc-meta-secondary {
+			align-items: flex-start;
+			flex-direction: column;
+			gap: 0.25rem;
 		}
 	}
 </style>

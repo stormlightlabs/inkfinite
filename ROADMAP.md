@@ -169,6 +169,55 @@ path caches, incremental materialization, alternate rendering backends, and
 similar architecture changes should require evidence from representative
 workloads.
 
+## Prioritizing Correctness
+
+Finish the smallest end-to-end path through the shared document model before
+expanding feature coverage. For each slice, establish the durable Rust
+representation and validation first, then bindings, rendering and hit testing,
+transaction workflows, and interface-specific behavior. A feature is not done
+when one entry point can create it; it must survive save and reopen, undo and
+redo, CRDT merge, inspection, and deterministic export where applicable.
+
+Use this order when work competes:
+
+1. Protect document invariants and reject malformed durable state.
+2. Preserve transaction atomicity, causal-head checks, and convergence.
+3. Match geometry, transforms, bounds, fill, stroke, and hit testing across Rust
+   and TypeScript.
+4. Make unsupported or unauthorized operations explicit and non-destructive.
+5. Add workflow and interoperability coverage before broadening the supported
+   feature set.
+6. Optimize only after a representative benchmark identifies the dominant cost.
+
+Prefer executable examples over duplicated assertions. Shared Rust/TypeScript
+fixtures should cover valid boundaries, invalid inputs, nested transforms, and
+compound geometry. Round-trip tests should compare normalized structure where
+representation matters and rendered output where visual equivalence matters.
+Fuzz parsers and validation boundaries with size and recursion limits; keep any
+minimized regression input as a fixture.
+
+The following references define behavior rather than serving as optional design
+inspiration:
+
+- [SVG 2 paths](https://www.w3.org/TR/SVG2/paths.html) defines path grammar,
+  subpaths, close behavior, and error handling.
+- [SVG 2 coordinate systems](https://www.w3.org/TR/SVG2/coords.html) defines
+  transforms, viewports, units, and bounding boxes.
+- [SVG 2 painting](https://www.w3.org/TR/SVG2/painting.html) defines fill rules,
+  strokes, markers, and paint order.
+- [SVG 2 conformance and processing modes](https://www.w3.org/TR/SVG2/conform.html)
+  distinguishes scripts, animation, interaction, and external resource loading.
+  Import should choose and test a static, non-interactive policy rather than
+  inheriting browser behavior accidentally.
+- [MCP authorization](https://modelcontextprotocol.io/specification/latest/basic/authorization)
+  and [MCP security guidance](https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices)
+  guide permission failures and transport-specific authorization. The initial
+  stdio server should receive credentials from its environment and must not
+  treat document validation as authorization.
+- The [Rust Fuzz Book](https://rust-fuzz.github.io/book/cargo-fuzz.html) describes
+  `cargo-fuzz`, which should target SVG parsing, path normalization, transaction
+  decoding, and durable validation once those boundaries exist.
+
 ## Engineering Principles
 
 - Rust owns the durable document model and transaction engine.

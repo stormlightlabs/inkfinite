@@ -26,6 +26,7 @@
 	"devDependencies": {
 		"@eslint/compat": "^1.4.0",
 		"@eslint/js": "^9.39.1",
+		"@fontsource-variable/google-sans": "^5.3.1",
 		"@inkfinite/runtime": "workspace:*",
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.49.1",

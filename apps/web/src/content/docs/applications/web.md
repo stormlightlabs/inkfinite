@@ -1,13 +1,14 @@
-<svelte:head>
-	<title>Web editor · Inkfinite documentation</title>
-	<meta name="description" content="Run the Inkfinite web editor and understand its browser storage." />
-</svelte:head>
-
-# Web editor
+---
+title: Web editor
+description: Run the Inkfinite web editor and understand its browser storage.
+section: Applications
+group: Applications
+order: 5
+---
 
 The web editor provides the full canvas interface without access to native `.inkfinite` files.
 
-<h2 id="open-the-editor">Open the editor</h2>
+## Open the editor
 
 The hosted editor lives at [`/app`](/app). To run it from a source checkout:
 
@@ -19,7 +20,7 @@ pnpm dev:web
 Open the local URL printed by Vite and add `/app` to its path. The site root contains this
 documentation.
 
-<h2 id="browser-storage">Storage and backups</h2>
+## Storage and backups
 
 The web editor stores boards in IndexedDB for the current origin and browser profile. It does not
 write canonical files to your filesystem, and another browser or deployment origin has a separate

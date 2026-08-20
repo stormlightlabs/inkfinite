@@ -1,140 +1,88 @@
 <script lang="ts">
-	// TODO: active link styling
 	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
-	import { DOCS_GROUPS } from './navigation';
+	import { docSections, type Doc } from './content/types';
 
-	let { close, open }: { close: () => void; open: boolean } = $props();
+	let { docs, currentSlug }: { docs: Doc[]; currentSlug: string } = $props();
 
 	function resolveDocsPath(path: string): string {
 		return (resolve as (route: string) => string)(path);
 	}
 </script>
 
-<aside id="docs-sidebar" class:open aria-label="Documentation navigation">
-	<nav>
-		{#each DOCS_GROUPS as group (group.title)}
-			<section>
-				<h2>{group.title}</h2>
-				<ul>
-					{#each group.pages as item (item.href)}
-						<li>
-							<!-- eslint-disable svelte/no-navigation-without-resolve -->
-							<a
-								href={resolveDocsPath(item.href)}
-								aria-current={page.url.pathname === item.href ? 'page' : undefined}
-								onclick={close}>
-								{item.title}
-							</a>
-							<!-- eslint-enable svelte/no-navigation-without-resolve -->
-						</li>
-					{/each}
-				</ul>
-			</section>
-		{/each}
-	</nav>
-</aside>
+<div class="sidebar-inner">
+	<p class="sidebar-kicker">Documentation</p>
+	{#each docSections as section (section)}
+		<section class="sidebar-section" aria-labelledby={`sidebar-${section}`}>
+			<h2 id={`sidebar-${section}`}>{section}</h2>
+			<nav aria-label={`${section} pages`}>
+				{#each docs.filter((doc) => doc.section === section) as doc (doc.slug)}
+					<!-- eslint-disable svelte/no-navigation-without-resolve -->
+					<a
+						class:active={doc.slug === currentSlug}
+						href={resolveDocsPath(`/docs/${doc.slug}/`)}
+						aria-current={doc.slug === currentSlug ? 'page' : undefined}>
+						{doc.title}
+					</a>
+					<!-- eslint-enable svelte/no-navigation-without-resolve -->
+				{/each}
+			</nav>
+		</section>
+	{/each}
+</div>
 
 <style>
-	aside {
+	.sidebar-inner {
 		position: sticky;
-		top: 4rem;
-		height: calc(100svh - 4rem);
+		top: 6.75rem;
+		max-height: calc(100vh - 8rem);
 		overflow-y: auto;
-		padding: var(--ink-space-6) var(--ink-space-4) clamp(1rem, 3vw, 2rem);
-		background: color-mix(in srgb, var(--ink-surface) 56%, var(--ink-canvas));
-		box-shadow: inset -1px 0 0 color-mix(in srgb, var(--ink-border) 30%, transparent);
-		scrollbar-width: thin;
+		padding-right: 0.5rem;
 	}
 
-	nav,
-	section,
-	ul {
-		display: grid;
-	}
-
-	nav {
-		gap: var(--ink-space-6);
-	}
-
-	section,
-	ul {
-		gap: var(--ink-space-1);
-	}
-
-	h2 {
-		margin: 0 0 var(--ink-space-2);
-		padding-inline: var(--ink-space-3);
-		color: var(--ink-text-muted);
-		font-family: var(--ink-font-body);
-		font-size: var(--ink-type-xs);
-		font-weight: 700;
-		letter-spacing: 0.075em;
+	.sidebar-kicker,
+	.sidebar-section h2 {
+		font-family: var(--docs-font-mono);
+		letter-spacing: 0.06em;
 		text-transform: uppercase;
 	}
 
-	ul {
-		margin: 0;
-		padding: 0;
-		list-style: none;
-	}
-
-	a {
-		display: flex;
-		align-items: center;
-		min-height: 40px;
-		padding: var(--ink-space-2) var(--ink-space-3);
-		color: var(--ink-text-muted);
-		border-radius: var(--ink-radius-wobbly-small);
-		font-size: var(--ink-type-sm);
-		font-weight: 520;
-		text-decoration: none;
-		transition-property: color, background-color, translate;
-		transition-duration: var(--ink-duration-fast);
-		transition-timing-function: var(--ink-ease-out);
-	}
-
-	a:hover {
-		color: var(--ink-text);
-		background: color-mix(in srgb, var(--ink-surface-hover) 76%, transparent);
-		translate: 2px 0;
-	}
-
-	a:active {
-		scale: 0.96;
-	}
-
-	a[aria-current='page'] {
-		color: var(--ink-accent-text);
-		background: color-mix(in srgb, var(--ink-accent) 14%, var(--ink-surface-raised));
-		box-shadow: inset 3px 0 0 var(--ink-accent);
+	.sidebar-kicker {
+		margin: 0 0 0.85rem;
+		color: var(--docs-accent-text);
+		font-size: var(--docs-type-xs);
 		font-weight: 650;
 	}
 
-	@media (max-width: 960px) {
-		aside {
-			position: fixed;
-			inset: 4rem auto 0 0;
-			z-index: 8;
-			width: min(19rem, 86vw);
-			height: calc(100svh - 4rem);
-			padding-left: var(--ink-space-4);
-			translate: -105% 0;
-			box-shadow:
-				12px 0 30px color-mix(in srgb, var(--ink-shadow-color) 20%, transparent),
-				inset -1px 0 0 color-mix(in srgb, var(--ink-border) 30%, transparent);
-			transition: translate 180ms var(--ink-ease-out);
-		}
-
-		aside.open {
-			translate: 0;
-		}
+	.sidebar-section {
+		margin-top: 1.7rem;
 	}
 
-	@media (prefers-reduced-motion: reduce) {
-		aside,
-		a {
-			transition: none;
-		}
+	.sidebar-section h2 {
+		margin: 0 0 0.4rem;
+		color: var(--docs-heading);
+		font-family: var(--docs-font-heading);
+		font-size: 0.72rem;
+		font-weight: 650;
+	}
+
+	.sidebar-section nav {
+		display: grid;
+		gap: 0.1rem;
+	}
+
+	.sidebar-section a {
+		padding: 0.38rem 0.55rem;
+		border-left: 2px solid transparent;
+		color: var(--docs-text-muted);
+		font-size: 0.86rem;
+		line-height: 1.35;
+		text-decoration: none;
+	}
+
+	.sidebar-section a:hover,
+	.sidebar-section a.active {
+		border-left-color: var(--docs-accent);
+		background: var(--docs-surface);
+		color: var(--docs-accent-text);
 	}
 </style>

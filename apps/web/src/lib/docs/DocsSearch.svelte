@@ -18,7 +18,6 @@
 			}) => unknown;
 		};
 
-	/** Pagefind writes these files after SvelteKit generates its static asset types. */
 	function resolvePagefindAsset(path: string): string {
 		return (resolve as (assetPath: string) => string)(path);
 	}
@@ -32,9 +31,9 @@
 		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
 			event.preventDefault();
 			open = true;
-			requestAnimationFrame(() => {
-				document.querySelector<HTMLInputElement>('.pagefind-ui__search-input')?.focus();
-			});
+			requestAnimationFrame(() =>
+				document.querySelector<HTMLInputElement>('.pagefind-ui__search-input')?.focus()
+			);
 		}
 	}
 
@@ -80,9 +79,7 @@
 		script.async = true;
 		script.src = scriptUrl;
 		script.addEventListener('load', startSearch, { once: true });
-		script.addEventListener('error', () => {
-			unavailable = true;
-		});
+		script.addEventListener('error', () => (unavailable = true));
 		document.head.append(script);
 	});
 </script>
@@ -95,21 +92,19 @@
 	aria-label="Search documentation"
 	aria-expanded={open}
 	onclick={() => (open = true)}>
-	<Icon name="search" size={18} />
+	<Icon name="search" size={17} />
 	<span>Search docs</span>
 	<kbd>⌘ K</kbd>
 </button>
 
-<button
-	hidden={!open}
-	class="search-scrim"
-	aria-label="Close search"
-	type="button"
-	onclick={close}>
-</button>
+<button hidden={!open} class="search-scrim" aria-label="Close search" type="button" onclick={close}
+></button>
 <section hidden={!open} class="search-dialog" aria-label="Search documentation">
 	<div class="search-heading">
-		<strong>Search documentation</strong>
+		<div>
+			<p class="search-kicker">Documentation search</p>
+			<strong>Search the docs</strong>
+		</div>
 		<button class="close-button" type="button" aria-label="Close search" onclick={close}>
 			<Icon name="close" size={18} />
 		</button>
@@ -126,45 +121,37 @@
 	.search-trigger {
 		display: flex;
 		align-items: center;
-		gap: var(--ink-space-2);
-		min-width: min(18rem, 28vw);
-		height: var(--ink-control-height);
-		padding: 0 var(--ink-space-2) 0 var(--ink-space-3);
-		color: var(--ink-text-muted);
-		background: var(--ink-surface-raised);
-		border: 1px solid color-mix(in srgb, var(--ink-border) 55%, transparent);
-		border-radius: var(--ink-radius-wobbly-small);
-		box-shadow: 0 1px 2px color-mix(in srgb, var(--ink-shadow-color) 12%, transparent);
-		font: inherit;
+		gap: 0.5rem;
+		width: min(15rem, 22vw);
+		min-height: 2.75rem;
+		padding: 0.42rem 0.55rem;
+		border: 1px solid var(--docs-border);
+		border-radius: 0.35rem;
+		background: var(--docs-surface-raised);
+		color: var(--docs-text-muted);
+		font: 550 0.86rem / 1 var(--docs-font-body);
+		text-align: left;
 		cursor: pointer;
-		transition-property: color, background-color, box-shadow, scale;
-		transition-duration: var(--ink-duration-fast);
-		transition-timing-function: var(--ink-ease-out);
 	}
 
 	.search-trigger:hover {
-		color: var(--ink-text);
-		background: var(--ink-surface-hover);
-		box-shadow: 0 2px 5px color-mix(in srgb, var(--ink-shadow-color) 16%, transparent);
-	}
-
-	.search-trigger:active {
-		scale: 0.96;
+		border-color: var(--docs-accent);
+		color: var(--docs-accent-text);
 	}
 
 	.search-trigger span {
 		flex: 1;
-		text-align: left;
 	}
 
 	kbd {
-		padding: 0.15rem 0.4rem;
-		color: var(--ink-text-muted);
-		background: var(--ink-surface);
-		border-radius: 4px;
-		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink-border) 45%, transparent);
-		font-family: var(--ink-font-body);
-		font-size: var(--ink-type-xs);
+		padding: 0.18rem 0.3rem;
+		border: 1px solid var(--docs-border);
+		border-bottom-width: 2px;
+		border-radius: 0.2rem;
+		background: var(--docs-canvas);
+		color: var(--docs-text-muted);
+		font: 650 0.68rem / 1 var(--docs-font-mono);
+		white-space: nowrap;
 	}
 
 	.search-scrim {
@@ -174,75 +161,88 @@
 		width: 100%;
 		height: 100%;
 		padding: 0;
-		background: color-mix(in srgb, var(--ink-canvas) 38%, transparent);
 		border: 0;
-		backdrop-filter: blur(4px);
+		background: rgb(8 9 16 / 58%);
+		backdrop-filter: blur(3px);
 	}
 
 	.search-dialog {
 		position: fixed;
-		inset: max(5rem, 10vh) 50% auto auto;
+		top: 50%;
+		left: 50%;
 		z-index: 21;
 		width: min(42rem, calc(100vw - 2rem));
-		max-height: min(42rem, calc(100vh - 8rem));
+		max-height: min(42rem, calc(100vh - 2rem));
+		padding: 1.25rem;
+		transform: translate(-50%, -50%);
 		overflow: auto;
-		padding: var(--ink-space-4);
-		translate: 50% 0;
-		color: var(--ink-text);
-		background: var(--ink-surface-raised);
-		border-radius: var(--ink-radius-panel);
-		box-shadow:
-			0 24px 64px color-mix(in srgb, var(--ink-shadow-color) 32%, transparent),
-			0 0 0 1px color-mix(in srgb, var(--ink-border) 38%, transparent);
+		border: 1px solid var(--docs-border);
+		border-radius: 0.65rem;
+		background: var(--docs-surface-raised);
+		color: var(--docs-text);
+		box-shadow: var(--docs-shadow);
 	}
 
 	.search-heading {
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		justify-content: space-between;
-		margin-bottom: var(--ink-space-3);
+		gap: 1rem;
+		margin-bottom: 1rem;
+	}
+
+	.search-kicker {
+		margin: 0 0 0.3rem;
+		color: var(--docs-accent-text);
+		font: 650 var(--docs-type-xs) / 1 var(--docs-font-mono);
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+	}
+
+	.search-heading strong {
+		font-size: 1.45rem;
 	}
 
 	.close-button {
 		display: grid;
 		place-items: center;
-		width: 40px;
-		height: 40px;
+		width: 2.5rem;
+		height: 2.5rem;
 		padding: 0;
-		color: var(--ink-text-muted);
+		border: 1px solid var(--docs-border);
+		border-radius: 0.3rem;
 		background: transparent;
-		border: 0;
-		border-radius: var(--ink-radius-wobbly-small);
+		color: var(--docs-text-muted);
 		cursor: pointer;
 	}
 
 	.close-button:hover {
-		color: var(--ink-text);
-		background: var(--ink-surface-hover);
+		border-color: var(--docs-accent);
+		background: var(--docs-surface-hover);
+		color: var(--docs-accent-text);
 	}
 
 	.search-note {
-		color: var(--ink-text-muted);
-		font-size: var(--ink-type-sm);
+		color: var(--docs-text-muted);
+		font-size: var(--docs-type-sm);
 	}
 
 	.search-dialog :global(.pagefind-ui) {
 		--pagefind-ui-scale: 0.9;
-		--pagefind-ui-primary: var(--ink-accent-text);
-		--pagefind-ui-text: var(--ink-text);
-		--pagefind-ui-background: var(--ink-surface-raised);
-		--pagefind-ui-border: var(--ink-border);
-		--pagefind-ui-tag: var(--ink-surface);
+		--pagefind-ui-primary: var(--docs-accent-text);
+		--pagefind-ui-text: var(--docs-text);
+		--pagefind-ui-background: var(--docs-surface-raised);
+		--pagefind-ui-border: var(--docs-border);
+		--pagefind-ui-tag: var(--docs-canvas);
 		--pagefind-ui-border-width: 1px;
-		--pagefind-ui-border-radius: 8px;
-		--pagefind-ui-font: var(--ink-font-body);
+		--pagefind-ui-border-radius: 0.35rem;
+		--pagefind-ui-font: var(--docs-font-body);
 	}
 
-	@media (max-width: 760px) {
+	@media (max-width: 900px) {
 		.search-trigger {
-			min-width: 40px;
-			width: 40px;
-			padding: 0;
+			width: 2.75rem;
+			padding-inline: 0.5rem;
 			justify-content: center;
 		}
 

@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import '$lib/docs/docs.css';
-	import DocsShell from '$lib/docs/DocsShell.svelte';
+	import { getDocs } from '$lib/docs/content';
+	import SiteHeader from '$lib/docs/SiteHeader.svelte';
 	import { Icon } from '$ui';
 
 	const features = [
@@ -31,6 +32,8 @@
 	function resolveDocsPath(path: string): string {
 		return (resolve as (route: string) => string)(path);
 	}
+
+	const docs = getDocs();
 </script>
 
 <svelte:head>
@@ -40,78 +43,84 @@
 		content="Build, edit, automate, and share infinite-canvas documents with Inkfinite." />
 </svelte:head>
 
-<DocsShell>
-	<div class="landing-page">
-		<section class="hero" data-pagefind-ignore>
-			<div class="hero-copy">
-				<p class="eyebrow"><span></span> Documentation</p>
-				<h1>Give your ideas</h1>
-				<h1><em>infinite room.</em></h1>
-				<p class="tagline">
-					Inkfinite is an open canvas for people and agents to sketch, connect, and
-					refine ideas together.
-				</p>
-				<div class="hero-actions">
-					<a class="primary-action" href={resolve('/app')}>
-						Open the app <Icon name="arrow-right" size={18} />
-					</a>
-					<a class="secondary-action" href={resolve('/docs/getting-started/')}>
-						<Icon name="arrow-right" size={18} /> Quick start
-					</a>
+<div class="docs-site">
+	<SiteHeader {docs} />
+	<main id="main-content">
+		<div class="landing-page">
+			<section class="hero" data-pagefind-ignore>
+				<div class="hero-copy">
+					<p class="eyebrow"><span></span> Documentation</p>
+					<h1>Give your ideas</h1>
+					<h1><em>infinite room.</em></h1>
+					<p class="tagline">
+						Inkfinite is an open canvas for people and agents to sketch, connect, and
+						refine ideas together.
+					</p>
+					<div class="hero-actions">
+						<a class="primary-action" href={resolve('/app')}>
+							Open the app <Icon name="arrow-right" size={18} />
+						</a>
+						<a class="secondary-action" href={resolve('/docs/getting-started/')}>
+							<Icon name="arrow-right" size={18} /> Quick start
+						</a>
+					</div>
 				</div>
-			</div>
 
-			<div class="canvas-window" aria-hidden="true">
-				<div class="window-bar">
-					<span></span><span></span><span></span>
-					<small>new_idea.inkfinite</small>
+				<div class="canvas-window" aria-hidden="true">
+					<div class="window-bar">
+						<span></span><span></span><span></span>
+						<small>new_idea.inkfinite</small>
+					</div>
+					<div class="mini-canvas">
+						<div class="canvas-grid"></div>
+						<div class="shape note-one">Sketch</div>
+
+						<div class="shape decision">Iterate</div>
+
+						<div class="shape note-two">Ship</div>
+						<div class="cursor"><Icon name="select" size={25} /><span>you</span></div>
+					</div>
 				</div>
-				<div class="mini-canvas">
-					<div class="canvas-grid"></div>
-					<div class="shape note-one">Sketch</div>
+			</section>
 
-					<div class="shape decision">Iterate</div>
-
-					<div class="shape note-two">Ship</div>
-					<div class="cursor"><Icon name="select" size={25} /><span>you</span></div>
+			<section class="feature-section" aria-labelledby="why-inkfinite">
+				<div class="section-heading">
+					<p class="eyebrow"><span></span> One whiteboard, many ways in</p>
+					<h2 id="why-inkfinite">Draw or automate.</h2>
 				</div>
-			</div>
-		</section>
+				<div class="feature-grid">
+					{#each features as feature, index (feature.title)}
+						<!-- eslint-disable svelte/no-navigation-without-resolve -->
+						<a
+							class="feature-card"
+							href={resolveDocsPath(feature.href)}
+							style={`--card-tilt: ${index % 2 === 0 ? -0.8 : 0.8}deg`}>
+							<span class="feature-icon"
+								><Icon name={feature.icon} size={24} /></span>
+							<h3>{feature.title}</h3>
+							<p>{feature.description}</p>
+							<span class="card-link"
+								>Read the guide <Icon name="arrow-right" size={16} /></span>
+						</a>
+						<!-- eslint-enable svelte/no-navigation-without-resolve -->
+					{/each}
+				</div>
+			</section>
 
-		<section class="feature-section" aria-labelledby="why-inkfinite">
-			<div class="section-heading">
-				<p class="eyebrow"><span></span> One whiteboard, many ways in</p>
-				<h2 id="why-inkfinite">Draw or automate.</h2>
-			</div>
-			<div class="feature-grid">
-				{#each features as feature, index (feature.title)}
-					<!-- eslint-disable svelte/no-navigation-without-resolve -->
-					<a
-						class="feature-card"
-						href={resolveDocsPath(feature.href)}
-						style={`--card-tilt: ${index % 2 === 0 ? -0.8 : 0.8}deg`}>
-						<span class="feature-icon"><Icon name={feature.icon} size={24} /></span>
-						<h3>{feature.title}</h3>
-						<p>{feature.description}</p>
-						<span class="card-link"
-							>Read the guide <Icon name="arrow-right" size={16} /></span>
-					</a>
-					<!-- eslint-enable svelte/no-navigation-without-resolve -->
-				{/each}
-			</div>
-		</section>
-
-		<section class="quick-start" aria-labelledby="quick-start-title">
-			<div>
-				<p class="eyebrow"><span></span> Start here</p>
-				<h2 id="quick-start-title">Open a canvas and make your first mark.</h2>
-			</div>
-			<a class="primary-action" href="https://github.com/stormlightlabs/inkfinite/releases">
-				Download <Icon name="github" size={18} />
-			</a>
-		</section>
-	</div>
-</DocsShell>
+			<section class="quick-start" aria-labelledby="quick-start-title">
+				<div>
+					<p class="eyebrow"><span></span> Start here</p>
+					<h2 id="quick-start-title">Open a canvas and make your first mark.</h2>
+				</div>
+				<a
+					class="primary-action"
+					href="https://github.com/stormlightlabs/inkfinite/releases">
+					Download <Icon name="github" size={18} />
+				</a>
+			</section>
+		</div>
+	</main>
+</div>
 
 <style>
 	.landing-page {
@@ -125,16 +134,16 @@
 		gap: clamp(2rem, 7vw, 8rem);
 		min-height: min(46rem, calc(100svh - 4rem));
 		padding: clamp(2rem, 8vw, 4rem);
-		background: var(--ink-canvas);
+		background: var(--docs-canvas);
 	}
 
 	.eyebrow {
 		display: flex;
 		align-items: center;
-		gap: var(--ink-space-2);
-		margin: 0 0 var(--ink-space-4);
-		color: var(--ink-accent-text);
-		font-size: var(--ink-type-xs);
+		gap: var(--docs-space-2);
+		margin: 0 0 var(--docs-space-4);
+		color: var(--docs-accent-text);
+		font-size: var(--docs-type-xs);
 		font-weight: 750;
 		letter-spacing: 0.11em;
 		text-transform: uppercase;
@@ -143,15 +152,15 @@
 	.eyebrow span {
 		width: 1.75rem;
 		height: 3px;
-		background: var(--ink-accent);
+		background: var(--docs-accent);
 		border-radius: 999px;
 		transform: rotate(-2deg);
 	}
 
 	h1 {
 		margin: 0;
-		color: var(--ink-text);
-		font-family: var(--ink-font-body);
+		color: var(--docs-text);
+		font-family: var(--docs-font-heading);
 		font-size: clamp(3.3rem, 7.2vw, 6.7rem);
 		font-weight: 700;
 		letter-spacing: -0.0375em;
@@ -160,14 +169,14 @@
 	}
 
 	h1 em {
-		color: var(--ink-heading);
+		color: var(--docs-heading);
 		font-style: normal;
 	}
 
 	.tagline {
 		max-width: 38rem;
-		margin: var(--ink-space-6) 0 0;
-		color: var(--ink-text-muted);
+		margin: var(--docs-space-6) 0 0;
+		color: var(--docs-text-muted);
 		font-size: clamp(1.05rem, 1.5vw, 1.25rem);
 		line-height: 1.65;
 		text-wrap: pretty;
@@ -176,8 +185,8 @@
 	.hero-actions {
 		display: flex;
 		flex-wrap: wrap;
-		gap: var(--ink-space-3);
-		margin-top: var(--ink-space-6);
+		gap: var(--docs-space-3);
+		margin-top: var(--docs-space-6);
 	}
 
 	.primary-action,
@@ -185,42 +194,42 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		gap: var(--ink-space-2);
+		gap: var(--docs-space-2);
 		min-height: 44px;
-		padding: var(--ink-space-3) var(--ink-space-5);
-		border-radius: var(--ink-radius-wobbly);
-		font-size: var(--ink-type-sm);
+		padding: var(--docs-space-3) var(--docs-space-5);
+		border-radius: var(--docs-radius-wobbly);
+		font-size: var(--docs-type-sm);
 		font-weight: 700;
 		text-decoration: none;
 		transition-property: color, background-color, box-shadow, translate, scale;
-		transition-duration: var(--ink-duration-fast);
-		transition-timing-function: var(--ink-ease-out);
+		transition-duration: var(--docs-duration-fast);
+		transition-timing-function: var(--docs-ease-out);
 	}
 
 	.primary-action {
-		color: var(--ink-on-accent);
-		background: var(--ink-accent);
-		box-shadow: 3px 4px 0 var(--ink-shadow-color);
+		color: var(--docs-on-accent);
+		background: var(--docs-accent);
+		box-shadow: 3px 4px 0 var(--docs-shadow-color);
 	}
 
 	.primary-action:hover {
-		color: var(--ink-on-accent);
-		background: var(--ink-accent-hover);
+		color: var(--docs-on-accent);
+		background: var(--docs-accent-hover);
 		translate: -1px -1px;
-		box-shadow: 5px 6px 0 var(--ink-shadow-color);
+		box-shadow: 5px 6px 0 var(--docs-shadow-color);
 	}
 
 	.secondary-action {
-		color: var(--ink-text);
-		background: var(--ink-surface-raised);
+		color: var(--docs-text);
+		background: var(--docs-surface-raised);
 		box-shadow:
-			0 4px 14px color-mix(in srgb, var(--ink-shadow-color) 10%, transparent),
-			inset 0 0 0 1px color-mix(in srgb, var(--ink-border) 45%, transparent);
+			0 4px 14px color-mix(in srgb, var(--docs-shadow-color) 10%, transparent),
+			inset 0 0 0 1px color-mix(in srgb, var(--docs-border) 45%, transparent);
 	}
 
 	.secondary-action:hover {
-		color: var(--ink-text);
-		background: var(--ink-surface-hover);
+		color: var(--docs-text);
+		background: var(--docs-surface-hover);
 		translate: 0 -1px;
 	}
 
@@ -234,12 +243,12 @@
 		aspect-ratio: 1.18;
 		min-width: 0;
 		overflow: hidden;
-		background: var(--ink-surface-raised);
+		background: var(--docs-surface-raised);
 		border-radius: 16px 24px 19px 22px / 22px 17px 25px 18px;
 		box-shadow:
-			18px 22px 0 color-mix(in srgb, var(--ink-shadow-color) 92%, transparent),
-			0 30px 80px color-mix(in srgb, var(--ink-shadow-color) 25%, transparent),
-			inset 0 0 0 1px color-mix(in srgb, var(--ink-border) 40%, transparent);
+			18px 22px 0 color-mix(in srgb, var(--docs-shadow-color) 92%, transparent),
+			0 30px 80px color-mix(in srgb, var(--docs-shadow-color) 25%, transparent),
+			inset 0 0 0 1px color-mix(in srgb, var(--docs-border) 40%, transparent);
 		transform: rotate(1.25deg);
 	}
 
@@ -249,32 +258,32 @@
 		gap: 0.4rem;
 		height: 2.8rem;
 		padding-inline: 1rem;
-		background: var(--ink-surface);
-		box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--ink-border) 35%, transparent);
+		background: var(--docs-surface);
+		box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--docs-border) 35%, transparent);
 	}
 
 	.window-bar > span {
 		width: 0.7rem;
 		height: 0.7rem;
-		background: var(--ink-border);
+		background: var(--docs-border);
 		border-radius: 50%;
 	}
 
 	.window-bar > span:first-child {
-		background: var(--ink-danger);
+		background: var(--docs-danger);
 	}
 
 	.window-bar > span:nth-child(2) {
-		background: var(--ink-warning);
+		background: var(--docs-warning);
 	}
 
 	.window-bar > span:nth-child(3) {
-		background: var(--ink-accent);
+		background: var(--docs-accent);
 	}
 
 	.window-bar small {
 		margin-left: auto;
-		color: var(--ink-text-muted);
+		color: var(--docs-text-muted);
 		font-size: 0.66rem;
 	}
 
@@ -282,14 +291,14 @@
 		position: relative;
 		height: calc(100% - 2.8rem);
 		overflow: hidden;
-		background: var(--ink-canvas);
+		background: var(--docs-canvas);
 	}
 
 	.canvas-grid {
 		position: absolute;
 		inset: 0;
 		opacity: 0.4;
-		background-image: radial-gradient(var(--ink-border) 1px, transparent 1px);
+		background-image: radial-gradient(var(--docs-border) 1px, transparent 1px);
 		background-size: 18px 18px;
 	}
 
@@ -300,12 +309,12 @@
 		place-items: center;
 		width: 7.4rem;
 		height: 4.6rem;
-		color: var(--ink-on-accent);
-		background: var(--ink-accent);
-		border: 2px solid var(--ink-border-strong);
-		border-radius: var(--ink-radius-wobbly);
-		box-shadow: 3px 4px 0 var(--ink-shadow-color);
-		font-family: var(--ink-font-body);
+		color: var(--docs-on-accent);
+		background: var(--docs-accent);
+		border: 2px solid var(--docs-border-strong);
+		border-radius: var(--docs-radius-wobbly);
+		box-shadow: 3px 4px 0 var(--docs-shadow-color);
+		font-family: var(--docs-font-body);
 		font-size: 0.9rem;
 		font-weight: 650;
 	}
@@ -319,15 +328,15 @@
 	.decision {
 		top: 45%;
 		left: 39%;
-		background: var(--ink-warning);
+		background: var(--docs-warning);
 		transform: rotate(1deg);
 	}
 
 	.note-two {
 		right: 7%;
 		bottom: 13%;
-		color: var(--ink-text);
-		background: var(--ink-surface-raised);
+		color: var(--docs-text);
+		background: var(--docs-surface-raised);
 		transform: rotate(-1deg);
 	}
 
@@ -336,23 +345,23 @@
 		z-index: 3;
 		top: 26%;
 		right: 18%;
-		color: var(--ink-accent-text);
-		filter: drop-shadow(0 1px 0 var(--ink-surface-raised));
+		color: var(--docs-accent-text);
+		filter: drop-shadow(0 1px 0 var(--docs-surface-raised));
 	}
 
 	.cursor span {
 		display: block;
 		margin: -0.1rem 0 0 1rem;
 		padding: 0.1rem 0.4rem;
-		color: var(--ink-on-accent);
-		background: var(--ink-accent);
+		color: var(--docs-on-accent);
+		background: var(--docs-accent);
 		border-radius: 3px;
 		font-size: 0.62rem;
 	}
 
 	.feature-section {
 		padding: clamp(5rem, 9vw, 8rem) max(1.5rem, calc((100vw - 76rem) / 2));
-		background: var(--ink-surface-raised);
+		background: var(--docs-surface-raised);
 	}
 
 	.section-heading {
@@ -362,8 +371,8 @@
 	.section-heading h2,
 	.quick-start h2 {
 		margin: 0;
-		color: var(--ink-heading);
-		font-family: var(--ink-font-body);
+		color: var(--docs-heading);
+		font-family: var(--docs-font-heading);
 		font-size: clamp(2rem, 4vw, 3.4rem);
 		letter-spacing: -0.045em;
 		line-height: 1.1;
@@ -373,7 +382,7 @@
 	.feature-grid {
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
-		gap: var(--ink-space-5);
+		gap: var(--docs-space-5);
 		margin-top: clamp(2.5rem, 5vw, 4rem);
 	}
 
@@ -381,29 +390,29 @@
 		display: flex;
 		flex-direction: column;
 		min-height: 18rem;
-		padding: var(--ink-space-5);
-		color: var(--ink-text);
-		background: var(--ink-canvas);
-		border-radius: var(--ink-radius-panel);
+		padding: var(--docs-space-5);
+		color: var(--docs-text);
+		background: var(--docs-canvas);
+		border-radius: var(--docs-radius-panel);
 		box-shadow:
-			0 12px 32px color-mix(in srgb, var(--ink-shadow-color) 8%, transparent),
-			inset 0 0 0 1px color-mix(in srgb, var(--ink-border) 30%, transparent);
+			0 12px 32px color-mix(in srgb, var(--docs-shadow-color) 8%, transparent),
+			inset 0 0 0 1px color-mix(in srgb, var(--docs-border) 30%, transparent);
 		text-decoration: none;
 		transform: translateY(0) rotate(0deg);
 		transform-origin: 50% 85%;
 		transition-property: background-color, box-shadow, color, transform, scale;
 		transition-duration: 220ms;
-		transition-timing-function: var(--ink-ease-out);
+		transition-timing-function: var(--docs-ease-out);
 	}
 
 	.feature-card:hover,
 	.feature-card:focus-visible {
-		color: var(--ink-text);
-		background: color-mix(in srgb, var(--ink-canvas) 88%, var(--ink-accent) 12%);
+		color: var(--docs-text);
+		background: color-mix(in srgb, var(--docs-canvas) 88%, var(--docs-accent) 12%);
 		box-shadow:
-			7px 10px 0 color-mix(in srgb, var(--ink-shadow-color) 88%, transparent),
-			0 24px 44px color-mix(in srgb, var(--ink-shadow-color) 18%, transparent),
-			inset 0 0 0 2px color-mix(in srgb, var(--ink-border-strong) 78%, transparent);
+			7px 10px 0 color-mix(in srgb, var(--docs-shadow-color) 88%, transparent),
+			0 24px 44px color-mix(in srgb, var(--docs-shadow-color) 18%, transparent),
+			inset 0 0 0 2px color-mix(in srgb, var(--docs-border-strong) 78%, transparent);
 		transform: translate(-2px, -8px) rotate(var(--card-tilt));
 	}
 
@@ -416,22 +425,22 @@
 		place-items: center;
 		width: 3rem;
 		height: 3rem;
-		color: var(--ink-accent-text);
-		background: color-mix(in srgb, var(--ink-accent) 14%, var(--ink-surface-raised));
-		border-radius: var(--ink-radius-wobbly-small);
+		color: var(--docs-accent-text);
+		background: color-mix(in srgb, var(--docs-accent) 14%, var(--docs-surface-raised));
+		border-radius: var(--docs-radius-wobbly-small);
 	}
 
 	.feature-card h3 {
-		margin: var(--ink-space-5) 0 var(--ink-space-2);
-		color: var(--ink-heading);
-		font-family: var(--ink-font-body);
+		margin: var(--docs-space-5) 0 var(--docs-space-2);
+		color: var(--docs-heading);
+		font-family: var(--docs-font-heading);
 		font-size: 1.2rem;
 	}
 
 	.feature-card p {
 		margin: 0;
-		color: var(--ink-text-muted);
-		font-size: var(--ink-type-sm);
+		color: var(--docs-text-muted);
+		font-size: var(--docs-type-sm);
 		line-height: 1.65;
 		text-wrap: pretty;
 	}
@@ -439,11 +448,11 @@
 	.card-link {
 		display: flex;
 		align-items: center;
-		gap: var(--ink-space-2);
+		gap: var(--docs-space-2);
 		margin-top: auto;
-		padding-top: var(--ink-space-5);
-		color: var(--ink-accent-text);
-		font-size: var(--ink-type-sm);
+		padding-top: var(--docs-space-5);
+		color: var(--docs-accent-text);
+		font-size: var(--docs-type-sm);
 		font-weight: 700;
 	}
 
@@ -451,9 +460,9 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: var(--ink-space-6);
+		gap: var(--docs-space-6);
 		padding: clamp(4rem, 7vw, 6rem) max(1.5rem, calc((100vw - 76rem) / 2));
-		background: var(--ink-surface);
+		background: var(--docs-surface);
 	}
 
 	.quick-start > div {
@@ -492,8 +501,8 @@
 		.canvas-window {
 			width: 100%;
 			box-shadow:
-				9px 11px 0 var(--ink-shadow-color),
-				0 24px 50px color-mix(in srgb, var(--ink-shadow-color) 20%, transparent);
+				9px 11px 0 var(--docs-shadow-color),
+				0 24px 50px color-mix(in srgb, var(--docs-shadow-color) 20%, transparent);
 		}
 
 		.shape {

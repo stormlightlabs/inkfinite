@@ -1,14 +1,15 @@
-<svelte:head>
-	<title>Documents · Inkfinite documentation</title>
-	<meta name="description" content="Pages, layers, shapes, bindings, and persistence in Inkfinite documents." />
-</svelte:head>
-
-# Documents
+---
+title: Documents
+description: 'Pages, layers, shapes, bindings, and persistence in Inkfinite documents.'
+section: Concepts
+group: Concepts
+order: 3
+---
 
 An Inkfinite document stores canvas content and the history needed to merge edits from different
 peers.
 
-<h2 id="document-structure">Document structure</h2>
+## Document structure
 
 A document contains pages. Each page has an ordered tree of layers and shapes, along with bindings
 that connect related shapes. Stable IDs identify every record, so an edit can refer to one object
@@ -17,7 +18,7 @@ without relying on its current position or display name.
 Pages separate canvases within one document. The editor displays one selected page at a time, but
 the native file preserves every page and its history.
 
-<h2 id="shapes-and-layers">Shapes and layers</h2>
+## Shapes and layers
 
 Shapes include rectangles, ellipses, lines, arrows, text, Markdown cards, and freehand strokes.
 Each shape has a kind, transform, kind-specific properties, and metadata. A shape can also carry a
@@ -31,7 +32,7 @@ Locks prevent edits to a layer or shape. The `agent_editable` metadata flag crea
 boundary for agent-originated transactions, even when a human can still edit the object in the
 canvas.
 
-<h2 id="persistence">Persistence</h2>
+## Persistence
 
 The web editor stores documents in the browser's IndexedDB database. Clearing site data or using a
 different browser profile can make those documents unavailable, so export important work.

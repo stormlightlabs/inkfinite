@@ -2,11 +2,13 @@
 
 Active implementation work for [ROADMAP.md](ROADMAP.md).
 
-Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
+Completed work is in [CHANGELOG.md](CHANGELOG.md).
 
 ## SVG Interoperability
 
 ### Native path geometry
+
+#### Representation and validation
 
 - [ ] Add a native `path` shape kind
 - [ ] Define normalized path and subpath representation
@@ -18,6 +20,9 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 - [ ] Define compound-path fill rules
 - [ ] Generate TypeScript bindings for path geometry
 - [ ] Implement Rust path validation
+
+#### Geometry, rendering, and fixtures
+
 - [ ] Implement path bounds
 - [ ] Include quadratic and cubic extrema in bounds
 - [ ] Implement Canvas path rendering
@@ -29,6 +34,8 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 - [ ] Add invalid-path fixtures
 
 ### SVG import
+
+#### Parsing and native mapping
 
 - [ ] Add an SVG import boundary
 - [ ] Parse SVG into a normalized intermediate representation
@@ -46,6 +53,9 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 - [ ] Preserve opacity
 - [ ] Define SVG text import behavior
 - [ ] Import supported embedded raster images as assets
+
+#### Unsupported content and security
+
 - [ ] Preserve original SVG source as an asset
 - [ ] Define warnings for unsupported SVG features
 - [ ] Define opaque fallback behavior for unsupported visual subtrees
@@ -54,10 +64,16 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 - [ ] Handle masks explicitly
 - [ ] Handle filters explicitly
 - [ ] Reject or ignore scripts and animation explicitly
+
+#### Transactions and entry points
+
 - [ ] Commit imports through one validated transaction
 - [ ] Add desktop SVG file import
 - [ ] Add drag-and-drop SVG import
 - [ ] Add CLI SVG import
+
+#### Import fixtures
+
 - [ ] Add SVG import fixtures for icons
 - [ ] Add SVG import fixtures for logos
 - [ ] Add SVG import fixtures for nested groups
@@ -67,6 +83,8 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 
 ### SVG round-trip
 
+#### Document workflows
+
 - [ ] Test SVG import → save → reopen
 - [ ] Test SVG import → edit → SVG export
 - [ ] Test SVG import → undo → redo
@@ -74,6 +92,9 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 - [ ] Test imported shapes through CLI inspect
 - [ ] Test imported shapes through CLI query
 - [ ] Test imported shapes through CLI mutation
+
+#### Export fidelity
+
 - [ ] Verify native vector geometry exports without rasterization
 - [ ] Verify nested transforms export deterministically
 - [ ] Verify compound fill rules survive import and export
@@ -84,6 +105,8 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 
 ### Hierarchical object editing
 
+#### Navigation and transforms
+
 - [ ] Audit current nested-transform selection behavior
 - [ ] Select an imported SVG container as one object
 - [ ] Enter a container for child selection
@@ -92,6 +115,9 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 - [ ] Resize nested child shapes
 - [ ] Rotate nested child shapes
 - [ ] Restyle nested child shapes
+
+#### Hierarchy semantics and tests
+
 - [ ] Reparent shapes while preserving world-space appearance
 - [ ] Define selection behavior across different parents
 - [ ] Define multi-selection behavior across different parents
@@ -103,6 +129,8 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 
 ### Direct selection
 
+#### Selection and manipulation
+
 - [ ] Add a direct-selection tool
 - [ ] Select complete subpaths
 - [ ] Select individual anchors
@@ -113,6 +141,9 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 - [ ] Render cubic control handles
 - [ ] Drag quadratic control handles
 - [ ] Drag cubic control handles
+
+#### Preview, commit, and tests
+
 - [ ] Update bounds during path-edit previews
 - [ ] Update hit regions during path-edit previews
 - [ ] Commit one transaction per completed geometry gesture
@@ -121,12 +152,17 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 
 ### Path topology
 
+#### Segment editing
+
 - [ ] Add anchors to path segments
 - [ ] Delete anchors
 - [ ] Convert straight segments to curves
 - [ ] Convert curves to straight segments
 - [ ] Break Bezier handles
 - [ ] Join Bezier handles
+
+#### Open paths, compound paths, and tests
+
 - [ ] Open closed paths
 - [ ] Close open paths
 - [ ] Join compatible endpoints
@@ -138,12 +174,17 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 
 ### Separate capability from policy
 
+#### Remove agent-specific restrictions
+
 - [ ] Audit all `Origin::Agent` behavior
 - [ ] Separate document invariants from agent authorization
 - [ ] Separate ordinary document locks from agent policy
 - [ ] Remove `agent_editable` restrictions from direct CLI operations
 - [ ] Remove hidden-from-agent restrictions from direct CLI operations
 - [ ] Decide whether `Origin` remains provenance-only
+
+#### Preserve document correctness
+
 - [ ] Keep causal-head checks
 - [ ] Keep record-version checks
 - [ ] Keep transaction validation
@@ -153,11 +194,16 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 
 ### Simplify CLI and live control
 
+#### Runtime behavior and contracts
+
 - [ ] Remove Review/Direct authorization concepts from general CLI behavior
 - [ ] Simplify live apply semantics
 - [ ] Keep proposal behavior only where it remains independently useful
 - [ ] Update `capabilities --json`
 - [ ] Update generated protocol/schema contracts as needed
+
+#### Guidance and regression coverage
+
 - [ ] Update CLI help
 - [ ] Update CLI documentation
 - [ ] Update bundled skill guidance
@@ -178,10 +224,15 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 
 ### Resources and discovery
 
+#### Documents and state
+
 - [ ] Discover open desktop sessions
 - [ ] Discover accessible Inkfinite files where appropriate
 - [ ] Inspect document metadata
 - [ ] Inspect causal heads
+
+#### Record queries
+
 - [ ] Query document records
 - [ ] Query by semantic role
 - [ ] Query by shape kind
@@ -190,6 +241,8 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 
 ### Mutation tools
 
+#### Shape and structure mutations
+
 - [ ] Create shapes
 - [ ] Patch shapes
 - [ ] Move/reparent shapes
@@ -197,6 +250,9 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 - [ ] Create and patch layers
 - [ ] Create containers
 - [ ] Apply layout operations
+
+#### Connections, import, and results
+
 - [ ] Create connections
 - [ ] Delete connections
 - [ ] Import SVG where appropriate
@@ -205,6 +261,8 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 
 ### Permission model
 
+#### Permission scopes
+
 - [ ] Define read permission
 - [ ] Define create permission
 - [ ] Define modify permission
@@ -212,6 +270,9 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 - [ ] Define structural/layout permission
 - [ ] Define per-document policy
 - [ ] Define per-session policy
+
+#### Document policy and errors
+
 - [ ] Apply `agent_editable` policy at the MCP boundary
 - [ ] Decide hidden-layer visibility policy for MCP clients
 - [ ] Decide how ordinary shape/layer locks interact with MCP permissions
@@ -235,11 +296,16 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 
 ### Fixture corpus
 
+#### Scale fixtures
+
 - [ ] Turn representative fixtures into an executable performance corpus
 - [ ] Add a small document fixture
 - [ ] Add a medium document fixture
 - [ ] Add a large document fixture
 - [ ] Retain a 10,000-shape fixture
+
+#### Workload fixtures and methodology
+
 - [ ] Add a vector-heavy fixture
 - [ ] Add a deeply nested hierarchy fixture
 - [ ] Add a large imported SVG fixture
@@ -249,10 +315,15 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 
 ### Document and CRDT profiling
 
+#### Persistence and materialization
+
 - [ ] Profile document open
 - [ ] Profile document save
 - [ ] Profile Automerge load
 - [ ] Profile Automerge materialization
+
+#### Transactions, merge, and queries
+
 - [ ] Profile transaction validation
 - [ ] Profile transaction commit
 - [ ] Profile undo/redo
@@ -262,17 +333,24 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 
 ### Renderer and interaction profiling
 
+#### Scene traversal and paths
+
 - [ ] Profile Canvas frame time
 - [ ] Profile viewport culling
 - [ ] Profile hit testing
 - [ ] Profile nested-transform traversal
 - [ ] Profile path rendering
 - [ ] Profile compound paths
+
+#### Overlays and editing
+
 - [ ] Profile selection overlays
 - [ ] Profile vector-edit previews
 - [ ] Profile text and Markdown alongside vector-heavy scenes
 
 ### Interop and tooling profiling
+
+#### SVG and CLI
 
 - [ ] Profile SVG parse time
 - [ ] Profile SVG import time
@@ -280,15 +358,23 @@ Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 - [ ] Profile CLI startup
 - [ ] Profile common CLI queries
 - [ ] Profile common CLI mutations
+
+#### IPC and MCP
+
 - [ ] Profile local IPC round trips
 - [ ] Profile MCP startup
 - [ ] Profile MCP queries and mutations
 
 ### Optimization
 
+#### Baselines and budgets
+
 - [ ] Record baseline measurements before architecture changes
 - [ ] Identify dominant costs
 - [ ] Establish regression budgets for measured bottlenecks
+
+#### Evidence-driven architecture
+
 - [ ] Evaluate spatial indexing only if hit testing warrants it
 - [ ] Evaluate path caches only if vector rendering warrants them
 - [ ] Evaluate render caches only if profiling warrants them

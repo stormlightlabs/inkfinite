@@ -1,79 +1,97 @@
 <script lang="ts">
-	// TODO: active section styling, smooth scrolling
-	import { afterNavigate } from '$app/navigation';
-	import { onMount, tick } from 'svelte';
+	import type { DocHeading } from './content/types';
+	import { startScrollSpy } from './scroll-spy';
 
-	type Heading = { id: string; title: string };
+	let { headings }: { headings: DocHeading[] } = $props();
+	let activeHeading = $state<string | null>(null);
 
-	let headings = $state<Heading[]>([]);
+	$effect(() => {
+		const elements = headings
+			.map((heading) => document.getElementById(heading.slug))
+			.filter((heading): heading is HTMLElement => heading instanceof HTMLElement);
 
-	async function refreshHeadings() {
-		await tick();
-		headings = Array.from(
-			document.querySelectorAll<HTMLElement>('#docs-content article h2[id]')
-		).map((heading) => ({ id: heading.id, title: heading.textContent?.trim() || heading.id }));
-	}
-
-	onMount(() => void refreshHeadings());
-	afterNavigate(() => void refreshHeadings());
+		return startScrollSpy(elements, (heading) => {
+			activeHeading = heading;
+		});
+	});
 </script>
 
 {#if headings.length > 0}
-	<aside aria-label="On this page">
-		<h2>On this page</h2>
+	<nav class="toc" aria-label="On this page" data-pagefind-ignore>
+		<p class="toc-title">On this page</p>
 		<ul>
-			{#each headings as heading (heading.id)}
-				<li><a href={`#${heading.id}`}>{heading.title}</a></li>
+			{#each headings as heading (heading.slug)}
+				<li
+					class:toc-subitem={heading.level === 3}
+					class:active={heading.slug === activeHeading}>
+					<a
+						href={`#${heading.slug}`}
+						aria-current={heading.slug === activeHeading ? 'location' : undefined}>
+						{heading.title}
+					</a>
+				</li>
 			{/each}
 		</ul>
-	</aside>
+	</nav>
 {/if}
 
 <style>
-	aside {
+	.toc {
 		position: sticky;
-		top: 4rem;
-		max-height: calc(100svh - 4rem);
-		overflow-y: auto;
-		padding: var(--ink-space-6) clamp(1rem, 2.5vw, 2rem) var(--ink-space-6) var(--ink-space-4);
+		top: 6.75rem;
+		padding-left: 1rem;
+		border-left: 1px solid var(--docs-border);
 	}
 
-	h2 {
-		margin: 0 0 var(--ink-space-3);
-		color: var(--ink-text);
-		font-family: var(--ink-font-body);
-		font-size: var(--ink-type-sm);
+	.toc-title {
+		margin: 0 0 0.85rem;
+		color: var(--docs-accent-text);
+		font-family: var(--docs-font-mono);
+		font-size: var(--docs-type-xs);
+		font-weight: 650;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
 	}
 
-	ul {
+	.toc ul {
 		display: grid;
-		gap: var(--ink-space-2);
+		gap: 0.5rem;
 		margin: 0;
-		padding: 0 0 0 var(--ink-space-3);
-		border-left: 1px solid color-mix(in srgb, var(--ink-border) 38%, transparent);
+		padding: 0;
 		list-style: none;
 	}
 
-	a {
-		display: block;
-		padding-block: 0.2rem;
-		color: var(--ink-text-muted);
-		font-size: var(--ink-type-xs);
-		line-height: 1.45;
+	.toc li {
+		position: relative;
+		line-height: 1.35;
+	}
+
+	.toc li.active::before {
+		position: absolute;
+		top: 0.15em;
+		bottom: 0.15em;
+		left: -1.05rem;
+		width: 2px;
+		background: var(--docs-accent);
+		content: '';
+	}
+
+	.toc li.toc-subitem {
+		padding-left: 0.75rem;
+	}
+
+	.toc a {
+		color: var(--docs-text-muted);
+		font-size: 0.78rem;
 		text-decoration: none;
-		transition-property: color, translate;
-		transition-duration: var(--ink-duration-fast);
-		transition-timing-function: var(--ink-ease-out);
 	}
 
-	a:hover {
-		color: var(--ink-accent-text);
-		translate: 2px 0;
+	.toc a:hover,
+	.toc a[aria-current='location'] {
+		color: var(--docs-accent-text);
 	}
 
-	@media (max-width: 1180px) {
-		aside {
-			display: none;
-		}
+	.toc a[aria-current='location'] {
+		font-weight: 650;
 	}
 </style>

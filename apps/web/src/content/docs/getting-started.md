@@ -1,14 +1,15 @@
-<svelte:head>
-	<title>Getting started · Inkfinite documentation</title>
-	<meta name="description" content="Install Inkfinite and create your first document." />
-</svelte:head>
-
-# Getting started
+---
+title: Getting started
+description: Install Inkfinite and create your first document.
+section: Get started
+group: Start here
+order: 2
+---
 
 Run Inkfinite from the repository, then choose the web or desktop editor based on where you want
 to keep your documents.
 
-<h2 id="requirements">Requirements</h2>
+## Requirements
 
 You need Node.js 18 or newer, pnpm, and Rust 1.89. Building the desktop app also requires the
 [Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) for your operating system.
@@ -19,7 +20,7 @@ Clone the repository, open a terminal in its root directory, and install the Jav
 pnpm install
 ```
 
-<h2 id="installation">Installation</h2>
+## Installation
 
 Start the web editor:
 
@@ -38,7 +39,7 @@ pnpm tauri dev
 
 The desktop app can open and save `.inkfinite` files on your computer.
 
-<h2 id="create-a-document">Create a document</h2>
+## Create a document
 
 Open the editor and use the file browser to create a board. Add shapes from the toolbar, then drag
 on the canvas to place them. The editor saves web documents to IndexedDB; the desktop app keeps a
@@ -47,7 +48,7 @@ draft until you choose **Save As** and select a file.
 Use **Import** when you already have an Excalidraw or Obsidian Canvas file. Import creates a new
 Inkfinite document and leaves the source file unchanged.
 
-<h2 id="next-steps">Next steps</h2>
+## Next steps
 
 - Read [Documents](/docs/concepts/documents/) to understand pages, layers, and shapes.
 - Read [Web editor](/docs/applications/web/) or [Desktop editor](/docs/applications/desktop/) for

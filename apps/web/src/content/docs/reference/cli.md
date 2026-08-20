@@ -1,28 +1,29 @@
-<svelte:head>
-	<title>Command-line interface · Inkfinite documentation</title>
-	<meta name="description" content="Use the Inkfinite CLI with saved files and live desktop sessions." />
-</svelte:head>
-
-# Command-line interface
+---
+title: Command-line interface
+description: Use the Inkfinite CLI with saved files and live desktop sessions.
+section: Reference
+group: Reference
+order: 7
+---
 
 Inspect, change, validate, and render Inkfinite documents from a terminal.
 
-<h2 id="command-overview">Command overview</h2>
+## Command overview
 
 Run `inkfinite --help` or `inkfinite <command> --help` for the complete option reference. The main
 commands are:
 
-| Command | Purpose |
-| --- | --- |
-| `new` | Create a blank canonical document |
-| `inspect` | Print a document summary or materialized snapshot |
-| `query` | Find records by semantic, structural, kind, or bounds filters |
-| `validate` | Load and validate a canonical document |
-| `shape`, `connect`, `layout` | Build a structured file or live desktop edit |
-| `apply` | Validate and apply a transaction draft from JSON |
-| `render` | Write an SVG or PNG of a document or filtered view |
-| `app` | Inspect or work with a running desktop session |
-| `schema`, `capabilities` | Print machine-readable contracts for integrations |
+| Command                      | Purpose                                                       |
+| ---------------------------- | ------------------------------------------------------------- |
+| `new`                        | Create a blank canonical document                             |
+| `inspect`                    | Print a document summary or materialized snapshot             |
+| `query`                      | Find records by semantic, structural, kind, or bounds filters |
+| `validate`                   | Load and validate a canonical document                        |
+| `shape`, `connect`, `layout` | Build a structured file or live desktop edit                  |
+| `apply`                      | Validate and apply a transaction draft from JSON              |
+| `render`                     | Write an SVG or PNG of a document or filtered view            |
+| `app`                        | Inspect or work with a running desktop session                |
+| `schema`, `capabilities`     | Print machine-readable contracts for integrations             |
 
 During development, build the binary with:
 
@@ -30,7 +31,7 @@ During development, build the binary with:
 cargo build -p inkfinite-cli --bin inkfinite
 ```
 
-<h2 id="file-mode">File mode</h2>
+## File mode
 
 File-mode commands operate on a closed `.inkfinite` file. Start by inspecting its heads and querying
 only the records you need:
@@ -64,7 +65,7 @@ To hand the edit to another process without changing the document, add
 and refuses to overwrite an existing output file. Run `shape kinds` or `shape describe KIND` to
 discover shape contracts.
 
-<h2 id="live-mode">Live mode</h2>
+## Live mode
 
 With the desktop app running, use `app status`, `app context`, `app inspect`, and `app query` for
 read-only access. Context reports the active page, selection, viewport, actor, and current heads.
@@ -90,7 +91,7 @@ and the CLI cannot enable it. `app propose` always requests review, even in Dire
 
 `app apply` sends a prepared transaction directly and works only while **Apply directly** is enabled.
 
-<h2 id="rendering">Rendering</h2>
+## Rendering
 
 The output extension selects SVG or PNG. The same options work for a closed file and a live desktop
 session:
@@ -104,7 +105,7 @@ inkfinite app render --output current.png
 Use `--region x,y,width,height` for an exact world-space crop. Live rendering can also write a
 proposed result with `--transaction` and `--proposed-output` without changing the open document.
 
-<h2 id="output-format">Output format</h2>
+## Output format
 
 Pass `--json` for deterministic machine-readable output. Successful mutations report the previous
 and current heads, transaction ID, created, updated, and deleted records, repairs, and warnings.
@@ -113,13 +114,13 @@ Failures go to standard error as JSON with `code`, `message`, `details`, `retrya
 
 `capabilities --json` reports supported commands and stable exit codes. Current exit codes are:
 
-| Code | Meaning |
-| ---: | --- |
-| `0` | Success |
-| `2` | Invalid command usage |
-| `3` | File or input error |
-| `4` | Invalid document or data |
-| `5` | Existing file, lock, or state conflict |
+| Code | Meaning                                |
+| ---: | -------------------------------------- |
+|  `0` | Success                                |
+|  `2` | Invalid command usage                  |
+|  `3` | File or input error                    |
+|  `4` | Invalid document or data               |
+|  `5` | Existing file, lock, or state conflict |
 
 Use `schema document`, `schema transaction`, and `schema protocol` instead of inferring JSON shapes
 from examples. Global `--json` and `--non-interactive` options may appear before or after a

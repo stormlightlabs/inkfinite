@@ -1,22 +1,21 @@
-<svelte:head>
-	<title>Introduction · Inkfinite documentation</title>
-	<meta
-		name="description"
-		content="Learn what Inkfinite is, where documents live, and which guide to read next." />
-</svelte:head>
-
-# Introduction
+---
+title: Introduction
+description: 'Learn what Inkfinite is, where documents live, and which guide to read next.'
+section: Get started
+group: Start here
+order: 1
+---
 
 Inkfinite is a local-first infinite canvas for drawing, wireframing, and diagramming. It runs in
 the browser and as a desktop app, with the same editor and document model in both.
 
-<h2 id="what-you-can-make">What you can make</h2>
+## What you can make
 
 Use shapes, arrows, text, Markdown, freehand strokes, layers, and stencils to sketch an idea or
 build a structured diagram. The canvas supports direct manipulation, undo and redo, grouping,
 reordering, panning, and zooming.
 
-<h2 id="where-documents-live">Where documents live</h2>
+## Where documents live
 
 The web editor stores boards in the browser's IndexedDB database. The desktop editor works with
 local `.inkfinite` files and keeps an unsaved draft in the app's local data directory until you
@@ -25,7 +24,7 @@ choose **Save As**.
 An `.inkfinite` file contains the document and its Automerge change history. The desktop app and
 command-line tools use file locks, atomic replacement, and recovery data to protect writes.
 
-<h2 id="ways-to-work">Ways to work</h2>
+## Ways to work
 
 - Open the [web editor](/app) for a browser-based canvas, or read its
   [storage guide](/docs/applications/web/).
@@ -34,7 +33,7 @@ command-line tools use file locks, atomic replacement, and recovery data to prot
   document from a script.
 - Use [agent workflows](/docs/reference/agents/) to propose document changes for review.
 
-<h2 id="where-to-go-next">Where to go next</h2>
+## Where to go next
 
 Follow [Getting started](/docs/getting-started/) to run an editor and create a document.
 
