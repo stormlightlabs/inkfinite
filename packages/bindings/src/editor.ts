@@ -116,6 +116,10 @@ export type EditorShape = {
 	 */
 	stroke_opacity: Opacity | null;
 	/**
+	 * Whether this shape and its descendants can be edited.
+	 */
+	locked: boolean;
+	/**
 	 * Agent editability retained for editor policy surfaces.
 	 */
 	agent_editable: boolean;

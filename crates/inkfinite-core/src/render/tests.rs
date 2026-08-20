@@ -640,6 +640,31 @@ fn renders_native_path_geometry_with_curves_and_fill_rule() {
 }
 
 #[test]
+fn nested_renderer_composes_parent_transforms_for_selection_and_bounds() {
+    let mut snapshot = fixture_snapshot();
+    let group_id = ShapeId::from("group:card");
+    let child_id = ShapeId::from("shape:stencil-card");
+    snapshot.document.shapes.get_mut(&group_id).unwrap().transform =
+        Transform { translation: Vec2 { x: 100.0, y: 120.0 }, rotation: 0.35, scale_x: 2.0, scale_y: 0.75 };
+    snapshot.document.shapes.get_mut(&child_id).unwrap().transform =
+        Transform { translation: Vec2 { x: 20.0, y: 30.0 }, rotation: -0.2, scale_x: 1.25, scale_y: 0.8 };
+    let expected = world_transform(&snapshot.document, &snapshot.document.shapes[&child_id]);
+    let output = render_svg(
+        &snapshot,
+        &SvgRenderOptions {
+            page_id: Some(PageId::from("page:fixtures")),
+            selection: BTreeSet::from([child_id.clone()]),
+            ..SvgRenderOptions::default()
+        },
+    )
+    .expect("nested selection renders");
+
+    assert!(output.svg.contains(&format!("data-shape-id=\"{child_id}\"")));
+    assert!(output.svg.contains(&format!("transform=\"{}\"", affine_svg(expected))));
+    assert!(output.svg.contains("viewBox=\""));
+}
+
+#[test]
 fn filters_page_layer_selection_and_region_without_changing_order() {
     let mut snapshot = fixture_snapshot();
     let page_id = PageId::from("page:ordering");

@@ -13,14 +13,14 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use ts_rs::TS;
 
-use crate::engine::geometry::{Affine, world_transform};
+use crate::engine::geometry::{Affine, decompose_transform, parent_world_transform, world_transform};
 use crate::proto::{
     LayerContentsDisposition, LayerPatch, Operation, ShapePatch as NativeShapePatch, TransactionDraft, TransactionId,
 };
 use crate::{
     ActorId, BindingAnchor, BindingRecord, CONTAINER_KIND, ContainerLayout, Document, DocumentSnapshot, LayerId,
     LayerRecord, Opacity, Origin, PageId, PageRecord, Provenance, RecordVersion, SemanticMetadata, ShapeId, ShapeKind,
-    ShapeParent, ShapeProperties, ShapeRecord, ShapeStyle, SiblingAnchor, Timestamp, Transform, Vec2,
+    ShapeParent, ShapeProperties, ShapeRecord, ShapeStyle, SiblingAnchor, Timestamp, Transform,
 };
 
 /// Full affine transform used by the editor projection.
@@ -89,6 +89,8 @@ pub struct EditorShape {
     pub fill_opacity: Option<Opacity>,
     /// Optional stroke opacity.
     pub stroke_opacity: Option<Opacity>,
+    /// Whether this shape and its descendants can be edited.
+    pub locked: bool,
     /// Agent editability retained for editor policy surfaces.
     pub agent_editable: bool,
     /// Kind-specific properties using editor property names.
@@ -434,6 +436,7 @@ fn append_projected_shape(
             opacity: shape.style.opacity,
             fill_opacity: shape.style.fill_opacity,
             stroke_opacity: shape.style.stroke_opacity,
+            locked: shape.metadata.locked,
             agent_editable: shape.metadata.agent_editable,
             props: properties,
         },
@@ -678,38 +681,26 @@ fn local_transform(
 ) -> Result<Transform, EditorReconciliationError> {
     let parent_world = match parent {
         ShapeParent::Layer(layer_id) => {
-            if !document.layers.contains_key(layer_id) && !created_layers.contains(layer_id) {
-                return Err(EditorReconciliationError::UnknownLayer(layer_id.clone()));
+            if created_layers.contains(layer_id) {
+                Affine::IDENTITY
+            } else {
+                parent_world_transform(document, parent)
+                    .ok_or_else(|| EditorReconciliationError::UnknownLayer(layer_id.clone()))?
             }
-            Affine::IDENTITY
         }
         ShapeParent::Shape(parent_id) => {
-            let parent_shape = document
-                .shapes
-                .get(parent_id)
-                .ok_or_else(|| EditorReconciliationError::UnknownParent(parent_id.clone()))?;
-            world_transform(document, parent_shape)
+            if !document.shapes.contains_key(parent_id) {
+                return Err(EditorReconciliationError::UnknownParent(parent_id.clone()));
+            }
+            parent_world_transform(document, parent)
+                .ok_or_else(|| EditorReconciliationError::UnknownParent(parent_id.clone()))?
         }
     };
     let Some(inverse) = parent_world.inverse() else {
         return Err(EditorReconciliationError::SingularParent { shape_id: shape_id.clone() });
     };
-    decompose_native_transform(inverse.then(world.into()), shape_id)
-}
-
-fn decompose_native_transform(matrix: Affine, shape_id: &ShapeId) -> Result<Transform, EditorReconciliationError> {
-    let scale_x = matrix.a.hypot(matrix.b);
-    if scale_x <= f64::EPSILON {
-        return Err(EditorReconciliationError::UnsupportedShear { shape_id: shape_id.clone() });
-    }
-    let rotation = matrix.b.atan2(matrix.a);
-    let scale_y = (matrix.a * matrix.d - matrix.b * matrix.c) / scale_x;
-    let transform = Transform { translation: Vec2 { x: matrix.e, y: matrix.f }, rotation, scale_x, scale_y };
-    let reconstructed = Affine::from_transform(transform);
-    if !same_affine(reconstructed, matrix) {
-        return Err(EditorReconciliationError::UnsupportedShear { shape_id: shape_id.clone() });
-    }
-    Ok(transform)
+    decompose_transform(inverse.then(world.into()))
+        .ok_or_else(|| EditorReconciliationError::UnsupportedShear { shape_id: shape_id.clone() })
 }
 
 fn same_affine(left: Affine, right: Affine) -> bool {
@@ -752,7 +743,7 @@ fn default_metadata(request: &EditorReconciliationRequest) -> SemanticMetadata {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{BindingId, BindingRecord, ChangeHash, DocumentId, RecordVersion, ShapeParent, blank_document};
+    use crate::{BindingId, BindingRecord, ChangeHash, DocumentId, RecordVersion, ShapeParent, Vec2, blank_document};
     use serde_json::Value;
 
     fn metadata() -> SemanticMetadata {
@@ -923,6 +914,41 @@ mod tests {
             .point(Vec2 { x: moved.e, y: moved.f });
         assert!((local.translation.x - expected.x).abs() < 1e-9);
         assert!((local.translation.y - expected.y).abs() < 1e-9);
+    }
+
+    #[test]
+    fn reconciliation_reparents_without_changing_a_world_transform() {
+        let snapshot = nested_snapshot();
+        let child_id = ShapeId::from("shape:child");
+        let root_id = ShapeId::from("shape:root");
+        let before = world_transform(&snapshot.document, &snapshot.document.shapes[&child_id]);
+        let transaction = reconcile_editor_patches(
+            &snapshot,
+            request(vec![EditorPatch::Shape {
+                shape_id: child_id,
+                transform: None,
+                properties: None,
+                metadata: None,
+                style: None,
+                parent: Some(ShapeParent::Shape(root_id.clone())),
+                anchor: Some(SiblingAnchor::Last),
+            }]),
+        )
+        .expect("reparent should reconcile");
+
+        assert_eq!(transaction.operations.len(), 1);
+        assert!(matches!(transaction.operations[0], Operation::ReparentShape { .. }));
+        let Operation::ReparentShape { parent, .. } = &transaction.operations[0] else {
+            panic!("expected reparent operation")
+        };
+        assert_eq!(parent, &ShapeParent::Shape(root_id.clone()));
+        let local = crate::engine::geometry::local_transform_from_world(&snapshot.document, parent, before)
+            .expect("target parent should represent the world transform");
+        let target_world = world_transform(&snapshot.document, &snapshot.document.shapes[&root_id]);
+        assert!(same_affine(
+            target_world.then(crate::engine::geometry::Affine::from_transform(local)),
+            before
+        ));
     }
 
     #[test]

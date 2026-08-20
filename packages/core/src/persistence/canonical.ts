@@ -170,6 +170,7 @@ export function fromEditorProjection(projection: EditorProjection, snapshot?: Na
 			...(shape.stroke_opacity === null ? {} : { strokeOpacity: shape.stroke_opacity }),
 			...(shape.group_id === null ? {} : { groupId: shape.group_id }),
 			layerId: shape.layer_id,
+			locked: shape.locked,
 			agentEditable: shape.agent_editable,
 			props: shape.props as ShapeRecord['props']
 		} as ShapeRecord;
@@ -466,6 +467,7 @@ function editorShape(
 		opacity: native.style.opacity,
 		...(native.style.fill_opacity === null ? {} : { fillOpacity: native.style.fill_opacity }),
 		...(native.style.stroke_opacity === null ? {} : { strokeOpacity: native.style.stroke_opacity }),
+		locked: native.metadata.locked,
 		agentEditable: native.metadata.agent_editable,
 		props: editorProperties(native.properties)
 	} as ShapeRecord;
@@ -718,7 +720,7 @@ function nativeShape(shape: ShapeRecord, layerId: string, document: Document): N
 		role: null,
 		description: null,
 		tags: [],
-		locked: false,
+		locked: shape.locked ?? false,
 		agent_editable: shape.agentEditable ?? true,
 		provenance: provenance()
 	};

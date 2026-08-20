@@ -13,6 +13,7 @@ use proptest::prelude::*;
 use serde_json::json;
 
 use super::{EngineError, TransactionEngine};
+use crate::engine::geometry::world_transform;
 
 fn metadata(actor: &str, name: &str) -> SemanticMetadata {
     SemanticMetadata {
@@ -604,6 +605,110 @@ fn two_offline_replicas_converge_independent_of_change_order() {
     left.merge_changes(&right_changes).unwrap();
     right.merge_changes(&left_changes).unwrap();
     assert_eq!(left.snapshot().unwrap().document, right.snapshot().unwrap().document);
+}
+
+#[test]
+fn reparent_preserves_world_space_transform_and_undo_restores_hierarchy() {
+    let mut document = document();
+    let layer_id = LayerId::from("layer:one");
+    let first_id = ShapeId::from("shape:a");
+    let second_id = ShapeId::from("shape:b");
+    let child_id = ShapeId::from("shape:c");
+    for id in [&first_id, &second_id] {
+        let container = document.shapes.get_mut(id).expect("fixture container");
+        container.kind = ShapeKind::from(crate::CONTAINER_KIND);
+        container.layout = Some(crate::ContainerLayout::Free);
+        container.properties = ShapeProperties::from([("width".into(), json!(100.0)), ("height".into(), json!(100.0))]);
+    }
+    document.layers.get_mut(&layer_id).unwrap().shape_ids = vec![first_id.clone(), second_id.clone()];
+    document.shapes.get_mut(&first_id).unwrap().child_ids = vec![child_id.clone()];
+    document.shapes.get_mut(&child_id).unwrap().parent = ShapeParent::Shape(first_id.clone());
+    document.shapes.get_mut(&first_id).unwrap().transform.translation = Vec2 { x: 20.0, y: 30.0 };
+    document.shapes.get_mut(&second_id).unwrap().transform.translation = Vec2 { x: 240.0, y: 80.0 };
+    document.shapes.get_mut(&child_id).unwrap().transform.translation = Vec2 { x: 15.0, y: 25.0 };
+
+    let mut engine = TransactionEngine::create(
+        DocumentId::from("document:reparent"),
+        ActorId::from("actor:reparent"),
+        document,
+    )
+    .unwrap();
+    let child = child_id.clone();
+    let before_snapshot = engine.snapshot().unwrap();
+    let before = world_transform(&before_snapshot.document, &before_snapshot.document.shapes[&child]);
+    let transaction = transaction(
+        &mut engine,
+        "actor:reparent",
+        "reparent child",
+        vec![Operation::ReparentShape {
+            shape_id: child.clone(),
+            parent: ShapeParent::Shape(second_id.clone()),
+            anchor: SiblingAnchor::Last,
+            expected_version: Some(RecordVersion(1)),
+        }],
+    );
+    engine.commit(transaction).expect("reparent should commit");
+    let after_snapshot = engine.snapshot().unwrap();
+    let after_shape = &after_snapshot.document.shapes[&child];
+    let after = world_transform(&after_snapshot.document, after_shape);
+    assert_eq!(after_shape.parent, ShapeParent::Shape(second_id));
+    assert!(
+        [
+            (before.a, after.a),
+            (before.b, after.b),
+            (before.c, after.c),
+            (before.d, after.d),
+            (before.e, after.e),
+            (before.f, after.f),
+        ]
+        .into_iter()
+        .all(|(left, right)| (left - right).abs() < 1e-9)
+    );
+
+    engine
+        .undo(&ActorId::from("actor:reparent"))
+        .expect("undo should restore reparent");
+    let restored = engine.snapshot().unwrap();
+    assert_eq!(restored.document.shapes[&child].parent, ShapeParent::Shape(first_id));
+}
+
+#[test]
+fn locked_container_blocks_edits_to_nested_shapes() {
+    let mut document = document();
+    let container_id = ShapeId::from("shape:a");
+    let child_id = ShapeId::from("shape:b");
+    document.shapes.get_mut(&container_id).unwrap().kind = ShapeKind::from(crate::CONTAINER_KIND);
+    document.shapes.get_mut(&container_id).unwrap().layout = Some(crate::ContainerLayout::Free);
+    document.shapes.get_mut(&container_id).unwrap().child_ids = vec![child_id.clone(), ShapeId::from("shape:c")];
+    document.shapes.get_mut(&container_id).unwrap().metadata.locked = true;
+    document.shapes.get_mut(&child_id).unwrap().parent = ShapeParent::Shape(container_id.clone());
+    document.shapes.get_mut(&ShapeId::from("shape:c")).unwrap().parent = ShapeParent::Shape(container_id);
+    document.layers.get_mut(&LayerId::from("layer:one")).unwrap().shape_ids = vec![ShapeId::from("shape:a")];
+    let mut engine = TransactionEngine::create(
+        DocumentId::from("document:locked-container"),
+        ActorId::from("actor:locked-container"),
+        document,
+    )
+    .unwrap();
+    let transaction = transaction(
+        &mut engine,
+        "actor:locked-container",
+        "edit nested shape",
+        vec![Operation::PatchShape {
+            shape_id: child_id,
+            patch: ShapePatch {
+                transform: Some(Transform {
+                    translation: Vec2 { x: 5.0, y: 5.0 },
+                    rotation: 0.0,
+                    scale_x: 1.0,
+                    scale_y: 1.0,
+                }),
+                ..ShapePatch::default()
+            },
+            expected_version: Some(RecordVersion(1)),
+        }],
+    );
+    assert!(matches!(engine.commit(transaction), Err(EngineError::Permission(_))));
 }
 
 #[test]

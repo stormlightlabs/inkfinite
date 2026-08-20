@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Action, EditorState, PageRecord, SelectTool, ShapeRecord, Store, shapeBounds } from '../src';
+import { Action, EditorState, PageRecord, SelectTool, ShapeRecord, Store, hitTestPoint, shapeBounds } from '../src';
 
 const modifiers = { ctrl: false, shift: false, alt: false, meta: false };
 const buttons = { left: true, middle: false, right: false };
@@ -23,6 +23,29 @@ function nestedState() {
 	state.doc = { pages: { [page.id]: page }, shapes: { [container.id]: container, [child.id]: child }, bindings: {} };
 	state.ui.currentPageId = page.id;
 	return new Store(state).getState();
+}
+
+function multiParentState() {
+	const state = nestedState();
+	const page = state.doc.pages['page:one']!;
+	const layer = state.doc.layers?.[page.layerIds?.[0] ?? ''];
+	const sibling = ShapeRecord.createContainer(page.id, 300, 40, { w: 100, h: 80 }, 'shape:sibling');
+	sibling.editorTransform = { a: 1, b: 0, c: 0, d: 1, e: 300, f: 40 };
+	const siblingChild = ShapeRecord.createRect(
+		page.id,
+		320,
+		60,
+		{ w: 20, h: 10, fill: '#fff', stroke: '#000', radius: 0 },
+		'shape:sibling-child'
+	);
+	siblingChild.groupId = sibling.id;
+	siblingChild.editorTransform = { a: 1, b: 0, c: 0, d: 1, e: 320, f: 60 };
+	const pages = { ...state.doc.pages, [page.id]: { ...page, shapeIds: [...page.shapeIds, sibling.id, siblingChild.id] } };
+	const shapes = { ...state.doc.shapes, [sibling.id]: sibling, [siblingChild.id]: siblingChild };
+	const layers = layer
+		? { ...state.doc.layers, [layer.id]: { ...layer, shapeIds: [...layer.shapeIds, sibling.id, siblingChild.id] } }
+		: state.doc.layers;
+	return new Store({ ...state, doc: { ...state.doc, pages, layers, shapes } }).getState();
 }
 
 describe('hierarchical selection', () => {
@@ -90,6 +113,59 @@ describe('hierarchical selection', () => {
 		);
 		expect((preview.doc.shapes['shape:child'] as typeof child)?.props).toMatchObject({ w: 25, h: 16 });
 		tool.onAction(preview, Action.pointerUp({ x: 0, y: 0 }, { x: 0, y: 0 }, 0, buttonsUp, modifiers));
+	});
+
+	it('keeps selection at the current scope when shapes have different parents', () => {
+		const tool = new SelectTool();
+		const state = multiParentState();
+		const first = tool.onAction(
+			state,
+			Action.pointerDown({ x: 325, y: 65 }, { x: 325, y: 65 }, 0, buttons, modifiers)
+		);
+		expect(first.ui.selectionIds).toEqual(['shape:sibling']);
+		const multiple = tool.onAction(
+			first,
+			Action.pointerDown(
+				{ x: 125, y: 75 },
+				{ x: 125, y: 75 },
+				0,
+				buttons,
+				{ ...modifiers, shift: true }
+			)
+		);
+		expect(multiple.ui.selectionIds).toEqual(['shape:sibling', 'shape:container']);
+
+		const entered = tool.onAction(
+			{ ...state, ui: { ...state.ui, containerPath: ['shape:sibling'] } },
+			Action.pointerDown({ x: 325, y: 65 }, { x: 325, y: 65 }, 0, buttons, modifiers)
+		);
+		expect(entered.ui.selectionIds).toEqual(['shape:sibling-child']);
+	});
+
+	it('maps hit testing through nested transforms and excludes locked or hidden hierarchy', () => {
+		const state = nestedState();
+		expect(hitTestPoint(state, { x: 125, y: 75 })).toBe('shape:child');
+
+		const lockedContainer = { ...state.doc.shapes['shape:container']!, locked: true };
+		const locked = new Store({
+			...state,
+			doc: { ...state.doc, shapes: { ...state.doc.shapes, [lockedContainer.id]: lockedContainer } },
+			ui: { ...state.ui, selectionIds: [lockedContainer.id] }
+		}).getState();
+		expect(locked.ui.selectionIds).toEqual([]);
+		expect(hitTestPoint(locked, { x: 125, y: 75 })).toBeNull();
+
+		const layerId = locked.doc.pages['page:one']!.layerIds?.[0];
+		const hiddenLayer = layerId && locked.doc.layers?.[layerId]
+			? { ...locked.doc.layers[layerId]!, visible: false }
+			: undefined;
+		const hidden = hiddenLayer
+			? new Store({
+						...locked,
+						doc: { ...locked.doc, layers: { ...locked.doc.layers, [layerId!]: hiddenLayer } }
+					}).getState()
+			: locked;
+		expect(hitTestPoint(hidden, { x: 125, y: 75 })).toBeNull();
 	});
 
 	it('rotates a nested child around its local geometry center', () => {

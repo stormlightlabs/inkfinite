@@ -58,6 +58,13 @@ editor selects containers as objects, enters and leaves nested scopes, and
 moves, resizes, rotates, and restyles selected children through the existing
 reconciliation path.
 
+Hierarchy commits now use the Rust affine geometry helpers. Reparenting computes
+a parent-relative transform from the shape's world transform, and rejects a
+move when the native transform cannot represent it. Selection is scoped to the
+current container, multi-selection removes descendant duplicates, and hit
+testing excludes locked or hidden ancestors. Rust renderer tests cover nested
+transform composition alongside runtime selection tests.
+
 Direct path editing follows:
 
 - select path subpaths

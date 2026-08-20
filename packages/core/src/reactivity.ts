@@ -1,14 +1,8 @@
 import { BehaviorSubject, type Subscription } from 'rxjs';
 import type { Camera } from './camera';
 import { Camera as CameraOps } from './camera';
-import {
-	type Command,
-	History,
-	type HistoryAppliedEvent,
-	type HistoryEntry,
-	type HistoryOperation,
-	type HistoryState
-} from './history';
+import { History } from './history';
+import type { Command, HistoryAppliedEvent, HistoryEntry, HistoryOperation, HistoryState } from './history';
 import type { Document, LayerRecord, PageRecord, ShapeRecord } from './model';
 import { Document as DocumentOps, ensureDocumentLayers } from './model';
 
@@ -401,14 +395,19 @@ export function selectionTarget(state: EditorState, shapeId: string): string | n
 
 /** Returns whether a shape and all of its ancestors can participate in editing. */
 function isShapeInteractive(state: EditorState, shape: ShapeRecord): boolean {
+	return isShapeInteractiveInDocument(state.doc, shape);
+}
+
+function isShapeInteractiveInDocument(document: Document, shape: ShapeRecord): boolean {
+	if (shape.locked) return false;
 	if (shape.layerId) {
-		const layer = state.doc.layers?.[shape.layerId];
+		const layer = document.layers?.[shape.layerId];
 		if (layer && (!layer.visible || layer.locked)) return false;
 	}
 	let parentId = shape.groupId;
 	while (parentId) {
-		const parent = state.doc.shapes[parentId];
-		if (!parent) return false;
+		const parent = document.shapes[parentId];
+		if (!parent || parent.locked) return false;
 		parentId = parent.groupId;
 	}
 	return true;
@@ -437,10 +436,16 @@ export function getLayersOnCurrentPage(state: EditorState): LayerRecord[] {
 }
 
 function getInteractiveShapeIds(document: Document, page: PageRecord): string[] {
-	if (!document.layers || !page.layerIds?.length) return page.shapeIds;
-	return page.layerIds.flatMap((id) => {
-		const layer = document.layers?.[id];
-		return layer?.visible && !layer.locked ? layer.shapeIds : [];
+	const ids =
+		!document.layers || !page.layerIds?.length
+			? page.shapeIds
+			: page.layerIds.flatMap((id) => {
+					const layer = document.layers?.[id];
+					return layer?.visible && !layer.locked ? layer.shapeIds : [];
+				});
+	return ids.filter((id) => {
+		const shape = document.shapes[id];
+		return shape ? isShapeInteractiveInDocument(document, shape) : false;
 	});
 }
 

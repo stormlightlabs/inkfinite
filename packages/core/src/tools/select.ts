@@ -212,13 +212,14 @@ export class SelectTool implements Tool {
 						.map((shape) => shape.id)
 				: [targetId];
 		const isSelected = legacyGroupIds.some((id) => state.ui.selectionIds.includes(id));
-		const newSelectionIds = isShiftHeld
+		const requestedSelectionIds = isShiftHeld
 			? isSelected
 				? state.ui.selectionIds.filter((id) => !legacyGroupIds.includes(id))
 				: [...state.ui.selectionIds, ...legacyGroupIds]
 			: isSelected
 				? state.ui.selectionIds
 				: legacyGroupIds;
+		const newSelectionIds = removeSelectedDescendants(state, requestedSelectionIds);
 
 		this.toolState.isDragging = true;
 		this.toolState.dragStartWorld = action.world;
@@ -1023,6 +1024,13 @@ function hasSelectedAncestor(shape: ShapeRecord, selectedIds: string[], state: E
 		parentId = state.doc.shapes[parentId]?.groupId;
 	}
 	return false;
+}
+
+function removeSelectedDescendants(state: EditorState, ids: string[]): string[] {
+	return ids.filter((id) => {
+		const shape = state.doc.shapes[id];
+		return shape ? !hasSelectedAncestor(shape, ids, state) : false;
+	});
 }
 
 function updateShapeTransform(shape: ShapeRecord, matrix: Mat3): ShapeRecord {

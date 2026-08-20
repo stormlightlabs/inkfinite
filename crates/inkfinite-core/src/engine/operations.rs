@@ -1,9 +1,12 @@
-use super::geometry::{bottom, center_x, center_y, count_as_f64, local_shape_bounds, right};
+use super::geometry::{
+    bottom, center_x, center_y, count_as_f64, decompose_transform, local_shape_bounds, parent_world_transform, right,
+    world_transform,
+};
 use super::hierarchy::{
-    anchor_for, asset, asset_is_referenced, asset_mut, binding, bindings_touching, descendant_ids_for_layer,
-    descendant_ids_for_shape, ensure_absent, ensure_version_one, insert_anchored, insert_shape_child, is_descendant,
-    layer, layer_mut, move_anchored, next_version, page, page_mut, remove_shape_child, shape, shape_mut,
-    shape_siblings,
+    anchor_for, asset, asset_is_referenced, asset_mut, binding, bindings_touching, containing_layer,
+    descendant_ids_for_layer, descendant_ids_for_shape, ensure_absent, ensure_version_one, insert_anchored,
+    insert_shape_child, is_descendant, layer, layer_mut, move_anchored, next_version, page, page_mut,
+    remove_shape_child, shape, shape_mut, shape_siblings,
 };
 use super::validation::ensure_binding_endpoints;
 use super::{
@@ -284,6 +287,45 @@ pub fn reparent_shape(
             "reparenting {shape_id} would create a cycle"
         )));
     }
+    if let ShapeParent::Shape(parent_id) = parent {
+        let parent_shape = document
+            .shapes
+            .get(parent_id)
+            .ok_or_else(|| EngineError::Precondition(format!("parent shape {parent_id} is missing")))?;
+        if parent_shape.kind.as_str() != crate::CONTAINER_KIND {
+            return Err(EngineError::Schema(format!(
+                "parent shape {parent_id} is not a container"
+            )));
+        }
+    }
+    let source_layer = containing_layer(document, &shape)
+        .ok_or_else(|| EngineError::Invariant(format!("shape {shape_id} has no containing layer")))?;
+    let target_layer = match parent {
+        ShapeParent::Layer(layer_id) => document
+            .layers
+            .get(layer_id)
+            .ok_or_else(|| EngineError::Precondition(format!("parent layer {layer_id} is missing")))?,
+        ShapeParent::Shape(parent_id) => {
+            let parent_shape = document
+                .shapes
+                .get(parent_id)
+                .ok_or_else(|| EngineError::Precondition(format!("parent shape {parent_id} is missing")))?;
+            containing_layer(document, parent_shape)
+                .ok_or_else(|| EngineError::Invariant(format!("parent shape {parent_id} has no containing layer")))?
+        }
+    };
+    if source_layer.page_id != target_layer.page_id {
+        return Err(EngineError::Invariant("shape hierarchy cannot cross pages".into()));
+    }
+    let world = world_transform(document, &shape);
+    let local = parent_world_transform(document, parent)
+        .and_then(|parent_world| parent_world.inverse())
+        .and_then(|inverse| decompose_transform(inverse.then(world)))
+        .ok_or_else(|| {
+            EngineError::Invariant(format!(
+                "reparenting {shape_id} cannot preserve its world-space transform"
+            ))
+        })?;
     let old_siblings = shape_siblings(document, &shape.parent)?;
     let old_anchor = anchor_for(old_siblings, shape_id)?;
     remove_shape_child(document, &shape.parent, shape_id)?;
@@ -293,6 +335,7 @@ pub fn reparent_shape(
         .get_mut(shape_id)
         .ok_or_else(|| EngineError::Invariant(format!("shape {shape_id} disappeared during reparent")))?;
     changed.parent = parent.clone();
+    changed.transform = local;
     changed.version = next_version(changed.version)?;
     Ok(vec![Operation::ReparentShape {
         shape_id: shape_id.clone(),
@@ -373,27 +416,15 @@ pub fn delete_layer(
                 layer: crate::LayerRecord { shape_ids: Vec::new(), version: RecordVersion(1), ..layer.clone() },
                 anchor,
             }];
-            for shape_id in &root_ids {
-                inverse.push(Operation::ReparentShape {
-                    shape_id: shape_id.clone(),
-                    parent: ShapeParent::Layer(layer_id.clone()),
-                    anchor: SiblingAnchor::Last,
-                    expected_version: None,
-                });
-            }
             for shape_id in root_ids {
-                insert_shape_child(
+                let restoration = reparent_shape(
                     document,
+                    &shape_id,
                     &ShapeParent::Layer(destination.clone()),
-                    shape_id.clone(),
                     &SiblingAnchor::Last,
+                    None,
                 )?;
-                let shape = document
-                    .shapes
-                    .get_mut(&shape_id)
-                    .ok_or_else(|| EngineError::Invariant(format!("missing root shape {shape_id}")))?;
-                shape.parent = ShapeParent::Layer(destination.clone());
-                shape.version = next_version(shape.version)?;
+                inverse.extend(restoration);
             }
             remove_layer_record(document, &layer)?;
             Ok(inverse)

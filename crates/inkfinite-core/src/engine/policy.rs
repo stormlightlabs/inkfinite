@@ -1,7 +1,7 @@
 use super::hierarchy::{
     containing_layer, descendant_ids_for_layer, descendant_ids_for_shape, operation_layer_id, operation_shape_ids,
 };
-use super::{Document, EngineError, Operation, Origin, TransactionDraft};
+use super::{Document, EngineError, LayerContentsDisposition, Operation, Origin, TransactionDraft};
 
 pub fn validate_transaction_schema(transaction: &TransactionDraft) -> Result<(), EngineError> {
     if transaction.id.0.trim().is_empty() {
@@ -21,6 +21,14 @@ pub fn validate_transaction_schema(transaction: &TransactionDraft) -> Result<(),
 
 pub fn validate_permissions(document: &Document, operation: &Operation, origin: &Origin) -> Result<(), EngineError> {
     let mut shape_ids = operation_shape_ids(operation);
+    if let Operation::ReparentShape { parent: crate::ShapeParent::Shape(parent_id), .. } = operation {
+        shape_ids.push(parent_id.clone());
+    }
+    if let Operation::DeleteLayer { contents: LayerContentsDisposition::MoveTo(destination), .. } = operation
+        && document.layers.get(destination).is_some_and(|layer| layer.locked)
+    {
+        return Err(EngineError::Permission("destination layer is locked".into()));
+    }
     match operation {
         Operation::DeletePage { page_id, .. } => {
             if let Some(page) = document.pages.get(page_id) {
@@ -42,26 +50,47 @@ pub fn validate_permissions(document: &Document, operation: &Operation, origin: 
     shape_ids.sort();
     shape_ids.dedup();
     for shape_id in shape_ids {
-        let Some(shape) = document.shapes.get(&shape_id) else {
-            continue;
-        };
-        if shape.metadata.locked {
-            return Err(EngineError::Permission(format!("shape {shape_id} is locked")));
+        let mut current_id = Some(shape_id.clone());
+        while let Some(current) = current_id {
+            let Some(shape) = document.shapes.get(&current) else {
+                break;
+            };
+            if shape.metadata.locked {
+                return Err(EngineError::Permission(format!("shape {current} is locked")));
+            }
+            if matches!(origin, Origin::Agent) && !shape.metadata.agent_editable {
+                return Err(EngineError::Permission(format!(
+                    "shape {current} is not agent-editable"
+                )));
+            }
+            if matches!(origin, Origin::Agent) && containing_layer(document, shape).is_some_and(|layer| !layer.visible)
+            {
+                return Err(EngineError::Permission(format!(
+                    "shape {current} is hidden from agents"
+                )));
+            }
+            current_id = match &shape.parent {
+                crate::ShapeParent::Shape(parent_id) => Some(parent_id.clone()),
+                crate::ShapeParent::Layer(_) => None,
+            };
         }
-        if matches!(origin, Origin::Agent) && !shape.metadata.agent_editable {
-            return Err(EngineError::Permission(format!(
-                "shape {shape_id} is not agent-editable"
-            )));
-        }
-        if matches!(origin, Origin::Agent) && containing_layer(document, shape).is_some_and(|layer| !layer.visible) {
-            return Err(EngineError::Permission(format!(
-                "shape {shape_id} is hidden from agents"
-            )));
-        }
-        if let Some(layer) = containing_layer(document, shape)
+        if let Some(shape) = document.shapes.get(&shape_id)
+            && let Some(layer) = containing_layer(document, shape)
             && layer.locked
         {
             return Err(EngineError::Permission(format!("layer {} is locked", layer.id)));
+        }
+        if let Operation::ReparentShape { parent, .. } = operation {
+            let destination_layer = match parent {
+                crate::ShapeParent::Layer(layer_id) => document.layers.get(layer_id),
+                crate::ShapeParent::Shape(parent_id) => document
+                    .shapes
+                    .get(parent_id)
+                    .and_then(|parent| containing_layer(document, parent)),
+            };
+            if destination_layer.is_some_and(|layer| layer.locked) {
+                return Err(EngineError::Permission("destination layer is locked".into()));
+            }
         }
     }
     if let Some(layer_id) = operation_layer_id(operation)

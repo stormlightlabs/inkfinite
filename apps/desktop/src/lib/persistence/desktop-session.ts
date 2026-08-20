@@ -992,6 +992,7 @@ function loadedDocFromProjection(projection: EditorProjection): LoadedDoc {
 			...(shape.stroke_opacity !== null ? { strokeOpacity: shape.stroke_opacity } : {}),
 			...(shape.group_id ? { groupId: shape.group_id } : {}),
 			layerId: shape.layer_id,
+			locked: shape.locked,
 			agentEditable: shape.agent_editable,
 			props: shape.props as EditorShapeRecord['props']
 		} as EditorShapeRecord;
@@ -1148,6 +1149,7 @@ function editorShapeFromSnapshot(
 		...(shape.style.fill_opacity !== null ? { fillOpacity: shape.style.fill_opacity } : {}),
 		...(shape.style.stroke_opacity !== null ? { strokeOpacity: shape.style.stroke_opacity } : {}),
 		...(groupId ? { groupId } : {}),
+		locked: shape.metadata.locked,
 		agentEditable: shape.metadata.agent_editable,
 		props: properties as EditorShapeRecord['props']
 	} as EditorShapeRecord;

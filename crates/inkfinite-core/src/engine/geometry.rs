@@ -155,15 +155,70 @@ pub fn world_shape_bounds(document: &Document, shape_id: &ShapeId) -> Bounds {
     let Some(shape) = document.shapes.get(shape_id) else {
         return Bounds { x: 0.0, y: 0.0, width: 0.0, height: 0.0 };
     };
-    let parent_transform = match &shape.parent {
-        ShapeParent::Layer(_) => Affine::IDENTITY,
-        ShapeParent::Shape(parent_id) => document
+    parent_world_transform(document, &shape.parent)
+        .unwrap_or(Affine::IDENTITY)
+        .transform_bounds(local_shape_bounds(shape))
+}
+
+/// Returns the world transform of a shape parent.
+///
+/// `None` means that the parent record is missing. Callers that are validating
+/// a document should report that missing record instead of falling back to the
+/// identity transform.
+#[must_use]
+pub fn parent_world_transform(document: &Document, parent: &ShapeParent) -> Option<Affine> {
+    match parent {
+        ShapeParent::Layer(layer_id) => document.layers.contains_key(layer_id).then_some(Affine::IDENTITY),
+        ShapeParent::Shape(shape_id) => document
             .shapes
-            .get(parent_id)
-            .map(|parent| world_transform(document, parent))
-            .unwrap_or(Affine::IDENTITY),
-    };
-    parent_transform.transform_bounds(local_shape_bounds(shape))
+            .get(shape_id)
+            .map(|shape| world_transform(document, shape)),
+    }
+}
+
+/// Decomposes an affine transform into the native translation, rotation, and
+/// scale representation.
+///
+/// Native transforms cannot represent shear. `None` is returned for singular,
+/// non-finite, or sheared matrices.
+#[must_use]
+pub fn decompose_transform(matrix: Affine) -> Option<Transform> {
+    let scale_x = matrix.a.hypot(matrix.b);
+    if ![matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f, scale_x]
+        .into_iter()
+        .all(f64::is_finite)
+        || scale_x <= f64::EPSILON
+    {
+        return None;
+    }
+    let rotation = matrix.b.atan2(matrix.a);
+    let scale_y = (matrix.a * matrix.d - matrix.b * matrix.c) / scale_x;
+    if !scale_y.is_finite() || scale_y.abs() <= f64::EPSILON {
+        return None;
+    }
+    let transform = Transform { translation: Vec2 { x: matrix.e, y: matrix.f }, rotation, scale_x, scale_y };
+    affine_approximately_equal(Affine::from_transform(transform), matrix).then_some(transform)
+}
+
+/// Converts a world transform into a native transform relative to `parent`.
+#[must_use]
+pub fn local_transform_from_world(document: &Document, parent: &ShapeParent, world: Affine) -> Option<Transform> {
+    parent_world_transform(document, parent)
+        .and_then(Affine::inverse)
+        .and_then(|inverse| decompose_transform(inverse.then(world)))
+}
+
+fn affine_approximately_equal(left: Affine, right: Affine) -> bool {
+    [
+        (left.a, right.a),
+        (left.b, right.b),
+        (left.c, right.c),
+        (left.d, right.d),
+        (left.e, right.e),
+        (left.f, right.f),
+    ]
+    .into_iter()
+    .all(|(left, right)| (left - right).abs() <= 1e-9 * (1.0 + left.abs().max(right.abs())))
 }
 
 /// Returns the exact axis-aligned bounds of normalized path geometry.

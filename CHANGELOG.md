@@ -42,7 +42,8 @@
 - Browser smoke coverage for the compiled WASM document engine and real worker across create,
   mutate, save, reopen, projection, undo, redo, SVG import, and SVG rendering.
 - Hierarchical vector object editing with selectable imported containers, nested selection scopes,
-  full affine hit testing, and world-space child transforms for move, resize, and rotation.
+  full affine hit testing, world-space child transforms for move, resize, and rotation, and
+  world-space-preserving reparent operations with locked-ancestor selection rules.
 
 #### SVG Interop
 

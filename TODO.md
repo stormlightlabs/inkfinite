@@ -82,15 +82,15 @@ document lifecycle, including SVG import and rendering.
 
 #### Hierarchy semantics and tests
 
-- [ ] Route committed hierarchy operations through canonical Rust geometry APIs
-- [ ] Reparent shapes while preserving world-space appearance
-- [ ] Define selection behavior across different parents
-- [ ] Define multi-selection behavior across different parents
-- [ ] Ensure hit testing maps through nested transforms correctly
-- [ ] Ensure gesture previews use the same transform semantics as commits
-- [ ] Preserve locked and hidden hierarchy behavior
-- [ ] Add nested-selection runtime tests
-- [ ] Add nested-transform renderer tests
+- [x] Route committed hierarchy operations through canonical Rust geometry APIs
+- [x] Reparent shapes while preserving world-space appearance
+- [x] Define selection behavior across different parents
+- [x] Define multi-selection behavior across different parents
+- [x] Ensure hit testing maps through nested transforms correctly
+- [x] Ensure gesture previews use the same transform semantics as commits
+- [x] Preserve locked and hidden hierarchy behavior
+- [x] Add nested-selection runtime tests
+- [x] Add nested-transform renderer tests
 
 ### Direct selection
 

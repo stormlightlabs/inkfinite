@@ -7,6 +7,7 @@ import type {
 } from '@inkfinite/bindings/model';
 import { v4 } from 'uuid';
 import type { Vec2 } from './math';
+
 /**
  * Generate a unique ID with an optional prefix
  * @param prefix - Optional prefix for the ID (e.g., 'shape', 'page', 'binding')
@@ -198,6 +199,8 @@ export type BaseShape = {
 	groupId?: string;
 	/** Owning layer assigned when the shape enters an editor document. */
 	layerId?: string;
+	/** Whether this shape is excluded from selection and editing. */
+	locked?: boolean;
 	/** Whether an agent may propose or apply edits to this shape; omitted values allow edits. */
 	agentEditable?: boolean;
 };
