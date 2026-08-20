@@ -169,6 +169,29 @@ pub fn is_builtin_shape_kind(kind: &str) -> bool {
 /// Kind-specific shape properties owned by the shape registry.
 pub type ShapeProperties = BTreeMap<String, Value>;
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StrokeBrushProperties {
+    pub(crate) size: f64,
+    pub(crate) thinning: f64,
+    pub(crate) smoothing: f64,
+    pub(crate) streamline: f64,
+    pub(crate) simulate_pressure: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct StrokeStyleProperties {
+    pub(crate) color: String,
+    pub(crate) opacity: f64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct StrokeProperties {
+    pub(crate) points: Vec<Vec<f64>>,
+    pub(crate) style: StrokeStyleProperties,
+    pub(crate) brush: StrokeBrushProperties,
+}
+
 /// Storage form for asset contents.
 #[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case", tag = "kind")]
@@ -218,6 +241,9 @@ pub enum ShapePropertyError {
     /// Native path properties do not decode or fail path geometry validation.
     #[error("shape kind {kind} has invalid path geometry: {message}")]
     InvalidPath { kind: String, message: String },
+    /// Freehand properties do not decode or fail committed stroke validation.
+    #[error("shape kind {kind} has invalid stroke geometry: {message}")]
+    InvalidStroke { kind: String, message: String },
 }
 
 /// Anchor used to place an item in an ordered child list without numeric indexes.
@@ -870,12 +896,12 @@ pub fn blank_document(document_id: &DocumentId, page_name: Option<&str>) -> Docu
 /// Unknown properties remain available for shape-specific extensions. The
 /// registry gives common `width` and `height` properties cross-language numeric
 /// and non-negative constraints, and validates the normalized geometry of path
-/// shapes.
+/// and freehand stroke shapes.
 ///
 /// # Errors
 ///
-/// Returns [`ShapePropertyError`] when the kind is unknown or a supplied common
-/// dimension cannot be represented as a finite, non-negative number.
+/// Returns [`ShapePropertyError`] when the kind, a common dimension, or a
+/// path or stroke geometry value is invalid.
 pub fn validate_shape_properties(kind: &str, properties: &ShapeProperties) -> Result<(), ShapePropertyError> {
     if !is_builtin_shape_kind(kind) {
         return Err(ShapePropertyError::UnknownKind { kind: kind.to_owned() });
@@ -900,8 +926,117 @@ pub fn validate_shape_properties(kind: &str, properties: &ShapeProperties) -> Re
             .map_err(|error| ShapePropertyError::InvalidPath { kind: kind.to_owned(), message: error.to_string() })?;
         validate_path_geometry(&geometry)
             .map_err(|error| ShapePropertyError::InvalidPath { kind: kind.to_owned(), message: error.to_string() })?;
+    } else if kind == STROKE_KIND {
+        validate_stroke_properties(properties)
+            .map_err(|message| ShapePropertyError::InvalidStroke { kind: kind.to_owned(), message })?;
     }
     Ok(())
+}
+
+/// Normalizes geometry properties at the canonical transaction boundary.
+///
+/// Path properties are decoded and reserialized from the native representation.
+/// Freehand points and brush settings are likewise decoded and written back with
+/// the stable browser-facing field names. Other shape properties are cloned
+/// unchanged. Callers should use this before storing a shape or patching its
+/// geometry so equivalent editor values have one durable representation.
+///
+/// # Errors
+///
+/// Returns [`ShapePropertyError`] when the kind or its geometry is invalid.
+pub fn normalize_shape_properties(
+    kind: &str, properties: &ShapeProperties,
+) -> Result<ShapeProperties, ShapePropertyError> {
+    validate_shape_properties(kind, properties)?;
+    let mut normalized = properties.clone();
+    if kind == PATH_KIND {
+        let geometry = path_geometry_from_properties(properties)
+            .map_err(|error| ShapePropertyError::InvalidPath { kind: kind.to_owned(), message: error.to_string() })?;
+        normalized.insert(
+            "subpaths".into(),
+            serde_json::to_value(geometry.subpaths).map_err(|error| ShapePropertyError::InvalidPath {
+                kind: kind.to_owned(),
+                message: error.to_string(),
+            })?,
+        );
+        normalized.insert(
+            "fill_rule".into(),
+            serde_json::to_value(geometry.fill_rule).map_err(|error| ShapePropertyError::InvalidPath {
+                kind: kind.to_owned(),
+                message: error.to_string(),
+            })?,
+        );
+    } else if kind == STROKE_KIND {
+        let stroke = decode_stroke_properties(properties)
+            .map_err(|message| ShapePropertyError::InvalidStroke { kind: kind.to_owned(), message })?;
+        normalized.insert(
+            "points".into(),
+            serde_json::to_value(stroke.points).map_err(|error| ShapePropertyError::InvalidStroke {
+                kind: kind.to_owned(),
+                message: error.to_string(),
+            })?,
+        );
+        normalized.insert(
+            "style".into(),
+            serde_json::to_value(stroke.style).map_err(|error| ShapePropertyError::InvalidStroke {
+                kind: kind.to_owned(),
+                message: error.to_string(),
+            })?,
+        );
+        normalized.insert(
+            "brush".into(),
+            serde_json::to_value(stroke.brush).map_err(|error| ShapePropertyError::InvalidStroke {
+                kind: kind.to_owned(),
+                message: error.to_string(),
+            })?,
+        );
+    }
+    Ok(normalized)
+}
+
+fn validate_stroke_properties(properties: &ShapeProperties) -> Result<(), String> {
+    let stroke = decode_stroke_properties(properties)?;
+    if stroke.points.len() < 2 {
+        return Err("stroke must contain at least two points".into());
+    }
+    for (index, point) in stroke.points.iter().enumerate() {
+        if !(2..=3).contains(&point.len()) {
+            return Err(format!(
+                "stroke point {index} must contain x, y, and an optional pressure"
+            ));
+        }
+        if !point[..2].iter().all(|value| value.is_finite()) {
+            return Err(format!("stroke point {index} has a non-finite coordinate"));
+        }
+        if let Some(pressure) = point.get(2)
+            && (!pressure.is_finite() || !(0.0..=1.0).contains(pressure))
+        {
+            return Err(format!("stroke point {index} has invalid pressure"));
+        }
+    }
+    if !stroke.brush.size.is_finite() || stroke.brush.size <= 0.0 {
+        return Err("stroke brush size must be finite and positive".into());
+    }
+    if ![
+        stroke.brush.thinning,
+        stroke.brush.smoothing,
+        stroke.brush.streamline,
+        stroke.style.opacity,
+    ]
+    .into_iter()
+    .all(f64::is_finite)
+    {
+        return Err("stroke brush and style values must be finite".into());
+    }
+    if !(0.0..=1.0).contains(&stroke.style.opacity) {
+        return Err("stroke style opacity must be between 0 and 1".into());
+    }
+    Ok(())
+}
+
+fn decode_stroke_properties(properties: &ShapeProperties) -> Result<StrokeProperties, String> {
+    serde_json::from_value(Value::Object(properties.clone().into_iter().collect()))
+        .map_err(|error| format!("stroke properties could not be decoded: {error}"))
 }
 
 #[cfg(test)]
@@ -1011,6 +1146,45 @@ mod tests {
         assert!(matches!(
             validate_shape_properties(PATH_KIND, &invalid_properties),
             Err(ShapePropertyError::InvalidPath { .. })
+        ));
+
+        let stroke_properties = BTreeMap::from([
+            ("points".into(), serde_json::json!([[0.0, 0.0, 0.25], [20.0, 10.0]])),
+            ("style".into(), serde_json::json!({ "color": "#000", "opacity": 0.75 })),
+            (
+                "brush".into(),
+                serde_json::json!({
+                    "size": 8.0,
+                    "thinning": 0.5,
+                    "smoothing": 0.5,
+                    "streamline": 0.5,
+                    "simulatePressure": true
+                }),
+            ),
+        ]);
+        assert!(validate_shape_properties(STROKE_KIND, &stroke_properties).is_ok());
+        let normalized = normalize_shape_properties(STROKE_KIND, &stroke_properties).expect("stroke normalizes");
+        assert_eq!(normalized["points"], stroke_properties["points"]);
+        assert_eq!(normalized["brush"]["simulatePressure"], Value::Bool(true));
+        assert!(matches!(
+            validate_shape_properties(
+                STROKE_KIND,
+                &BTreeMap::from([
+                    ("points".into(), serde_json::json!([[0.0, 0.0]])),
+                    ("style".into(), serde_json::json!({ "color": "#000", "opacity": 1.0 })),
+                    (
+                        "brush".into(),
+                        serde_json::json!({
+                            "size": 8.0,
+                            "thinning": 0.5,
+                            "smoothing": 0.5,
+                            "streamline": 0.5,
+                            "simulatePressure": true
+                        })
+                    )
+                ])
+            ),
+            Err(ShapePropertyError::InvalidStroke { .. })
         ));
 
         assert_eq!(BuiltinShapeKind::parse("rect"), Some(BuiltinShapeKind::Rectangle));

@@ -53,8 +53,8 @@ the subpath its starting point. Later segments continue from the previous destin
 - `cubic` stores two control points and a destination.
 
 A `closed` subpath connects its final destination back to its initial move point. Closure is a
-property of the subpath, not a separate segment. Separate subpaths represent compound geometry;
-they do not use additional move segments inside one subpath.
+property of the subpath, not a separate segment. Separate subpaths represent compound geometry
+but do not use additional move segments inside one subpath.
 
 ## Compound fills
 
@@ -65,7 +65,14 @@ to all subpaths in the path when a renderer determines which regions are inside 
 
 Rust validates path properties before they enter a shape record. It rejects empty paths,
 empty subpaths, subpaths without an initial move, later move segments, and non-finite coordinates.
-`validate_shape_properties` applies this check whenever the shape kind is `path`.
+`validate_shape_properties` applies this check whenever the shape kind is `path`. Create and patch
+operations reserialize valid path geometry through the Rust representation before committing it.
+
+Freehand shapes keep their input points and brush settings as properties. Rust validates those
+properties at the same transaction boundary, writes their canonical field representation, and
+computes the committed outline for bounds and invalidated regions. TypeScript can use
+`perfect-freehand` for pointer previews and hit testing. It doesn't decide whether a stroke enters
+the document.
 
 The binding generator exports `PathFillRule`, `PathSegment`, `PathSubpath`, and `PathGeometry` to
 `@inkfinite/bindings`. Its registry also exposes `validatePathGeometry` and applies the same

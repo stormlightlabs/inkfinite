@@ -78,6 +78,49 @@ export function validatePathGeometry(value: unknown): value is PathGeometry {
 	});
 }
 
+function validateStrokeProperties(properties: Record<string, JsonValue>): boolean {
+	const points = properties.points;
+	if (!Array.isArray(points) || points.length < 2) return false;
+	if (
+		!points.every(
+			(point) =>
+				Array.isArray(point) &&
+				(point.length === 2 || point.length === 3) &&
+				point.every(
+					(value, index) =>
+						typeof value === 'number' && Number.isFinite(value) && (index < 2 || (value >= 0 && value <= 1))
+				)
+		)
+	)
+		return false;
+	const style = properties.style;
+	if (
+		!isRecord(style) ||
+		typeof style.color !== 'string' ||
+		typeof style.opacity !== 'number' ||
+		!Number.isFinite(style.opacity) ||
+		style.opacity < 0 ||
+		style.opacity > 1
+	)
+		return false;
+	const brush = properties.brush;
+	if (
+		!isRecord(brush) ||
+		typeof brush.size !== 'number' ||
+		!Number.isFinite(brush.size) ||
+		brush.size <= 0 ||
+		typeof brush.thinning !== 'number' ||
+		!Number.isFinite(brush.thinning) ||
+		typeof brush.smoothing !== 'number' ||
+		!Number.isFinite(brush.smoothing) ||
+		typeof brush.streamline !== 'number' ||
+		!Number.isFinite(brush.streamline) ||
+		typeof brush.simulatePressure !== 'boolean'
+	)
+		return false;
+	return true;
+}
+
 function numericProperty(properties: Record<string, JsonValue>, name: string): number {
 	const value = properties[name];
 	return typeof value === 'number' && Number.isFinite(value) ? value : 0;
@@ -176,6 +219,7 @@ export function validateShapeProperties(kind: string, properties: Record<string,
 	if (!(BUILTIN_SHAPE_KINDS as readonly string[]).includes(kind)) return false;
 	if (kind === 'path' && !validatePathGeometry({ subpaths: properties.subpaths, fill_rule: properties.fill_rule }))
 		return false;
+	if (kind === 'stroke' && !validateStrokeProperties(properties)) return false;
 	return ['width', 'height'].every((name) => {
 		const value = properties[name];
 		return value === undefined || (typeof value === 'number' && Number.isFinite(value) && value >= 0);

@@ -317,6 +317,56 @@
       "valid": true
     },
     {
+      "kind": "stroke",
+      "properties": {
+        "brush": {
+          "simulatePressure": true,
+          "size": 8.0,
+          "smoothing": 0.5,
+          "streamline": 0.5,
+          "thinning": 0.5
+        },
+        "points": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            20.0,
+            10.0
+          ]
+        ],
+        "style": {
+          "color": "#000000",
+          "opacity": 1.0
+        }
+      },
+      "valid": true
+    },
+    {
+      "kind": "stroke",
+      "properties": {
+        "brush": {
+          "simulatePressure": true,
+          "size": 8.0,
+          "smoothing": 0.5,
+          "streamline": 0.5,
+          "thinning": 0.5
+        },
+        "points": [
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "style": {
+          "color": "#000000",
+          "opacity": 1.0
+        }
+      },
+      "valid": false
+    },
+    {
       "kind": "rect",
       "properties": {
         "height": 20.0,

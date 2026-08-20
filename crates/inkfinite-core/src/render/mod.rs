@@ -3,12 +3,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 
-use perfect_freehand::{InputPoint, StrokeOptions, get_stroke};
 use serde::Deserialize;
 use serde_json::Value;
 use thiserror::Error;
 
-use crate::engine::geometry::{Affine, bounds_from_points, intersects, union, world_transform};
+use crate::engine::geometry::{
+    Affine, bounds_from_points, intersects, stroke_outline as canonical_stroke_outline, union, world_transform,
+};
 use crate::proto::Bounds;
 use crate::{
     AssetId, AssetSource, BindingAnchor, BuiltinShapeKind, Document, DocumentSnapshot, LayerId, PageId, PathFillRule,
@@ -231,8 +232,14 @@ impl Renderer<'_> {
                 self.render_markdown(shape, &transform, &fill_opacity, &stroke_opacity, &mut output)?;
             }
             Some(BuiltinShapeKind::Stroke) => {
-                let props: StrokeProps = properties(shape)?;
-                let outline = stroke_outline(&props);
+                let props: StrokePaintProperties = properties(shape)?;
+                let outline = canonical_stroke_outline(&shape.properties).map_err(|message| {
+                    SvgRenderError::InvalidShapeProperties {
+                        shape_id: shape.id.clone(),
+                        kind: shape.kind.to_string(),
+                        message,
+                    }
+                })?;
                 if !outline.is_empty() {
                     let path = outline
                         .iter()
@@ -574,26 +581,14 @@ struct PathProps {
 }
 
 #[derive(Deserialize)]
-struct StrokeProps {
-    points: Vec<Vec<f64>>,
+struct StrokePaintProperties {
     style: StrokeStyle,
-    brush: Brush,
 }
 
 #[derive(Deserialize)]
 struct StrokeStyle {
     color: String,
     opacity: f64,
-}
-
-#[derive(Deserialize)]
-struct Brush {
-    size: f64,
-    thinning: f64,
-    smoothing: f64,
-    streamline: f64,
-    #[serde(rename = "simulatePressure")]
-    simulate_pressure: bool,
 }
 
 struct MarkdownLine {
@@ -762,10 +757,16 @@ fn shape_local_bounds(shape: &ShapeRecord) -> Result<Bounds, SvgRenderError> {
             let props: MarkdownProps = properties(shape)?;
             Bounds { x: 0.0, y: 0.0, width: props.width, height: props.height.unwrap_or(props.font_size * 10.0) }
         }
-        Some(BuiltinShapeKind::Stroke) => {
-            let props: StrokeProps = properties(shape)?;
-            bounds_from_points(&stroke_outline(&props))
-        }
+        Some(BuiltinShapeKind::Stroke) => canonical_stroke_outline(&shape.properties).map_or_else(
+            |message| {
+                Err(SvgRenderError::InvalidShapeProperties {
+                    shape_id: shape.id.clone(),
+                    kind: shape.kind.to_string(),
+                    message,
+                })
+            },
+            |outline| Ok(bounds_from_points(&outline)),
+        )?,
         Some(BuiltinShapeKind::Path) => {
             let geometry = crate::path_geometry_from_properties(&shape.properties).map_err(|error| {
                 SvgRenderError::InvalidShapeProperties {
@@ -826,30 +827,6 @@ fn path_fill_rule(rule: PathFillRule) -> &'static str {
         PathFillRule::NonZero => "nonzero",
         PathFillRule::EvenOdd => "evenodd",
     }
-}
-
-fn stroke_outline(props: &StrokeProps) -> Vec<Vec2> {
-    if props.points.len() < 2 {
-        return Vec::new();
-    }
-    let points = props
-        .points
-        .iter()
-        .filter(|point| point.len() >= 2)
-        .map(|point| InputPoint::Array([point[0], point[1]], point.get(2).copied()))
-        .collect::<Vec<_>>();
-    let options = StrokeOptions {
-        size: Some(props.brush.size),
-        thinning: Some(props.brush.thinning),
-        smoothing: Some(props.brush.smoothing),
-        streamline: Some(props.brush.streamline),
-        simulate_pressure: Some(props.brush.simulate_pressure),
-        ..StrokeOptions::default()
-    };
-    get_stroke(&points, &options)
-        .into_iter()
-        .map(|point| Vec2 { x: point[0], y: point[1] })
-        .collect()
 }
 
 fn render_shape_world_bounds(document: &Document, shape: &ShapeRecord) -> Result<Bounds, SvgRenderError> {

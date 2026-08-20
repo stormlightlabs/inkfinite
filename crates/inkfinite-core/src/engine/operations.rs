@@ -9,6 +9,7 @@ use super::validation::ensure_binding_endpoints;
 use super::{
     AssetId, AssetPatch, BTreeMap, BTreeSet, Document, EngineError, LayerContentsDisposition, LayerId, LayerPatch,
     LayoutAxis, Operation, PageId, RecordVersion, ShapeAlignment, ShapeId, ShapeParent, ShapePatch, SiblingAnchor,
+    normalize_shape_properties,
 };
 
 #[allow(clippy::too_many_lines)]
@@ -79,8 +80,11 @@ pub fn apply_operation(document: &mut Document, operation: &Operation) -> Result
                     "new shape child_ids must be empty; create children separately".into(),
                 ));
             }
-            insert_shape_child(document, &shape.parent, shape.id.clone(), anchor)?;
-            document.shapes.insert(shape.id.clone(), shape.clone());
+            let mut canonical_shape = shape.clone();
+            canonical_shape.properties = normalize_shape_properties(shape.kind.as_str(), &shape.properties)
+                .map_err(|error| EngineError::Schema(format!("shape {}: {error}", shape.id)))?;
+            insert_shape_child(document, &canonical_shape.parent, canonical_shape.id.clone(), anchor)?;
+            document.shapes.insert(canonical_shape.id.clone(), canonical_shape);
             Ok(vec![Operation::DeleteShape {
                 shape_id: shape.id.clone(),
                 expected_version: Some(shape.version),
@@ -179,6 +183,15 @@ pub fn patch_layer(
 pub fn patch_shape(
     document: &mut Document, shape_id: &ShapeId, patch: &ShapePatch, expected: Option<RecordVersion>,
 ) -> Result<Vec<Operation>, EngineError> {
+    let normalized_properties = patch
+        .properties
+        .as_ref()
+        .map(|properties| {
+            let kind = shape(document, shape_id, expected)?.kind.clone();
+            normalize_shape_properties(kind.as_str(), properties)
+                .map_err(|error| EngineError::Schema(format!("shape {shape_id}: {error}")))
+        })
+        .transpose()?;
     let shape = shape_mut(document, shape_id, expected)?;
     let inverse = ShapePatch {
         transform: patch.transform.map(|_| shape.transform),
@@ -190,8 +203,8 @@ pub fn patch_shape(
     if let Some(value) = patch.transform {
         shape.transform = value;
     }
-    if let Some(value) = &patch.properties {
-        shape.properties.clone_from(value);
+    if let Some(value) = normalized_properties {
+        shape.properties = value;
     }
     if let Some(value) = &patch.metadata {
         shape.metadata.clone_from(value);

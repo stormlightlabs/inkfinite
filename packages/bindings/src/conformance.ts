@@ -7,6 +7,14 @@ import type { Bounds, ShapePatch, TransactionDraft } from './transaction.js';
 const transform: Transform = { translation: { x: 10, y: 20 }, rotation: 0.5, scale_x: 2, scale_y: 1.5 };
 
 const properties: ShapeProperties = { width: 40, height: 20 };
+const strokeProperties: ShapeProperties = {
+	points: [
+		[0, 0],
+		[20, 10]
+	],
+	style: { color: '#000000', opacity: 1 },
+	brush: { size: 8, thinning: 0.5, smoothing: 0.5, streamline: 0.5, simulatePressure: true }
+};
 
 const pathGeometry: PathGeometry = {
 	subpaths: [
@@ -68,6 +76,7 @@ const bounds: Bounds = boundsForShape(protocolShape);
 
 if (
 	!validateShapeProperties(shape.kind, properties) ||
+	!validateShapeProperties('stroke', strokeProperties) ||
 	!validatePathGeometry(pathGeometry) ||
 	bounds.width <= 0 ||
 	bounds.height <= 0

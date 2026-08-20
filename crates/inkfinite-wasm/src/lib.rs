@@ -765,8 +765,30 @@ mod tests {
                 "parent": {"kind": "layer", "id": "layer:one"},
                 "transform": {"a": 1, "b": 0, "c": 0, "d": 1, "e": 4, "f": 5},
                 "anchor": {"position": "last"}
+            }, {
+                "type": "create_shape",
+                "shape": {"id": "shape:path", "kind": "path", "properties": {
+                    "subpaths": [{"segments": [
+                        {"type": "move", "to": {"x": 0, "y": 0}},
+                        {"type": "line", "to": {"x": 20, "y": 10}}
+                    ], "closed": false}],
+                    "fill_rule": "nonzero"
+                }, "metadata": null, "style": {"opacity": 1, "fill_opacity": null, "stroke_opacity": null}, "layout": null},
+                "parent": {"kind": "layer", "id": "layer:one"},
+                "transform": {"a": 1, "b": 0, "c": 0, "d": 1, "e": 30, "f": 5},
+                "anchor": {"position": "last"}
+            }, {
+                "type": "create_shape",
+                "shape": {"id": "shape:stroke", "kind": "stroke", "properties": {
+                    "points": [[0, 0], [20, 10]],
+                    "style": {"color": "#000000", "opacity": 1},
+                    "brush": {"size": 8, "thinning": 0.5, "smoothing": 0.5, "streamline": 0.5, "simulatePressure": true}
+                }, "metadata": null, "style": {"opacity": 1, "fill_opacity": null, "stroke_opacity": null}, "layout": null},
+                "parent": {"kind": "layer", "id": "layer:one"},
+                "transform": {"a": 1, "b": 0, "c": 0, "d": 1, "e": 60, "f": 5},
+                "anchor": {"position": "last"}
             }],
-            "actor_id": "browser", "origin": "human", "transaction_id": "transaction:create", "description": "Create rectangle", "timestamp": 1
+            "actor_id": "browser", "origin": "human", "transaction_id": "transaction:create", "description": "Create geometry", "timestamp": 1
         });
         let response: Value =
             serde_json::from_str(&session.apply_editor_patches(&request.to_string())).expect("commit response");
@@ -774,6 +796,11 @@ mod tests {
         let state: Value =
             serde_json::from_str(&session.state_json().expect("state should serialize")).expect("state JSON");
         assert!(state["snapshot"]["document"]["shapes"]["shape:rect"].is_object());
+        assert!(state["snapshot"]["document"]["shapes"]["shape:path"].is_object());
+        assert_eq!(
+            state["snapshot"]["document"]["shapes"]["shape:stroke"]["properties"]["brush"]["simulatePressure"],
+            true
+        );
         assert!(session.can_undo());
         let saved = session.save().expect("session should save");
         let mut reopened = open_document(&saved, "browser").expect("saved bytes should reopen");

@@ -16,7 +16,7 @@ use crate::proto::{
 use crate::sync::{PeerSync, SyncDisposition, SyncMessage};
 use crate::{
     ActorId, AssetId, BindingId, ChangeHash, ContainerLayout, Document, DocumentId, LayerId, Origin, PageId,
-    RecordVersion, ShapeId, ShapeParent, ShapeProperties, ShapeRecord, SiblingAnchor,
+    RecordVersion, ShapeId, ShapeParent, ShapeProperties, ShapeRecord, SiblingAnchor, normalize_shape_properties,
 };
 use thiserror::Error;
 
@@ -103,7 +103,11 @@ impl TransactionEngine {
     ///
     /// Returns an error when the initial document violates an invariant or
     /// cannot be encoded by the CRDT adapter.
-    pub fn create(document_id: DocumentId, actor_id: ActorId, document: Document) -> Result<Self, EngineError> {
+    pub fn create(document_id: DocumentId, actor_id: ActorId, mut document: Document) -> Result<Self, EngineError> {
+        for shape in document.shapes.values_mut() {
+            shape.properties = normalize_shape_properties(shape.kind.as_str(), &shape.properties)
+                .map_err(|error| EngineError::Schema(format!("shape {}: {error}", shape.id)))?;
+        }
         validate_document(&document)?;
         Ok(Self {
             crdt: AutomergeDocument::create(document_id, actor_id, document)?,

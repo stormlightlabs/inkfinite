@@ -239,6 +239,20 @@ Run the shared UI workshop when changing components or the editor:
 pnpm dev:ui
 ```
 
+## Credits
+
+I was inspired by fantastic apps in the space like
+[Excalidraw](https://github.com/excalidraw/excalidraw) and more recently, tldraw.
+[tldraw offline](https://offline.tldraw.com/) in particular was so cool that it
+kicked off [a lot](https://thndrs.stormlightlabs.org/) [of other](https://sbuf.stormlightlabs.org/)
+[agent-capable](https://mire.stormlightlabs.org/) work for me.
+
+The choice to use [perfect-freehand](https://www.npmjs.com/package/perfect-freehand) came
+from playing around with [this](https://reactflow.dev/examples/whiteboard/freehand-draw)
+react flow demo.
+
+The SVG capabilities were inspired by this [post](https://aturi.to/explore/did:plc:p572wxnsuoogcrhlfrlizlrb/app.bsky.feed.post/3mth4fkaok2nl).
+
 ## License
 
 Inkfinite is licensed under [Apache-2.0](LICENSE).

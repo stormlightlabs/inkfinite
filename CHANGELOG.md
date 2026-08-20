@@ -37,6 +37,8 @@
   ancestor transforms, semantic editor patches, and minimal parent-relative native transactions.
 - Stateful browser WASM document sessions that open, validate, mutate, undo, redo, and save
   canonical Automerge bytes through one worker.
+- Canonical geometry commits that validate and normalize native paths and freehand strokes in Rust,
+  compute committed stroke bounds, and exercise shared Rust/TypeScript geometry fixtures.
 
 #### SVG Interop
 

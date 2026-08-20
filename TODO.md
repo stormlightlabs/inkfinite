@@ -90,10 +90,10 @@ Inkfinite now imports SVGs through one validated Rust pipeline across desktop, w
 
 ### Canonical geometry
 
-- [ ] Commit path geometry through Rust validation
-- [ ] Commit freehand strokes through Rust normalization
-- [ ] Keep gesture previews and hit testing in TypeScript
-- [ ] Add committed-geometry parity fixtures
+- [x] Commit path geometry through Rust validation
+- [x] Commit freehand strokes through Rust normalization
+- [x] Keep gesture previews and hit testing in TypeScript
+- [x] Add committed-geometry parity fixtures
 
 ## Vector Editing
 

@@ -1,5 +1,8 @@
+use perfect_freehand::{InputPoint, StrokeOptions, get_stroke};
+use serde_json::Value;
+
 use super::{Bounds, Document, EngineError, ShapeId, ShapeParent, ShapeRecord};
-use crate::{PathGeometry, PathSegment, Transform, Vec2};
+use crate::{PathGeometry, PathSegment, ShapeProperties, StrokeProperties, Transform, Vec2};
 
 /// A two-dimensional affine transform shared by document geometry consumers.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -93,12 +96,57 @@ pub fn local_shape_bounds(shape: &ShapeRecord) -> Bounds {
             .map_or(Bounds { x: 0.0, y: 0.0, width: 0.0, height: 0.0 }, |geometry| {
                 path_bounds(&geometry)
             })
+    } else if shape.kind.as_str() == crate::STROKE_KIND {
+        stroke_bounds(&shape.properties).unwrap_or(Bounds { x: 0.0, y: 0.0, width: 0.0, height: 0.0 })
     } else {
         let width = numeric_property(shape, "width").unwrap_or(0.0).abs();
         let height = numeric_property(shape, "height").unwrap_or(0.0).abs();
         Bounds { x: 0.0, y: 0.0, width, height }
     };
     Affine::from_transform(shape.transform).transform_bounds(local)
+}
+
+/// Computes the committed freehand outline using the Rust canonical renderer.
+///
+/// The editor may calculate the same outline for a responsive preview, but
+/// transaction validation and affected-region calculation use this function.
+///
+/// # Errors
+///
+/// Returns the decoded stroke-property error when the properties are malformed.
+pub fn stroke_outline(properties: &ShapeProperties) -> Result<Vec<Vec2>, String> {
+    crate::validate_shape_properties(crate::STROKE_KIND, properties).map_err(|error| error.to_string())?;
+    let stroke: StrokeProperties = serde_json::from_value(Value::Object(properties.clone().into_iter().collect()))
+        .map_err(|error| format!("stroke properties could not be decoded: {error}"))?;
+    if stroke.points.len() < 2 {
+        return Ok(Vec::new());
+    }
+    let points = stroke
+        .points
+        .iter()
+        .map(|point| InputPoint::Array([point[0], point[1]], point.get(2).copied()))
+        .collect::<Vec<_>>();
+    let options = StrokeOptions {
+        size: Some(stroke.brush.size),
+        thinning: Some(stroke.brush.thinning),
+        smoothing: Some(stroke.brush.smoothing),
+        streamline: Some(stroke.brush.streamline),
+        simulate_pressure: Some(stroke.brush.simulate_pressure),
+        ..StrokeOptions::default()
+    };
+    Ok(get_stroke(&points, &options)
+        .into_iter()
+        .map(|point| Vec2 { x: point[0], y: point[1] })
+        .collect())
+}
+
+/// Returns the axis-aligned bounds of a committed freehand outline.
+///
+/// # Errors
+///
+/// Returns the decoded stroke-property error when the properties are malformed.
+pub fn stroke_bounds(properties: &ShapeProperties) -> Result<Bounds, String> {
+    Ok(bounds_from_points(&stroke_outline(properties)?))
 }
 
 /// Returns a shape's axis-aligned bounds in document coordinates.

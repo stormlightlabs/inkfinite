@@ -1,0 +1,47 @@
+{
+  "path_cases": [
+    {
+      "name": "quadratic-and-cubic-extrema",
+      "geometry": {
+        "subpaths": [
+          {
+            "segments": [
+              { "type": "move", "to": { "x": 0, "y": 0 } },
+              { "type": "quadratic", "control": { "x": 10, "y": 20 }, "to": { "x": 20, "y": 0 } },
+              { "type": "cubic", "control_1": { "x": 30, "y": -20 }, "control_2": { "x": 40, "y": 20 }, "to": { "x": 50, "y": 0 } }
+            ],
+            "closed": false
+          }
+        ],
+        "fill_rule": "nonzero"
+      },
+      "expected_bounds": { "x": 0, "y": -5.773502691896258, "width": 50, "height": 15.773502691896258 }
+    }
+  ],
+  "stroke_cases": [
+    {
+      "name": "canonical-freehand-line",
+      "points": [[0, 0], [100, 0]],
+      "brush": {
+        "size": 16,
+        "thinning": 0.5,
+        "smoothing": 0.5,
+        "streamline": 0.5,
+        "simulatePressure": true
+      },
+      "style": { "color": "#000000", "opacity": 1 },
+      "committed_bounds": {
+        "x": -6.518636079036312,
+        "y": -6.5664765625,
+        "width": 92.51052395669203,
+        "height": 13.132953125
+      },
+      "preview_bounds": {
+        "x": -5.244746912062406,
+        "y": -5.28323828125,
+        "width": 90.74833137481014,
+        "height": 10.5664765625
+      }
+    }
+  ]
+}

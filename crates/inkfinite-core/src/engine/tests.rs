@@ -112,6 +112,65 @@ fn transaction(engine: &mut TransactionEngine, actor: &str, id: &str, operations
 }
 
 #[test]
+fn geometry_is_normalized_and_bounded_at_the_commit_boundary() {
+    let mut engine = engine();
+    let path_id = ShapeId::from("shape:path");
+    let stroke_id = ShapeId::from("shape:stroke");
+    let mut path = shape(path_id.as_str(), 120.0);
+    path.kind = ShapeKind::from(crate::PATH_KIND);
+    path.properties = ShapeProperties::from([
+        (
+            "subpaths".into(),
+            json!([{
+                "segments": [
+                    { "type": "move", "to": { "x": 0.0, "y": 0.0 } },
+                    { "type": "cubic", "control_1": { "x": 0.0, "y": 30.0 }, "control_2": { "x": 30.0, "y": 30.0 }, "to": { "x": 30.0, "y": 0.0 } }
+                ],
+                "closed": true
+            }]),
+        ),
+        ("fill_rule".into(), json!("evenodd")),
+    ]);
+    let mut stroke = shape(stroke_id.as_str(), 180.0);
+    stroke.kind = ShapeKind::from(crate::STROKE_KIND);
+    stroke.properties = ShapeProperties::from([
+        ("points".into(), json!([[0.0, 0.0], [40.0, 20.0], [80.0, 0.0]])),
+        ("style".into(), json!({ "color": "#000", "opacity": 1.0 })),
+        (
+            "brush".into(),
+            json!({
+                "size": 12.0,
+                "thinning": 0.5,
+                "smoothing": 0.5,
+                "streamline": 0.5,
+                "simulatePressure": true
+            }),
+        ),
+    ]);
+    let draft = transaction(
+        &mut engine,
+        "actor:local",
+        "create geometry",
+        vec![
+            Operation::CreateShape { shape: path, anchor: SiblingAnchor::Last },
+            Operation::CreateShape { shape: stroke, anchor: SiblingAnchor::Last },
+        ],
+    );
+    let result = engine.commit(draft).expect("valid geometry should commit");
+    assert!(result.affected_regions.iter().any(|region| region.bounds.width > 0.0));
+
+    let snapshot = engine.snapshot().expect("snapshot after geometry commit");
+    let committed_path = &snapshot.document.shapes[&path_id];
+    assert_eq!(committed_path.properties["fill_rule"], json!("evenodd"));
+    assert_eq!(
+        committed_path.properties["subpaths"][0]["segments"][0]["type"],
+        json!("move")
+    );
+    let committed_stroke = &snapshot.document.shapes[&stroke_id];
+    assert_eq!(committed_stroke.properties["brush"]["simulatePressure"], json!(true));
+}
+
+#[test]
 fn transaction_is_atomic_and_returns_inverse_patch_heads_and_regions() {
     let mut engine = engine();
     let initial = engine.snapshot().unwrap();
