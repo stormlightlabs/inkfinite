@@ -20,10 +20,11 @@ Inkfinite transaction.
 
 Both functions return an `SvgImport` value:
 
-```text
+```rs
 SvgImport {
     view_box: Option<SvgViewBox>,
     root: SvgGroup,
+    source_asset: SvgAsset,
     assets: Vec<SvgAsset>,
     warnings: Vec<SvgImportWarning>,
 }
@@ -32,8 +33,14 @@ SvgImport {
 `SvgGroup` retains its source ID, parent-relative transform, opacity, calculated
 size, and ordered `SvgImportNode` children. A node is a group, a native
 `SvgShape`, or an `SvgImage` referencing an extracted asset. Source IDs are
-hints for the transaction layer; callers assign document record IDs when they
+hints for the transaction layer. Callers assign document record IDs when they
 create the import transaction.
+
+`source_asset` is the exact UTF-8 input as an `image/svg+xml` asset with a
+content-addressed ID. `assets` contains the embedded raster assets referenced
+by image nodes. The source asset is retained even when the native tree omits
+unsupported content, so a later transaction can re-import it or attach an
+opaque fallback when that shape kind exists.
 
 ## Native mappings
 
@@ -52,7 +59,7 @@ create the import transaction.
 
 The importer handles SVG coordinates in user units. Numeric lengths can use
 `px`, `pt`, `pc`, `mm`, `cm`, `in`, or percentages when the root has a view box.
-Negative coordinates are valid; negative dimensions are rejected.
+Negative coordinates are valid, and negative dimensions are rejected.
 
 ## Path normalization
 
@@ -89,10 +96,12 @@ inherited values. The importer preserves supported `fill`, `stroke`,
 values. SVG defaults are a black fill and no stroke. `none` and `transparent`
 become absent native paint values.
 
-Paint servers such as gradients, `currentColor`, and other unsupported `url`
-values produce warnings and are omitted from the native paint properties.
-Skipped elements and unsupported paint values remain visible through
-`SvgImport::warnings`.
+Paint servers such as gradients, patterns, `currentColor`, and other
+unsupported `url` values produce warnings and are omitted from the native paint
+properties. `linearGradient`, `radialGradient`, mesh gradients, patterns,
+`clipPath`, `mask`, and `filter` definitions and references each produce a
+feature-specific warning. The importer does not evaluate a paint server or
+resolve a resource URL.
 
 ## Text
 
@@ -107,16 +116,33 @@ text paths, anchors, and rich span styling are not represented yet.
 The importer accepts embedded PNG, JPEG, GIF, and WebP data URLs. It decodes
 the bytes once, creates a content-addressed `SvgAsset` with a SHA-256 digest,
 and reuses that asset when multiple image elements contain the same bytes.
-External URLs and unsupported media types are skipped with warnings; the parser
+External URLs and unsupported media types are skipped with warnings. The parser
 does not fetch resources.
 
 `SvgImage` nodes retain the source element's position, size, transform,
 opacity, and asset ID. The current native shape registry has no image kind, so
 these nodes remain in the import result until image shape support is added.
 
+## Unsupported content and security
+
+The importer is a static parser. Named unsupported visual features are omitted
+from the normalized native tree and reported through typed
+`SvgImportWarning::UnsupportedFeature` values. Other unsupported elements use
+`SvgImportWarning::UnsupportedElement`. Their bytes remain in
+`source_asset`. The importer does not create a live opaque fallback because the
+native document model does not yet have an SVG-backed shape. A future fallback
+must render only a sanitized, static projection of the retained source and keep
+the imported subtree movable as one object.
+
+Gradients, patterns, clip paths, masks, and filters are not evaluated. Stylesheet
+blocks, event-handler attributes, scripts, and SVG animation elements are
+ignored with warnings. External image URLs and other resource references are
+also omitted. No script, animation, stylesheet, or resource is executed,
+inserted into a live DOM, or fetched during import. The retained source asset is
+input data for provenance and future re-import, not executable document content.
+
 ## Input safety and failures
 
 The parser accepts at most 16 MiB of UTF-8 input. XML, numeric attributes,
 transforms, path data, and embedded image data are validated before they enter
-the result. Scripts, animation, definitions, metadata, and unsupported elements
-are ignored or reported as warnings; they are never executed or fetched.
+the result. Malformed input returns an error rather than a partial import.

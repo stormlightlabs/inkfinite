@@ -56,20 +56,21 @@ Completed work is in [CHANGELOG.md](CHANGELOG.md).
 
 #### Unsupported content and security
 
-- [ ] Preserve original SVG source as an asset
-- [ ] Define warnings for unsupported SVG features
-- [ ] Define opaque fallback behavior for unsupported visual subtrees
-- [ ] Handle gradients explicitly
-- [ ] Handle clip paths explicitly
-- [ ] Handle masks explicitly
-- [ ] Handle filters explicitly
-- [ ] Reject or ignore scripts and animation explicitly
+- [x] Preserve original SVG source as an asset
+- [x] Define warnings for unsupported SVG features
+- [x] Define opaque fallback behavior for unsupported visual subtrees
+- [x] Handle gradients explicitly
+- [x] Handle clip paths explicitly
+- [x] Handle masks explicitly
+- [x] Handle filters explicitly
+- [x] Reject or ignore scripts and animation explicitly
 
 #### Transactions and entry points
 
 - [ ] Commit imports through one validated transaction
 - [ ] Add desktop SVG file import
-- [ ] Add drag-and-drop SVG import
+- [ ] Add web-app SVG file import
+  - [ ] Add drag-and-drop SVG import
 - [ ] Add CLI SVG import
 
 #### Import fixtures

@@ -28,13 +28,11 @@ SVG import should map supported elements onto native Inkfinite concepts:
 - fills, strokes, opacity, and other supported styles become native style data
 - embedded images become assets
 
-The original SVG source may be retained as an asset for provenance, fallback,
-and future re-import.
+The original SVG source is retained as an asset for provenance, future
+re-import, and fallback handling.
 
-Unsupported SVG features should degrade explicitly rather than silently
-disappear. Content that cannot yet be represented natively may use an opaque
-SVG-backed fallback while remaining movable, scalable, rotatable, and
-deletable like other Inkfinite content.
+Unsupported SVG features should be reported explicitly and preserve a path to
+opaque fallback rather than silently disappearing.
 
 SVG interoperability must use the same transaction, persistence, undo/redo,
 CRDT, desktop, and CLI paths as content created directly in Inkfinite.

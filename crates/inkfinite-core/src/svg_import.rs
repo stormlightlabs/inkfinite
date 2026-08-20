@@ -4,7 +4,8 @@
 //! an SVG document model. Groups retain their local transforms and become
 //! container candidates; supported vector elements become the corresponding
 //! native shape kinds. Raster images are extracted as embedded assets and kept
-//! as image nodes until the document model gains a native image shape.
+//! as image nodes until the document model gains a native image shape. The
+//! exact source is retained as a content-addressed SVG asset.
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -27,6 +28,185 @@ use crate::{
 /// Maximum UTF-8 input accepted by the SVG parser.
 pub const SVG_IMPORT_MAX_BYTES: usize = 16 * 1024 * 1024;
 
+#[derive(Clone, Copy)]
+enum PreviousSegment {
+    Cubic,
+    Quadratic,
+    Other,
+}
+
+/// An unsupported SVG feature identified during static import.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SvgUnsupportedFeature {
+    /// A linear, radial, or mesh gradient.
+    Gradient,
+    /// A pattern paint server.
+    Pattern,
+    /// A clip path definition or reference.
+    ClipPath,
+    /// A mask definition or reference.
+    Mask,
+    /// A filter definition or reference.
+    Filter,
+    /// Script content or an event handler.
+    Script,
+    /// SMIL animation content.
+    Animation,
+    /// An external resource reference.
+    ExternalResource,
+    /// A stylesheet that the static importer does not evaluate.
+    Stylesheet,
+}
+
+/// Action taken for unsupported SVG content during static import.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SvgUnsupportedAction {
+    /// Leave the content out of the normalized native tree.
+    Omitted,
+}
+
+impl fmt::Display for SvgUnsupportedFeature {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Gradient => "gradient",
+            Self::Pattern => "pattern",
+            Self::ClipPath => "clip path",
+            Self::Mask => "mask",
+            Self::Filter => "filter",
+            Self::Script => "script or event handler",
+            Self::Animation => "animation",
+            Self::ExternalResource => "external resource",
+            Self::Stylesheet => "stylesheet",
+        })
+    }
+}
+
+impl fmt::Display for SvgUnsupportedAction {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Omitted => "omitted from native tree",
+        })
+    }
+}
+
+/// A non-fatal condition encountered while importing an SVG.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SvgImportWarning {
+    /// An SVG element was skipped because it has no native mapping in this slice.
+    UnsupportedElement {
+        /// Element name.
+        element: String,
+        /// Source element ID, when present.
+        source_id: Option<String>,
+        /// Reason for skipping it.
+        reason: String,
+    },
+    /// A named SVG feature is intentionally excluded from the static native tree.
+    UnsupportedFeature {
+        /// Unsupported SVG feature.
+        feature: SvgUnsupportedFeature,
+        /// Element name.
+        element: String,
+        /// Source element ID, when present.
+        source_id: Option<String>,
+        /// Action taken by the importer.
+        action: SvgUnsupportedAction,
+    },
+    /// A paint value cannot be represented by native color properties.
+    UnsupportedPaint {
+        /// Element name.
+        element: String,
+        /// Paint property name.
+        property: String,
+        /// Original paint value.
+        value: String,
+    },
+}
+
+impl fmt::Display for SvgImportWarning {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnsupportedElement { element, source_id, reason } => {
+                write!(formatter, "skipped SVG element <{element}>")?;
+                if let Some(source_id) = source_id {
+                    write!(formatter, " ({source_id})")?;
+                }
+                write!(formatter, ": {reason}")
+            }
+            Self::UnsupportedFeature { feature, element, source_id, action } => {
+                write!(formatter, "skipped SVG {feature} on <{element}>")?;
+                if let Some(source_id) = source_id {
+                    write!(formatter, " ({source_id})")?;
+                }
+                write!(formatter, ": {action}")
+            }
+            Self::UnsupportedPaint { element, property, value } => {
+                write!(formatter, "skipped SVG {property} paint on <{element}>: {value}")
+            }
+        }
+    }
+}
+
+/// A failure at the SVG parsing or native mapping edge.
+#[derive(Debug, Error, PartialEq)]
+pub enum SvgImportError {
+    /// The input exceeded the parser's input limit.
+    #[error("SVG input exceeds the {limit}-byte limit")]
+    InputTooLarge {
+        /// Maximum accepted input size.
+        limit: usize,
+    },
+    /// The input was not UTF-8.
+    #[error("SVG input is not UTF-8: {0}")]
+    InvalidUtf8(String),
+    /// The XML document could not be parsed.
+    #[error("SVG XML is invalid: {0}")]
+    Xml(String),
+    /// The document did not have an SVG root element.
+    #[error("SVG document must have an <svg> root element")]
+    MissingRoot,
+    /// A numeric or style attribute could not be parsed.
+    #[error("invalid SVG {attribute} on <{element}>: {value}")]
+    InvalidAttribute {
+        /// Element carrying the attribute.
+        element: String,
+        /// Attribute name.
+        attribute: String,
+        /// Invalid source value.
+        value: String,
+    },
+    /// Path data could not be normalized into native segments.
+    #[error("invalid SVG path on <{element}>: {message}")]
+    InvalidPath {
+        /// Element carrying the path.
+        element: String,
+        /// Normalization failure.
+        message: String,
+    },
+    /// A transform cannot be represented by the native rotate/scale model.
+    #[error("unsupported SVG transform on <{element}>: {message}")]
+    UnsupportedTransform {
+        /// Element carrying the transform.
+        element: String,
+        /// Transform limitation.
+        message: String,
+    },
+    /// An embedded image data URL could not be decoded.
+    #[error("invalid embedded SVG image on <{element}>: {message}")]
+    InvalidImage {
+        /// Element carrying the image.
+        element: String,
+        /// Image decoding failure.
+        message: String,
+    },
+}
+
+#[derive(Clone, Copy)]
+enum Axis {
+    Horizontal,
+    Vertical,
+}
+
 /// A view box declared by the source SVG.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SvgViewBox {
@@ -40,7 +220,7 @@ pub struct SvgViewBox {
     pub height: f64,
 }
 
-/// A parsed SVG image asset.
+/// A parsed SVG asset, either the original source or embedded raster data.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SvgAsset {
     /// Deterministic asset identifier derived from the bytes.
@@ -51,7 +231,7 @@ pub struct SvgAsset {
     pub media_type: String,
     /// Content digest including its algorithm prefix.
     pub digest: String,
-    /// Embedded image bytes.
+    /// Embedded asset bytes.
     pub bytes: Vec<u8>,
 }
 
@@ -146,157 +326,58 @@ pub struct SvgImport {
     pub view_box: Option<SvgViewBox>,
     /// Root group containing the source SVG's visual children.
     pub root: SvgGroup,
+    /// The original source retained for provenance and future fallback or re-import.
+    pub source_asset: SvgAsset,
     /// Embedded raster assets referenced by image nodes.
     pub assets: Vec<SvgAsset>,
     /// Non-fatal features skipped during parsing.
     pub warnings: Vec<SvgImportWarning>,
 }
 
-/// A non-fatal condition encountered while importing an SVG.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum SvgImportWarning {
-    /// An SVG element was skipped because it has no native mapping in this slice.
-    UnsupportedElement {
-        /// Element name.
-        element: String,
-        /// Source element ID, when present.
-        source_id: Option<String>,
-        /// Reason for skipping it.
-        reason: String,
-    },
-    /// A paint value cannot be represented by native color properties.
-    UnsupportedPaint {
-        /// Element name.
-        element: String,
-        /// Paint property name.
-        property: String,
-        /// Original paint value.
-        value: String,
-    },
+#[derive(Clone)]
+struct SvgStyle {
+    fill: Option<String>,
+    stroke: Option<String>,
+    stroke_width: f64,
+    fill_opacity: f32,
+    stroke_opacity: f32,
+    opacity: f32,
+    fill_rule: PathFillRule,
+    font_size: f64,
+    font_family: String,
+    visible: bool,
 }
 
-impl fmt::Display for SvgImportWarning {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::UnsupportedElement { element, source_id, reason } => {
-                write!(formatter, "skipped SVG element <{element}>")?;
-                if let Some(source_id) = source_id {
-                    write!(formatter, " ({source_id})")?;
-                }
-                write!(formatter, ": {reason}")
-            }
-            Self::UnsupportedPaint { element, property, value } => {
-                write!(formatter, "skipped SVG {property} paint on <{element}>: {value}")
-            }
+impl Default for SvgStyle {
+    fn default() -> Self {
+        Self {
+            fill: Some("#000000".into()),
+            stroke: None,
+            stroke_width: 1.0,
+            fill_opacity: 1.0,
+            stroke_opacity: 1.0,
+            opacity: 1.0,
+            fill_rule: PathFillRule::NonZero,
+            font_size: 16.0,
+            font_family: "sans-serif".into(),
+            visible: true,
         }
     }
 }
 
-/// A failure at the SVG parsing or native mapping edge.
-#[derive(Debug, Error, PartialEq)]
-pub enum SvgImportError {
-    /// The input exceeded the parser's input limit.
-    #[error("SVG input exceeds the {limit}-byte limit")]
-    InputTooLarge {
-        /// Maximum accepted input size.
-        limit: usize,
-    },
-    /// The input was not UTF-8.
-    #[error("SVG input is not UTF-8: {0}")]
-    InvalidUtf8(String),
-    /// The XML document could not be parsed.
-    #[error("SVG XML is invalid: {0}")]
-    Xml(String),
-    /// The document did not have an SVG root element.
-    #[error("SVG document must have an <svg> root element")]
-    MissingRoot,
-    /// A numeric or style attribute could not be parsed.
-    #[error("invalid SVG {attribute} on <{element}>: {value}")]
-    InvalidAttribute {
-        /// Element carrying the attribute.
-        element: String,
-        /// Attribute name.
-        attribute: String,
-        /// Invalid source value.
-        value: String,
-    },
-    /// Path data could not be normalized into native segments.
-    #[error("invalid SVG path on <{element}>: {message}")]
-    InvalidPath {
-        /// Element carrying the path.
-        element: String,
-        /// Normalization failure.
-        message: String,
-    },
-    /// A transform cannot be represented by the native rotate/scale model.
-    #[error("unsupported SVG transform on <{element}>: {message}")]
-    UnsupportedTransform {
-        /// Element carrying the transform.
-        element: String,
-        /// Transform limitation.
-        message: String,
-    },
-    /// An embedded image data URL could not be decoded.
-    #[error("invalid embedded SVG image on <{element}>: {message}")]
-    InvalidImage {
-        /// Element carrying the image.
-        element: String,
-        /// Image decoding failure.
-        message: String,
-    },
-}
-
-/// Parses SVG text into normalized native mapping records.
-///
-/// The parser is static and does not resolve external resources. Supported
-/// vector elements are mapped to native shape properties, groups retain local
-/// transforms, simple text becomes a native text shape, and embedded raster
-/// images become [`SvgAsset`] records.
-///
-/// # Errors
-///
-/// Returns [`SvgImportError`] when XML, geometry, numeric attributes, or an
-/// embedded image cannot be represented.
-pub fn parse_svg(source: &str) -> Result<SvgImport, SvgImportError> {
-    if source.len() > SVG_IMPORT_MAX_BYTES {
-        return Err(SvgImportError::InputTooLarge { limit: SVG_IMPORT_MAX_BYTES });
+impl SvgStyle {
+    fn native_style(&self) -> Result<ShapeStyle, SvgImportError> {
+        Ok(ShapeStyle {
+            opacity: Opacity::new(self.opacity).map_err(|error| invalid_style("opacity", error.to_string()))?,
+            fill_opacity: Some(
+                Opacity::new(self.fill_opacity).map_err(|error| invalid_style("fill-opacity", error.to_string()))?,
+            ),
+            stroke_opacity: Some(
+                Opacity::new(self.stroke_opacity)
+                    .map_err(|error| invalid_style("stroke-opacity", error.to_string()))?,
+            ),
+        })
     }
-    let document = XmlDocument::parse(source).map_err(|error| SvgImportError::Xml(error.to_string()))?;
-    let root = document.root_element();
-    if local_name(root) != "svg" {
-        return Err(SvgImportError::MissingRoot);
-    }
-
-    let view_box = root
-        .attribute("viewBox")
-        .map(|value| parse_view_box(value, "svg", "viewBox"))
-        .transpose()?;
-    let mut parser = ImportParser { assets: Vec::new(), warnings: Vec::new(), view_box };
-    let root_style = resolve_style(&SvgStyle::default(), root, &mut parser.warnings)?;
-    let children = parser.children(root, &root_style)?;
-    let root_transform = parser.transform(root)?;
-    let root_group = SvgGroup {
-        source_id: source_id(root),
-        transform: root_transform,
-        style: root_style.native_style()?,
-        properties: group_properties(&children),
-        children,
-    };
-    Ok(SvgImport { view_box, root: root_group, assets: parser.assets, warnings: parser.warnings })
-}
-
-/// Imports SVG text or UTF-8 bytes through the shared SVG import edge.
-///
-/// This convenience entry point accepts both `&str` and byte slices so file,
-/// desktop, and CLI callers can share the parser.
-///
-/// # Errors
-///
-/// Returns [`SvgImportError`] when [`parse_svg`] rejects the source.
-pub fn import_svg(source: impl AsRef<[u8]>) -> Result<SvgImport, SvgImportError> {
-    let source =
-        std::str::from_utf8(source.as_ref()).map_err(|error| SvgImportError::InvalidUtf8(error.to_string()))?;
-    parse_svg(source)
 }
 
 struct ImportParser {
@@ -319,6 +400,7 @@ impl ImportParser {
         &mut self, node: Node<'a, 'input>, parent_style: &SvgStyle,
     ) -> Result<Option<SvgImportNode>, SvgImportError> {
         let element = local_name(node).to_owned();
+        self.warn_event_handlers(node);
         let style = resolve_style(parent_style, node, &mut self.warnings)?;
         if !style.visible {
             return Ok(None);
@@ -345,9 +427,41 @@ impl ImportParser {
             "path" => Ok(Some(SvgImportNode::Shape(self.path(node, &style)?))),
             "text" => Ok(Some(SvgImportNode::Shape(self.text(node, &style)?))),
             "image" => self.image(node, &style).map(|image| image.map(SvgImportNode::Image)),
-            "defs" | "metadata" | "title" | "desc" | "style" => Ok(None),
-            "script" | "animate" | "animateMotion" | "animateTransform" | "set" => {
-                self.warn_unsupported(node, "static import ignores scripts and animation");
+            "defs" => {
+                self.warn_definition_features(node);
+                Ok(None)
+            }
+            "metadata" | "title" | "desc" => Ok(None),
+            "style" => {
+                self.warn_feature(node, SvgUnsupportedFeature::Stylesheet, SvgUnsupportedAction::Omitted);
+                Ok(None)
+            }
+            "linearGradient" | "radialGradient" | "meshgradient" => {
+                self.warn_feature(node, SvgUnsupportedFeature::Gradient, SvgUnsupportedAction::Omitted);
+                Ok(None)
+            }
+            "pattern" => {
+                self.warn_feature(node, SvgUnsupportedFeature::Pattern, SvgUnsupportedAction::Omitted);
+                Ok(None)
+            }
+            "clipPath" => {
+                self.warn_feature(node, SvgUnsupportedFeature::ClipPath, SvgUnsupportedAction::Omitted);
+                Ok(None)
+            }
+            "mask" => {
+                self.warn_feature(node, SvgUnsupportedFeature::Mask, SvgUnsupportedAction::Omitted);
+                Ok(None)
+            }
+            "filter" => {
+                self.warn_feature(node, SvgUnsupportedFeature::Filter, SvgUnsupportedAction::Omitted);
+                Ok(None)
+            }
+            "script" => {
+                self.warn_feature(node, SvgUnsupportedFeature::Script, SvgUnsupportedAction::Omitted);
+                Ok(None)
+            }
+            "animate" | "animateMotion" | "animateTransform" | "set" | "discard" => {
+                self.warn_feature(node, SvgUnsupportedFeature::Animation, SvgUnsupportedAction::Omitted);
                 Ok(None)
             }
             _ => {
@@ -545,10 +659,18 @@ impl ImportParser {
         let Some((media_type, bytes)) = decode_raster_data_url(href)
             .map_err(|message| SvgImportError::InvalidImage { element: local_name(node).into(), message })?
         else {
-            self.warn_unsupported(node, "only embedded raster data URLs are imported");
+            if !href.starts_with("data:") {
+                self.warn_feature(
+                    node,
+                    SvgUnsupportedFeature::ExternalResource,
+                    SvgUnsupportedAction::Omitted,
+                );
+            } else {
+                self.warn_unsupported(node, "only embedded raster data URLs are imported");
+            }
             return Ok(None);
         };
-        let asset = make_asset(media_type, bytes);
+        let asset = make_asset(media_type, bytes, "image");
         let asset_id = asset.id.clone();
         if !self.assets.iter().any(|candidate| candidate.id == asset_id) {
             self.assets.push(asset);
@@ -632,58 +754,113 @@ impl ImportParser {
             reason: reason.into(),
         });
     }
-}
 
-#[derive(Clone, Copy)]
-enum Axis {
-    Horizontal,
-    Vertical,
-}
+    fn warn_feature<'a, 'input>(
+        &mut self, node: Node<'a, 'input>, feature: SvgUnsupportedFeature, action: SvgUnsupportedAction,
+    ) {
+        self.warnings.push(SvgImportWarning::UnsupportedFeature {
+            feature,
+            element: local_name(node).into(),
+            source_id: source_id(node),
+            action,
+        });
+    }
 
-#[derive(Clone)]
-struct SvgStyle {
-    fill: Option<String>,
-    stroke: Option<String>,
-    stroke_width: f64,
-    fill_opacity: f32,
-    stroke_opacity: f32,
-    opacity: f32,
-    fill_rule: PathFillRule,
-    font_size: f64,
-    font_family: String,
-    visible: bool,
-}
+    fn warn_definition_features<'a, 'input>(&mut self, node: Node<'a, 'input>) {
+        for descendant in node.descendants().filter(|descendant| descendant.is_element()) {
+            self.warn_event_handlers(descendant);
+            let feature = match local_name(descendant) {
+                "linearGradient" | "radialGradient" | "meshgradient" => Some(SvgUnsupportedFeature::Gradient),
+                "pattern" => Some(SvgUnsupportedFeature::Pattern),
+                "clipPath" => Some(SvgUnsupportedFeature::ClipPath),
+                "mask" => Some(SvgUnsupportedFeature::Mask),
+                "filter" => Some(SvgUnsupportedFeature::Filter),
+                "script" => Some(SvgUnsupportedFeature::Script),
+                "animate" | "animateMotion" | "animateTransform" | "set" | "discard" => {
+                    Some(SvgUnsupportedFeature::Animation)
+                }
+                "style" => Some(SvgUnsupportedFeature::Stylesheet),
+                _ => None,
+            };
+            if let Some(feature) = feature {
+                self.warn_feature(descendant, feature, SvgUnsupportedAction::Omitted);
+            }
+        }
+    }
 
-impl Default for SvgStyle {
-    fn default() -> Self {
-        Self {
-            fill: Some("#000000".into()),
-            stroke: None,
-            stroke_width: 1.0,
-            fill_opacity: 1.0,
-            stroke_opacity: 1.0,
-            opacity: 1.0,
-            fill_rule: PathFillRule::NonZero,
-            font_size: 16.0,
-            font_family: "sans-serif".into(),
-            visible: true,
+    fn warn_event_handlers<'a, 'input>(&mut self, node: Node<'a, 'input>) {
+        for attribute in node.attributes() {
+            let name = attribute.name().as_bytes();
+            if name.len() >= 2 && name[0].eq_ignore_ascii_case(&b'o') && name[1].eq_ignore_ascii_case(&b'n') {
+                self.warn_feature(node, SvgUnsupportedFeature::Script, SvgUnsupportedAction::Omitted);
+            }
         }
     }
 }
 
-impl SvgStyle {
-    fn native_style(&self) -> Result<ShapeStyle, SvgImportError> {
-        Ok(ShapeStyle {
-            opacity: Opacity::new(self.opacity).map_err(|error| invalid_style("opacity", error.to_string()))?,
-            fill_opacity: Some(
-                Opacity::new(self.fill_opacity).map_err(|error| invalid_style("fill-opacity", error.to_string()))?,
-            ),
-            stroke_opacity: Some(
-                Opacity::new(self.stroke_opacity)
-                    .map_err(|error| invalid_style("stroke-opacity", error.to_string()))?,
-            ),
-        })
+#[derive(Clone, Copy)]
+struct SvgArc {
+    rx: f64,
+    ry: f64,
+    x_axis_rotation: f64,
+    large_arc: bool,
+    sweep: bool,
+}
+
+/// Parses SVG text into normalized native mapping records.
+///
+/// The parser is static and does not resolve external resources. Supported
+/// vector elements are mapped to native shape properties, groups retain local
+/// transforms, simple text becomes a native text shape, embedded raster images
+/// become [`SvgAsset`] records, and the original source is retained as an
+/// `image/svg+xml` asset.
+///
+/// # Errors
+///
+/// Returns [`SvgImportError`] when XML, geometry, numeric attributes, or an
+/// embedded image cannot be represented.
+pub fn parse_svg(source: &str) -> Result<SvgImport, SvgImportError> {
+    if source.len() > SVG_IMPORT_MAX_BYTES {
+        return Err(SvgImportError::InputTooLarge { limit: SVG_IMPORT_MAX_BYTES });
     }
+    let document = XmlDocument::parse(source).map_err(|error| SvgImportError::Xml(error.to_string()))?;
+    let root = document.root_element();
+    if local_name(root) != "svg" {
+        return Err(SvgImportError::MissingRoot);
+    }
+
+    let view_box = root
+        .attribute("viewBox")
+        .map(|value| parse_view_box(value, "svg", "viewBox"))
+        .transpose()?;
+    let source_asset = make_source_asset(source.as_bytes());
+    let mut parser = ImportParser { assets: Vec::new(), warnings: Vec::new(), view_box };
+    parser.warn_event_handlers(root);
+    let root_style = resolve_style(&SvgStyle::default(), root, &mut parser.warnings)?;
+    let children = parser.children(root, &root_style)?;
+    let root_transform = parser.transform(root)?;
+    let root_group = SvgGroup {
+        source_id: source_id(root),
+        transform: root_transform,
+        style: root_style.native_style()?,
+        properties: group_properties(&children),
+        children,
+    };
+    Ok(SvgImport { view_box, root: root_group, source_asset, assets: parser.assets, warnings: parser.warnings })
+}
+
+/// Imports SVG text or UTF-8 bytes through the shared SVG import edge.
+///
+/// This convenience entry point accepts both `&str` and byte slices so file,
+/// desktop, and CLI callers can share the parser.
+///
+/// # Errors
+///
+/// Returns [`SvgImportError`] when [`parse_svg`] rejects the source.
+pub fn import_svg(source: impl AsRef<[u8]>) -> Result<SvgImport, SvgImportError> {
+    let source =
+        std::str::from_utf8(source.as_ref()).map_err(|error| SvgImportError::InvalidUtf8(error.to_string()))?;
+    parse_svg(source)
 }
 
 fn resolve_style<'a, 'input>(
@@ -728,6 +905,30 @@ fn resolve_style<'a, 'input>(
                 }
             }
             "font-family" => style.font_family = first_font_family(value),
+            "clip-path" if value.trim_start().starts_with("url(") => {
+                warnings.push(SvgImportWarning::UnsupportedFeature {
+                    feature: SvgUnsupportedFeature::ClipPath,
+                    element: local_name(node).into(),
+                    source_id: source_id(node),
+                    action: SvgUnsupportedAction::Omitted,
+                });
+            }
+            "mask" if value.trim_start().starts_with("url(") => {
+                warnings.push(SvgImportWarning::UnsupportedFeature {
+                    feature: SvgUnsupportedFeature::Mask,
+                    element: local_name(node).into(),
+                    source_id: source_id(node),
+                    action: SvgUnsupportedAction::Omitted,
+                });
+            }
+            "filter" if value.trim_start().starts_with("url(") => {
+                warnings.push(SvgImportWarning::UnsupportedFeature {
+                    feature: SvgUnsupportedFeature::Filter,
+                    element: local_name(node).into(),
+                    source_id: source_id(node),
+                    action: SvgUnsupportedAction::Omitted,
+                });
+            }
             "display" if value.trim() == "none" => style.visible = false,
             "visibility" if matches!(value.trim(), "hidden" | "collapse") => style.visible = false,
             _ => {}
@@ -1137,13 +1338,6 @@ fn normalize_path(value: &str, fill_rule: PathFillRule) -> Result<PathGeometry, 
     Ok(PathGeometry { subpaths, fill_rule })
 }
 
-#[derive(Clone, Copy)]
-enum PreviousSegment {
-    Cubic,
-    Quadratic,
-    Other,
-}
-
 fn point(abs: bool, x: f64, y: f64, current: Vec2) -> Vec2 {
     if abs { Vec2 { x, y } } else { Vec2 { x: current.x + x, y: current.y + y } }
 }
@@ -1162,15 +1356,6 @@ fn current_subpath(subpaths: &mut [PathSubpath]) -> Result<&mut PathSubpath, Str
     subpaths
         .last_mut()
         .ok_or_else(|| "path command appeared before a move command".into())
-}
-
-#[derive(Clone, Copy)]
-struct SvgArc {
-    rx: f64,
-    ry: f64,
-    x_axis_rotation: f64,
-    large_arc: bool,
-    sweep: bool,
 }
 
 fn append_arc(segments: &mut Vec<NativePathSegment>, start: Vec2, end: Vec2, arc: SvgArc) {
@@ -1314,13 +1499,18 @@ fn hex_digit(value: u8) -> Option<u8> {
     }
 }
 
-fn make_asset(media_type: String, bytes: Vec<u8>) -> SvgAsset {
+fn make_source_asset(bytes: &[u8]) -> SvgAsset {
+    make_asset("image/svg+xml".into(), bytes.to_vec(), "source")
+}
+
+fn make_asset(media_type: String, bytes: Vec<u8>, prefix: &str) -> SvgAsset {
     let digest_bytes = Sha256::digest(&bytes);
     let hex = digest_bytes
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect::<String>();
     let extension = match media_type.as_str() {
+        "image/svg+xml" => "svg",
         "image/jpeg" => "jpg",
         "image/gif" => "gif",
         "image/webp" => "webp",
@@ -1328,7 +1518,7 @@ fn make_asset(media_type: String, bytes: Vec<u8>) -> SvgAsset {
     };
     SvgAsset {
         id: AssetId::from(format!("asset:sha256-{hex}")),
-        name: format!("image-{hex}.{extension}"),
+        name: format!("{prefix}-{hex}.{extension}"),
         media_type,
         digest: format!("sha256:{hex}"),
         bytes,
@@ -1435,6 +1625,27 @@ mod tests {
     }
 
     #[test]
+    fn retains_original_source_as_a_content_addressed_asset() {
+        let source = r#"<svg onload="alert(1)"><rect width="10" height="20"/></svg>"#;
+        let import = parse_svg(source).expect("SVG should import");
+
+        assert_eq!(import.source_asset.media_type, "image/svg+xml");
+        assert_eq!(import.source_asset.bytes, source.as_bytes());
+        assert_eq!(
+            import.source_asset.name,
+            format!("source-{}.svg", &import.source_asset.digest[7..])
+        );
+        assert_eq!(
+            import.source_asset.id.as_str(),
+            format!("asset:sha256-{}", &import.source_asset.digest[7..])
+        );
+        assert!(import.warnings.iter().any(|warning| matches!(
+            warning,
+            SvgImportWarning::UnsupportedFeature { feature: SvgUnsupportedFeature::Script, .. }
+        )));
+    }
+
+    #[test]
     fn extracts_and_deduplicates_embedded_raster_assets() {
         let source = base64::engine::general_purpose::STANDARD.encode([137_u8, 80, 78, 71]);
         let svg = format!(
@@ -1465,13 +1676,51 @@ mod tests {
     }
 
     #[test]
-    fn skips_scripts_external_images_and_unsupported_paints() {
+    fn reports_unsupported_features_without_executing_or_fetching_them() {
         let import = parse_svg(
-            r#"<svg><script>alert(1)</script><image href="https://example.com/a.png"/><path fill="url(#gradient)" d="M0 0L1 1"/></svg>"#,
+            r##"<svg onload="alert(1)">
+                <defs>
+                    <linearGradient id="gradient"/>
+                    <clipPath id="clip"/>
+                    <mask id="mask"/>
+                    <filter id="filter"/>
+                </defs>
+                <script>alert(1)</script>
+                <animate attributeName="x"/>
+                <image href="https://example.com/a.png"/>
+                <path clip-path="url(#clip)" mask="url(#mask)" filter="url(#filter)" fill="url(#gradient)" d="M0 0L1 1"/>
+            </svg>"##,
         )
         .expect("unsupported content should be reported");
         assert_eq!(import.root.children.len(), 1);
-        assert_eq!(import.warnings.len(), 3);
+        assert!(import.warnings.iter().any(|warning| matches!(
+            warning,
+            SvgImportWarning::UnsupportedFeature { feature: SvgUnsupportedFeature::Gradient, .. }
+        )));
+        assert!(import.warnings.iter().any(|warning| matches!(
+            warning,
+            SvgImportWarning::UnsupportedFeature { feature: SvgUnsupportedFeature::ClipPath, .. }
+        )));
+        assert!(import.warnings.iter().any(|warning| matches!(
+            warning,
+            SvgImportWarning::UnsupportedFeature { feature: SvgUnsupportedFeature::Mask, .. }
+        )));
+        assert!(import.warnings.iter().any(|warning| matches!(
+            warning,
+            SvgImportWarning::UnsupportedFeature { feature: SvgUnsupportedFeature::Filter, .. }
+        )));
+        assert!(import.warnings.iter().any(|warning| matches!(
+            warning,
+            SvgImportWarning::UnsupportedFeature { feature: SvgUnsupportedFeature::Script, .. }
+        )));
+        assert!(import.warnings.iter().any(|warning| matches!(
+            warning,
+            SvgImportWarning::UnsupportedFeature { feature: SvgUnsupportedFeature::Animation, .. }
+        )));
+        assert!(import.warnings.iter().any(|warning| matches!(
+            warning,
+            SvgImportWarning::UnsupportedFeature { feature: SvgUnsupportedFeature::ExternalResource, .. }
+        )));
         assert!(
             import
                 .warnings
