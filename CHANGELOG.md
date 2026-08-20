@@ -38,6 +38,9 @@
 
 - Native path shape representation with normalized move, line, quadratic, and
   cubic subpaths, closed-path flags, compound fill rules, and generated bindings.
+- Static SVG import parsing with native primitive and path mapping, nested
+  transforms, inherited paint and opacity, text flattening, and embedded raster
+  asset extraction.
 - Native path bounds with Bézier extrema, Canvas rendering, fill and stroke hit
   testing, parent-relative transforms, deterministic SVG output, and shared
   valid/invalid geometry fixtures.

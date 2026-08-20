@@ -37,22 +37,22 @@ Completed work is in [CHANGELOG.md](CHANGELOG.md).
 
 #### Parsing and native mapping
 
-- [ ] Add an SVG import boundary
-- [ ] Parse SVG into a normalized intermediate representation
-- [ ] Import `<g>` as containers
-- [ ] Import `<rect>` as rect shapes
-- [ ] Import `<circle>` as ellipse shapes
-- [ ] Import `<ellipse>` as ellipse shapes
-- [ ] Import `<line>` as line shapes
-- [ ] Import `<polygon>` as path shapes
-- [ ] Import `<polyline>` as path shapes
-- [ ] Import `<path>` as path shapes
-- [ ] Preserve nested transforms
-- [ ] Preserve supported fill styles
-- [ ] Preserve supported stroke styles
-- [ ] Preserve opacity
-- [ ] Define SVG text import behavior
-- [ ] Import supported embedded raster images as assets
+- [x] Add an SVG import boundary
+- [x] Parse SVG into a normalized intermediate representation
+- [x] Import `<g>` as containers
+- [x] Import `<rect>` as rect shapes
+- [x] Import `<circle>` as ellipse shapes
+- [x] Import `<ellipse>` as ellipse shapes
+- [x] Import `<line>` as line shapes
+- [x] Import `<polygon>` as path shapes
+- [x] Import `<polyline>` as path shapes
+- [x] Import `<path>` as path shapes
+- [x] Preserve nested transforms
+- [x] Preserve supported fill styles
+- [x] Preserve supported stroke styles
+- [x] Preserve opacity
+- [x] Define SVG text import behavior
+- [x] Import supported embedded raster images as assets
 
 #### Unsupported content and security
 

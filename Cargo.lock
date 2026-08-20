@@ -2119,12 +2119,16 @@ name = "inkfinite-core"
 version = "0.0.0"
 dependencies = [
  "automerge",
+ "base64 0.22.1",
  "getrandom 0.4.3",
  "perfect_freehand",
  "proptest",
+ "roxmltree 0.21.1",
  "schemars 1.2.1",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
+ "svgtypes",
  "thiserror 2.0.18",
  "tokio",
  "ts-rs",

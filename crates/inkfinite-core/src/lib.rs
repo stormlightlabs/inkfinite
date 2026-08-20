@@ -9,6 +9,7 @@ pub mod ipc;
 pub mod proto;
 pub mod render;
 pub mod session;
+pub mod svg_import;
 pub mod sync;
 
 use std::collections::BTreeMap;

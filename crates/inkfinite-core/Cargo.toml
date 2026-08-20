@@ -8,11 +8,15 @@ version.workspace = true
 
 [dependencies]
 automerge.workspace = true
+base64.workspace = true
 perfect_freehand.workspace = true
+roxmltree.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 getrandom.workspace = true
+sha2.workspace = true
+svgtypes.workspace = true
 tokio.workspace = true
 ts-rs.workspace = true
 thiserror.workspace = true

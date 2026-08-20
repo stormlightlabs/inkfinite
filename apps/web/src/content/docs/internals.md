@@ -69,7 +69,8 @@ and `.inkfinite` file.
 
 For the durable record structure, see [Documents](/docs/concepts/documents/). The [native path
 geometry guide](/docs/internals/native-path-geometry/) documents the path representation used by
-SVG interoperability and future vector editing.
+SVG interoperability and future vector editing. The [SVG import guide](/docs/internals/svg-import/)
+documents the parser's native mappings, transform rules, styles, text behavior, and asset handling.
 
 ## Edit flow
 
