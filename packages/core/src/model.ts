@@ -373,16 +373,6 @@ export const BindingRecord = {
 	}
 };
 
-/** A retained group imported from an external document. */
-export type ImportedGroup = {
-	id: string;
-	sourceId?: string;
-	parentId?: string;
-	transform: { translation: Vec2; rotation: number; scale_x: number; scale_y: number };
-	style: { opacity: number; fill_opacity: number | null; stroke_opacity: number | null };
-	properties: Record<string, unknown>;
-};
-
 /** A retained binary asset imported from an external document. */
 export type ImportedAsset = { id: string; name: string; mediaType: string; digest: string; bytes: number[] };
 
@@ -392,8 +382,6 @@ export type Document = {
 	layers?: Record<string, LayerRecord>;
 	/** Binary assets retained by interchange imports. */
 	assets?: Record<string, ImportedAsset>;
-	/** SVG group hierarchy retained by interchange imports. */
-	svgGroups?: Record<string, ImportedGroup>;
 	shapes: Record<string, ShapeRecord>;
 	bindings: Record<string, BindingRecord>;
 };
@@ -425,21 +413,6 @@ export const Document = {
 							Object.entries(document.assets).map(([id, asset]) => [
 								id,
 								{ ...asset, bytes: [...asset.bytes] }
-							])
-						)
-					}
-				: {}),
-			...(document.svgGroups
-				? {
-						svgGroups: Object.fromEntries(
-							Object.entries(document.svgGroups).map(([id, group]) => [
-								id,
-								{
-									...group,
-									transform: { ...group.transform, translation: { ...group.transform.translation } },
-									style: { ...group.style },
-									properties: { ...group.properties }
-								}
 							])
 						)
 					}

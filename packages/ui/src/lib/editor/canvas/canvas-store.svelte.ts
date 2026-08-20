@@ -21,7 +21,6 @@ import {
 	LayerRecord,
 	exportInterchange,
 	importInterchange,
-	importInterchangeAsync,
 	MarkdownTool,
 	PageRecord,
 	PenTool,
@@ -283,7 +282,7 @@ export function createCanvasController(
 		platformSession?.setActiveBoard?.(boardId);
 	}
 
-	function applyLoadedDoc(doc: LoadedDoc, fitDrawing = false) {
+	function applyLoadedDoc(doc: LoadedDoc, fitDrawing = false, syncCanonical = true) {
 		const firstPageId = doc.order.pageIds[0] ?? Object.keys(doc.pages)[0] ?? null;
 		store.setState((state) => ({
 			...state,
@@ -291,13 +290,25 @@ export function createCanvasController(
 				pages: doc.pages,
 				layers: doc.layers ?? doc.order.layers,
 				...(doc.assets ? { assets: doc.assets } : {}),
-				...(doc.svgGroups ? { svgGroups: doc.svgGroups } : {}),
 				shapes: doc.shapes,
 				bindings: doc.bindings
 			},
 			ui: { ...state.ui, currentPageId: firstPageId, selectionIds: [] }
 		}));
-		if (activeBoardId) platformSession?.setActiveDocument?.(activeBoardId, doc);
+		if (activeBoardId && syncCanonical) {
+			const boardId = activeBoardId;
+			const hydration = platformSession?.setActiveDocument?.(boardId, doc);
+			if (hydration) {
+				void hydration
+					.then((hydrated) => {
+						if (hydrated && activeBoardId === boardId)
+							applyLoadedDoc(hydrated, false, false);
+					})
+					.catch((error) =>
+						console.error('Failed to hydrate the Rust document projection', error)
+					);
+			}
+		}
 		if (fitDrawing) {
 			camera.fitAll();
 		}
@@ -486,9 +497,9 @@ export function createCanvasController(
 		name: string;
 		contents: string | Uint8Array;
 	}) {
-		if (!repo || !sink) return;
-		const importSvg = platformSession?.interchange?.importSvg;
-		if (!importSvg) throw new Error('The browser SVG importer is not available.');
+		if (!repo || !sink || !platformSession?.commitSvgImport) {
+			throw new Error('The browser document engine is not available.');
+		}
 		const size =
 			typeof source.contents === 'string'
 				? new TextEncoder().encode(source.contents).byteLength
@@ -496,12 +507,24 @@ export function createCanvasController(
 		if (size > 16 * 1024 * 1024) {
 			throw new Error('The SVG source is larger than the 16 MB import limit.');
 		}
-		const imported = await importInterchangeAsync(source.contents, source.name, importSvg);
+		const bytes =
+			typeof source.contents === 'string'
+				? new TextEncoder().encode(source.contents)
+				: source.contents;
 		await sink.flush();
-		const boardId = await repo.importBoard(imported.snapshot);
+		const boardName = source.name.replace(/\.[^.]+$/, '').trim() || 'Untitled Board';
+		const boardId = await repo.createBoard(boardName);
 		const doc = await repo.loadDoc(boardId);
 		setActiveBoardId(boardId);
 		applyLoadedDoc(doc, true);
+		const imported = await platformSession.commitSvgImport({
+			boardId,
+			source: bytes,
+			sourceName: source.name,
+			pageId: doc.order.pageIds[0],
+			layerId: doc.pages[doc.order.pageIds[0] ?? '']?.layerIds?.[0]
+		});
+		applyLoadedDoc(imported.doc, true);
 		interchangeNotice = {
 			title: 'SVG import complete',
 			message: `${source.name} is now an Inkfinite document.`,

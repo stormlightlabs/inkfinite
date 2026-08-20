@@ -53,13 +53,10 @@
   valid/invalid geometry fixtures.
 - SVG imports committed as one validated transaction from the desktop file menu,
   browser file and drop entry points, and the CLI.
-- Browser SVG imports use the Rust importer through a lazy WASM facade and
-  reusable worker. The normalized result retains groups, composed transforms,
-  styles, fill rules, source assets, embedded assets, warnings, and structured
-  failures before one IndexedDB board import.
+- Browser SVG imports use the Rust document session through a lazy WASM facade
+  and reusable worker.
 - Browser SVG exports project the current board into the canonical snapshot,
-  render it through the Rust SVG renderer in the shared worker, and preserve
-  warnings.
+  render it through the Rust SVG renderer in the shared worker, and preserve warnings.
 
 ### Changed
 
@@ -74,6 +71,9 @@
 - Desktop ordinary editor updates now use Rust reconciliation instead of
   deleting and recreating the native scene; full mirror replacement remains
   only for structural page and layer changes not yet covered by semantic patches.
+- Browser canonical state now caches the Rust editor projection with Automerge
+  bytes. The browser SVG projector and imported-group metadata were removed, and
+  WASM request and response payloads are generated from Rust.
 
 ### Fixed
 

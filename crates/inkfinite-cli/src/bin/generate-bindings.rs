@@ -10,6 +10,7 @@ use std::process::{Command, Stdio};
 use inkfinite_core::editor::*;
 use inkfinite_core::proto::*;
 use inkfinite_core::svg_import::*;
+use inkfinite_core::wasm::*;
 use inkfinite_core::*;
 use schemars::JsonSchema;
 use serde_json::{Value, json};
@@ -147,6 +148,7 @@ fn artifacts() -> Result<BTreeMap<PathBuf, String>, Box<dyn Error>> {
         svg_import_bindings(),
     );
     artifacts.insert(PathBuf::from("packages/bindings/src/editor.ts"), editor_bindings());
+    artifacts.insert(PathBuf::from("packages/bindings/src/wasm.ts"), wasm_bindings());
     artifacts.insert(PathBuf::from("packages/bindings/src/index.ts"), index_bindings());
     Ok(artifacts)
 }
@@ -316,9 +318,33 @@ fn editor_bindings() -> String {
     output
 }
 
+fn wasm_bindings() -> String {
+    let config = ts_config();
+    let mut output = GENERATED_TS_HEADER.to_owned();
+    output.push_str("import type { Bounds, CommitResult, TransactionDraft } from './transaction.js';\n");
+    output.push_str("import type { AssetId, DocumentSnapshot, ShapeId } from './model.js';\n");
+    output.push_str("import type { EditorProjection } from './editor.js';\n");
+    output.push_str("import type { SvgImport, SvgImportWarning } from './svg-import.js';\n\n");
+    append_declaration::<WasmDocumentSessionFailure>(&mut output, &config);
+    append_declaration::<WasmDocumentSessionState>(&mut output, &config);
+    append_clean_declaration::<WasmDocumentMutationResponse>(&mut output, &config);
+    append_declaration::<WasmSvgRenderOptions>(&mut output, &config);
+    append_declaration::<WasmSvgImportFailure>(&mut output, &config);
+    append_clean_declaration::<WasmSvgImportResponse>(&mut output, &config);
+    append_clean_declaration::<WasmSvgImportCommitResponse>(&mut output, &config);
+    append_declaration::<WasmSvgRenderWarning>(&mut output, &config);
+    append_declaration::<WasmSvgRenderFailure>(&mut output, &config);
+    append_clean_declaration::<WasmSvgRenderResponse>(&mut output, &config);
+    append_declaration::<WasmEditorProjectionFailure>(&mut output, &config);
+    append_clean_declaration::<WasmEditorProjectionResponse>(&mut output, &config);
+    append_declaration::<WasmEditorReconciliationFailure>(&mut output, &config);
+    append_clean_declaration::<WasmEditorReconciliationResponse>(&mut output, &config);
+    output
+}
+
 fn index_bindings() -> String {
     format!(
-        "{GENERATED_TS_HEADER}export * from './model.js';\nexport * from './protocol.js';\nexport * from './registry.js';\nexport * from './svg-import.js';\nexport * from './editor.js';\nexport * from './transaction.js';\n"
+        "{GENERATED_TS_HEADER}export * from './model.js';\nexport * from './protocol.js';\nexport * from './registry.js';\nexport * from './svg-import.js';\nexport * from './editor.js';\nexport * from './transaction.js';\nexport * from './wasm.js';\n"
     )
 }
 

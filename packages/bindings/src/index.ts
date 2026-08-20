@@ -7,3 +7,4 @@ export * from './registry.js';
 export * from './svg-import.js';
 export * from './editor.js';
 export * from './transaction.js';
+export * from './wasm.js';

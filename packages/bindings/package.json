@@ -8,7 +8,8 @@
 		"./model": "./src/model.ts",
 		"./editor": "./src/editor.ts",
 		"./transaction": "./src/transaction.ts",
-		"./svg-import": "./src/svg-import.ts"
+		"./svg-import": "./src/svg-import.ts",
+		"./wasm": "./src/wasm.ts"
 	},
 	"types": "./dist/index.d.ts",
 	"scripts": {

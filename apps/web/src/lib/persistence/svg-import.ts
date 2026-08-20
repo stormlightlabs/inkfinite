@@ -12,9 +12,12 @@ import type {
 	SvgRenderOptions,
 	SvgRenderResponse,
 	TransactionDraft,
-	DocumentSessionState
+	DocumentSessionState,
+	SvgImport,
+	SvgImportCommitResponse
 } from '@inkfinite/wasm';
-import type { SvgImportResult } from '@inkfinite/core';
+
+export type SvgImportResult = SvgImport & { omitted_image_count: number };
 
 /** A structured parser failure returned by the SVG worker. */
 export class SvgImportWorkerError extends Error {
@@ -31,6 +34,14 @@ type WorkerRequestBody =
 	| { type: 'import'; source: ArrayBuffer }
 	| { type: 'open_document'; source: ArrayBuffer; actorId: string }
 	| { type: 'create_document'; snapshot: DocumentSnapshot; actorId: string }
+	| {
+			type: 'import_document_svg';
+			source: ArrayBuffer;
+			sourceName: string;
+			pageId: string;
+			layerId: string;
+			timestamp: number;
+	  }
 	| { type: 'document_state' }
 	| { type: 'apply_transaction'; transaction: TransactionDraft }
 	| { type: 'apply_editor_patches'; request: EditorReconciliationRequest }
@@ -50,19 +61,27 @@ type WorkerResponse =
 				| SvgImportResponse
 				| SvgRenderResponse
 				| BrowserDocumentState
+				| BrowserSvgImportState
 				| EditorProjection
 				| TransactionDraft;
 	  }
 	| { id: number; error: string };
 
 export type BrowserDocumentState = DocumentSessionState & { bytes: Uint8Array };
+type SvgImportCommitSuccess = Extract<SvgImportCommitResponse, { status: 'success' }>;
+export type BrowserSvgImportState = BrowserDocumentState &
+	Pick<
+		SvgImportCommitSuccess,
+		'warnings' | 'omitted_image_count' | 'shape_ids' | 'source_asset_id'
+	>;
 
 type WorkerResponseValue =
 	| SvgImportResponse
 	| SvgRenderResponse
 	| EditorProjection
 	| TransactionDraft
-	| BrowserDocumentState;
+	| BrowserDocumentState
+	| BrowserSvgImportState;
 
 /** A worker boundary that keeps Rust parsing, rendering, and document state off the UI thread. */
 export class SvgImportWorkerClient {
@@ -89,6 +108,28 @@ export class SvgImportWorkerClient {
 			throw new SvgImportWorkerError(response.error.code, response.error.message);
 		}
 		return { ...response.import, omitted_image_count: response.omitted_image_count };
+	}
+
+	/** Parses and commits SVG bytes through the worker-owned Rust document session. */
+	importDocumentSvg(
+		source: Uint8Array,
+		sourceName: string,
+		pageId = '',
+		layerId = '',
+		timestamp = Date.now()
+	): Promise<BrowserSvgImportState> {
+		const transferable = source.slice();
+		return this.request<BrowserSvgImportState>(
+			{
+				type: 'import_document_svg',
+				source: transferable.buffer,
+				sourceName,
+				pageId,
+				layerId,
+				timestamp
+			},
+			[transferable.buffer]
+		);
 	}
 
 	/** Opens canonical bytes in the worker-owned Rust document session. */

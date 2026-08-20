@@ -13,6 +13,7 @@ pub mod session;
 pub mod svg_import;
 pub mod svg_transaction;
 pub mod sync;
+pub mod wasm;
 
 use std::collections::BTreeMap;
 use std::fmt;

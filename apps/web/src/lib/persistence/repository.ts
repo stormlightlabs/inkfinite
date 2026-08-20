@@ -3,6 +3,7 @@ import {
 	BoardStatsOps,
 	createId,
 	fromCanonicalDocumentSnapshot,
+	fromEditorProjection,
 	LayerRecord as LayerOps,
 	PageRecord as PageOps,
 	ShapeRecord as ShapeOps
@@ -20,7 +21,6 @@ import type {
 	LoadedDoc,
 	LayerRecord,
 	ImportedAsset,
-	ImportedGroup,
 	PageRecord,
 	PersistenceSink,
 	PersistentDocRepo,
@@ -44,6 +44,7 @@ export type CanonicalRow = {
 	boardId: string;
 	bytes: Uint8Array;
 	snapshot: CanonicalDocumentState['snapshot'];
+	projection?: CanonicalDocumentState['projection'];
 	updatedAt: Timestamp;
 };
 
@@ -63,7 +64,6 @@ const PAGE_ORDER_META_PREFIX = 'page-order:';
 const SHAPE_ORDER_META_PREFIX = 'shape-order:';
 const LAYERS_META_PREFIX = 'layers:';
 const ASSETS_META_PREFIX = 'assets:';
-const SVG_GROUPS_META_PREFIX = 'svg-groups:';
 
 const pageOrderKey = (boardId: string) => `${PAGE_ORDER_META_PREFIX}${boardId}`;
 
@@ -72,8 +72,6 @@ const shapeOrderKey = (boardId: string) => `${SHAPE_ORDER_META_PREFIX}${boardId}
 const layersKey = (boardId: string) => `${LAYERS_META_PREFIX}${boardId}`;
 
 const assetsKey = (boardId: string) => `${ASSETS_META_PREFIX}${boardId}`;
-
-const svgGroupsKey = (boardId: string) => `${SVG_GROUPS_META_PREFIX}${boardId}`;
 
 /**
  * Create a Dexie-backed persistent DocRepo used by the web app.
@@ -146,7 +144,7 @@ export function createDexieDocRepo(
 				await meta().delete(shapeOrderKey(boardId));
 				await meta().delete(layersKey(boardId));
 				await meta().delete(assetsKey(boardId));
-				await meta().delete(svgGroupsKey(boardId));
+				await meta().delete(`svg-groups:${boardId}`);
 				await canonical().delete(boardId);
 			}
 		);
@@ -154,7 +152,13 @@ export function createDexieDocRepo(
 
 	async function loadCanonical(boardId: string) {
 		const row = await canonical().get(boardId);
-		return row ? { bytes: new Uint8Array(row.bytes), snapshot: row.snapshot } : null;
+		return row
+			? {
+					bytes: new Uint8Array(row.bytes),
+					snapshot: row.snapshot,
+					projection: row.projection
+				}
+			: null;
 	}
 
 	async function saveCanonical(boardId: string, state: CanonicalDocumentState): Promise<void> {
@@ -167,6 +171,7 @@ export function createDexieDocRepo(
 					boardId,
 					bytes: new Uint8Array(state.bytes),
 					snapshot: state.snapshot,
+					projection: state.projection,
 					updatedAt: timestamp
 				});
 				const pageKeys = (await pages().where('boardId').equals(boardId).toArray()).map(
@@ -185,7 +190,7 @@ export function createDexieDocRepo(
 				await meta().delete(shapeOrderKey(boardId));
 				await meta().delete(layersKey(boardId));
 				await meta().delete(assetsKey(boardId));
-				await meta().delete(svgGroupsKey(boardId));
+				await meta().delete(`svg-groups:${boardId}`);
 				await boards().update(boardId, { updatedAt: timestamp });
 			}
 		);
@@ -193,14 +198,17 @@ export function createDexieDocRepo(
 
 	async function loadDoc(boardId: string): Promise<LoadedDoc> {
 		const canonicalRow = await canonical().get(boardId);
-		if (canonicalRow) return fromCanonicalDocumentSnapshot(canonicalRow.snapshot);
+		if (canonicalRow) {
+			return canonicalRow.projection
+				? fromEditorProjection(canonicalRow.projection, canonicalRow.snapshot)
+				: fromCanonicalDocumentSnapshot(canonicalRow.snapshot);
+		}
 		const pageRows = await pages().where('boardId').equals(boardId).toArray();
-		const [shapeRows, bindingRows, order, assetsRow, svgGroupsRow] = await Promise.all([
+		const [shapeRows, bindingRows, order, assetsRow] = await Promise.all([
 			shapes().where('boardId').equals(boardId).toArray(),
 			bindings().where('boardId').equals(boardId).toArray(),
 			loadOrder(boardId, pageRows),
-			meta().get(assetsKey(boardId)),
-			meta().get(svgGroupsKey(boardId))
+			meta().get(assetsKey(boardId))
 		]);
 
 		const docPages: Record<string, PageRecord> = {};
@@ -224,7 +232,6 @@ export function createDexieDocRepo(
 			shapes: docShapes,
 			bindings: docBindings,
 			assets: assetsRow?.value as Record<string, ImportedAsset> | undefined,
-			svgGroups: svgGroupsRow?.value as Record<string, ImportedGroup> | undefined,
 			order
 		};
 	}
@@ -315,13 +322,11 @@ export function createDexieDocRepo(
 			throw new Error(`Board ${boardId} not found`);
 		}
 
-		const { pages, layers, shapes, bindings, assets, svgGroups, order } =
-			await loadDoc(boardId);
+		const { pages, layers, shapes, bindings, assets, order } = await loadDoc(boardId);
 		const doc: Document = {
 			pages,
 			...(layers ? { layers } : {}),
 			...(assets ? { assets } : {}),
-			...(svgGroups ? { svgGroups } : {}),
 			shapes,
 			bindings
 		};
@@ -374,12 +379,6 @@ export function createDexieDocRepo(
 				}
 				if (snapshot.doc.assets && Object.keys(snapshot.doc.assets).length > 0) {
 					await meta().put({ key: assetsKey(boardId), value: snapshot.doc.assets });
-				}
-				if (snapshot.doc.svgGroups && Object.keys(snapshot.doc.svgGroups).length > 0) {
-					await meta().put({
-						key: svgGroupsKey(boardId),
-						value: snapshot.doc.svgGroups
-					});
 				}
 			}
 		);

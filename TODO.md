@@ -61,39 +61,36 @@ Inkfinite now imports SVGs through one validated Rust pipeline across desktop, w
 
 ## WASM
 
-### Browser facade
+Inkfinite now runs the canonical Rust document engine in a browser worker. The browser stores
+Automerge bytes, commits validated transactions, uses Rust projection and reconciliation APIs,
+and shares SVG and committed-geometry behavior with native callers. TypeScript continues to own
+interaction state, previews, hit testing, Canvas rendering, and browser APIs.
 
-- [x] Establish the `inkfinite-wasm` build and TypeScript bindings
-- [x] Expose deterministic Rust SVG rendering to the browser
-- [x] Route browser SVG export through Rust
-- [x] Keep Canvas and PNG rendering in TypeScript
+### Engine integration closure
 
-### Editor projection and reconciliation
+#### Canonical browser flow
 
-- [x] Move native-to-editor projection into Rust
-- [x] Compose ancestor transforms in editor projections
-- [x] Define semantic editor patches for durable changes
-- [x] Reconcile editor patches into minimal native transactions
-- [x] Stop rebuilding the native scene for ordinary edits
-- [x] Test native and WASM projection parity
+- [x] Return the Rust editor projection with browser document session state
+- [x] Hydrate canonical browser documents from the Rust projection
+- [x] Commit browser SVG imports through the Rust session and SVG transaction builder
+- [x] Remove the TypeScript SVG projector and imported-group compatibility metadata
+- [x] Generate TypeScript types for WASM request and response payloads
 
-### Browser document engine
+#### Shared reconciliation
 
-- [x] Add a stateful WASM document session
-- [x] Open and save canonical Automerge document bytes
-- [x] Apply validated Rust transactions in the browser
-- [x] Use Rust undo and redo for durable changes
-- [x] Persist canonical document state to IndexedDB
-- [x] Migrate existing browser documents to canonical state
-- [x] Retire the Dexie shape graph as the browser source of truth
-- [x] Keep ephemeral editor history in TypeScript
+- [ ] Use one TypeScript editor-patch builder across web and desktop
+- [ ] Reconcile desktop page and layer changes through Rust
+- [ ] Retire the desktop whole-document mirror fallback
+- [ ] Reuse generated native geometry and transform types in the editor model
 
-### Canonical geometry
+#### Worker verification and cleanup
 
-- [x] Commit path geometry through Rust validation
-- [x] Commit freehand strokes through Rust normalization
-- [x] Keep gesture previews and hit testing in TypeScript
-- [x] Add committed-geometry parity fixtures
+- [ ] Rename the shared SVG worker and client around their document-engine role
+- [ ] Add browser tests against the compiled WASM module and real worker
+- [ ] Cover create, mutate, save, reopen, project, undo, redo, SVG import, and SVG render
+- [ ] Run WASM build, type checking, and browser smoke tests from root verification
+- [ ] Remove unused TypeScript validation and generated bounds helpers after the browser tests pass
+- [ ] Remove unused standalone WASM APIs after migrating their consumers
 
 ## Vector Editing
 
@@ -404,3 +401,30 @@ Inkfinite now imports SVGs through one validated Rust pipeline across desktop, w
 
 - [ ] Revisit skill organization after SVG and MCP workflows stabilize
 - [ ] Consider separate drawing, wireframing, SVG, and MCP skills
+
+### Color Scheme/"Vibe" Shift
+
+| Mode      | Background              | Accent               |
+| --------- | ----------------------- | -------------------- |
+| **Light** | `#E0E0FE` soft lavender | `#EB4999` vivid pink |
+| **Dark**  | `#292E6E` deep indigo   | `#EB4999` vivid pink |
+
+The palette is based on Skeleton's **Modern** theme: `surface-50` / `surface-950` for the light and dark backgrounds, with `primary-500` as the shared brand accent.
+
+```css
+/* Light */
+--bg: #e0e0fe;
+--surface: #c7c8fb;
+--text: #292e6e;
+--muted: #575ad9;
+--accent: #eb4999;
+--link: #c92f7d;
+
+/* Dark */
+--bg: #292e6e;
+--surface: #353988;
+--text: #e0e0fe;
+--muted: #aeb0f6;
+--accent: #eb4999;
+--link: #f06bad;
+```

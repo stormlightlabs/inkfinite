@@ -1,6 +1,7 @@
 import {
 	createEditorReconciliationRequest,
 	diffDoc,
+	fromEditorProjection,
 	toCanonicalDocumentSnapshot
 } from '@inkfinite/core';
 import type {
@@ -18,7 +19,7 @@ import type { EditorPlatformAdapter, EditorPlatformSession } from '@inkfinite/ui
 import { liveQuery } from 'dexie';
 import { InkfiniteDB } from './database';
 import { createDexieDocRepo, createPersistenceSink, getBoardInspectorData } from './repository';
-import { getSharedSvgImportWorker, importSvgInWorker, renderSvgInWorker } from './svg-import';
+import { getSharedSvgImportWorker, renderSvgInWorker } from './svg-import';
 import type { BrowserDocumentState } from './svg-import';
 import type { PersistenceSinkOptions } from './repository';
 import type { LoadedDoc } from '@inkfinite/core';
@@ -57,7 +58,7 @@ export function createDexieSession(
 	let subscription: { unsubscribe(): void } | null = null;
 	let documentWorker: ReturnType<typeof getSharedSvgImportWorker> | null = null;
 	let documentBoardId: string | null = null;
-	let documentReady: Promise<void> | null = null;
+	let documentReady: Promise<LoadedDoc | null> | null = null;
 	let documentQueue: Promise<void> = Promise.resolve();
 	let transactionNumber = 0;
 	const canonicalEnabled =
@@ -94,15 +95,14 @@ export function createDexieSession(
 			pages: doc.pages,
 			...(doc.layers ? { layers: doc.layers } : {}),
 			...(doc.assets ? { assets: doc.assets } : {}),
-			...(doc.svgGroups ? { svgGroups: doc.svgGroups } : {}),
 			shapes: doc.shapes,
 			bindings: doc.bindings
 		};
 	}
 
-	function openCanonicalDocument(boardId: string, doc: LoadedDoc): Promise<void> {
+	function openCanonicalDocument(boardId: string, doc: LoadedDoc): Promise<LoadedDoc | null> {
 		const worker = ensureDocumentWorker();
-		if (!worker || !repo.loadCanonical || !repo.saveCanonical) return Promise.resolve();
+		if (!worker || !repo.loadCanonical || !repo.saveCanonical) return Promise.resolve(null);
 		documentBoardId = boardId;
 		return (async () => {
 			const canonical = await repo.loadCanonical!(boardId);
@@ -113,16 +113,72 @@ export function createDexieSession(
 						'browser'
 					);
 			if (!canonical) await repo.saveCanonical!(boardId, state);
+			return fromEditorProjection(state.editor_projection, state.snapshot);
 		})();
 	}
 
-	function setActiveDocument(boardId: string, doc: LoadedDoc) {
-		if (!canonicalEnabled) return;
-		if (documentBoardId === boardId && documentReady) return;
+	async function setActiveDocument(boardId: string, doc: LoadedDoc): Promise<LoadedDoc | null> {
+		if (!canonicalEnabled) return null;
+		if (documentBoardId === boardId && documentReady) {
+			return documentReady.then(async (hydrated) => {
+				if (!documentWorker) return hydrated;
+				const state = await documentWorker.documentState();
+				return fromEditorProjection(state.editor_projection, state.snapshot);
+			});
+		}
 		documentReady = openCanonicalDocument(boardId, doc).catch((error) => {
 			documentBoardId = null;
 			throw error;
 		});
+		return documentReady;
+	}
+
+	async function commitSvgImport(args: {
+		boardId: string;
+		source: Uint8Array;
+		sourceName: string;
+		pageId?: string;
+		layerId?: string;
+	}) {
+		if (!canonicalEnabled || !repo.saveCanonical) {
+			throw new Error('The browser document engine is unavailable.');
+		}
+		const current = await repo.loadDoc(args.boardId);
+		await setActiveDocument(args.boardId, current);
+		await documentReady;
+		const worker = ensureDocumentWorker();
+		if (!worker) throw new Error('The browser document worker is unavailable.');
+		const state = await worker.importDocumentSvg(
+			args.source,
+			args.sourceName,
+			args.pageId,
+			args.layerId
+		);
+		await repo.saveCanonical!(args.boardId, {
+			bytes: state.bytes,
+			snapshot: state.snapshot,
+			projection: state.editor_projection
+		});
+		return {
+			doc: fromEditorProjection(state.editor_projection, state.snapshot),
+			warnings: state.warnings.map((warning) => ({
+				code:
+					warning.kind === 'unsupported_feature'
+						? `svg-${warning.feature}`
+						: warning.kind === 'unsupported_element'
+							? 'svg-unsupported-element'
+							: 'svg-unsupported-paint',
+				message:
+					warning.kind === 'unsupported_feature'
+						? `Skipped SVG ${warning.feature.replaceAll('_', ' ')}`
+						: warning.kind === 'unsupported_element'
+							? `Skipped SVG element <${warning.element}>: ${warning.reason}`
+							: `Skipped SVG ${warning.property} paint: ${warning.value}`,
+				count: 1
+			})),
+			omittedImageCount: state.omitted_image_count,
+			shapeIds: [...state.shape_ids]
+		};
 	}
 
 	function enqueueEditorChange(change: EditorDocumentChange) {
@@ -141,7 +197,6 @@ export function createDexieSession(
 				pages: change.before.pages,
 				layers: change.before.layers,
 				assets: change.before.assets,
-				svgGroups: change.before.svgGroups,
 				shapes: change.before.shapes,
 				bindings: change.before.bindings,
 				order: { pageIds: Object.keys(change.before.pages), layers: change.before.layers }
@@ -227,6 +282,7 @@ export function createDexieSession(
 			});
 		},
 		setActiveDocument,
+		commitSvgImport,
 		dispose() {
 			subscription?.unsubscribe();
 			subscription = null;
@@ -325,7 +381,6 @@ export function createBrowserInterchangeFiles(
 	return {
 		pickImport: () => pickTextFile('.excalidraw,.canvas,application/json'),
 		pickSvg: pickSvgFile,
-		importSvg: importSvgInWorker,
 		async exportSvg(
 			snapshot: BoardExport,
 			options: SvgExportOptions = {}

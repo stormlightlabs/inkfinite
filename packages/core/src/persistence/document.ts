@@ -7,9 +7,9 @@ import {
 	PageRecord as PageOps,
 	type ShapeRecord,
 	ShapeRecord as ShapeOps,
-	type ImportedAsset,
-	type ImportedGroup
+	type ImportedAsset
 } from '../model';
+import type { EditorProjection } from '@inkfinite/bindings/editor';
 import type { DocumentSnapshot as NativeDocumentSnapshot } from '@inkfinite/bindings/model';
 import type { BoardMeta, DocRepo } from './repo';
 
@@ -36,7 +36,6 @@ export type LoadedDoc = {
 	shapes: Record<string, ShapeRecord>;
 	bindings: Record<string, BindingRecord>;
 	assets?: Record<string, ImportedAsset>;
-	svgGroups?: Record<string, ImportedGroup>;
 	order: DocOrder;
 };
 
@@ -44,7 +43,12 @@ export type LoadedDoc = {
 export type BoardExport = { board: BoardMeta; doc: Document; order: DocOrder };
 
 /** Canonical bytes and their materialized cache stored by browser adapters. */
-export type CanonicalDocumentState = { bytes: Uint8Array; snapshot: NativeDocumentSnapshot };
+export type CanonicalDocumentState = {
+	bytes: Uint8Array;
+	snapshot: NativeDocumentSnapshot;
+	/** Rust-owned editor projection cached with canonical state for hydration. */
+	projection?: EditorProjection;
+};
 
 /** One editor document change handed to a Rust-backed browser persistence adapter. */
 export type EditorDocumentChange = {

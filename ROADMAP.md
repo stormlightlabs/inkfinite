@@ -92,58 +92,57 @@ rendering, hit testing, and fixture coverage used by later import and editing wo
 
 ### WASM
 
-Use WebAssembly to bring Inkfinite's canonical Rust semantics to the browser,
-not to replace the browser editor. Rust should own document meaning while
-TypeScript continues to own immediate interaction and browser APIs.
+WebAssembly brings Inkfinite's Rust document engine to the browser. A persistent
+worker session opens, mutates, undoes, redoes, and saves the canonical Automerge
+document used by native entry points. IndexedDB stores canonical bytes rather
+than maintaining another shape graph. SVG parsing and export, committed
+geometry, editor projection, and editor reconciliation call the Rust
+implementations.
 
-The web app currently persists a TypeScript document graph in Dexie, while the
-desktop app and CLI use the Rust transaction engine and Automerge document.
-Desktop projection also flattens native hierarchy without composing every
-ancestor transform, and its reverse mirror can delete and recreate the scene for
-an ordinary edit. Shared TypeScript types do not prevent these execution paths
-from diverging.
+The browser still has a TypeScript editor model for low-latency interaction and
+browser APIs. Pointer movement, hover, selection, camera state, drag previews,
+snap guides, hit testing, Canvas rendering, PNG export, and DOM/Svelte work do
+not cross the WASM interface. TypeScript creates semantic editor patches; Rust
+reconciles them into validated parent-relative transactions. Rust owns committed
+path geometry, exact bounds, hierarchy transforms, reparenting, topology, arc
+conversion, validation, and final freehand normalization.
 
-The first step is a thin `inkfinite-wasm` facade. SVG import establishes the
-build, packaging, worker, and binding path. Deterministic SVG export should use
-the Rust renderer through the same facade so browser, desktop, and CLI output
-share hierarchy, bounds, and serialization behavior. Canvas rendering and PNG
-export remain in TypeScript.
+Canonical browser documents load their editor state from the Rust projection
+returned with each session response. The projection is cached with canonical
+IndexedDB state so reopening a board does not rebuild the editor view from a
+second hierarchy representation. Browser SVG imports pass bytes to the worker;
+the Rust session parses the source, builds the shared SVG transaction, commits it,
+and returns the updated snapshot, projection, assets, and diagnostics. SVG group
+compatibility metadata and the TypeScript SVG projector are no longer part of the
+browser document model.
 
-The second step moves native-to-editor projection and editor-to-native
-reconciliation into Rust. Projection must compose hierarchy transforms into a
-consistent editor view. Editor commits should describe semantic changes such as
-moving, resizing, restyling, reparenting, or changing path geometry. Rust should
-translate those changes into minimal validated transactions instead of replacing
-the scene. Native and WASM callers should exercise the same projection and
-reconciliation fixtures.
+Desktop reconciliation has a related fallback. Page or layer creation and
+deletion can still trigger the whole-document mirror even though Rust supports
+semantic structural patches. Web and desktop should use one TypeScript
+before-and-after patch builder, then let Rust reconcile and commit those patches.
+The mirror fallback can be removed once all supported structural edits use that
+path.
 
-The third step makes the browser document session stateful in WASM. It should
-open, mutate, undo, redo, and save the same canonical Automerge document used by
-native entry points. IndexedDB remains the browser storage adapter, but stores
-canonical document bytes rather than acting as a second shape graph. Existing
-browser documents need an explicit migration before the Dexie graph can stop
-being the source of truth.
+The WASM request and response payloads now use generated TypeScript types, and
+native editor types are reused where the representations match. The shared worker
+and client still need names that describe their document-engine role rather than
+SVG import. Standalone projection or reconciliation exports can be removed when
+the stateful session covers their use cases.
 
-The JS/WASM boundary should carry coarse operations and batches. Strings,
-objects, and arrays may require conversion or copying, so pointer movement,
-hover, selection, camera state, drag previews, snap guides, Canvas rendering,
-and DOM/Svelte work remain in TypeScript. A persistent WASM session avoids
-serializing the complete document for each operation.
+Root verification should build and type-check the WASM package and run a browser
+smoke test against the compiled module and real worker. The test should create a
+document, commit a transaction, save and reopen its bytes, project editor state,
+exercise undo and redo, import a representative SVG, render SVG, and verify the
+canonical state after each operation. Remove fallback implementations only after
+this path is covered.
 
-Rust remains authoritative for committed path geometry, exact bounds,
-transforms, reparenting, topology, arc conversion, validation, and final
-freehand normalization. TypeScript may keep fast previews, cached bounds, hit
-testing, and selection geometry for responsive interaction. Shared fixtures
-must keep those previews acceptably aligned with committed results. Batched WASM
-geometry queries should be considered only when profiling shows a need.
-
-Excalidraw and JSON Canvas conversion can remain TypeScript-only while they are
-browser conveniences. Move them into Rust when desktop, CLI, or MCP also need
-them. TypeScript history likewise continues to own ephemeral editor state;
-durable document undo and redo belong to the Rust session.
-
-This sequencing leads to one document engine across browser, desktop, CLI, and
-future MCP access without placing the frame-by-frame editor loop behind WASM.
+This cleanup does not move the frame-by-frame editor loop into WASM. TypeScript
+keeps responsive previews, cached bounds, hit testing, selection geometry, and
+ephemeral history. Shared fixtures compare those approximations with committed
+Rust results. Legacy Dexie migration may still build an initial canonical
+snapshot in TypeScript, and Excalidraw and JSON Canvas conversion can remain in
+TypeScript until another native entry point needs them. Add batched WASM geometry
+queries only when profiling identifies a browser geometry bottleneck.
 
 ### Vector editing
 

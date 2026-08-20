@@ -137,14 +137,15 @@ must render only a sanitized, static projection of the retained source and keep
 the imported subtree movable as one object.
 
 Desktop imports use the native Tauri dialog plugin to select a path, then Rust
-reads, parses, and commits the file through the active session. The browser adapter exposes an Import menu with editable-document, SVG file,
-and pasted SVG code/markup options. SVG file bytes and pasted markup cross one
-reusable worker, which lazy-loads the Rust WASM facade and returns the normalized
-result. The browser projects that result into its local document model, retains
-source and embedded assets, and persists the imported board in one IndexedDB
-operation. File selection, drag-and-drop, and pasted markup use this path. The
-web build runs `scripts/build-wasm.mjs` before Vite packages the worker; it
-requires the matching `wasm-bindgen` CLI. The CLI accepts
+reads, parses, and commits the file through the active session. The browser adapter
+exposes an Import menu with editable-document, SVG file, and pasted SVG code or
+markup options. SVG file bytes and pasted markup cross one reusable worker. The
+Rust document session parses the bytes, builds the shared SVG transaction, commits
+one history entry, and returns the new canonical snapshot and editor projection.
+The browser caches that projection with the canonical IndexedDB bytes and uses it
+to hydrate the editor. File selection, drag-and-drop, and pasted markup use this
+path. The web build runs `scripts/build-wasm.mjs` before Vite packages the worker;
+it requires the matching `wasm-bindgen` CLI. The CLI accepts
 `inkfinite import svg FILE --input ARTWORK.svg` and can validate the transaction
 with `--dry-run` before saving.
 
@@ -157,15 +158,17 @@ input data for provenance and future re-import, not executable document content.
 
 ## Browser WASM facade
 
-`@inkfinite/wasm` exposes the Rust importer and deterministic SVG renderer. The
-browser loads the generated module once inside the shared SVG worker. Import
-requests transfer their byte buffer; render requests send one canonical snapshot
-and one render-options object across the worker boundary.
+`@inkfinite/wasm` exposes the Rust document session, importer, and deterministic
+SVG renderer. The browser loads the generated module once inside the shared worker.
+Import requests transfer their byte buffer to the session; render requests send one
+canonical snapshot and one render-options object across the worker boundary. Rust
+response envelopes and renderer options use the generated types in
+`@inkfinite/bindings/wasm`.
 
-The web adapter projects its editor document into the canonical snapshot before
-export. Page and selection filters become Rust renderer options, and renderer
-warnings become export conversion notes. Canvas drawing and PNG capture stay in
-TypeScript, where they can use the browser's frame loop and canvas APIs.
+The web adapter uses the canonical session snapshot before export. Page and
+selection filters become Rust renderer options, and renderer warnings become
+export conversion notes. Canvas drawing and PNG capture stay in TypeScript, where
+they can use the browser's frame loop and canvas APIs.
 
 ## Input safety and failures
 

@@ -1,7 +1,20 @@
 import type { DocumentSnapshot } from '@inkfinite/bindings/model';
 import type { EditorProjection, EditorReconciliationRequest } from '@inkfinite/bindings/editor';
 import type { CommitResult, TransactionDraft } from '@inkfinite/bindings/transaction';
-import type { SvgImport } from '@inkfinite/bindings/svg-import';
+import type {
+	WasmDocumentMutationResponse,
+	WasmDocumentSessionFailure,
+	WasmDocumentSessionState,
+	WasmEditorProjectionResponse,
+	WasmEditorReconciliationResponse,
+	WasmSvgImportCommitResponse,
+	WasmSvgImportFailure,
+	WasmSvgImportResponse,
+	WasmSvgRenderFailure,
+	WasmSvgRenderOptions,
+	WasmSvgRenderResponse,
+	WasmSvgRenderWarning
+} from '@inkfinite/bindings/wasm';
 export type { DocumentSnapshot } from '@inkfinite/bindings/model';
 export type {
 	EditorPatch,
@@ -11,51 +24,60 @@ export type {
 } from '@inkfinite/bindings/editor';
 export type { TransactionDraft, CommitResult } from '@inkfinite/bindings/transaction';
 export type { SvgImport, SvgImportWarning } from '@inkfinite/bindings/svg-import';
+export type {
+	WasmDocumentMutationResponse,
+	WasmDocumentSessionFailure,
+	WasmDocumentSessionState,
+	WasmEditorProjectionResponse,
+	WasmEditorReconciliationResponse,
+	WasmSvgImportCommitResponse,
+	WasmSvgImportFailure,
+	WasmSvgImportResponse,
+	WasmSvgRenderFailure,
+	WasmSvgRenderOptions,
+	WasmSvgRenderResponse,
+	WasmSvgRenderWarning
+} from '@inkfinite/bindings/wasm';
 
 /** Structured error returned when Rust rejects an SVG. */
-export type SvgImportFailure = { code: string; message: string };
-
-/** JSON envelope emitted by the `inkfinite-wasm` crate. */
-export type SvgImportResponse =
-	| { status: 'success'; import: SvgImport; omitted_image_count: number }
-	| { status: 'error'; error: SvgImportFailure };
-
-/** Options accepted by the Rust SVG renderer. Empty selections include the whole page. */
-export type SvgRenderOptions = {
-	page_id?: string;
-	layer_ids?: string[];
-	selection?: string[];
-	region?: { x: number; y: number; width: number; height: number };
-	available_font_families?: string[];
-	available_asset_ids?: string[];
-};
-
+export type SvgImportFailure = WasmSvgImportFailure;
+/** JSON envelope emitted by the `inkfinite-wasm` SVG importer. */
+export type SvgImportResponse = WasmSvgImportResponse;
+/** JSON envelope emitted after an SVG is committed to a document session. */
+export type SvgImportCommitResponse = WasmSvgImportCommitResponse;
+/** Options accepted by the Rust SVG renderer. */
+export type SvgRenderOptions = Partial<WasmSvgRenderOptions>;
 /** Structured warning emitted by deterministic Rust SVG rendering. */
-export type SvgRenderWarning = { code: string; message: string };
-
+export type SvgRenderWarning = WasmSvgRenderWarning;
 /** Structured failure returned when Rust cannot render a snapshot. */
-export type SvgRenderFailure = { code: string; message: string };
-
+export type SvgRenderFailure = WasmSvgRenderFailure;
 /** JSON envelope emitted by the `inkfinite-wasm` SVG renderer. */
-export type SvgRenderResponse =
-	| { status: 'success'; svg: string; warnings: SvgRenderWarning[] }
-	| { status: 'error'; error: SvgRenderFailure };
-
+export type SvgRenderResponse = WasmSvgRenderResponse;
 /** Response envelope returned by Rust editor projection. */
-export type EditorProjectionResponse =
-	| { status: 'success'; projection: EditorProjection }
-	| { status: 'error'; error: { code: string; message: string } };
-
+export type EditorProjectionResponse = WasmEditorProjectionResponse;
 /** Response envelope returned by Rust editor reconciliation. */
-export type EditorReconciliationResponse =
-	| { status: 'success'; transaction: TransactionDraft }
-	| { status: 'error'; error: { code: string; message: string } };
+export type EditorReconciliationResponse = WasmEditorReconciliationResponse;
+/** Stable failure returned by a stateful browser document session. */
+export type DocumentSessionFailure = WasmDocumentSessionFailure;
+/** Successful mutation envelope returned by the Rust document engine. */
+export type DocumentMutationResponse = WasmDocumentMutationResponse;
+/** Snapshot, projection, and history capabilities owned by one Rust session. */
+export type DocumentSessionState = WasmDocumentSessionState;
+
+type SvgImportCommitSuccess = Extract<SvgImportCommitResponse, { status: 'success' }>;
 
 interface GeneratedDocumentSession {
 	state_json(): string;
 	save(): Uint8Array;
 	apply_transaction(transactionJson: string): string;
 	apply_editor_patches(requestJson: string): string;
+	import_svg_document(
+		source: Uint8Array,
+		sourceName: string,
+		pageId: string,
+		layerId: string,
+		timestamp: number
+	): string;
 	undo(): string;
 	redo(): string;
 	can_undo(): boolean;
@@ -72,17 +94,6 @@ interface GeneratedWasmModule {
 	create_document(snapshotJson: string, actorId: string): GeneratedDocumentSession;
 	open_document(bytes: Uint8Array, actorId: string): GeneratedDocumentSession;
 }
-
-/** Stable failure returned by a stateful browser document session. */
-export type DocumentSessionFailure = { code: string; message: string };
-
-/** Successful mutation envelope returned by the Rust document engine. */
-export type DocumentMutationResponse =
-	| { status: 'success'; commit: CommitResult }
-	| { status: 'error'; error: DocumentSessionFailure };
-
-/** Snapshot and history capabilities owned by one Rust document session. */
-export type DocumentSessionState = { snapshot: DocumentSnapshot; can_undo: boolean; can_redo: boolean };
 
 /** A stateful WASM document session. Keep one instance per worker/document. */
 export class WasmDocumentSession {
@@ -118,6 +129,23 @@ export class WasmDocumentSession {
 	/** Reconciles semantic editor patches and commits the resulting transaction. */
 	applyEditorPatches(request: EditorReconciliationRequest): CommitResult {
 		return mutation(this.session.apply_editor_patches(JSON.stringify(request)));
+	}
+
+	/** Parses and commits an SVG through the shared Rust transaction builder. */
+	importSvg(
+		source: Uint8Array,
+		sourceName = '',
+		pageId = '',
+		layerId = '',
+		timestamp = Date.now()
+	): SvgImportCommitSuccess {
+		const response = JSON.parse(
+			this.session.import_svg_document(source, sourceName, pageId, layerId, timestamp)
+		) as SvgImportCommitResponse;
+		if (response.status === 'error') {
+			throw new DocumentSessionError(response.error.code, response.error.message);
+		}
+		return response;
 	}
 
 	/** Compensates the latest transaction for this session actor. */

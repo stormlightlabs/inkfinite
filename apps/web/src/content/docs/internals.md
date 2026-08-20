@@ -62,10 +62,10 @@ coordinates, rotation, optional grouping and layer IDs, and shape-specific prope
 editor geometry, actions, tools, stencils, interchange helpers, and browser-side persistence
 utilities.
 
-These are not two canonical file formats. On desktop, the persistence adapter translates between
-the generated Rust contracts in `@inkfinite/bindings` and the editor projection. The frontend keeps
-the projected state for low-latency interaction; Rust remains authoritative for the native session
-and `.inkfinite` file.
+These are not two canonical file formats. The desktop and browser persistence adapters translate
+between the generated Rust contracts in `@inkfinite/bindings` and the editor projection returned by
+Rust sessions. The frontend keeps the projected state for low-latency interaction; Rust remains
+authoritative for the native session and `.inkfinite` file.
 
 For the durable record structure, see [Documents](/docs/concepts/documents/). The [native path
 geometry guide](/docs/internals/native-path-geometry/) documents the path representation used by
@@ -171,5 +171,5 @@ Rust types are serialized with Serde, described with Schemars, and exported to T
 `ts-rs`. `pnpm bindings:generate` regenerates `@inkfinite/bindings`, while `pnpm bindings:check`
 verifies that checked-in generated contracts still match Rust.
 
-This generated boundary is used for durable document, transaction, and protocol data. The
+This generated boundary is used for document, transaction, protocol, and browser WASM payloads. The
 hand-written `@inkfinite/core` editor types remain a separate interaction-oriented representation.

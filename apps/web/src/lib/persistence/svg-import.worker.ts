@@ -18,6 +18,15 @@ type Request =
 	| { type: 'import'; id: number; source: ArrayBuffer }
 	| { type: 'open_document'; id: number; source: ArrayBuffer; actorId: string }
 	| { type: 'create_document'; id: number; snapshot: DocumentSnapshot; actorId: string }
+	| {
+			type: 'import_document_svg';
+			id: number;
+			source: ArrayBuffer;
+			sourceName: string;
+			pageId: string;
+			layerId: string;
+			timestamp: number;
+	  }
 	| { type: 'document_state'; id: number }
 	| { type: 'apply_transaction'; id: number; transaction: TransactionDraft }
 	| { type: 'apply_editor_patches'; id: number; request: EditorReconciliationRequest }
@@ -58,6 +67,20 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
 					event.data.actorId
 				);
 				response = documentState();
+				break;
+			}
+			case 'import_document_svg': {
+				if (!documentSession) {
+					throw new Error('No browser document is open in the Rust worker.');
+				}
+				const imported = documentSession.importSvg(
+					new Uint8Array(event.data.source),
+					event.data.sourceName,
+					event.data.pageId,
+					event.data.layerId,
+					event.data.timestamp
+				);
+				response = { ...imported, ...imported.state, bytes: documentSession.save() };
 				break;
 			}
 			case 'document_state':

@@ -7,8 +7,7 @@ import type {
 	SvgExportOptions,
 	PersistenceSink,
 	PersistenceStatus,
-	PersistentDocRepo,
-	SvgImportResult
+	PersistentDocRepo
 } from '@inkfinite/core';
 import type { StatusStore } from './status';
 
@@ -80,8 +79,6 @@ export interface InterchangeFileAccess {
 	pickImport(): Promise<InterchangeSourceFile | null>;
 	/** Picks SVG bytes for the browser import path. */
 	pickSvg?(): Promise<SvgSourceFile | null>;
-	/** Parses SVG bytes through the application's shared Rust/WASM worker. */
-	importSvg?(source: Uint8Array): Promise<SvgImportResult>;
 	/** Renders a browser document through the application's shared Rust/WASM worker. */
 	exportSvg?(snapshot: BoardExport, options?: SvgExportOptions): Promise<SvgExport>;
 	saveExport(file: InterchangeExport | SvgExport, defaultStem: string): Promise<boolean>;
@@ -144,8 +141,24 @@ export type EditorPlatformSession = {
 	desktop?: DesktopDocumentRepo;
 	inspectBoard?: (boardId: string) => Promise<BoardInspectorData>;
 	setActiveBoard?: (boardId: string | null) => void;
-	/** Supplies the current editor projection to a Rust-backed browser session. */
-	setActiveDocument?: (boardId: string, doc: import('@inkfinite/core').LoadedDoc) => void;
+	/** Supplies the current editor document to a Rust-backed browser session and returns its projection. */
+	setActiveDocument?: (
+		boardId: string,
+		doc: import('@inkfinite/core').LoadedDoc
+	) => Promise<import('@inkfinite/core').LoadedDoc | null>;
+	/** Commits browser SVG bytes through the active Rust document session. */
+	commitSvgImport?: (args: {
+		boardId: string;
+		source: Uint8Array;
+		sourceName: string;
+		pageId?: string;
+		layerId?: string;
+	}) => Promise<{
+		doc: import('@inkfinite/core').LoadedDoc;
+		warnings: Array<{ code: string; message: string; count: number }>;
+		omittedImageCount: number;
+		shapeIds: string[];
+	}>;
 	subscribeFileMenu?: (listener: (action: NativeFileMenuAction) => void) => () => void;
 	dispose?: () => void;
 };

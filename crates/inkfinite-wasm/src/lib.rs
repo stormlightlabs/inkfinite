@@ -8,98 +8,31 @@
 use std::collections::BTreeSet;
 
 use inkfinite_core::editor::{
-    EditorProjection, EditorReconciliationError, EditorReconciliationRequest, project_editor as project_native,
+    EditorReconciliationError, EditorReconciliationRequest, project_editor as project_native,
     reconcile_editor_patches as reconcile_native,
 };
 use inkfinite_core::engine::{EngineError, TransactionEngine};
-use inkfinite_core::proto::{Bounds, CommitResult, TransactionDraft};
+use inkfinite_core::proto::{TransactionDraft, TransactionId};
 use inkfinite_core::render::{SvgRenderError, SvgRenderOptions, SvgRenderWarning, render_svg as render_native_svg};
-use inkfinite_core::svg_import::{SvgImport, SvgImportError, SvgImportNode, import_svg as parse_svg};
-use inkfinite_core::{
-    ActorId, AssetId, DocumentId, DocumentSnapshot, INKFINITE_FORMAT_ID, INKFINITE_FORMAT_VERSION, LayerId, PageId,
-    ShapeId,
+use inkfinite_core::svg_import::{SvgImportError, SvgImportNode, import_svg as parse_svg};
+use inkfinite_core::svg_transaction::{SvgImportTransactionOptions, build_svg_import_transaction};
+use inkfinite_core::wasm::{
+    WasmDocumentMutationResponse as DocumentMutationResponse, WasmDocumentSessionFailure as DocumentSessionFailure,
+    WasmDocumentSessionState as DocumentSessionState, WasmEditorProjectionFailure as EditorProjectionFailure,
+    WasmEditorProjectionResponse as EditorProjectionResponse,
+    WasmEditorReconciliationFailure as EditorReconciliationFailure,
+    WasmEditorReconciliationResponse as EditorReconciliationResponse,
+    WasmSvgImportCommitResponse as SvgImportCommitResponse, WasmSvgImportFailure as SvgImportFailure,
+    WasmSvgImportResponse as SvgImportResponse, WasmSvgRenderFailure as SvgRenderFailure,
+    WasmSvgRenderOptions as SvgRenderOptionsInput, WasmSvgRenderResponse as SvgRenderResponse,
+    WasmSvgRenderWarning as SvgRenderWarningResponse,
 };
-use serde::{Deserialize, Serialize};
+use inkfinite_core::{
+    ActorId, AssetId, DocumentId, DocumentSnapshot, INKFINITE_FORMAT_ID, INKFINITE_FORMAT_VERSION, LayerId, Origin,
+    PageId, ShapeId, Timestamp,
+};
+use serde::Serialize;
 use wasm_bindgen::prelude::*;
-
-/// The result envelope exchanged between the SVG worker and the browser.
-#[derive(Debug, Serialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
-pub enum SvgImportResponse {
-    /// A normalized import and the image nodes that the current browser model omits.
-    Success {
-        /// The normalized Rust import tree.
-        import: Box<SvgImport>,
-        /// Number of embedded image nodes in the tree.
-        omitted_image_count: usize,
-    },
-    /// A structured failure that did not mutate a document.
-    Error {
-        /// Import failure details.
-        error: SvgImportFailure,
-    },
-}
-
-/// A stable error crossing the WASM boundary.
-#[derive(Debug, Serialize)]
-pub struct SvgImportFailure {
-    /// Machine-readable failure category.
-    pub code: &'static str,
-    /// Human-readable failure detail.
-    pub message: String,
-}
-
-/// The result envelope exchanged for deterministic browser SVG rendering.
-#[derive(Debug, Serialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
-pub enum SvgRenderResponse {
-    /// The rendered SVG and any non-fatal resource warnings.
-    Success {
-        /// Complete deterministic SVG markup.
-        svg: String,
-        /// Warnings emitted while resolving render resources.
-        warnings: Vec<SvgRenderWarningResponse>,
-    },
-    /// The snapshot or render request could not be processed.
-    Error {
-        /// Render failure details.
-        error: SvgRenderFailure,
-    },
-}
-
-/// A stable render error crossing the WASM boundary.
-#[derive(Debug, Serialize)]
-pub struct SvgRenderFailure {
-    /// Machine-readable failure category.
-    pub code: &'static str,
-    /// Human-readable failure detail.
-    pub message: String,
-}
-
-/// A browser document session mutation result.
-#[derive(Debug, Serialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
-pub enum DocumentMutationResponse {
-    /// A validated transaction or history compensation was committed.
-    Success {
-        /// Materialized commit metadata.
-        commit: CommitResult,
-    },
-    /// The mutation was rejected without changing the session.
-    Error {
-        /// Mutation failure details.
-        error: DocumentSessionFailure,
-    },
-}
-
-/// A stable document-session error crossing the WASM boundary.
-#[derive(Debug, Serialize)]
-pub struct DocumentSessionFailure {
-    /// Machine-readable failure category.
-    pub code: &'static str,
-    /// Human-readable failure detail.
-    pub message: String,
-}
 
 /// A stateful Rust document engine owned by one browser worker.
 ///
@@ -121,6 +54,7 @@ impl DocumentSession {
             .snapshot()
             .map_err(|error| JsValue::from_str(&error.to_string()))?;
         serialize_result(&DocumentSessionState {
+            editor_projection: project_native(&snapshot),
             can_undo: self.engine.can_undo(&self.actor_id),
             can_redo: self.engine.can_redo(&self.actor_id),
             snapshot,
@@ -147,7 +81,7 @@ impl DocumentSession {
         if transaction.actor_id != self.actor_id {
             return serialize_response(DocumentMutationResponse::Error {
                 error: DocumentSessionFailure {
-                    code: "actor_mismatch",
+                    code: "actor_mismatch".into(),
                     message: "transaction actor does not belong to this session".into(),
                 },
             });
@@ -171,7 +105,7 @@ impl DocumentSession {
         if request.actor_id != self.actor_id {
             return serialize_response(DocumentMutationResponse::Error {
                 error: DocumentSessionFailure {
-                    code: "actor_mismatch",
+                    code: "actor_mismatch".into(),
                     message: "editor request actor does not belong to this session".into(),
                 },
             });
@@ -184,14 +118,14 @@ impl DocumentSession {
             Ok(transaction) => transaction,
             Err(error) => {
                 return serialize_response(DocumentMutationResponse::Error {
-                    error: DocumentSessionFailure { code: "editor_reconciliation", message: error.to_string() },
+                    error: DocumentSessionFailure { code: "editor_reconciliation".into(), message: error.to_string() },
                 });
             }
         };
         if transaction.operations.is_empty() {
             return serialize_response(DocumentMutationResponse::Error {
                 error: DocumentSessionFailure {
-                    code: "no_changes",
+                    code: "no_changes".into(),
                     message: "editor patches contain no document changes".into(),
                 },
             });
@@ -200,6 +134,116 @@ impl DocumentSession {
             Ok(commit) => serialize_response(DocumentMutationResponse::Success { commit }),
             Err(error) => serialize_response(DocumentMutationResponse::Error { error: engine_failure(&error) }),
         }
+    }
+
+    /// Imports and commits one SVG as a single native transaction.
+    pub fn import_svg_document(
+        &mut self, source: &[u8], source_name: &str, page_id: &str, layer_id: &str, timestamp: f64,
+    ) -> String {
+        let import = match parse_svg(source) {
+            Ok(import) => import,
+            Err(error) => {
+                let error = failure(&error);
+                return serialize_response(SvgImportCommitResponse::Error {
+                    error: DocumentSessionFailure { code: error.code, message: error.message },
+                });
+            }
+        };
+        let snapshot = match self.engine.snapshot() {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                return serialize_response(SvgImportCommitResponse::Error { error: engine_failure(&error) });
+            }
+        };
+        let page_id = if page_id.trim().is_empty() {
+            match snapshot.document.page_ids.first() {
+                Some(page_id) => page_id.clone(),
+                None => {
+                    return serialize_response(SvgImportCommitResponse::Error {
+                        error: DocumentSessionFailure {
+                            code: "missing_page".into(),
+                            message: "document has no page for SVG import".into(),
+                        },
+                    });
+                }
+            }
+        } else {
+            PageId::from(page_id)
+        };
+        let page = match snapshot.document.pages.get(&page_id) {
+            Some(page) => page,
+            None => {
+                return serialize_response(SvgImportCommitResponse::Error {
+                    error: DocumentSessionFailure {
+                        code: "missing_page".into(),
+                        message: format!("SVG import page {page_id} does not exist"),
+                    },
+                });
+            }
+        };
+        let layer_id = if layer_id.trim().is_empty() {
+            match page.layer_ids.first() {
+                Some(layer_id) => layer_id.clone(),
+                None => {
+                    return serialize_response(SvgImportCommitResponse::Error {
+                        error: DocumentSessionFailure {
+                            code: "missing_layer".into(),
+                            message: format!("SVG import page {page_id} has no layer"),
+                        },
+                    });
+                }
+            }
+        } else {
+            LayerId::from(layer_id)
+        };
+        let source_name = (!source_name.trim().is_empty()).then(|| source_name.to_owned());
+        let transaction = match build_svg_import_transaction(
+            &snapshot,
+            &import,
+            SvgImportTransactionOptions {
+                actor_id: self.actor_id.clone(),
+                origin: Origin::Human,
+                page_id,
+                layer_id,
+                transaction_id: TransactionId(format!(
+                    "transaction:svg-import:{}",
+                    import.source_asset.digest.replace(':', "-")
+                )),
+                description: source_name
+                    .as_deref()
+                    .map(|name| format!("Import SVG {name}"))
+                    .unwrap_or_else(|| "Import SVG".into()),
+                source_name,
+                timestamp: Timestamp(timestamp as i64),
+            },
+        ) {
+            Ok(transaction) => transaction,
+            Err(error) => {
+                return serialize_response(SvgImportCommitResponse::Error {
+                    error: DocumentSessionFailure { code: "svg_import".into(), message: error.to_string() },
+                });
+            }
+        };
+        let shape_ids = transaction.shape_ids;
+        let asset_id = import.source_asset.id.clone();
+        let omitted_image_count = transaction.omitted_image_count;
+        let warnings = import.warnings;
+        if let Err(error) = self.engine.commit(transaction.transaction) {
+            return serialize_response(SvgImportCommitResponse::Error { error: engine_failure(&error) });
+        }
+        let state = match self.session_state() {
+            Ok(state) => state,
+            Err(error) => {
+                return serialize_response(SvgImportCommitResponse::Error { error: engine_failure(&error) });
+            }
+        };
+        serialize_response(SvgImportCommitResponse::Success {
+            state: Box::new(state),
+            warnings,
+            omitted_image_count,
+            shape_ids,
+            source_asset_id: asset_id,
+        })
     }
 
     /// Compensates the latest transaction committed by this session actor.
@@ -229,108 +273,30 @@ impl DocumentSession {
     pub fn can_redo(&self) -> bool {
         self.engine.can_redo(&self.actor_id)
     }
+
+    fn session_state(&mut self) -> Result<DocumentSessionState, EngineError> {
+        let snapshot = self.engine.snapshot()?;
+        Ok(DocumentSessionState {
+            editor_projection: project_native(&snapshot),
+            can_undo: self.engine.can_undo(&self.actor_id),
+            can_redo: self.engine.can_redo(&self.actor_id),
+            snapshot,
+        })
+    }
 }
 
-/// The result of opening or creating a browser document session.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub struct DocumentSessionState {
-    /// Current canonical materialized snapshot.
-    pub snapshot: DocumentSnapshot,
-    /// Whether the session actor can compensate its latest transaction.
-    pub can_undo: bool,
-    /// Whether the session actor can reapply its latest compensated transaction.
-    pub can_redo: bool,
-}
-
-/// The result envelope exchanged for editor projection.
-#[derive(Debug, Serialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
-pub enum EditorProjectionResponse {
-    /// The native snapshot projected into editor records.
-    Success {
-        /// Flat editor projection with composed world transforms.
-        projection: EditorProjection,
-    },
-    /// The snapshot could not be decoded.
-    Error {
-        /// Projection failure details.
-        error: EditorProjectionFailure,
-    },
-}
-
-/// The result envelope exchanged for editor reconciliation.
-#[derive(Debug, Serialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
-pub enum EditorReconciliationResponse {
-    /// Semantic patches translated into one native transaction draft.
-    Success {
-        /// Validated-shape transaction draft. The document engine performs
-        /// final optimistic and invariant validation when it is committed.
-        transaction: inkfinite_core::proto::TransactionDraft,
-    },
-    /// The patches could not be translated.
-    Error {
-        /// Reconciliation failure details.
-        error: EditorReconciliationFailure,
-    },
-}
-
-/// A stable editor projection error crossing the WASM boundary.
-#[derive(Debug, Serialize)]
-pub struct EditorProjectionFailure {
-    /// Machine-readable failure category.
-    pub code: &'static str,
-    /// Human-readable failure detail.
-    pub message: String,
-}
-
-/// A stable editor reconciliation error crossing the WASM boundary.
-#[derive(Debug, Serialize)]
-pub struct EditorReconciliationFailure {
-    /// Machine-readable failure category.
-    pub code: &'static str,
-    /// Human-readable failure detail.
-    pub message: String,
-}
-
-/// A render warning with a stable browser-facing code.
-#[derive(Debug, Serialize)]
-pub struct SvgRenderWarningResponse {
-    /// Machine-readable warning category.
-    pub code: &'static str,
-    /// Human-readable warning detail.
-    pub message: String,
-}
-
-#[derive(Debug, Default, Deserialize)]
-struct SvgRenderOptionsInput {
-    page_id: Option<String>,
-    #[serde(default)]
-    layer_ids: Vec<String>,
-    #[serde(default)]
-    selection: Vec<String>,
-    region: Option<Bounds>,
-    #[serde(default)]
-    available_font_families: Vec<String>,
-    #[serde(default)]
-    available_asset_ids: Vec<String>,
-}
-
-impl From<SvgRenderOptionsInput> for SvgRenderOptions {
-    fn from(input: SvgRenderOptionsInput) -> Self {
-        Self {
-            page_id: input.page_id.map(PageId::from),
-            layer_ids: input.layer_ids.into_iter().map(LayerId::from).collect::<BTreeSet<_>>(),
-            selection: input.selection.into_iter().map(ShapeId::from).collect::<BTreeSet<_>>(),
-            region: input.region,
-            available_font_families: input.available_font_families.into_iter().collect::<BTreeSet<_>>(),
-            available_asset_ids: input
-                .available_asset_ids
-                .into_iter()
-                .map(AssetId::from)
-                .collect::<BTreeSet<_>>(),
-        }
+fn render_options(input: SvgRenderOptionsInput) -> SvgRenderOptions {
+    SvgRenderOptions {
+        page_id: input.page_id.map(PageId::from),
+        layer_ids: input.layer_ids.into_iter().map(LayerId::from).collect::<BTreeSet<_>>(),
+        selection: input.selection.into_iter().map(ShapeId::from).collect::<BTreeSet<_>>(),
+        region: input.region,
+        available_font_families: input.available_font_families.into_iter().collect::<BTreeSet<_>>(),
+        available_asset_ids: input
+            .available_asset_ids
+            .into_iter()
+            .map(AssetId::from)
+            .collect::<BTreeSet<_>>(),
     }
 }
 
@@ -409,7 +375,7 @@ pub fn project_editor_json(snapshot_json: &str) -> String {
         Ok(snapshot) => snapshot,
         Err(error) => {
             return serialize_response(EditorProjectionResponse::Error {
-                error: EditorProjectionFailure { code: "invalid_snapshot", message: error.to_string() },
+                error: EditorProjectionFailure { code: "invalid_snapshot".into(), message: error.to_string() },
             });
         }
     };
@@ -429,7 +395,7 @@ pub fn reconcile_editor_patches_json(snapshot_json: &str, request_json: &str) ->
         Ok(snapshot) => snapshot,
         Err(error) => {
             return serialize_response(EditorReconciliationResponse::Error {
-                error: EditorReconciliationFailure { code: "invalid_snapshot", message: error.to_string() },
+                error: EditorReconciliationFailure { code: "invalid_snapshot".into(), message: error.to_string() },
             });
         }
     };
@@ -437,7 +403,7 @@ pub fn reconcile_editor_patches_json(snapshot_json: &str, request_json: &str) ->
         Ok(request) => request,
         Err(error) => {
             return serialize_response(EditorReconciliationResponse::Error {
-                error: EditorReconciliationFailure { code: "invalid_request", message: error.to_string() },
+                error: EditorReconciliationFailure { code: "invalid_request".into(), message: error.to_string() },
             });
         }
     };
@@ -460,16 +426,16 @@ pub fn render_svg_json(snapshot_json: &str, options_json: &str) -> String {
         Ok(snapshot) => snapshot,
         Err(error) => {
             return serialize_response(SvgRenderResponse::Error {
-                error: SvgRenderFailure { code: "invalid_snapshot", message: error.to_string() },
+                error: SvgRenderFailure { code: "invalid_snapshot".into(), message: error.to_string() },
             });
         }
     };
     let options_source = if options_json.trim().is_empty() { "{}" } else { options_json };
     let options = match serde_json::from_str::<SvgRenderOptionsInput>(options_source) {
-        Ok(options) => options.into(),
+        Ok(options) => render_options(options),
         Err(error) => {
             return serialize_response(SvgRenderResponse::Error {
-                error: SvgRenderFailure { code: "invalid_options", message: error.to_string() },
+                error: SvgRenderFailure { code: "invalid_options".into(), message: error.to_string() },
             });
         }
     };
@@ -488,7 +454,7 @@ fn serialize_result<T: Serialize>(value: &T) -> Result<String, JsValue> {
 }
 
 fn invalid_json_failure(code: &'static str, error: &serde_json::Error) -> DocumentSessionFailure {
-    DocumentSessionFailure { code, message: error.to_string() }
+    DocumentSessionFailure { code: code.into(), message: error.to_string() }
 }
 
 fn engine_failure(error: &EngineError) -> DocumentSessionFailure {
@@ -508,7 +474,7 @@ fn engine_failure(error: &EngineError) -> DocumentSessionFailure {
             }
         }
     };
-    DocumentSessionFailure { code, message: error.to_string() }
+    DocumentSessionFailure { code: code.into(), message: error.to_string() }
 }
 
 fn serialize_response<T: Serialize>(response: T) -> String {
@@ -530,7 +496,7 @@ fn reconciliation_failure(error: &EditorReconciliationError) -> EditorReconcilia
         EditorReconciliationError::SingularParent { .. } => "singular_parent",
         EditorReconciliationError::UnsupportedShear { .. } => "unsupported_shear",
     };
-    EditorReconciliationFailure { code, message: error.to_string() }
+    EditorReconciliationFailure { code: code.into(), message: error.to_string() }
 }
 
 fn render_failure(error: &SvgRenderError) -> SvgRenderFailure {
@@ -539,7 +505,7 @@ fn render_failure(error: &SvgRenderError) -> SvgRenderFailure {
         SvgRenderError::InvalidRegion => "invalid_region",
         SvgRenderError::InvalidShapeProperties { .. } => "invalid_shape_properties",
     };
-    SvgRenderFailure { code, message: error.to_string() }
+    SvgRenderFailure { code: code.into(), message: error.to_string() }
 }
 
 fn render_warning(warning: &SvgRenderWarning) -> SvgRenderWarningResponse {
@@ -548,7 +514,7 @@ fn render_warning(warning: &SvgRenderWarning) -> SvgRenderWarningResponse {
         SvgRenderWarning::MissingAsset { .. } => "missing_asset",
         SvgRenderWarning::UnresolvedExternalAsset { .. } => "unresolved_external_asset",
     };
-    SvgRenderWarningResponse { code, message: warning.to_string() }
+    SvgRenderWarningResponse { code: code.into(), message: warning.to_string() }
 }
 
 fn count_images(group: &inkfinite_core::svg_import::SvgGroup) -> usize {
@@ -574,7 +540,7 @@ fn failure(error: &SvgImportError) -> SvgImportFailure {
         SvgImportError::UnsupportedTransform { .. } => "unsupported_transform",
         SvgImportError::InvalidImage { .. } => "invalid_image",
     };
-    SvgImportFailure { code, message: error.to_string() }
+    SvgImportFailure { code: code.into(), message: error.to_string() }
 }
 
 fn escape_json_string(value: &str) -> String {
@@ -795,6 +761,7 @@ mod tests {
         assert_eq!(response["status"], "success");
         let state: Value =
             serde_json::from_str(&session.state_json().expect("state should serialize")).expect("state JSON");
+        assert!(state["editor_projection"].is_object());
         assert!(state["snapshot"]["document"]["shapes"]["shape:rect"].is_object());
         assert!(state["snapshot"]["document"]["shapes"]["shape:path"].is_object());
         assert_eq!(
@@ -813,5 +780,17 @@ mod tests {
         let redo: Value = serde_json::from_str(&session.redo()).expect("redo response");
         assert_eq!(redo["status"], "success");
         assert!(session.can_undo());
+
+        let imported: Value = serde_json::from_str(&session.import_svg_document(
+            br#"<svg viewBox="0 0 20 20"><g id="group"><rect id="box" width="10" height="8"/></g></svg>"#,
+            "icon.svg",
+            "page:one",
+            "layer:one",
+            1.0,
+        ))
+        .expect("SVG import response");
+        assert_eq!(imported["status"], "success");
+        assert_eq!(imported["shape_ids"].as_array().map(Vec::len), Some(3));
+        assert!(imported["state"]["editor_projection"]["shapes"].is_object());
     }
 }

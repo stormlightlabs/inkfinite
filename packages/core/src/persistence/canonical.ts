@@ -1,4 +1,9 @@
-import type { EditorPatch, EditorReconciliationRequest, EditorTransform } from '@inkfinite/bindings/editor';
+import type {
+	EditorPatch,
+	EditorProjection,
+	EditorReconciliationRequest,
+	EditorTransform
+} from '@inkfinite/bindings/editor';
 import type {
 	AssetRecord as NativeAssetRecord,
 	BindingRecord as NativeBindingRecord,
@@ -122,11 +127,98 @@ export function toCanonicalDocumentSnapshot(
 }
 
 /**
- * Projects a canonical Rust snapshot back into the editor's flat document.
+ * Hydrates the editor document from the Rust-owned flat projection.
  *
- * The canonical snapshot remains authoritative. This conversion only creates
- * the low-latency TypeScript projection used by the existing canvas runtime.
+ * `snapshot` is supplied only for assets because the editor projection contains
+ * drawable records and ordering, not binary content.
  */
+export function fromEditorProjection(projection: EditorProjection, snapshot?: NativeDocumentSnapshot): LoadedDoc {
+	const pages: Record<string, import('../model').PageRecord> = {};
+	const layers: Record<string, LayerRecord> = {};
+	const shapes: Record<string, ShapeRecord> = {};
+	const bindings: Record<string, import('../model').BindingRecord> = {};
+
+	for (const pageId of projection.order.page_ids) {
+		const page = projection.pages[pageId];
+		if (!page) continue;
+		pages[page.id] = { id: page.id, name: page.name, shapeIds: [...page.shape_ids], layerIds: [...page.layer_ids] };
+	}
+	for (const layer of Object.values(projection.layers)) {
+		layers[layer.id] = {
+			id: layer.id,
+			pageId: layer.page_id,
+			name: layer.name,
+			shapeIds: [...layer.shape_ids],
+			visible: layer.visible,
+			locked: layer.locked,
+			opacity: layer.opacity
+		};
+	}
+	for (const shape of Object.values(projection.shapes)) {
+		shapes[shape.id] = {
+			id: shape.id,
+			type: shape.type as ShapeRecord['type'],
+			pageId: shape.page_id,
+			x: shape.x,
+			y: shape.y,
+			rot: shape.rot,
+			editorTransform: shape.transform,
+			opacity: shape.opacity,
+			...(shape.fill_opacity === null ? {} : { fillOpacity: shape.fill_opacity }),
+			...(shape.stroke_opacity === null ? {} : { strokeOpacity: shape.stroke_opacity }),
+			...(shape.group_id === null ? {} : { groupId: shape.group_id }),
+			layerId: shape.layer_id,
+			agentEditable: shape.agent_editable,
+			props: shape.props as ShapeRecord['props']
+		} as ShapeRecord;
+	}
+	for (const binding of Object.values(projection.bindings)) {
+		bindings[binding.id] = {
+			id: binding.id,
+			type: binding.type as import('../model').BindingType,
+			fromShapeId: binding.from_shape_id,
+			toShapeId: binding.to_shape_id,
+			handle: binding.handle as import('../model').BindingHandle,
+			anchor:
+				binding.anchor.kind === 'center'
+					? { kind: 'center' }
+					: { kind: 'edge', nx: binding.anchor.x, ny: binding.anchor.y }
+		};
+	}
+	const assets = Object.fromEntries(
+		Object.values(snapshot?.document.assets ?? {}).flatMap((asset) =>
+			asset.source.kind === 'embedded'
+				? [
+						[
+							asset.id,
+							{
+								id: asset.id,
+								name: asset.name,
+								mediaType: asset.media_type,
+								digest: asset.digest,
+								bytes: [...asset.source.bytes]
+							}
+						]
+					]
+				: []
+		)
+	);
+	return {
+		pages,
+		layers,
+		shapes,
+		bindings,
+		...(Object.keys(assets).length > 0 ? { assets } : {}),
+		order: {
+			pageIds: [...projection.order.page_ids],
+			shapeOrder: Object.fromEntries(
+				Object.entries(projection.order.shape_order).map(([pageId, shapeIds]) => [pageId, [...shapeIds]])
+			),
+			layers
+		}
+	};
+}
+
 export function fromCanonicalDocumentSnapshot(snapshot: NativeDocumentSnapshot): LoadedDoc {
 	const pages: Record<string, import('../model').PageRecord> = {};
 	const layers: Record<string, LayerRecord> = {};
