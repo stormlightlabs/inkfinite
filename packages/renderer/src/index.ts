@@ -22,8 +22,12 @@ import {
 	getLayersOnCurrentPage,
 	getStrokeOutline,
 	getShapesOnCurrentPage,
+	localToWorld,
+	localShapeBounds,
 	resolveArrowEndpoints,
-	shapeBounds
+	shapeBounds,
+	shapeTransform,
+	worldToLocal
 } from '@inkfinite/core';
 
 export interface Renderer {
@@ -458,10 +462,7 @@ function drawShape(
 	context.save();
 	context.globalAlpha *= shape.opacity ?? 1;
 
-	context.translate(shape.x, shape.y);
-	if (shape.rot !== 0) {
-		context.rotate(shape.rot);
-	}
+	applyShapeTransform(context, shape);
 
 	switch (shape.type) {
 		case 'rect': {
@@ -496,6 +497,10 @@ function drawShape(
 			drawPath(context, shape);
 			break;
 		}
+		case 'container':
+			// Containers provide hierarchy and selection bounds; their children
+			// are rendered in the surrounding depth-first traversal.
+			break;
 	}
 
 	context.restore();
@@ -589,8 +594,8 @@ function drawArrow(context: CanvasRenderingContext2D, state: EditorState, shape:
 	const resolved = resolveArrowEndpoints(state, shape.id);
 	if (!resolved) return;
 
-	const a = { x: resolved.a.x - shape.x, y: resolved.a.y - shape.y };
-	const b = { x: resolved.b.x - shape.x, y: resolved.b.y - shape.y };
+	const a = worldToLocal(resolved.a, shape);
+	const b = worldToLocal(resolved.b, shape);
 
 	let points: Vec2[];
 
@@ -1130,10 +1135,7 @@ function drawSelection(
 		if (!selectedIds.has(shape.id)) continue;
 
 		context.save();
-		context.translate(shape.x, shape.y);
-		if (shape.rot !== 0) {
-			context.rotate(shape.rot);
-		}
+		applyShapeTransform(context, shape);
 
 		const strokeSelectionBounds = () => {
 			switch (shape.type) {
@@ -1159,22 +1161,22 @@ function drawSelection(
 					break;
 				}
 				case 'arrow': {
-					const bounds = shapeBounds(shape);
+					const bounds = localShapeBounds(shape);
 					const padding = 5;
 					context.strokeRect(
-						bounds.min.x - shape.x - padding,
-						bounds.min.y - shape.y - padding,
+						bounds.min.x - padding,
+						bounds.min.y - padding,
 						bounds.max.x - bounds.min.x + padding * 2,
 						bounds.max.y - bounds.min.y + padding * 2
 					);
 					break;
 				}
 				case 'path': {
-					const bounds = shapeBounds(shape);
+					const bounds = localShapeBounds(shape);
 					const padding = 5;
 					context.strokeRect(
-						bounds.min.x - shape.x - padding,
-						bounds.min.y - shape.y - padding,
+						bounds.min.x - padding,
+						bounds.min.y - padding,
 						bounds.max.x - bounds.min.x + padding * 2,
 						bounds.max.y - bounds.min.y + padding * 2
 					);
@@ -1190,6 +1192,16 @@ function drawSelection(
 				case 'markdown': {
 					const { w, h, fontSize } = shape.props;
 					context.strokeRect(0, 0, w, h ?? fontSize * 10);
+					break;
+				}
+				case 'container': {
+					const bounds = localShapeBounds(shape);
+					context.strokeRect(
+						bounds.min.x,
+						bounds.min.y,
+						bounds.max.x - bounds.min.x,
+						bounds.max.y - bounds.min.y
+					);
 					break;
 				}
 				case 'stroke': {
@@ -1287,7 +1299,13 @@ function drawHandles(
 
 function getHandlesForShape(state: EditorState, shape: ShapeRecord): HandleVisual[] {
 	const handles: HandleVisual[] = [];
-	if (shape.type === 'rect' || shape.type === 'ellipse' || shape.type === 'text' || shape.type === 'markdown') {
+	if (
+		shape.type === 'rect' ||
+		shape.type === 'ellipse' ||
+		shape.type === 'text' ||
+		shape.type === 'markdown' ||
+		shape.type === 'container'
+	) {
 		const bounds = shapeBounds(shape);
 		const minX = bounds.min.x;
 		const maxX = bounds.max.x;
@@ -1359,11 +1377,12 @@ function getHandlesForShape(state: EditorState, shape: ShapeRecord): HandleVisua
 	return handles;
 }
 
-function localToWorld(shape: ShapeRecord, point: Vec2): Vec2 {
-	if (shape.rot === 0) {
-		return { x: shape.x + point.x, y: shape.y + point.y };
+function applyShapeTransform(context: CanvasRenderingContext2D, shape: ShapeRecord): void {
+	const matrix = shapeTransform(shape);
+	if (shape.editorTransform && typeof context.transform === 'function') {
+		context.transform(matrix[0], matrix[1], matrix[3], matrix[4], matrix[6], matrix[7]);
+		return;
 	}
-	const cos = Math.cos(shape.rot);
-	const sin = Math.sin(shape.rot);
-	return { x: shape.x + point.x * cos - point.y * sin, y: shape.y + point.x * sin + point.y * cos };
+	context.translate(shape.x, shape.y);
+	if (shape.rot !== 0) context.rotate(shape.rot);
 }

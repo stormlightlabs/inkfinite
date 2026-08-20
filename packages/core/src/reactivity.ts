@@ -22,6 +22,8 @@ export type UIState = {
 	activeLayerId?: string | null;
 	selectionIds: string[];
 	toolId: ToolId;
+	/** Nested container scope used for hierarchical selection. */
+	containerPath?: string[];
 	bindingPreview?: BindingPreview;
 };
 
@@ -50,6 +52,7 @@ export const EditorState = {
 				activeLayerId: state.ui.activeLayerId,
 				selectionIds: [...state.ui.selectionIds],
 				toolId: state.ui.toolId,
+				containerPath: state.ui.containerPath ? [...state.ui.containerPath] : undefined,
 				bindingPreview: state.ui.bindingPreview ? { ...state.ui.bindingPreview } : undefined
 			},
 			camera: CameraOps.clone(state.camera)
@@ -276,8 +279,10 @@ function enforceInvariants(state: EditorState): EditorState {
 		currentPageId = pages.length > 0 ? pages[0] : null;
 	}
 
+	let containerPath = normalizeContainerPath(state, doc, currentPageId);
 	let selectionIds = state.ui.selectionIds;
 	if (currentPageId === null) {
+		containerPath = [];
 		selectionIds = [];
 	} else {
 		const currentPage = doc.pages[currentPageId];
@@ -299,7 +304,11 @@ function enforceInvariants(state: EditorState): EditorState {
 			? requestedActiveLayer.id
 			: ([...layerIds].reverse().find((id) => doc.layers?.[id]?.visible && !doc.layers?.[id]?.locked) ?? null);
 
-	return { ...state, doc, ui: { ...state.ui, currentPageId, activeLayerId: nextActiveLayerId, selectionIds } };
+	return {
+		...state,
+		doc,
+		ui: { ...state.ui, currentPageId, activeLayerId: nextActiveLayerId, selectionIds, containerPath }
+	};
 }
 
 /**
@@ -356,15 +365,66 @@ export function getShapesOnCurrentPage(state: EditorState): ShapeRecord[] {
 export function getInteractiveShapesOnCurrentPage(state: EditorState): ShapeRecord[] {
 	const currentPage = getCurrentPage(state);
 	if (!currentPage) return [];
-	const layers = state.doc.layers;
-	if (!layers || !currentPage.layerIds?.length) return getShapesOnCurrentPage(state);
-	return currentPage.layerIds.flatMap((layerId) => {
-		const layer = layers[layerId];
-		if (!layer?.visible || layer.locked) return [];
-		return layer.shapeIds
-			.map((id) => state.doc.shapes[id])
-			.filter((shape): shape is ShapeRecord => shape !== undefined);
-	});
+	const shapes = getShapesOnCurrentPage(state);
+	return shapes.filter((shape) => isShapeInteractive(state, shape));
+}
+
+/** Returns the direct children of the active container selection scope. */
+export function getSelectionScopeShapes(state: EditorState): ShapeRecord[] {
+	const path = getContainerPath(state);
+	const parentId = path.at(-1);
+	const shapes = getInteractiveShapesOnCurrentPage(state);
+	return shapes.filter((shape) =>
+		parentId ? shape.groupId === parentId : !shape.groupId || !state.doc.shapes[shape.groupId ?? '']
+	);
+}
+
+/** Returns the current nested selection path, repaired against the document. */
+export function getContainerPath(state: EditorState): string[] {
+	return normalizeContainerPath(state, state.doc, state.ui.currentPageId);
+}
+
+/** Maps a visual descendant to the object selectable in the current scope. */
+export function selectionTarget(state: EditorState, shapeId: string): string | null {
+	const shape = state.doc.shapes[shapeId];
+	if (!shape || !isShapeInteractive(state, shape)) return null;
+	const parentId = getContainerPath(state).at(-1);
+	let current = shape;
+	while ((parentId && current.groupId !== parentId) || (!parentId && current.groupId)) {
+		if (!current.groupId) return null;
+		const parent = state.doc.shapes[current.groupId];
+		if (!parent) return current.id;
+		current = parent;
+	}
+	return current.id;
+}
+
+/** Returns whether a shape and all of its ancestors can participate in editing. */
+function isShapeInteractive(state: EditorState, shape: ShapeRecord): boolean {
+	if (shape.layerId) {
+		const layer = state.doc.layers?.[shape.layerId];
+		if (layer && (!layer.visible || layer.locked)) return false;
+	}
+	let parentId = shape.groupId;
+	while (parentId) {
+		const parent = state.doc.shapes[parentId];
+		if (!parent) return false;
+		parentId = parent.groupId;
+	}
+	return true;
+}
+
+function normalizeContainerPath(state: EditorState, document: Document, pageId: string | null): string[] {
+	if (!pageId) return [];
+	const path: string[] = [];
+	for (const id of state.ui.containerPath ?? []) {
+		const container = document.shapes[id];
+		const parentId = path.at(-1);
+		if (!container || container.type !== 'container' || container.pageId !== pageId) break;
+		if ((parentId && container.groupId !== parentId) || (!parentId && container.groupId)) break;
+		path.push(id);
+	}
+	return path;
 }
 
 /** Returns the current page's layers in back-to-front order. */

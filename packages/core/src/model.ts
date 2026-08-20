@@ -124,6 +124,9 @@ export type ArrowProps = {
 
 export type TextProps = { text: string; fontSize: number; fontFamily: string; color: string; w?: number };
 
+/** Native container dimensions used for hierarchy selection and overlays. */
+export type ContainerProps = { w?: number; h?: number };
+
 /**
  * Markdown block properties
  * - md: markdown source text
@@ -172,7 +175,7 @@ export type StrokeStyle = { color: string; opacity: number };
  */
 export type StrokeProps = { points: StrokePoint[]; style: StrokeStyle; brush: BrushConfig };
 
-export type ShapeType = 'rect' | 'ellipse' | 'line' | 'arrow' | 'text' | 'stroke' | 'path' | 'markdown';
+export type ShapeType = 'rect' | 'ellipse' | 'line' | 'arrow' | 'text' | 'stroke' | 'path' | 'markdown' | 'container';
 
 /** Full projected transform shared with the Rust editor projection. */
 export type EditorTransform = GeneratedEditorTransform;
@@ -206,6 +209,7 @@ export type TextShape = BaseShape & { type: 'text'; props: TextProps };
 export type StrokeShape = BaseShape & { type: 'stroke'; props: StrokeProps };
 export type PathShape = BaseShape & { type: 'path'; props: PathProps };
 export type MarkdownShape = BaseShape & { type: 'markdown'; props: MarkdownProps };
+export type ContainerShape = BaseShape & { type: 'container'; props: ContainerProps };
 
 export type ShapeRecord =
 	| RectShape
@@ -215,7 +219,8 @@ export type ShapeRecord =
 	| TextShape
 	| StrokeShape
 	| PathShape
-	| MarkdownShape;
+	| MarkdownShape
+	| ContainerShape;
 
 export const ShapeRecord = {
 	/**
@@ -270,6 +275,11 @@ export const ShapeRecord = {
 	 */
 	createMarkdown(pageId: string, x: number, y: number, properties: MarkdownProps, id?: string): MarkdownShape {
 		return { id: id ?? createId('shape'), type: 'markdown', pageId, x, y, rot: 0, props: properties };
+	},
+
+	/** Create a selectable native container. */
+	createContainer(pageId: string, x: number, y: number, properties: ContainerProps, id?: string): ContainerShape {
+		return { id: id ?? createId('shape'), type: 'container', pageId, x, y, rot: 0, props: properties };
 	},
 
 	/**
@@ -635,6 +645,13 @@ export function validateDoc(document: Document): ValidationResult {
 					errors.push(`Markdown shape '${shapeId}' has invalid height`);
 				}
 
+				break;
+			}
+			case 'container': {
+				if (shape.props.w !== undefined && shape.props.w < 0)
+					errors.push(`Container shape '${shapeId}' has negative width`);
+				if (shape.props.h !== undefined && shape.props.h < 0)
+					errors.push(`Container shape '${shapeId}' has negative height`);
 				break;
 			}
 		}

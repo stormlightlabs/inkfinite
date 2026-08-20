@@ -52,6 +52,12 @@ Object-level editing comes first:
 - move, resize, rotate, reparent, and restyle nested shapes
 - preserve world-space appearance when changing hierarchy
 
+The initial navigation and transforms slice is implemented. The Rust editor
+projection includes imported containers and composed world transforms. The web
+editor selects containers as objects, enters and leaves nested scopes, and
+moves, resizes, rotates, and restyles selected children through the existing
+reconciliation path.
+
 Direct path editing follows:
 
 - select path subpaths

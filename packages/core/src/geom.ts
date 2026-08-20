@@ -1,6 +1,6 @@
 import getStroke from 'perfect-freehand';
 import type { Box2, Vec2 } from './math';
-import { Box2 as Box2Ops, Vec2 as Vec2Ops } from './math';
+import { Box2 as Box2Ops, Mat3, Vec2 as Vec2Ops } from './math';
 import type {
 	ArrowShape,
 	BrushConfig,
@@ -20,170 +20,70 @@ import { getInteractiveShapesOnCurrentPage } from './reactivity';
 
 const strokeOutlineCache = new WeakMap<StrokeShape, Vec2[]>();
 
-/**
- * Get the axis-aligned bounding box of a shape in world coordinates
- *
- * For shapes with rotation, this returns the bounding box of the rotated shape
- * (not the minimal bounding box of the original shape)
- *
- * @param shape - The shape to get bounds for
- * @returns Bounding box in world coordinates
- */
-export function shapeBounds(shape: ShapeRecord): Box2 {
+/** Return the affine matrix that maps a shape's local geometry to world space. */
+export function shapeTransform(shape: ShapeRecord): Mat3 {
+	if (shape.editorTransform) {
+		return [
+			shape.editorTransform.a,
+			shape.editorTransform.b,
+			0,
+			shape.editorTransform.c,
+			shape.editorTransform.d,
+			0,
+			shape.editorTransform.e,
+			shape.editorTransform.f,
+			1
+		];
+	}
+	return Mat3.fromTransform(shape.x, shape.y, shape.rot, 1, 1);
+}
+
+/** Transform one local point through a shape's complete world transform. */
+export function localToWorld(shape: ShapeRecord, point: Vec2): Vec2 {
+	return Mat3.transformPoint(shapeTransform(shape), point);
+}
+
+/** Transform one world point into shape-local coordinates. */
+export function worldToLocal(point: Vec2, shape: ShapeRecord): Vec2 {
+	const inverse = Mat3.invert(shapeTransform(shape));
+	return inverse ? Mat3.transformPoint(inverse, point) : { x: point.x - shape.x, y: point.y - shape.y };
+}
+
+/** Returns local geometry bounds without applying the shape transform. */
+export function localShapeBounds(shape: ShapeRecord): Box2 {
 	switch (shape.type) {
-		case 'rect': {
-			return rectBounds(shape);
-		}
-		case 'ellipse': {
-			return ellipseBounds(shape);
-		}
-		case 'line': {
-			return lineBounds(shape);
-		}
-		case 'arrow': {
-			return arrowBounds(shape);
-		}
-		case 'text': {
-			return textBounds(shape);
-		}
-		case 'stroke': {
-			return strokeBounds(shape);
-		}
-		case 'path': {
-			return pathBounds(shape);
-		}
-		case 'markdown': {
-			return markdownBounds(shape);
-		}
+		case 'rect':
+		case 'ellipse':
+		case 'container':
+			return Box2Ops.create(0, 0, shape.props.w ?? 0, shape.props.h ?? 0);
+		case 'line':
+			return Box2Ops.fromPoints([shape.props.a, shape.props.b]);
+		case 'arrow':
+			return Box2Ops.fromPoints(shape.props.points ?? []);
+		case 'text':
+			return Box2Ops.create(0, 0, shape.props.w ?? shape.props.fontSize * 10, shape.props.fontSize * 1.2);
+		case 'markdown':
+			return Box2Ops.create(0, 0, shape.props.w, shape.props.h ?? shape.props.fontSize * 10);
+		case 'stroke':
+			return boundsFromOutline(shape.props.points.length >= 2 ? getStrokeOutline(shape) : []);
+		case 'path':
+			return pathGeometryBounds(shape.props);
 	}
 }
 
-/**
- * Get bounds for a rectangle shape
- */
-function rectBounds(shape: RectShape): Box2 {
-	const { w, h } = shape.props;
-	const { x, y, rot } = shape;
-
-	if (rot === 0) {
-		return Box2Ops.create(x, y, x + w, y + h);
-	}
-
+function transformLocalBounds(shape: ShapeRecord, bounds: Box2): Box2 {
 	const corners = [
-		{ x: 0, y: 0 },
-		{ x: w, y: 0 },
-		{ x: w, y: h },
-		{ x: 0, y: h }
+		bounds.min,
+		{ x: bounds.max.x, y: bounds.min.y },
+		bounds.max,
+		{ x: bounds.min.x, y: bounds.max.y }
 	];
-	const rotatedCorners = corners.map((corner) => Vec2Ops.rotate(corner, rot));
-	const translatedCorners = rotatedCorners.map((corner) => ({ x: corner.x + x, y: corner.y + y }));
-	return Box2Ops.fromPoints(translatedCorners);
+	return Box2Ops.fromPoints(corners.map((point) => localToWorld(shape, point)));
 }
 
-/**
- * Get bounds for an ellipse shape
- */
-function ellipseBounds(shape: EllipseShape): Box2 {
-	const { w, h } = shape.props;
-	const { x, y, rot } = shape;
-
-	if (rot === 0) {
-		return Box2Ops.create(x, y, x + w, y + h);
-	}
-
-	const corners = [
-		{ x: 0, y: 0 },
-		{ x: w, y: 0 },
-		{ x: w, y: h },
-		{ x: 0, y: h }
-	];
-	const rotatedCorners = corners.map((corner) => Vec2Ops.rotate(corner, rot));
-	const translatedCorners = rotatedCorners.map((corner) => ({ x: corner.x + x, y: corner.y + y }));
-	return Box2Ops.fromPoints(translatedCorners);
-}
-
-/**
- * Get bounds for a line shape
- */
-function lineBounds(shape: LineShape): Box2 {
-	const { a, b } = shape.props;
-	const { x, y, rot } = shape;
-
-	const points = [a, b];
-
-	if (rot === 0) {
-		const translatedPoints = points.map((p) => ({ x: p.x + x, y: p.y + y }));
-		return Box2Ops.fromPoints(translatedPoints);
-	}
-
-	const rotatedPoints = points.map((p) => Vec2Ops.rotate(p, rot));
-	const translatedPoints = rotatedPoints.map((p) => ({ x: p.x + x, y: p.y + y }));
-	return Box2Ops.fromPoints(translatedPoints);
-}
-
-function arrowBounds(shape: ArrowShape): Box2 {
-	const { x, y, rot } = shape;
-	const points = shape.props.points;
-
-	if (!points || points.length < 2) {
-		return { min: { x, y }, max: { x, y } };
-	}
-
-	if (rot === 0) {
-		const translatedPoints = points.map((p) => ({ x: p.x + x, y: p.y + y }));
-		return Box2Ops.fromPoints(translatedPoints);
-	}
-
-	const rotatedPoints = points.map((p) => Vec2Ops.rotate(p, rot));
-	const translatedPoints = rotatedPoints.map((p) => ({ x: p.x + x, y: p.y + y }));
-	return Box2Ops.fromPoints(translatedPoints);
-}
-
-/**
- * Get bounds for a text shape
- */
-function textBounds(shape: TextShape): Box2 {
-	const { fontSize, w } = shape.props;
-	const { x, y, rot } = shape;
-
-	const width = w ?? fontSize * 10;
-	const height = fontSize * 1.2;
-
-	if (rot === 0) {
-		return Box2Ops.create(x, y, x + width, y + height);
-	}
-
-	const corners = [
-		{ x: 0, y: 0 },
-		{ x: width, y: 0 },
-		{ x: width, y: height },
-		{ x: 0, y: height }
-	];
-
-	const rotatedCorners = corners.map((corner) => Vec2Ops.rotate(corner, rot));
-	const translatedCorners = rotatedCorners.map((corner) => ({ x: corner.x + x, y: corner.y + y }));
-	return Box2Ops.fromPoints(translatedCorners);
-}
-
-/** Get bounds for a native path shape. */
-function pathBounds(shape: PathShape): Box2 {
-	const local = pathGeometryBounds(shape.props);
-	const { x, y, rot } = shape;
-	if (rot === 0) {
-		return Box2Ops.create(x + local.min.x, y + local.min.y, x + local.max.x, y + local.max.y);
-	}
-	const corners = [
-		{ x: local.min.x, y: local.min.y },
-		{ x: local.max.x, y: local.min.y },
-		{ x: local.max.x, y: local.max.y },
-		{ x: local.min.x, y: local.max.y }
-	];
-	return Box2Ops.fromPoints(
-		corners.map((corner) => {
-			const rotated = Vec2Ops.rotate(corner, rot);
-			return { x: rotated.x + x, y: rotated.y + y };
-		})
-	);
+/** Get the axis-aligned bounding box of a shape in world coordinates. */
+export function shapeBounds(shape: ShapeRecord): Box2 {
+	return transformLocalBounds(shape, localShapeBounds(shape));
 }
 
 /** Return exact local bounds for path endpoints and Bézier extrema. */
@@ -271,31 +171,6 @@ function cubicPoint(start: Vec2, control1: Vec2, control2: Vec2, end: Vec2, t: n
 }
 
 /**
- * Get bounds for a markdown block shape
- */
-function markdownBounds(shape: MarkdownShape): Box2 {
-	const { w, h, fontSize } = shape.props;
-	const { x, y, rot } = shape;
-
-	const width = w;
-	const height = h ?? fontSize * 10;
-
-	if (rot === 0) {
-		return Box2Ops.create(x, y, x + width, y + height);
-	}
-
-	const corners = [
-		{ x: 0, y: 0 },
-		{ x: width, y: 0 },
-		{ x: width, y: height },
-		{ x: 0, y: height }
-	];
-	const rotatedCorners = corners.map((corner) => Vec2Ops.rotate(corner, rot));
-	const translatedCorners = rotatedCorners.map((corner) => ({ x: corner.x + x, y: corner.y + y }));
-	return Box2Ops.fromPoints(translatedCorners);
-}
-
-/**
  * Compute outline polygon points for a stroke using perfect-freehand
  *
  * @param points - Array of stroke points [x, y, pressure?]
@@ -357,24 +232,6 @@ export function boundsFromOutline(outline: Vec2[]): Box2 {
 }
 
 /**
- * Get bounds for a stroke shape
- *
- * Computes the outline polygon and returns its bounding box
- */
-function strokeBounds(shape: StrokeShape): Box2 {
-	const { points } = shape.props;
-	const { x, y } = shape;
-
-	if (points.length < 2) {
-		return Box2Ops.create(x, y, x, y);
-	}
-
-	const outline = getStrokeOutline(shape);
-	const localBounds = boundsFromOutline(outline);
-	return Box2Ops.create(localBounds.min.x + x, localBounds.min.y + y, localBounds.max.x + x, localBounds.max.y + y);
-}
-
-/**
  * Rotate a point around the origin
  *
  * @param p - Point to rotate
@@ -389,9 +246,8 @@ function strokeBounds(shape: StrokeShape): Box2 {
  * @returns True if point is inside the rectangle
  */
 export function pointInRect(p: Vec2, shape: RectShape): boolean {
-	const { x, y, rot } = shape;
 	const { w, h } = shape.props;
-	const localP = worldToLocal(p, x, y, rot);
+	const localP = worldToLocal(p, shape);
 	return localP.x >= 0 && localP.x <= w && localP.y >= 0 && localP.y <= h;
 }
 
@@ -403,10 +259,9 @@ export function pointInRect(p: Vec2, shape: RectShape): boolean {
  * @returns True if point is inside the ellipse
  */
 export function pointInEllipse(p: Vec2, shape: EllipseShape): boolean {
-	const { x, y, rot } = shape;
 	const { w, h } = shape.props;
 
-	const localP = worldToLocal(p, x, y, rot);
+	const localP = worldToLocal(p, shape);
 
 	const centerX = w / 2;
 	const centerY = h / 2;
@@ -451,8 +306,6 @@ export function pointNearSegment(p: Vec2, a: Vec2, b: Vec2, tolerance: number): 
  * @returns True if point is near the line
  */
 export function pointNearLine(p: Vec2, shape: LineShape | ArrowShape, tolerance = 5): boolean {
-	const { x, y, rot } = shape;
-
 	let points: Vec2[];
 	if (shape.type === 'line') {
 		points = [shape.props.a, shape.props.b];
@@ -463,7 +316,7 @@ export function pointNearLine(p: Vec2, shape: LineShape | ArrowShape, tolerance 
 		points = shape.props.points;
 	}
 
-	const localP = worldToLocal(p, x, y, rot);
+	const localP = worldToLocal(p, shape);
 
 	for (let i = 0; i < points.length - 1; i++) {
 		if (pointNearSegment(localP, points[i], points[i + 1], tolerance)) {
@@ -482,9 +335,8 @@ export function pointNearLine(p: Vec2, shape: LineShape | ArrowShape, tolerance 
  * @returns True if point is inside the text bounds
  */
 export function pointInText(p: Vec2, shape: TextShape): boolean {
-	const { x, y, rot } = shape;
 	const { fontSize, w } = shape.props;
-	const localP = worldToLocal(p, x, y, rot);
+	const localP = worldToLocal(p, shape);
 	const width = w ?? fontSize * 10;
 	const height = fontSize * 1.2;
 	return localP.x >= 0 && localP.x <= width && localP.y >= 0 && localP.y <= height;
@@ -498,9 +350,8 @@ export function pointInText(p: Vec2, shape: TextShape): boolean {
  * @returns True if point is inside the markdown block bounds
  */
 export function pointInMarkdown(p: Vec2, shape: MarkdownShape): boolean {
-	const { x, y, rot } = shape;
 	const { w, h, fontSize } = shape.props;
-	const localP = worldToLocal(p, x, y, rot);
+	const localP = worldToLocal(p, shape);
 	const width = w;
 	const height = h ?? fontSize * 10;
 	return localP.x >= 0 && localP.x <= width && localP.y >= 0 && localP.y <= height;
@@ -583,7 +434,7 @@ export function pointInPath(point: Vec2, geometry: PathGeometry): boolean {
 
 /** Test a world point against a native path's stroked segments. */
 export function pointNearPath(point: Vec2, shape: PathShape, tolerance = 5): boolean {
-	const local = worldToLocal(point, shape.x, shape.y, shape.rot);
+	const local = worldToLocal(point, shape);
 	const radius = Math.max(0, shape.props.stroke_width ?? 2) / 2 + tolerance;
 	for (const polyline of pathPolylines(shape.props, false)) {
 		for (let index = 1; index < polyline.length; index += 1) {
@@ -595,7 +446,7 @@ export function pointNearPath(point: Vec2, shape: PathShape, tolerance = 5): boo
 
 /** Test a world point against either the fill or stroke of a native path. */
 export function hitTestPath(point: Vec2, shape: PathShape, tolerance = 5): boolean {
-	const local = worldToLocal(point, shape.x, shape.y, shape.rot);
+	const local = worldToLocal(point, shape);
 	return (
 		(Boolean(shape.props.fill) && pointInPath(local, shape.props)) ||
 		(Boolean(shape.props.stroke) && pointNearPath(point, shape, tolerance))
@@ -612,39 +463,19 @@ export function hitTestPath(point: Vec2, shape: PathShape, tolerance = 5): boole
  * @returns True if point is inside the stroke
  */
 export function hitTestStroke(p: Vec2, shape: StrokeShape): boolean {
-	const { x, y } = shape;
 	const { points } = shape.props;
 
 	if (points.length < 2) return false;
 
-	const bounds = strokeBounds(shape);
+	const bounds = shapeBounds(shape);
 	if (p.x < bounds.min.x || p.x > bounds.max.x || p.y < bounds.min.y || p.y > bounds.max.y) {
 		return false;
 	}
 
-	const localP = { x: p.x - x, y: p.y - y };
+	const localP = worldToLocal(p, shape);
 
 	const outline = getStrokeOutline(shape);
 	return pointInPolygon(localP, outline);
-}
-
-/**
- * Transform a point from world coordinates to shape-local coordinates
- *
- * @param p - Point in world coordinates
- * @param shapeX - Shape x position
- * @param shapeY - Shape y position
- * @param shapeRot - Shape rotation in radians
- * @returns Point in shape-local coordinates
- */
-function worldToLocal(p: Vec2, shapeX: number, shapeY: number, shapeRot: number): Vec2 {
-	const translated = { x: p.x - shapeX, y: p.y - shapeY };
-
-	if (shapeRot === 0) {
-		return translated;
-	}
-
-	return Vec2Ops.rotate(translated, -shapeRot);
 }
 
 /**
@@ -706,6 +537,10 @@ export function hitTestPoint(state: EditorState, worldPoint: Vec2, tolerance = 5
 				if (hitTestPath(worldPoint, shape, tolerance)) {
 					return shape.id;
 				}
+				break;
+			}
+			case 'container': {
+				if (Box2Ops.containsPoint(shapeBounds(shape), worldPoint)) return shape.id;
 				break;
 			}
 		}
@@ -801,8 +636,8 @@ export function resolveArrowEndpoints(state: EditorState, arrowId: string): { a:
 
 	const firstPoint = points[0];
 	const lastPoint = points[points.length - 1];
-	let a: Vec2 = { x: arrow.x + firstPoint.x, y: arrow.y + firstPoint.y };
-	let b: Vec2 = { x: arrow.x + lastPoint.x, y: arrow.y + lastPoint.y };
+	let a = localToWorld(arrow, firstPoint);
+	let b = localToWorld(arrow, lastPoint);
 
 	const arrowStrokeWidth = arrow.props.style?.width ?? 2;
 	const targetShapeStrokeWidth = 2;

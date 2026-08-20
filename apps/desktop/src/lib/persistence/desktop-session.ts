@@ -27,7 +27,7 @@ import type {
 	ShapeRecord,
 	TransactionDraft
 } from '@inkfinite/bindings';
-import type { EditorPatch, EditorProjection } from '@inkfinite/bindings/editor';
+import type { EditorPatch, EditorProjection, EditorTransform } from '@inkfinite/bindings/editor';
 
 const ACTOR_ID = 'actor:desktop';
 
@@ -1040,7 +1040,16 @@ function loadedDocFromSnapshot(snapshot: DocumentSnapshot): LoadedDoc {
 			if (!layer) continue;
 			const layerShapeIds: string[] = [];
 			for (const shapeId of layer.shape_ids) {
-				flattenShape(snapshot, page.id, layer.id, shapeId, undefined, layerShapeIds, shapes);
+				flattenShape(
+					snapshot,
+					page.id,
+					layer.id,
+					shapeId,
+					undefined,
+					identityEditorTransform(),
+					layerShapeIds,
+					shapes
+				);
 			}
 			flattened.push(...layerShapeIds);
 			layers[layer.id] = {
@@ -1080,15 +1089,15 @@ function flattenShape(
 	layerId: string,
 	shapeId: string,
 	groupId: string | undefined,
+	parentTransform: EditorTransform,
 	flattened: string[],
 	shapes: Record<string, EditorShapeRecord>
 ) {
 	const shape = snapshot.document.shapes[shapeId];
 	if (!shape) return;
-	if (shape.kind !== 'container') {
-		flattened.push(shape.id);
-		shapes[shape.id] = { ...editorShapeFromSnapshot(shape, pageId, groupId), layerId };
-	}
+	const worldTransform = multiplyEditorTransforms(parentTransform, nativeEditorTransform(shape));
+	flattened.push(shape.id);
+	shapes[shape.id] = { ...editorShapeFromSnapshot(shape, pageId, groupId, worldTransform), layerId };
 	for (const childId of shape.child_ids) {
 		flattenShape(
 			snapshot,
@@ -1096,13 +1105,19 @@ function flattenShape(
 			layerId,
 			childId,
 			shape.kind === 'container' ? shape.id : groupId,
+			worldTransform,
 			flattened,
 			shapes
 		);
 	}
 }
 
-function editorShapeFromSnapshot(shape: ShapeRecord, pageId: string, groupId?: string): EditorShapeRecord {
+function editorShapeFromSnapshot(
+	shape: ShapeRecord,
+	pageId: string,
+	groupId: string | undefined,
+	worldTransform = nativeEditorTransform(shape)
+): EditorShapeRecord {
 	const properties = { ...(shape.properties as Record<string, JsonValue>) };
 	if ('width' in properties) {
 		properties.w = properties.width;
@@ -1125,9 +1140,10 @@ function editorShapeFromSnapshot(shape: ShapeRecord, pageId: string, groupId?: s
 		id: shape.id,
 		type: shape.kind as EditorShapeRecord['type'],
 		pageId,
-		x: shape.transform.translation.x,
-		y: shape.transform.translation.y,
-		rot: shape.transform.rotation,
+		x: worldTransform.e,
+		y: worldTransform.f,
+		rot: Math.atan2(worldTransform.b, worldTransform.a),
+		editorTransform: worldTransform,
 		opacity: shape.style.opacity,
 		...(shape.style.fill_opacity !== null ? { fillOpacity: shape.style.fill_opacity } : {}),
 		...(shape.style.stroke_opacity !== null ? { strokeOpacity: shape.style.stroke_opacity } : {}),
@@ -1135,6 +1151,34 @@ function editorShapeFromSnapshot(shape: ShapeRecord, pageId: string, groupId?: s
 		agentEditable: shape.metadata.agent_editable,
 		props: properties as EditorShapeRecord['props']
 	} as EditorShapeRecord;
+}
+
+function identityEditorTransform(): EditorTransform {
+	return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+}
+
+function nativeEditorTransform(shape: ShapeRecord): EditorTransform {
+	const cos = Math.cos(shape.transform.rotation);
+	const sin = Math.sin(shape.transform.rotation);
+	return {
+		a: cos * shape.transform.scale_x,
+		b: sin * shape.transform.scale_x,
+		c: -sin * shape.transform.scale_y,
+		d: cos * shape.transform.scale_y,
+		e: shape.transform.translation.x,
+		f: shape.transform.translation.y
+	};
+}
+
+function multiplyEditorTransforms(parent: EditorTransform, child: EditorTransform): EditorTransform {
+	return {
+		a: parent.a * child.a + parent.c * child.b,
+		b: parent.b * child.a + parent.d * child.b,
+		c: parent.a * child.c + parent.c * child.d,
+		d: parent.b * child.c + parent.d * child.d,
+		e: parent.a * child.e + parent.c * child.f + parent.e,
+		f: parent.b * child.e + parent.d * child.f + parent.f
+	};
 }
 
 function applyPatch(doc: LoadedDoc, patch: DocPatch): LoadedDoc {

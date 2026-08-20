@@ -6,6 +6,7 @@
 		InterchangeFormat,
 		LineShape,
 		MarkdownShape,
+		PathShape,
 		RectShape,
 		ShapeRecord,
 		Store,
@@ -314,42 +315,59 @@
 		downloadBlob(blob, filename);
 	}
 
-	function shapeSupportsFill(shape: ShapeRecord): shape is RectShape | EllipseShape | TextShape {
-		return shape.type === 'rect' || shape.type === 'ellipse' || shape.type === 'text';
+	function shapeSupportsFill(
+		shape: ShapeRecord
+	): shape is RectShape | EllipseShape | TextShape | PathShape {
+		return (
+			shape.type === 'rect' ||
+			shape.type === 'ellipse' ||
+			shape.type === 'text' ||
+			shape.type === 'path'
+		);
 	}
 
 	function shapeSupportsStroke(
 		shape: ShapeRecord
-	): shape is RectShape | EllipseShape | LineShape | ArrowShape {
+	): shape is RectShape | EllipseShape | LineShape | ArrowShape | PathShape {
 		return (
 			shape.type === 'rect' ||
 			shape.type === 'ellipse' ||
 			shape.type === 'line' ||
-			shape.type === 'arrow'
+			shape.type === 'arrow' ||
+			shape.type === 'path'
 		);
 	}
 
 	function shapeSupportsFillOpacity(
 		shape: ShapeRecord
-	): shape is RectShape | EllipseShape | TextShape | MarkdownShape {
+	): shape is RectShape | EllipseShape | TextShape | MarkdownShape | PathShape {
 		return (
 			shape.type === 'rect' ||
 			shape.type === 'ellipse' ||
 			shape.type === 'text' ||
-			shape.type === 'markdown'
+			shape.type === 'markdown' ||
+			shape.type === 'path'
 		);
 	}
 
 	function shapeSupportsStrokeOpacity(
 		shape: ShapeRecord
-	): shape is RectShape | EllipseShape | LineShape | ArrowShape | StrokeShape | MarkdownShape {
+	): shape is
+		| RectShape
+		| EllipseShape
+		| LineShape
+		| ArrowShape
+		| StrokeShape
+		| MarkdownShape
+		| PathShape {
 		return (
 			shape.type === 'rect' ||
 			shape.type === 'ellipse' ||
 			shape.type === 'line' ||
 			shape.type === 'arrow' ||
 			shape.type === 'stroke' ||
-			shape.type === 'markdown'
+			shape.type === 'markdown' ||
+			shape.type === 'path'
 		);
 	}
 
@@ -398,6 +416,9 @@
 				newShapes[shape.id] = updated;
 			} else if (shape.type === 'ellipse') {
 				const updated: EllipseShape = { ...shape, props: { ...shape.props, fill: color } };
+				newShapes[shape.id] = updated;
+			} else if (shape.type === 'path') {
+				const updated: PathShape = { ...shape, props: { ...shape.props, fill: color } };
 				newShapes[shape.id] = updated;
 			}
 		}
@@ -449,6 +470,14 @@
 					const updated: ArrowShape = {
 						...shape,
 						props: { ...shape.props, style: { ...shape.props.style, stroke: color } }
+					};
+					newShapes[shape.id] = updated;
+					break;
+				}
+				case 'path': {
+					const updated: PathShape = {
+						...shape,
+						props: { ...shape.props, stroke: color }
 					};
 					newShapes[shape.id] = updated;
 					break;

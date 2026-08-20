@@ -212,7 +212,18 @@ function applyKeyboardShortcut(
 			for (const id of state.ui.selectionIds) {
 				const shape = shapes[id];
 				if (!shape) continue;
-				shapes[id] = { ...shape, x: shape.x + delta.x, y: shape.y + delta.y };
+				shapes[id] = shape.editorTransform
+					? {
+							...shape,
+							x: shape.x + delta.x,
+							y: shape.y + delta.y,
+							editorTransform: {
+								...shape.editorTransform,
+								e: shape.editorTransform.e + delta.x,
+								f: shape.editorTransform.f + delta.y
+							}
+						}
+					: { ...shape, x: shape.x + delta.x, y: shape.y + delta.y };
 				changed = true;
 			}
 			if (changed) return { ...state, doc: { ...state.doc, shapes } };

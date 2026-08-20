@@ -17,6 +17,8 @@ import {
 	diffDoc,
 	EllipseTool,
 	getInteractiveShapesOnCurrentPage,
+	hitTestPoint,
+	selectionTarget,
 	LineTool,
 	LayerRecord,
 	exportInterchange,
@@ -692,9 +694,24 @@ export function createCanvasController(
 		}
 		const rect = canvas.getBoundingClientRect();
 		const screen = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-		const world = Camera.screenToWorld(store.getState().camera, screen, getViewport());
+		const state = store.getState();
+		const world = Camera.screenToWorld(state.camera, screen, getViewport());
+		const hitShapeId = hitTestPoint(state, world);
+		const targetId = hitShapeId ? selectionTarget(state, hitShapeId) : null;
+		const target = targetId ? state.doc.shapes[targetId] : undefined;
+		if (target?.type === 'container') {
+			store.setState((current) => ({
+				...current,
+				ui: {
+					...current.ui,
+					containerPath: [...(current.ui.containerPath ?? []), target.id],
+					selectionIds: []
+				}
+			}));
+			return;
+		}
 
-		const shapes = getInteractiveShapesOnCurrentPage(store.getState());
+		const shapes = getInteractiveShapesOnCurrentPage(state);
 		for (let index = shapes.length - 1; index >= 0; index--) {
 			const shape = shapes[index];
 			if (shape.type === 'text') {

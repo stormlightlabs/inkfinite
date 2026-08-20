@@ -1,6 +1,6 @@
 //! Projection and reconciliation between native documents and editor state.
 //!
-//! The editor works with a flat list of drawable shapes, while the canonical
+//! The editor works with a flat depth-first shape list, while the canonical
 //! document stores containers and parent-relative transforms. This module is
 //! the shared boundary between those representations: projections expose
 //! world-space transforms, and editor patches are converted back into minimal
@@ -56,7 +56,11 @@ impl From<EditorTransform> for Affine {
     }
 }
 
-/// One drawable shape projected into the editor's flat shape collection.
+/// One shape projected into the editor's flat depth-first shape collection.
+///
+/// Containers are included so the editor can select them as one object and
+/// enter their child scope. They have no direct drawing primitive; their
+/// descendants remain in the same depth-first order.
 #[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct EditorShape {
     /// Stable shape identifier.
@@ -117,7 +121,7 @@ pub struct EditorPage {
     pub id: PageId,
     /// User-visible page name.
     pub name: String,
-    /// Drawable shape IDs in depth-first draw order.
+    /// Shape IDs in depth-first draw order, including containers.
     pub shape_ids: Vec<ShapeId>,
     /// Layer IDs in back-to-front order.
     pub layer_ids: Vec<LayerId>,
@@ -132,7 +136,7 @@ pub struct EditorLayer {
     pub page_id: PageId,
     /// User-visible layer name.
     pub name: String,
-    /// Drawable shape IDs in depth-first draw order.
+    /// Shape IDs in depth-first draw order, including containers.
     pub shape_ids: Vec<ShapeId>,
     /// Whether the layer participates in rendering.
     pub visible: bool,
@@ -166,7 +170,7 @@ pub struct EditorBinding {
 pub struct EditorOrder {
     /// Page IDs in document order.
     pub page_ids: Vec<PageId>,
-    /// Flattened drawable shape order by page.
+    /// Flattened depth-first shape order by page.
     pub shape_order: BTreeMap<PageId, Vec<ShapeId>>,
     /// Layer records in their projected form.
     pub layers: BTreeMap<LayerId, EditorLayer>,
@@ -179,7 +183,7 @@ pub struct EditorProjection {
     pub pages: BTreeMap<PageId, EditorPage>,
     /// Projected layers.
     pub layers: BTreeMap<LayerId, EditorLayer>,
-    /// Drawable shapes with composed world transforms.
+    /// Shapes with composed world transforms, including containers.
     pub shapes: BTreeMap<ShapeId, EditorShape>,
     /// Projected bindings.
     pub bindings: BTreeMap<crate::BindingId, EditorBinding>,
@@ -412,30 +416,28 @@ fn append_projected_shape(
     group_id: Option<ShapeId>, flattened: &mut Vec<ShapeId>, shapes: &mut BTreeMap<ShapeId, EditorShape>,
 ) {
     let Some(shape) = document.shapes.get(shape_id) else { return };
-    if shape.kind.as_str() != CONTAINER_KIND {
-        flattened.push(shape.id.clone());
-        let world = world_transform(document, shape);
-        let properties = editor_properties(&shape.properties);
-        shapes.insert(
-            shape.id.clone(),
-            EditorShape {
-                id: shape.id.clone(),
-                kind: shape.kind.clone(),
-                page_id: page.id.clone(),
-                transform: world.into(),
-                x: world.e,
-                y: world.f,
-                rot: world.b.atan2(world.a),
-                group_id: group_id.clone(),
-                layer_id: layer.id.clone(),
-                opacity: shape.style.opacity,
-                fill_opacity: shape.style.fill_opacity,
-                stroke_opacity: shape.style.stroke_opacity,
-                agent_editable: shape.metadata.agent_editable,
-                props: properties,
-            },
-        );
-    }
+    flattened.push(shape.id.clone());
+    let world = world_transform(document, shape);
+    let properties = editor_properties(&shape.properties);
+    shapes.insert(
+        shape.id.clone(),
+        EditorShape {
+            id: shape.id.clone(),
+            kind: shape.kind.clone(),
+            page_id: page.id.clone(),
+            transform: world.into(),
+            x: world.e,
+            y: world.f,
+            rot: world.b.atan2(world.a),
+            group_id: group_id.clone(),
+            layer_id: layer.id.clone(),
+            opacity: shape.style.opacity,
+            fill_opacity: shape.style.fill_opacity,
+            stroke_opacity: shape.style.stroke_opacity,
+            agent_editable: shape.metadata.agent_editable,
+            props: properties,
+        },
+    );
     let child_group = if shape.kind.as_str() == CONTAINER_KIND { Some(shape.id.clone()) } else { group_id };
     for child_id in &shape.child_ids {
         append_projected_shape(document, page, layer, child_id, child_group.clone(), flattened, shapes);
@@ -878,7 +880,7 @@ mod tests {
         let actual: Affine = child.transform.into();
         assert!(same_affine(actual, expected));
         assert_eq!(child.group_id, Some(ShapeId::from("shape:group")));
-        assert_eq!(projection.shapes.len(), 1);
+        assert_eq!(projection.shapes.len(), 3);
         assert_eq!(child.props["w"], Value::from(20.0));
         assert!(!child.props.contains_key("width"));
     }

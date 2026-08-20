@@ -41,6 +41,8 @@
   compute committed stroke bounds, and exercise shared Rust/TypeScript geometry fixtures.
 - Browser smoke coverage for the compiled WASM document engine and real worker across create,
   mutate, save, reopen, projection, undo, redo, SVG import, and SVG rendering.
+- Hierarchical vector object editing with selectable imported containers, nested selection scopes,
+  full affine hit testing, and world-space child transforms for move, resize, and rotation.
 
 #### SVG Interop
 

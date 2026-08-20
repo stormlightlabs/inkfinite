@@ -475,6 +475,9 @@ function excalidrawElement(
 		case 'path':
 			warnings.add('excalidraw-path', 'Native paths are omitted from Excalidraw export.');
 			return null;
+		case 'container':
+			warnings.add('excalidraw-container', 'Containers are represented by their child shapes.');
+			return null;
 		case 'stroke': {
 			const points = shape.props.points.map(([x, y]) => ({ x, y }));
 			const normalized = normalizePoints(points, shape.x, shape.y, shape.rot);

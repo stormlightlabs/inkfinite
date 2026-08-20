@@ -71,14 +71,14 @@ document lifecycle, including SVG import and rendering.
 
 #### Navigation and transforms
 
-- [ ] Audit current nested-transform selection behavior
-- [ ] Select an imported SVG container as one object
-- [ ] Enter a container for child selection
-- [ ] Leave a container and return to parent selection
-- [ ] Move nested child shapes
-- [ ] Resize nested child shapes
-- [ ] Rotate nested child shapes
-- [ ] Restyle nested child shapes
+- [x] Audit current nested-transform selection behavior
+- [x] Select an imported SVG container as one object
+- [x] Enter a container for child selection
+- [x] Leave a container and return to parent selection
+- [x] Move nested child shapes
+- [x] Resize nested child shapes
+- [x] Rotate nested child shapes
+- [x] Restyle nested child shapes
 
 #### Hierarchy semantics and tests
 

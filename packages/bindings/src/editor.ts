@@ -60,7 +60,11 @@ export type EditorTransform = {
 };
 
 /**
- * One drawable shape projected into the editor's flat shape collection.
+ * One shape projected into the editor's flat depth-first shape collection.
+ *
+ * Containers are included so the editor can select them as one object and
+ * enter their child scope. They have no direct drawing primitive; their
+ * descendants remain in the same depth-first order.
  */
 export type EditorShape = {
 	/**
@@ -164,7 +168,7 @@ export type EditorPage = {
 	 */
 	name: string;
 	/**
-	 * Drawable shape IDs in depth-first draw order.
+	 * Shape IDs in depth-first draw order, including containers.
 	 */
 	shape_ids: Array<ShapeId>;
 	/**
@@ -190,7 +194,7 @@ export type EditorLayer = {
 	 */
 	name: string;
 	/**
-	 * Drawable shape IDs in depth-first draw order.
+	 * Shape IDs in depth-first draw order, including containers.
 	 */
 	shape_ids: Array<ShapeId>;
 	/**
@@ -246,7 +250,7 @@ export type EditorOrder = {
 	 */
 	page_ids: Array<PageId>;
 	/**
-	 * Flattened drawable shape order by page.
+	 * Flattened depth-first shape order by page.
 	 */
 	shape_order: { [key in PageId]: Array<ShapeId> };
 	/**
@@ -268,7 +272,7 @@ export type EditorProjection = {
 	 */
 	layers: { [key in LayerId]: EditorLayer };
 	/**
-	 * Drawable shapes with composed world transforms.
+	 * Shapes with composed world transforms, including containers.
 	 */
 	shapes: { [key in ShapeId]: EditorShape };
 	/**

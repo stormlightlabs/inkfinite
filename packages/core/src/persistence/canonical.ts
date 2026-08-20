@@ -64,7 +64,10 @@ export function toCanonicalDocumentSnapshot(
 			id: layer.id,
 			page_id: layer.pageId,
 			name: layer.name,
-			shape_ids: [...layer.shapeIds],
+			shape_ids: layer.shapeIds.filter((shapeId) => {
+				const shape = document.shapes[shapeId];
+				return shape?.layerId === layer.id && !shape.groupId;
+			}),
 			visible: layer.visible,
 			locked: layer.locked,
 			opacity: clampOpacity(layer.opacity),
@@ -76,7 +79,7 @@ export function toCanonicalDocumentSnapshot(
 	for (const shape of Object.values(document.shapes)) {
 		const layerId = shape.layerId ?? ownerByShape.get(shape.id);
 		if (!layerId || !nativeLayers[layerId]) continue;
-		nativeShapes[shape.id] = nativeShape(shape, layerId);
+		nativeShapes[shape.id] = nativeShape(shape, layerId, document);
 	}
 
 	const nativeBindings: Record<string, NativeBindingRecord> = {};
@@ -236,12 +239,10 @@ export function fromCanonicalDocumentSnapshot(snapshot: NativeDocumentSnapshot):
 				const native = snapshot.document.shapes[shapeId];
 				if (!native) return;
 				const world = multiplyAffine(transform, transformFromNative(native.transform));
-				if (native.kind !== 'container') {
-					const shape = editorShape(native, page.id, layer.id, parent, world);
-					shapes[shape.id] = shape;
-					layerShapeIds.push(shape.id);
-					pages[page.id]!.shapeIds.push(shape.id);
-				}
+				const shape = editorShape(native, page.id, layer.id, parent, world);
+				shapes[shape.id] = shape;
+				layerShapeIds.push(shape.id);
+				pages[page.id]!.shapeIds.push(shape.id);
 				for (const childId of native.child_ids)
 					walk(childId, native.kind === 'container' ? native.id : parent, world);
 			};
@@ -551,8 +552,23 @@ function shapePatch(
 ): Extract<EditorPatch, { type: 'shape' }> | null {
 	const parentBefore = shapeParent(before, beforeDocument);
 	const parentAfter = shapeParent(after, afterDocument);
-	const transformChanged =
+	let transformChanged =
 		JSON.stringify(editorTransform(before, before)) !== JSON.stringify(editorTransform(after, before));
+	if (transformChanged && parentBefore.kind === 'shape' && parentAfter.kind === 'shape') {
+		const beforeParent = beforeDocument.shapes[parentBefore.id];
+		const afterParent = afterDocument.shapes[parentAfter.id];
+		if (beforeParent && afterParent) {
+			const beforeLocal = multiplyAffine(
+				inverseAffine(editorTransform(beforeParent)),
+				editorTransform(before, before)
+			);
+			const afterLocal = multiplyAffine(
+				inverseAffine(editorTransform(afterParent)),
+				editorTransform(after, before)
+			);
+			transformChanged = !sameAffine(beforeLocal, afterLocal);
+		}
+	}
 	const propertiesChanged = JSON.stringify(before.props) !== JSON.stringify(after.props);
 	const styleChanged = JSON.stringify(shapeStyle(before)) !== JSON.stringify(shapeStyle(after));
 	const orderChanged = skipDeletedLayerParent
@@ -581,7 +597,7 @@ function shapePatch(
 
 function editorTransform(shape: ShapeRecord, previous?: ShapeRecord): EditorTransform {
 	const current = shape.editorTransform ? { ...shape.editorTransform } : transformFromRotation(shape.rot, 1, 1);
-	if (previous && Math.abs(shape.rot - previous.rot) > 1e-9) {
+	if (previous && !shape.editorTransform && Math.abs(shape.rot - previous.rot) > 1e-9) {
 		const previousTransform = previous.editorTransform ?? transformFromRotation(previous.rot, 1, 1);
 		const scaleX = Math.hypot(previousTransform.a, previousTransform.b);
 		const determinant = previousTransform.a * previousTransform.d - previousTransform.b * previousTransform.c;
@@ -627,6 +643,60 @@ function orderAnchor(shapeId: string, parent: ShapeParent, document: Document) {
 		: { position: 'after' as const, sibling_id: ids[index - 1] ?? ids.at(-1)! };
 }
 
+function nativePropertiesForShape(shape: ShapeRecord): ShapeProperties {
+	const properties = JSON.parse(JSON.stringify(shape.props)) as ShapeProperties;
+	if (shape.type !== 'container' && !shape.groupId) return properties;
+	if ('w' in properties) {
+		properties.width = properties.w;
+		delete properties.w;
+	}
+	if ('h' in properties) {
+		properties.height = properties.h;
+		delete properties.h;
+	}
+	return properties;
+}
+
+function nativeTransform(shape: ShapeRecord, document: Document): Transform {
+	const world = editorTransform(shape);
+	const parent = shape.groupId ? document.shapes[shape.groupId] : undefined;
+	const parentWorld = parent ? editorTransform(parent) : identityAffine();
+	const local = multiplyAffine(inverseAffine(parentWorld), world);
+	const scaleX = Math.hypot(local.a, local.b);
+	const determinant = local.a * local.d - local.b * local.c;
+	const scaleY = scaleX > Number.EPSILON ? determinant / scaleX : 1;
+	return {
+		translation: { x: local.e, y: local.f },
+		rotation: Math.atan2(local.b, local.a),
+		scale_x: scaleX,
+		scale_y: scaleY
+	};
+}
+
+function inverseAffine(value: Affine): Affine {
+	const determinant = value.a * value.d - value.b * value.c;
+	if (Math.abs(determinant) <= Number.EPSILON) return identityAffine();
+	return {
+		a: value.d / determinant,
+		b: -value.b / determinant,
+		c: -value.c / determinant,
+		d: value.a / determinant,
+		e: (value.c * value.f - value.d * value.e) / determinant,
+		f: (value.b * value.e - value.a * value.f) / determinant
+	};
+}
+
+function sameAffine(left: Affine, right: Affine): boolean {
+	return [
+		[left.a, right.a],
+		[left.b, right.b],
+		[left.c, right.c],
+		[left.d, right.d],
+		[left.e, right.e],
+		[left.f, right.f]
+	].every(([a, b]) => Math.abs(a - b) <= 1e-9 * (1 + Math.max(Math.abs(a), Math.abs(b))));
+}
+
 function nativeBinding(binding: import('../model').BindingRecord): NativeBindingRecord {
 	return {
 		id: binding.id,
@@ -642,7 +712,7 @@ function nativeBinding(binding: import('../model').BindingRecord): NativeBinding
 	};
 }
 
-function nativeShape(shape: ShapeRecord, layerId: string): NativeShapeRecord {
+function nativeShape(shape: ShapeRecord, layerId: string, document: Document): NativeShapeRecord {
 	const metadata: SemanticMetadata = {
 		name: null,
 		role: null,
@@ -660,11 +730,13 @@ function nativeShape(shape: ShapeRecord, layerId: string): NativeShapeRecord {
 	return {
 		id: shape.id,
 		kind: shape.type,
-		parent: { kind: 'layer', id: layerId },
-		transform: { translation: { x: shape.x, y: shape.y }, rotation: shape.rot, scale_x: 1, scale_y: 1 },
-		child_ids: [],
+		parent: shapeParent(shape, document),
+		transform: nativeTransform(shape, document),
+		child_ids: Object.values(document.shapes)
+			.filter((candidate) => candidate.groupId === shape.id)
+			.map((candidate) => candidate.id),
 		layout: null,
-		properties: JSON.parse(JSON.stringify(shape.props)) as ShapeProperties,
+		properties: nativePropertiesForShape(shape),
 		metadata,
 		style,
 		version: 1

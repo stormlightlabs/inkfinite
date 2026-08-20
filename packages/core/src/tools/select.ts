@@ -4,12 +4,16 @@ import {
 	computePolylineLength,
 	getPointAtDistance,
 	hitTestPoint,
+	localToWorld,
 	resolveArrowEndpoints,
-	shapeBounds
+	shapeBounds,
+	localShapeBounds,
+	shapeTransform,
+	worldToLocal
 } from '../geom';
-import { Box2, clamp, type Vec2, Vec2 as Vec2Ops } from '../math';
+import { Box2, clamp, Mat3, type Vec2, Vec2 as Vec2Ops } from '../math';
 import { BindingRecord, ShapeRecord } from '../model';
-import { EditorState, getCurrentPage, getInteractiveShapesOnCurrentPage, type ToolId } from '../reactivity';
+import { EditorState, getCurrentPage, getSelectionScopeShapes, selectionTarget, type ToolId } from '../reactivity';
 import type { Tool } from './base';
 
 /**
@@ -22,6 +26,8 @@ type SelectToolState = {
 	dragStartWorld: Vec2 | null;
 	/** Initial positions of shapes being dragged (shape id -> {x, y}) */
 	initialShapePositions: Map<string, Vec2>;
+	/** Full shape snapshots used to preview nested affine movement. */
+	initialShapes: Map<string, ShapeRecord>;
 	/** Marquee selection start point in world coordinates */
 	marqueeStart: Vec2 | null;
 	/** Marquee selection end point in world coordinates */
@@ -78,6 +84,7 @@ export class SelectTool implements Tool {
 			isDragging: false,
 			dragStartWorld: null,
 			initialShapePositions: new Map(),
+			initialShapes: new Map(),
 			marqueeStart: null,
 			marqueeEnd: null,
 			activeHandle: null,
@@ -170,6 +177,11 @@ export class SelectTool implements Tool {
 		this.toolState.handleStartBounds = shapeBounds(shape);
 		this.toolState.handleInitialShapes.clear();
 		this.toolState.handleInitialShapes.set(shape.id, ShapeRecord.clone(shape));
+		for (const descendant of Object.values(state.doc.shapes)) {
+			if (hasSelectedAncestor(descendant, [shape.id], state)) {
+				this.toolState.handleInitialShapes.set(descendant.id, ShapeRecord.clone(descendant));
+			}
+		}
 		this.toolState.isDragging = false;
 		this.toolState.dragStartWorld = point;
 		const bounds = this.toolState.handleStartBounds;
@@ -188,59 +200,42 @@ export class SelectTool implements Tool {
 	private handleShapeClick(state: EditorState, shapeId: string, action: Action): EditorState {
 		if (action.type !== 'pointer-down') return state;
 
-		const clickedShape = state.doc.shapes[shapeId];
-		if (!clickedShape) return state;
+		const targetId = selectionTarget(state, shapeId);
+		const clickedShape = targetId ? state.doc.shapes[targetId] : undefined;
+		if (!clickedShape || !targetId) return state;
 
 		const isShiftHeld = action.modifiers.shift;
-
-		let idsToInteractWith: string[] = [shapeId];
-		if (clickedShape.groupId) {
-			idsToInteractWith = Object.values(state.doc.shapes)
-				.filter((s) => s.groupId === clickedShape.groupId)
-				.map((s) => s.id);
-		}
-
-		const isAnySelected = idsToInteractWith.some((id) => state.ui.selectionIds.includes(id));
-
-		let newSelectionIds: string[];
-
-		if (isShiftHeld) {
-			if (isAnySelected) {
-				newSelectionIds = state.ui.selectionIds.filter((id) => !idsToInteractWith.includes(id));
-			} else {
-				newSelectionIds = [...state.ui.selectionIds, ...idsToInteractWith];
-			}
-		} else {
-			if (isAnySelected && !isShiftHeld) {
-				newSelectionIds = state.ui.selectionIds;
-			} else {
-				newSelectionIds = idsToInteractWith;
-			}
-		}
-
-		if (isShiftHeld) {
-			const shouldSelect = !isAnySelected;
-			if (shouldSelect) {
-				newSelectionIds = [...new Set([...state.ui.selectionIds, ...idsToInteractWith])];
-			} else {
-				newSelectionIds = state.ui.selectionIds.filter((id) => !idsToInteractWith.includes(id));
-			}
-		} else {
-			if (isAnySelected) {
-				newSelectionIds = state.ui.selectionIds;
-			} else {
-				newSelectionIds = idsToInteractWith;
-			}
-		}
+		const legacyGroupIds =
+			clickedShape.groupId && !state.doc.shapes[clickedShape.groupId]
+				? Object.values(state.doc.shapes)
+						.filter((shape) => shape.groupId === clickedShape.groupId)
+						.map((shape) => shape.id)
+				: [targetId];
+		const isSelected = legacyGroupIds.some((id) => state.ui.selectionIds.includes(id));
+		const newSelectionIds = isShiftHeld
+			? isSelected
+				? state.ui.selectionIds.filter((id) => !legacyGroupIds.includes(id))
+				: [...state.ui.selectionIds, ...legacyGroupIds]
+			: isSelected
+				? state.ui.selectionIds
+				: legacyGroupIds;
 
 		this.toolState.isDragging = true;
 		this.toolState.dragStartWorld = action.world;
 		this.toolState.initialShapePositions.clear();
+		this.toolState.initialShapes.clear();
 
 		for (const id of newSelectionIds) {
 			const shape = state.doc.shapes[id];
 			if (shape) {
 				this.toolState.initialShapePositions.set(id, { x: shape.x, y: shape.y });
+				this.toolState.initialShapes.set(id, ShapeRecord.clone(shape));
+			}
+		}
+		for (const shape of Object.values(state.doc.shapes)) {
+			if (!newSelectionIds.includes(shape.id) && hasSelectedAncestor(shape, newSelectionIds, state)) {
+				this.toolState.initialShapePositions.set(shape.id, { x: shape.x, y: shape.y });
+				this.toolState.initialShapes.set(shape.id, ShapeRecord.clone(shape));
 			}
 		}
 
@@ -305,7 +300,7 @@ export class SelectTool implements Tool {
 
 		let updated: ShapeRecord | null = null;
 		if (this.toolState.activeHandle === 'rotate') {
-			updated = this.rotateShape(initialShape, action.world);
+			updated = this.rotateShape(state, initialShape, action.world);
 		} else if (this.toolState.activeHandle === 'arrow-label') {
 			updated = this.adjustArrowLabel(initialShape, action.world);
 		} else if (
@@ -328,6 +323,21 @@ export class SelectTool implements Tool {
 		}
 
 		let newState = { ...state, doc: { ...state.doc, shapes: { ...state.doc.shapes, [shapeId]: updated } } };
+		if (initialShape.type === 'container') {
+			const delta = Mat3.multiply(
+				shapeTransform(updated),
+				Mat3.invert(shapeTransform(initialShape)) ?? Mat3.identity()
+			);
+			const shapes = { ...newState.doc.shapes };
+			for (const [descendantId, descendant] of this.toolState.handleInitialShapes) {
+				if (descendantId === shapeId) continue;
+				shapes[descendantId] = updateShapeTransform(
+					descendant,
+					Mat3.multiply(delta, shapeTransform(descendant))
+				);
+			}
+			newState = { ...newState, doc: { ...newState.doc, shapes } };
+		}
 
 		if (
 			currentShape.type === 'arrow' &&
@@ -373,11 +383,9 @@ export class SelectTool implements Tool {
 
 		const newShapes = { ...state.doc.shapes };
 
-		for (const [shapeId, initialPos] of this.toolState.initialShapePositions) {
-			const shape = newShapes[shapeId];
-			if (shape) {
-				newShapes[shapeId] = { ...shape, x: initialPos.x + delta.x, y: initialPos.y + delta.y };
-			}
+		for (const [shapeId] of this.toolState.initialShapePositions) {
+			const initialShape = this.toolState.initialShapes.get(shapeId);
+			if (initialShape) newShapes[shapeId] = translateShape(initialShape, delta);
 		}
 
 		return { ...state, doc: { ...state.doc, shapes: newShapes } };
@@ -427,6 +435,7 @@ export class SelectTool implements Tool {
 		this.toolState.isDragging = false;
 		this.toolState.dragStartWorld = null;
 		this.toolState.initialShapePositions.clear();
+		this.toolState.initialShapes.clear();
 		this.toolState.marqueeStart = null;
 		this.toolState.marqueeEnd = null;
 		this.notifyMarqueeChange();
@@ -450,17 +459,9 @@ export class SelectTool implements Tool {
 		if (!currentPage) return state;
 
 		const selectedIds: string[] = [];
-
-		const interactiveIds = new Set(getInteractiveShapesOnCurrentPage(state).map((shape) => shape.id));
-		for (const shapeId of currentPage.shapeIds) {
-			if (!interactiveIds.has(shapeId)) continue;
-			const shape = state.doc.shapes[shapeId];
-			if (shape) {
-				const bounds = shapeBounds(shape);
-				if (Box2.intersectsBox(marqueeBox, bounds)) {
-					selectedIds.push(shapeId);
-				}
-			}
+		for (const shape of getSelectionScopeShapes(state)) {
+			const bounds = shapeBounds(shape);
+			if (Box2.intersectsBox(marqueeBox, bounds)) selectedIds.push(shape.id);
 		}
 
 		return { ...state, ui: { ...state.ui, selectionIds: selectedIds } };
@@ -472,7 +473,26 @@ export class SelectTool implements Tool {
 	private handleKeyDown(state: EditorState, action: Action): EditorState {
 		if (action.type !== 'key-down') return state;
 
+		if (action.key === 'Enter' && state.ui.selectionIds.length === 1) {
+			const selected = state.doc.shapes[state.ui.selectionIds[0]];
+			if (selected?.type === 'container') {
+				return {
+					...state,
+					ui: {
+						...state.ui,
+						containerPath: [...(state.ui.containerPath ?? []), selected.id],
+						selectionIds: []
+					}
+				};
+			}
+		}
+
 		if (action.key === 'Escape') {
+			const path = state.ui.containerPath ?? [];
+			if (path.length > 0) {
+				const leaving = path[path.length - 1];
+				return { ...state, ui: { ...state.ui, containerPath: path.slice(0, -1), selectionIds: [leaving] } };
+			}
 			return { ...state, ui: { ...state.ui, selectionIds: [] } };
 		}
 
@@ -536,6 +556,7 @@ export class SelectTool implements Tool {
 			isDragging: false,
 			dragStartWorld: null,
 			initialShapePositions: new Map(),
+			initialShapes: new Map(),
 			marqueeStart: null,
 			marqueeEnd: null,
 			activeHandle: null,
@@ -573,7 +594,13 @@ export class SelectTool implements Tool {
 
 	private getHandlePositions(state: EditorState, shape: ShapeRecord): Array<{ id: HandleKind; position: Vec2 }> {
 		const handles: Array<{ id: HandleKind; position: Vec2 }> = [];
-		if (shape.type === 'rect' || shape.type === 'ellipse' || shape.type === 'text') {
+		if (
+			shape.type === 'rect' ||
+			shape.type === 'ellipse' ||
+			shape.type === 'text' ||
+			shape.type === 'markdown' ||
+			shape.type === 'container'
+		) {
 			const bounds = shapeBounds(shape);
 			const minX = bounds.min.x;
 			const maxX = bounds.max.x;
@@ -593,8 +620,8 @@ export class SelectTool implements Tool {
 				{ id: 'rotate', position: { x: centerX, y: minY - ROTATE_HANDLE_OFFSET } }
 			);
 		} else if (shape.type === 'line') {
-			const start = this.localToWorld(shape, shape.props.a);
-			const end = this.localToWorld(shape, shape.props.b);
+			const start = localToWorld(shape, shape.props.a);
+			const end = localToWorld(shape, shape.props.b);
 			handles.push({ id: 'line-start', position: start }, { id: 'line-end', position: end });
 		} else if (shape.type === 'arrow') {
 			const resolved = resolveArrowEndpoints(state, shape.id);
@@ -603,7 +630,7 @@ export class SelectTool implements Tool {
 
 				for (let i = 1; i < shape.props.points.length - 1; i++) {
 					const point = shape.props.points[i];
-					const worldPos = this.localToWorld(shape, point);
+					const worldPos = localToWorld(shape, point);
 					handles.push({ id: `arrow-point-${i}` as HandleKind, position: worldPos });
 				}
 
@@ -625,7 +652,7 @@ export class SelectTool implements Tool {
 
 					distance = Math.max(0, Math.min(distance, polylineLength));
 					const labelPos = getPointAtDistance(shape.props.points, distance);
-					const worldLabelPos = this.localToWorld(shape, labelPos);
+					const worldLabelPos = localToWorld(shape, labelPos);
 					handles.push({ id: 'arrow-label', position: worldLabelPos });
 				}
 			}
@@ -635,7 +662,7 @@ export class SelectTool implements Tool {
 
 	private resizeRectLikeShape(
 		initial: ShapeRecord,
-		bounds: Box2,
+		_bounds: Box2,
 		pointer: Vec2,
 		handle: HandleKind
 	): ShapeRecord | null {
@@ -643,69 +670,61 @@ export class SelectTool implements Tool {
 			initial.type !== 'rect' &&
 			initial.type !== 'ellipse' &&
 			initial.type !== 'text' &&
-			initial.type !== 'markdown'
+			initial.type !== 'markdown' &&
+			initial.type !== 'container'
 		) {
 			return null;
 		}
-		let minX = bounds.min.x;
-		let maxX = bounds.max.x;
-		let minY = bounds.min.y;
-		let maxY = bounds.max.y;
-
+		const dimensions =
+			initial.type === 'text'
+				? { width: initial.props.w ?? initial.props.fontSize * 10, height: initial.props.fontSize * 1.2 }
+				: initial.type === 'markdown'
+					? { width: initial.props.w, height: initial.props.h ?? initial.props.fontSize * 10 }
+					: { width: initial.props.w ?? 0, height: initial.props.h ?? 0 };
+		let minX = 0;
+		let maxX = dimensions.width;
+		let minY = 0;
+		let maxY = dimensions.height;
+		const localPointer = worldToLocal(pointer, initial);
 		const clampCoordinate = (value: number) => clamp(value, -1e6, 1e6);
 
 		switch (handle) {
-			case 'nw': {
-				minX = Math.min(clampCoordinate(pointer.x), maxX - MIN_RESIZE_SIZE);
-				minY = Math.min(clampCoordinate(pointer.y), maxY - MIN_RESIZE_SIZE);
+			case 'nw':
+			case 'w':
+			case 'sw':
+				minX = Math.min(clampCoordinate(localPointer.x), maxX - MIN_RESIZE_SIZE);
 				break;
-			}
-			case 'n': {
-				minY = Math.min(clampCoordinate(pointer.y), maxY - MIN_RESIZE_SIZE);
+			case 'ne':
+			case 'e':
+			case 'se':
+				maxX = Math.max(clampCoordinate(localPointer.x), minX + MIN_RESIZE_SIZE);
 				break;
-			}
-			case 'ne': {
-				maxX = Math.max(clampCoordinate(pointer.x), minX + MIN_RESIZE_SIZE);
-				minY = Math.min(clampCoordinate(pointer.y), maxY - MIN_RESIZE_SIZE);
+		}
+		switch (handle) {
+			case 'nw':
+			case 'n':
+			case 'ne':
+				minY = Math.min(clampCoordinate(localPointer.y), maxY - MIN_RESIZE_SIZE);
 				break;
-			}
-			case 'e': {
-				maxX = Math.max(clampCoordinate(pointer.x), minX + MIN_RESIZE_SIZE);
+			case 'sw':
+			case 's':
+			case 'se':
+				maxY = Math.max(clampCoordinate(localPointer.y), minY + MIN_RESIZE_SIZE);
 				break;
-			}
-			case 'se': {
-				maxX = Math.max(clampCoordinate(pointer.x), minX + MIN_RESIZE_SIZE);
-				maxY = Math.max(clampCoordinate(pointer.y), minY + MIN_RESIZE_SIZE);
-				break;
-			}
-			case 's': {
-				maxY = Math.max(clampCoordinate(pointer.y), minY + MIN_RESIZE_SIZE);
-				break;
-			}
-			case 'sw': {
-				minX = Math.min(clampCoordinate(pointer.x), maxX - MIN_RESIZE_SIZE);
-				maxY = Math.max(clampCoordinate(pointer.y), minY + MIN_RESIZE_SIZE);
-				break;
-			}
-			case 'w': {
-				minX = Math.min(clampCoordinate(pointer.x), maxX - MIN_RESIZE_SIZE);
-				break;
-			}
 		}
 
 		const width = Math.max(maxX - minX, MIN_RESIZE_SIZE);
 		const height = Math.max(maxY - minY, MIN_RESIZE_SIZE);
-
-		if (initial.type === 'text') {
-			return { ...initial, x: minX, y: minY, props: { ...initial.props, w: width } };
-		}
-
-		if (initial.type === 'markdown') {
-			return { ...initial, x: minX, y: minY, props: { ...initial.props, w: width, h: height } };
-		}
-
-		// @ts-expect-error union mismatch
-		return { ...initial, x: minX, y: minY, props: { ...initial.props, w: width, h: height } };
+		const matrix = shapeTransform(initial);
+		const translated = [...matrix] as Mat3;
+		translated[6] += matrix[0] * minX + matrix[3] * minY;
+		translated[7] += matrix[1] * minX + matrix[4] * minY;
+		let resized: ShapeRecord;
+		if (initial.type === 'text') resized = { ...initial, props: { ...initial.props, w: width } };
+		else if (initial.type === 'markdown')
+			resized = { ...initial, props: { ...initial.props, w: width, h: height } };
+		else resized = { ...initial, props: { ...initial.props, w: width, h: height } } as ShapeRecord;
+		return updateShapeTransform(resized, translated);
 	}
 
 	private adjustArrowLabel(initial: ShapeRecord, pointer: Vec2): ShapeRecord | null {
@@ -718,7 +737,7 @@ export class SelectTool implements Tool {
 			return null;
 		}
 
-		const localPointer = this.worldToLocal(initial, pointer);
+		const localPointer = worldToLocal(pointer, initial);
 		const points = initial.props.points;
 		const polylineLength = computePolylineLength(points);
 
@@ -773,7 +792,7 @@ export class SelectTool implements Tool {
 
 			const newPoints = initial.props.points.map((p, i) => {
 				if (i === pointIndex) {
-					return { x: pointer.x - initial.x, y: pointer.y - initial.y };
+					return worldToLocal(pointer, initial);
 				}
 				return p;
 			});
@@ -786,86 +805,46 @@ export class SelectTool implements Tool {
 			return null;
 		}
 
-		let startPoint: Vec2, endPoint: Vec2;
-
-		if (initial.type === 'line') {
-			startPoint = initial.props.a;
-			endPoint = initial.props.b;
-		} else {
-			if (!initial.props.points || initial.props.points.length < 2) {
-				return null;
-			}
-			startPoint = initial.props.points[0];
-			endPoint = initial.props.points[initial.props.points.length - 1];
+		if (initial.type === 'arrow' && (!initial.props.points || initial.props.points.length < 2)) {
+			return null;
 		}
 
-		const startWorld = this.localToWorld(initial, startPoint);
-		const endWorld = this.localToWorld(initial, endPoint);
-		const newStart = handle === 'line-start' ? pointer : startWorld;
-		const newEnd = handle === 'line-end' ? pointer : endWorld;
-
+		const localPointer = worldToLocal(pointer, initial);
 		if (initial.type === 'line') {
-			const newProps = {
-				...initial.props,
-				a: { x: 0, y: 0 },
-				b: { x: newEnd.x - newStart.x, y: newEnd.y - newStart.y }
+			return {
+				...initial,
+				props: { ...initial.props, ...(handle === 'line-start' ? { a: localPointer } : { b: localPointer }) }
 			};
-			return { ...initial, x: newStart.x, y: newStart.y, props: newProps };
-		} else {
-			const newPoints = initial.props.points.map((p, i) => {
-				if (i === 0) {
-					return { x: 0, y: 0 };
-				} else if (i === initial.props.points.length - 1) {
-					return { x: newEnd.x - newStart.x, y: newEnd.y - newStart.y };
-				} else {
-					const worldPos = this.localToWorld(initial, p);
-					return { x: worldPos.x - newStart.x, y: worldPos.y - newStart.y };
-				}
-			});
-
-			const newProps = { ...initial.props, points: newPoints };
-			return { ...initial, x: newStart.x, y: newStart.y, props: newProps };
 		}
+		const newPoints = initial.props.points.map((point, index) =>
+			index === 0 && handle === 'line-start'
+				? localPointer
+				: index === initial.props.points.length - 1 && handle === 'line-end'
+					? localPointer
+					: point
+		);
+		return { ...initial, props: { ...initial.props, points: newPoints } };
 	}
 
-	private rotateShape(initial: ShapeRecord, pointer: Vec2): ShapeRecord | null {
-		if (!this.toolState.rotationCenter || this.toolState.rotationStartAngle === null) {
-			return null;
-		}
-		if (
-			initial.type !== 'rect' &&
-			initial.type !== 'ellipse' &&
-			initial.type !== 'text' &&
-			initial.type !== 'markdown'
-		) {
-			return null;
-		}
+	private rotateShape(state: EditorState, initial: ShapeRecord, pointer: Vec2): ShapeRecord | null {
+		if (!this.toolState.rotationCenter || this.toolState.rotationStartAngle === null) return null;
 		const currentAngle = Math.atan2(
 			pointer.y - this.toolState.rotationCenter.y,
 			pointer.x - this.toolState.rotationCenter.x
 		);
 		const delta = currentAngle - this.toolState.rotationStartAngle;
-		return { ...initial, rot: initial.rot + delta };
-	}
-
-	private localToWorld(shape: ShapeRecord, point: Vec2): Vec2 {
-		if (shape.rot === 0) {
-			return { x: shape.x + point.x, y: shape.y + point.y };
-		}
-		const cos = Math.cos(shape.rot);
-		const sin = Math.sin(shape.rot);
-		return { x: shape.x + point.x * cos - point.y * sin, y: shape.y + point.x * sin + point.y * cos };
-	}
-
-	private worldToLocal(shape: ShapeRecord, point: Vec2): Vec2 {
-		if (shape.rot === 0) {
-			return { x: point.x - shape.x, y: point.y - shape.y };
-		}
-		const dx = point.x - shape.x;
-		const dy = point.y - shape.y;
-		const cos = Math.cos(-shape.rot);
-		const sin = Math.sin(-shape.rot);
-		return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
+		const parent = initial.groupId ? state.doc.shapes[initial.groupId] : undefined;
+		const parentTransform = parent ? shapeTransform(parent) : Mat3.identity();
+		const inverseParent = Mat3.invert(parentTransform);
+		if (!inverseParent) return null;
+		const local = Mat3.multiply(inverseParent, shapeTransform(initial));
+		const localBounds = localShapeBounds(initial);
+		const center = Box2.center(localBounds);
+		const aroundCenter = Mat3.multiply(
+			Mat3.multiply(Mat3.translate(center.x, center.y), Mat3.rotate(delta)),
+			Mat3.translate(-center.x, -center.y)
+		);
+		return updateShapeTransform(initial, Mat3.multiply(parentTransform, Mat3.multiply(aroundCenter, local)));
 	}
 
 	/**
@@ -904,7 +883,7 @@ export class SelectTool implements Tool {
 			return null;
 		}
 
-		const clickLocal = { x: clickWorld.x - arrow.x, y: clickWorld.y - arrow.y };
+		const clickLocal = worldToLocal(clickWorld, arrow);
 		const tolerance = 10;
 
 		for (let i = 0; i < arrow.props.points.length - 1; i++) {
@@ -943,9 +922,9 @@ export class SelectTool implements Tool {
 	 * to prevent the endpoints from snapping back to the old binding positions.
 	 */
 	private removeBindingsForMovedArrows(state: EditorState): EditorState {
-		const movedArrowIds = Array.from(this.toolState.initialShapePositions.keys()).filter((shapeId) => {
+		const movedArrowIds = state.ui.selectionIds.filter((shapeId) => {
 			const shape = state.doc.shapes[shapeId];
-			return shape && shape.type === 'arrow';
+			return shape?.type === 'arrow';
 		});
 
 		if (movedArrowIds.length === 0) {
@@ -1035,4 +1014,30 @@ export class SelectTool implements Tool {
 
 		return { ...state, doc: { ...state.doc, bindings: newBindings } };
 	}
+}
+
+function hasSelectedAncestor(shape: ShapeRecord, selectedIds: string[], state: EditorState): boolean {
+	let parentId = shape.groupId;
+	while (parentId) {
+		if (selectedIds.includes(parentId)) return true;
+		parentId = state.doc.shapes[parentId]?.groupId;
+	}
+	return false;
+}
+
+function updateShapeTransform(shape: ShapeRecord, matrix: Mat3): ShapeRecord {
+	return {
+		...shape,
+		x: matrix[6],
+		y: matrix[7],
+		rot: Math.atan2(matrix[1], matrix[0]),
+		editorTransform: { a: matrix[0], b: matrix[1], c: matrix[3], d: matrix[4], e: matrix[6], f: matrix[7] }
+	};
+}
+
+function translateShape(shape: ShapeRecord, delta: Vec2): ShapeRecord {
+	const matrix = [...shapeTransform(shape)] as Mat3;
+	matrix[6] += delta.x;
+	matrix[7] += delta.y;
+	return updateShapeTransform(shape, matrix);
 }
