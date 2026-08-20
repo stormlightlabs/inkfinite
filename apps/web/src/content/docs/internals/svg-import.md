@@ -97,12 +97,13 @@ inherited values. The importer preserves supported `fill`, `stroke`,
 values. SVG defaults are a black fill and no stroke. `none` and `transparent`
 become absent native paint values.
 
-Paint servers such as gradients, patterns, `currentColor`, and other
-unsupported `url` values produce warnings and are omitted from the native paint
-properties. `linearGradient`, `radialGradient`, mesh gradients, patterns,
-`clipPath`, `mask`, and `filter` definitions and references each produce a
-feature-specific warning. The importer does not evaluate a paint server or
-resolve a resource URL.
+Paint servers such as gradients, patterns, and other unsupported `url` values
+produce warnings and are omitted from the native paint properties.
+`currentColor` resolves to the computed SVG `color` value, which defaults to
+black. `linearGradient`, `radialGradient`, mesh gradients, patterns, `clipPath`,
+`mask`, and `filter` definitions and references each produce a feature-specific
+warning. The importer does not evaluate a paint server or resolve a resource
+URL.
 
 ## Text
 

@@ -336,6 +336,8 @@ pub struct SvgImport {
 
 #[derive(Clone)]
 struct SvgStyle {
+    /// Computed CSS `color` used when a paint value is `currentColor`.
+    color: String,
     fill: Option<String>,
     stroke: Option<String>,
     stroke_width: f64,
@@ -351,6 +353,7 @@ struct SvgStyle {
 impl Default for SvgStyle {
     fn default() -> Self {
         Self {
+            color: "#000000".into(),
             fill: Some("#000000".into()),
             stroke: None,
             stroke_width: 1.0,
@@ -880,8 +883,15 @@ fn resolve_style<'a, 'input>(
     }
     for (name, value) in declarations {
         match name {
-            "fill" => style.fill = parse_paint(value, "fill", node, warnings),
-            "stroke" => style.stroke = parse_paint(value, "stroke", node, warnings),
+            "color" => {
+                let value = value.trim();
+                if !value.is_empty() {
+                    style.color =
+                        if value.eq_ignore_ascii_case("currentcolor") { parent.color.clone() } else { value.into() };
+                }
+            }
+            "fill" => style.fill = parse_paint(value, "fill", node, warnings, &style.color),
+            "stroke" => style.stroke = parse_paint(value, "stroke", node, warnings, &style.color),
             "stroke-width" => {
                 style.stroke_width = parse_style_length(value, "stroke-width", node)?;
                 if style.stroke_width < 0.0 {
@@ -938,19 +948,22 @@ fn resolve_style<'a, 'input>(
 }
 
 fn parse_paint<'a, 'input>(
-    value: &str, property: &str, node: Node<'a, 'input>, warnings: &mut Vec<SvgImportWarning>,
+    value: &str, property: &str, node: Node<'a, 'input>, warnings: &mut Vec<SvgImportWarning>, current_color: &str,
 ) -> Option<String> {
     let value = value.trim();
     if value.eq_ignore_ascii_case("none") || value.eq_ignore_ascii_case("transparent") {
         return None;
     }
-    if value.starts_with("url(") || value.eq_ignore_ascii_case("currentcolor") {
+    if value.starts_with("url(") {
         warnings.push(SvgImportWarning::UnsupportedPaint {
             element: local_name(node).into(),
             property: property.into(),
             value: value.into(),
         });
         return None;
+    }
+    if value.eq_ignore_ascii_case("currentcolor") {
+        return Some(current_color.into());
     }
     (!value.is_empty()).then(|| value.into())
 }

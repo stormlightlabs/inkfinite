@@ -47,6 +47,10 @@
   valid/invalid geometry fixtures.
 - SVG imports committed as one validated transaction from the desktop file menu,
   browser file and drop entry points, and the CLI.
+- SVG import fixture corpus covering Iconify-derived icons and logos, nested
+  groups, compound paths, unsupported content, and malformed inputs, with
+  importer regression tests for native mappings, `currentColor`, warnings, and
+  typed failures.
 
 ### Changed
 

@@ -71,6 +71,7 @@ For the durable record structure, see [Documents](/docs/concepts/documents/). Th
 geometry guide](/docs/internals/native-path-geometry/) documents the path representation used by
 SVG interoperability and future vector editing. The [SVG import guide](/docs/internals/svg-import/)
 documents the parser's native mappings, transform rules, styles, text behavior, and asset handling.
+The [testing guide](/docs/internals/testing/) documents shared fixtures and focused verification.
 
 ## Edit flow
 

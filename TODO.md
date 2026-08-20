@@ -75,12 +75,22 @@ Completed work is in [CHANGELOG.md](CHANGELOG.md).
 
 #### Import fixtures
 
-- [ ] Add SVG import fixtures for icons
-- [ ] Add SVG import fixtures for logos
-- [ ] Add SVG import fixtures for nested groups
-- [ ] Add SVG import fixtures for compound paths
-- [ ] Add SVG import fixtures for unsupported features
-- [ ] Add malformed SVG fixtures
+- [x] Add SVG import fixtures for icons
+- [x] Add SVG import fixtures for logos
+- [x] Add SVG import fixtures for nested groups
+- [x] Add SVG import fixtures for compound paths
+- [x] Add SVG import fixtures for unsupported features
+- [x] Add malformed SVG fixtures
+
+#### Shared Importer
+
+- [ ] Expose the Rust SVG importer to the browser through WASM
+- [ ] Run browser SVG imports in a reusable web worker
+- [ ] Project shared import results into browser documents
+- [ ] Route every web SVG entry point through the shared importer
+- [ ] Remove the handwritten TypeScript SVG parser
+- [ ] Test browser WASM imports with the shared fixture corpus
+- [ ] Add Bootstrap `filetype-svg` regression coverage
 
 ### SVG round-trip
 

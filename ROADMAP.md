@@ -31,13 +31,57 @@ SVG import should map supported elements onto native Inkfinite concepts:
 The original SVG source is retained as an asset for provenance, future
 re-import, and fallback handling.
 
-Desktop file-menu imports, browser file selection and drop, and the CLI use the
-same SVG transaction builder. Desktop imports into the active layer; browser
-imports create a new local board using the browser persistence adapter; CLI
-imports can target a file or a live desktop session.
+Desktop file-menu imports and the CLI already use the Rust importer and shared
+SVG transaction builder. Browser file selection, drop, and pasted markup still
+use a separate TypeScript parser, which supports a smaller SVG subset and can
+produce different geometry, hierarchy, style, warning, and asset results. The
+browser importer should be replaced rather than extended in parallel.
+
+A small browser-facing WASM crate should call the importer in
+`inkfinite-core`. The WASM API should expose a serializable normalized tree,
+source and embedded assets, structured warnings and errors, and omitted-image
+counts. TypeScript bindings should be generated or checked from that result
+schema so the browser does not acquire another handwritten importer contract.
+The core parser and normalization logic remain in Rust; the WASM crate is only
+the browser adapter.
+
+The web app should initialize and run WASM in a dedicated worker. It should
+lazy-load the module, reuse one initialized worker across imports, and transfer
+file bytes rather than parse on the main thread. The worker must enforce the
+same 16 MB input limit and report failures without leaving the editor in a busy
+state. Excalidraw and JSON Canvas imports should not wait for SVG WASM to load.
+
+The browser projects the normalized Rust result into its local document model,
+preserving groups, local transforms, styles, fill rules, warnings, and assets.
+Each completed import is committed as one document transaction and one undo
+step. Once file selection, drag-and-drop, and pasted markup use this path, the
+handwritten TypeScript SVG parser can be removed.
+
+The Bootstrap `filetype-svg` icon is the regression fixture for the original
+browser failure. It combines inherited `currentColor`, `evenodd`, relative
+commands, horizontal and vertical commands, arcs, and a compound path. Native
+and browser-WASM tests should compare normalized geometry, hierarchy, styles,
+warnings, source assets, and bounds. The imported result should be one editable
+path, resolve `currentColor` to concrete SVG paint, normalize arcs to cubic
+segments, retain `evenodd`, and match the artwork in its 16×16 viewBox. Canvas
+output should also agree visually with deterministic Rust SVG output; malformed,
+oversized, unsupported-feature, and embedded-image inputs must cross the worker
+boundary with the same outcomes as native import.
+
+Desktop imports into the active layer; browser imports create a new local board
+using the browser persistence adapter; CLI imports can target a file or a live
+desktop session.
 
 Unsupported SVG features should be reported explicitly and preserve a path to
 opaque fallback rather than silently disappearing.
+
+The importer has a checked-in fixture corpus under
+[`fixtures/svg-import`](fixtures/svg-import/). It includes Iconify-derived
+icons and logos, nested groups, compound paths, unsupported features, and
+malformed inputs. Rust and browser-WASM tests should exercise this corpus rather
+than maintain separate fixtures. They must validate native mappings, warning
+coverage, geometry semantics, and failure behavior as the supported SVG subset
+grows.
 
 SVG interoperability must use the same transaction, persistence, undo/redo,
 CRDT, desktop, and CLI paths as content created directly in Inkfinite.
