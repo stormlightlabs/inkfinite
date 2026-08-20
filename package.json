@@ -20,6 +20,8 @@
 		"performance:capture": "node scripts/capture-performance.mjs --output fixtures/native/performance/rendering-budget.json",
 		"bindings:generate": "cargo run -p inkfinite-cli --bin generate-bindings",
 		"bindings:check": "cargo run -p inkfinite-cli --bin generate-bindings -- --check",
+		"bindings:format": "pnpm --filter @inkfinite/bindings format",
+		"bindings:format:check": "pnpm --filter @inkfinite/bindings format:check",
 		"bindings:test": "pnpm --filter @inkfinite/bindings test"
 	},
 	"devDependencies": {

@@ -7,8 +7,10 @@
 	"types": "./dist/index.d.ts",
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
+		"format": "prettier --config ../../.prettierrc --write src",
+		"format:check": "prettier --config ../../.prettierrc --check src",
 		"test": "pnpm run build && node ../../scripts/check-bindings.mjs",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
-		"lint": "prettier --check src/index.ts"
+		"lint": "pnpm run format:check"
 	}
 }

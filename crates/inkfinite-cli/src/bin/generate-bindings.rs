@@ -3,7 +3,9 @@
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 
 use inkfinite_core::proto::*;
 use inkfinite_core::*;
@@ -42,7 +44,17 @@ fn main() {
 
 fn run(check: bool) -> Result<(), Box<dyn Error>> {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let artifacts = artifacts()?;
+    let artifacts = artifacts()?
+        .into_iter()
+        .map(|(relative_path, contents)| {
+            let contents = if relative_path.extension().and_then(|extension| extension.to_str()) == Some("ts") {
+                format_typescript(&root, &relative_path, &contents)?
+            } else {
+                contents
+            };
+            Ok((relative_path, contents))
+        })
+        .collect::<Result<BTreeMap<_, _>, Box<dyn Error>>>()?;
     let mut stale = Vec::new();
 
     for (relative_path, contents) in artifacts {
@@ -73,6 +85,43 @@ fn run(check: bool) -> Result<(), Box<dyn Error>> {
         eprintln!("  {}", path.display());
     }
     Err("run generate-bindings to refresh generated output".into())
+}
+
+fn format_typescript(root: &Path, relative_path: &Path, source: &str) -> Result<String, Box<dyn Error>> {
+    let prettier = root.join("node_modules/.bin/prettier");
+    if !prettier.is_file() {
+        return Err(format!(
+            "Prettier was not found at {}; install the workspace dependencies before generating bindings",
+            prettier.display()
+        )
+        .into());
+    }
+
+    let file_name = relative_path
+        .to_str()
+        .ok_or_else(|| format!("binding path is not valid UTF-8: {}", relative_path.display()))?;
+    let mut child = Command::new(prettier)
+        .args(["--config", ".prettierrc", "--stdin-filepath", file_name])
+        .current_dir(root)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    child
+        .stdin
+        .take()
+        .ok_or("could not open Prettier stdin")?
+        .write_all(source.as_bytes())?;
+    let output = child.wait_with_output()?;
+    if !output.status.success() {
+        return Err(format!(
+            "Prettier failed for {}: {}",
+            relative_path.display(),
+            String::from_utf8_lossy(&output.stderr).trim()
+        )
+        .into());
+    }
+    Ok(String::from_utf8(output.stdout)?)
 }
 
 fn artifacts() -> Result<BTreeMap<PathBuf, String>, Box<dyn Error>> {
