@@ -45,6 +45,8 @@
 - Native path bounds with Bézier extrema, Canvas rendering, fill and stroke hit
   testing, parent-relative transforms, deterministic SVG output, and shared
   valid/invalid geometry fixtures.
+- SVG imports committed as one validated transaction from the desktop file menu,
+  browser file and drop entry points, and the CLI.
 
 ### Changed
 

@@ -8,8 +8,9 @@ order: 12
 
 Inkfinite parses the supported static SVG subset in Rust and maps it to native
 shape properties. The importer does not retain an SVG-specific document model.
-Its output is a normalized tree that can later be turned into one validated
-Inkfinite transaction.
+Its output is a normalized tree. `build_svg_import_transaction` turns that
+result into one ordered transaction containing the source asset, extracted
+assets, a root container, nested groups, and native shapes.
 
 ## Import boundary
 
@@ -133,6 +134,13 @@ from the normalized native tree and reported through typed
 native document model does not yet have an SVG-backed shape. A future fallback
 must render only a sanitized, static projection of the retained source and keep
 the imported subtree movable as one object.
+
+Desktop imports use the native Tauri dialog plugin to select a path, then Rust
+reads, parses, and commits the file through the active session. The browser
+adapter uses the supported element mapping for file selection and SVG drop,
+then persists the imported board in one IndexedDB operation. The CLI accepts
+`inkfinite import svg FILE --input ARTWORK.svg` and can validate the transaction
+with `--dry-run` before saving.
 
 Gradients, patterns, clip paths, masks, and filters are not evaluated. Stylesheet
 blocks, event-handler attributes, scripts, and SVG animation elements are

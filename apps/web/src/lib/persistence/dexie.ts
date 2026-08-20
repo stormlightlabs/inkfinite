@@ -1,8 +1,8 @@
-import {
-	type DocPatch,
-	type InterchangeExport,
-	type PersistenceSink,
-	type PersistentDocRepo
+import type {
+	DocPatch,
+	InterchangeExport,
+	PersistenceSink,
+	PersistentDocRepo
 } from '@inkfinite/core';
 import { createStatusStore } from '@inkfinite/ui/editor';
 import type { EditorPlatformAdapter, EditorPlatformSession } from '@inkfinite/ui/editor';
@@ -113,45 +113,52 @@ export function createDexieSession(
 
 /** Creates browser-backed file selection and download operations. */
 export function createBrowserInterchangeFiles() {
-	return {
-		pickImport(): Promise<{ name: string; contents: string } | null> {
-			return new Promise((resolve, reject) => {
-				const input = document.createElement('input');
-				input.type = 'file';
-				input.accept = '.excalidraw,.canvas,application/json';
-				input.hidden = true;
-				const finish = (value: { name: string; contents: string } | null) => {
-					input.remove();
-					resolve(value);
-				};
-				input.addEventListener('cancel', () => finish(null), { once: true });
-				input.addEventListener(
-					'change',
-					() => {
-						const file = input.files?.[0];
-						if (!file) {
-							finish(null);
-							return;
-						}
-						if (file.size > 16 * 1024 * 1024) {
-							input.remove();
-							reject(new Error('The selected file is larger than the 16 MB import limit.'));
-							return;
-						}
-						void file.text().then(
-							(contents) => finish({ name: file.name, contents }),
-							(error) => {
-								input.remove();
-								reject(new Error(`Failed to read the selected file: ${String(error)}`));
-							}
+	function pickTextFile(accept: string): Promise<{ name: string; contents: string } | null> {
+		return new Promise((resolve, reject) => {
+			const input = document.createElement('input');
+			input.type = 'file';
+			input.accept = accept;
+			input.hidden = true;
+			const finish = (value: { name: string; contents: string } | null) => {
+				input.remove();
+				resolve(value);
+			};
+			input.addEventListener('cancel', () => finish(null), { once: true });
+			input.addEventListener(
+				'change',
+				() => {
+					const file = input.files?.[0];
+					if (!file) {
+						finish(null);
+						return;
+					}
+					if (file.size > 16 * 1024 * 1024) {
+						input.remove();
+						reject(
+							new Error('The selected file is larger than the 16 MB import limit.')
 						);
-					},
-					{ once: true }
-				);
-				document.body.appendChild(input);
-				input.click();
-			});
-		},
+						return;
+					}
+					void file.text().then(
+						(contents) => finish({ name: file.name, contents }),
+						(error) => {
+							input.remove();
+							reject(
+								new Error(`Failed to read the selected file: ${String(error)}`)
+							);
+						}
+					);
+				},
+				{ once: true }
+			);
+			document.body.appendChild(input);
+			input.click();
+		});
+	}
+
+	return {
+		pickImport: () => pickTextFile('.excalidraw,.canvas,application/json'),
+		pickSvg: () => pickTextFile('.svg,image/svg+xml'),
 		async saveExport(file: InterchangeExport, defaultStem: string): Promise<boolean> {
 			const blob = new Blob([file.contents], { type: file.mimeType });
 			const url = URL.createObjectURL(blob);

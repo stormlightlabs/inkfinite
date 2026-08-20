@@ -31,6 +31,11 @@ SVG import should map supported elements onto native Inkfinite concepts:
 The original SVG source is retained as an asset for provenance, future
 re-import, and fallback handling.
 
+Desktop file-menu imports, browser file selection and drop, and the CLI use the
+same SVG transaction builder. Desktop imports into the active layer; browser
+imports create a new local board using the browser persistence adapter; CLI
+imports can target a file or a live desktop session.
+
 Unsupported SVG features should be reported explicitly and preserve a path to
 opaque fallback rather than silently disappearing.
 

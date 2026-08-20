@@ -27,6 +27,11 @@ export interface DesktopFileOps {
 	showSaveDialog(defaultName?: string): Promise<string | null>;
 
 	/**
+	 * Show the native SVG file picker and return the selected path.
+	 */
+	showSvgDialog(): Promise<string | null>;
+
+	/**
 	 * Get recent files list
 	 */
 	getRecentFiles(): Promise<FileHandle[]>;

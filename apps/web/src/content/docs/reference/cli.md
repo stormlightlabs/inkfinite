@@ -21,6 +21,7 @@ commands are:
 | `validate`                   | Load and validate a canonical document                        |
 | `shape`, `connect`, `layout` | Build a structured file or live desktop edit                  |
 | `apply`                      | Validate and apply a transaction draft from JSON              |
+| `import svg`                 | Import static SVG content into native shapes                  |
 | `render`                     | Write an SVG or PNG of a document or filtered view            |
 | `app`                        | Inspect or work with a running desktop session                |
 | `schema`, `capabilities`     | Print machine-readable contracts for integrations             |
@@ -55,7 +56,14 @@ inkfinite shape patch architecture.inkfinite \
 inkfinite apply architecture.inkfinite \
   --transaction transaction.json \
   --dry-run --json
+
+inkfinite import svg architecture.inkfinite \
+  --input icon.svg --dry-run --json
 ```
+
+`import svg` creates the retained source asset, native group containers, and
+supported shapes in one validated transaction. Use `--page` or `--layer` to
+choose a target; otherwise the first page and layer receive the import.
 
 File commands never prompt. Close the desktop editor before changing its file; a lock or stale-head
 error is a signal to inspect current state, not a reason to overwrite the file.

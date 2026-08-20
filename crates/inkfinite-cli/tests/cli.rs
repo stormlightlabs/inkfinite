@@ -117,6 +117,50 @@ fn closed_file_workflow_has_stable_human_and_json_output() {
 }
 
 #[test]
+fn svg_import_is_one_atomic_transaction_with_dry_run_support() {
+    let temporary = TestDirectory::new("svg-import");
+    let document_path = temporary.path.join("import.inkfinite");
+    let svg_path = temporary.path.join("icon.svg");
+    fs::write(
+        &svg_path,
+        r#"<svg viewBox="0 0 100 80"><g id="mark"><rect id="box" width="20" height="30"/><path d="M0 0 L10 10 Z"/></g></svg>"#,
+    )
+    .unwrap();
+    assert_success(&run(["new", path(&document_path), "--json"]));
+    let before = fs::read(&document_path).unwrap();
+
+    let dry_run = run([
+        "import",
+        "svg",
+        path(&document_path),
+        "--input",
+        path(&svg_path),
+        "--dry-run",
+        "--json",
+    ]);
+    assert_success(&dry_run);
+    let dry_run_json = parse_stdout(&dry_run);
+    assert_eq!(dry_run_json["dry_run"], true);
+    assert_eq!(dry_run_json["created"].as_array().unwrap().len(), 5);
+    assert_eq!(fs::read(&document_path).unwrap(), before);
+
+    let imported = run([
+        "import",
+        "svg",
+        path(&document_path),
+        "--input",
+        path(&svg_path),
+        "--json",
+    ]);
+    assert_success(&imported);
+    let imported_json = parse_stdout(&imported);
+    assert_eq!(imported_json["warnings"].as_array().unwrap().len(), 0);
+    let summary = parse_stdout(&run(["inspect", path(&document_path), "--summary", "--json"]));
+    assert_eq!(summary["counts"]["assets"], 1);
+    assert_eq!(summary["counts"]["shapes"], 4);
+}
+
+#[test]
 fn query_forwards_semantic_hierarchy_kind_and_bounds_filters() {
     let temporary = TestDirectory::new("filters");
     let document_path = temporary.path.join("filters.inkfinite");

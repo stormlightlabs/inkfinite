@@ -113,11 +113,12 @@ mod mutation;
 mod render;
 mod shape;
 mod support;
+mod svg;
 
 use args::{
-    AlignmentArg, ApplyArgs, AxisArg, ConnectArgs, FileOutputArgs, InspectArgs, LayoutCommand, LayoutSelectionArgs,
-    MutationOptions, NewArgs, PlacementArg, QueryArgs, RenderArgs, SchemaKind, ShapeCommand, ShapeCreateArgs,
-    ShapeDeleteArgs, ShapeDescribeArgs, ShapePatchArgs,
+    AlignmentArg, ApplyArgs, AxisArg, ConnectArgs, FileOutputArgs, ImportCommand, InspectArgs, LayoutCommand,
+    LayoutSelectionArgs, MutationOptions, NewArgs, PlacementArg, QueryArgs, RenderArgs, SchemaKind, ShapeCommand,
+    ShapeCreateArgs, ShapeDeleteArgs, ShapeDescribeArgs, ShapePatchArgs, SvgImportArgs,
 };
 use support::parse_bounds;
 
@@ -131,6 +132,7 @@ pub fn run(command: Command, json_output: bool, stdout: &mut dyn Write) -> Resul
         Command::App(command) => app::run_app_command(command, json_output, stdout),
         Command::Validate(args) => document::validate_file(&args, json_output, stdout),
         Command::Apply(args) => apply::apply_transaction(&args, json_output, stdout),
+        Command::Import(command) => svg::run_import_command(command, json_output, stdout),
         Command::Shape(command) => shape::run_shape_command(command, json_output, stdout),
         Command::Connect(args) => connect::connect_shapes(args, json_output, stdout),
         Command::Layout(command) => layout::run_layout_command(command, json_output, stdout),

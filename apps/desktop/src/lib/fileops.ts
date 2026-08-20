@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-dialog';
 import { load } from '@tauri-apps/plugin-store';
 import type { DesktopFileOps, DirectoryEntry, FileHandle } from '@inkfinite/core';
 
@@ -30,6 +31,15 @@ export function createDesktopFileOps(): DesktopFileOps {
 
 	async function showSaveDialog(defaultName?: string): Promise<string | null> {
 		return invoke<string | null>('pick_save_document', { defaultName: defaultName || 'Untitled.inkfinite' });
+	}
+
+	async function showSvgDialog(): Promise<string | null> {
+		const selected = await open({
+			multiple: false,
+			directory: false,
+			filters: [{ name: 'SVG files', extensions: ['svg'] }]
+		});
+		return typeof selected === 'string' ? selected : null;
 	}
 
 	async function getRecentFiles(): Promise<FileHandle[]> {
@@ -98,6 +108,7 @@ export function createDesktopFileOps(): DesktopFileOps {
 	return {
 		showOpenDialog,
 		showSaveDialog,
+		showSvgDialog,
 		getRecentFiles,
 		addRecentFile,
 		removeRecentFile,

@@ -22,6 +22,8 @@ use crate::proto::{
     Warning,
 };
 use crate::render::{SvgRenderError, SvgRenderOptions, render_svg};
+use crate::svg_import::import_svg;
+use crate::svg_transaction::{SvgImportTransactionOptions, build_svg_import_transaction};
 use crate::sync::{PeerSyncStatus, SyncMessage};
 use crate::{
     ActorId, ChangeHash, Document, DocumentId, DocumentSnapshot, LayerId, Origin, PageId, ShapeId, Timestamp,
@@ -97,6 +99,21 @@ pub struct SessionCommit {
     pub commit: CommitResult,
     /// Session state after the commit.
     pub status: SessionStatus,
+}
+
+/// Result returned after importing one SVG through the desktop session.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SvgImportCommit {
+    /// Commit and session state returned by the shared transaction engine.
+    pub session: SessionCommit,
+    /// Warnings emitted while unsupported SVG content was omitted.
+    pub warnings: Vec<String>,
+    /// Number of embedded image nodes omitted until a native image kind exists.
+    pub omitted_image_count: usize,
+    /// Native shape IDs created by the import.
+    pub shape_ids: Vec<ShapeId>,
+    /// Retained source asset ID.
+    pub source_asset_id: crate::AssetId,
 }
 
 /// Review state exposed to an agent without granting review authority.
@@ -304,6 +321,9 @@ pub enum SessionError {
     /// The transaction engine rejected a history or validation operation.
     #[error(transparent)]
     Engine(#[from] EngineError),
+    /// SVG parsing or transaction construction rejected the import.
+    #[error("SVG import failed: {0}")]
+    SvgImport(String),
 }
 
 struct DocumentSession {
@@ -545,6 +565,76 @@ impl SessionService {
         let commit = session.file.commit(transaction)?;
         let status = session.status(session_id)?;
         Ok(SessionCommit { commit, status })
+    }
+
+    /// Parses and commits one SVG into the session's active layer.
+    ///
+    /// The source is parsed before the session changes. The resulting assets,
+    /// root container, groups, and native shapes then enter the document as one
+    /// actor-owned transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed session, SVG parser, target, transaction, or persistence
+    /// error. No document state changes when parsing or transaction construction
+    /// fails.
+    pub fn import_svg(
+        &mut self, session_id: &SessionId, source: &[u8], source_name: Option<&str>,
+    ) -> Result<SvgImportCommit, SessionError> {
+        let import = import_svg(source).map_err(|error| SessionError::SvgImport(error.to_string()))?;
+        let session = self.session_mut(session_id)?;
+        let snapshot = session.file.snapshot()?;
+        let page_id = session
+            .page_id
+            .clone()
+            .or_else(|| snapshot.document.page_ids.first().cloned())
+            .ok_or_else(|| SessionError::SvgImport("document has no page for SVG import".into()))?;
+        let page = snapshot
+            .document
+            .pages
+            .get(&page_id)
+            .ok_or_else(|| SessionError::SvgImport(format!("page {page_id} does not exist")))?;
+        let layer_id = session
+            .active_layer_id
+            .clone()
+            .filter(|layer_id| page.layer_ids.contains(layer_id))
+            .or_else(|| page.layer_ids.first().cloned())
+            .ok_or_else(|| SessionError::SvgImport(format!("page {page_id} has no import layer")))?;
+        let source_label = source_name.map(str::to_owned);
+        let transaction = build_svg_import_transaction(
+            &snapshot,
+            &import,
+            SvgImportTransactionOptions {
+                actor_id: session.file.actor_id().clone(),
+                origin: Origin::Human,
+                page_id,
+                layer_id,
+                transaction_id: crate::proto::TransactionId(format!(
+                    "transaction:svg-import:{}",
+                    import.source_asset.digest.replace(':', "-")
+                )),
+                description: source_label
+                    .as_deref()
+                    .map(|name| format!("Import SVG {name}"))
+                    .unwrap_or_else(|| "Import SVG".into()),
+                source_name: source_label,
+                timestamp: timestamp_now(),
+            },
+        )
+        .map_err(|error| SessionError::SvgImport(error.to_string()))?;
+        let shape_ids = transaction.shape_ids;
+        let omitted_image_count = transaction.omitted_image_count;
+        let source_asset_id = import.source_asset.id;
+        let warnings = import.warnings.iter().map(ToString::to_string).collect();
+        let commit = session.file.commit(transaction.transaction)?;
+        let status = session.status(session_id)?;
+        Ok(SvgImportCommit {
+            session: SessionCommit { commit, status },
+            warnings,
+            omitted_image_count,
+            shape_ids,
+            source_asset_id,
+        })
     }
 
     /// Validates and stores one agent transaction for explicit desktop review.

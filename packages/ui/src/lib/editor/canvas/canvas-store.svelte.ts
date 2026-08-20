@@ -1,11 +1,6 @@
 import { createInputAdapter, type InputAdapter } from '../input';
 import { initialPersistenceStatus } from '../platform';
-import type {
-	DesktopDocumentRepo,
-	EditorPlatformAdapter,
-	EditorPlatformSession,
-	LiveProposal
-} from '../platform';
+import type { DesktopDocumentRepo, EditorPlatformAdapter, EditorPlatformSession, LiveProposal } from '../platform';
 import { createBrushStore, createSnapStore, createStatusStore } from '../status';
 import type { BrushStore, SnapStore, StatusStore } from '../status';
 import { themeStore } from '../theme.svelte';
@@ -62,10 +57,7 @@ export type CanvasControllerBindings = { setHistoryViewerOpen(value: boolean): v
 
 export type CanvasController = ReturnType<typeof createCanvasController>;
 
-export function createCanvasController(
-	platformAdapter: EditorPlatformAdapter,
-	bindings: CanvasControllerBindings
-) {
+export function createCanvasController(platformAdapter: EditorPlatformAdapter, bindings: CanvasControllerBindings) {
 	let repo: PersistentDocRepo | null = null;
 	let sink: PersistenceSink | null = null;
 	let platformSession: EditorPlatformSession | null = null;
@@ -123,12 +115,7 @@ export function createCanvasController(
 				shapes: {},
 				bindings: {}
 			},
-			ui: {
-				currentPageId: initialPage.id,
-				activeLayerId: initialLayer.id,
-				selectionIds: [],
-				toolId: 'select'
-			},
+			ui: { currentPageId: initialPage.id, activeLayerId: initialLayer.id, selectionIds: [], toolId: 'select' },
 			camera: Camera.create()
 		},
 		{
@@ -201,37 +188,21 @@ export function createCanvasController(
 								const rect = element.getBoundingClientRect();
 								const min = Camera.screenToWorld(
 									state.camera,
-									{
-										x: rect.left - canvasRect.left,
-										y: rect.top - canvasRect.top
-									},
+									{ x: rect.left - canvasRect.left, y: rect.top - canvasRect.top },
 									viewport
 								);
 								const max = Camera.screenToWorld(
 									state.camera,
-									{
-										x: rect.right - canvasRect.left,
-										y: rect.bottom - canvasRect.top
-									},
+									{ x: rect.right - canvasRect.left, y: rect.bottom - canvasRect.top },
 									viewport
 								);
-								return {
-									x: min.x,
-									y: min.y,
-									width: max.x - min.x,
-									height: max.y - min.y
-								};
+								return { x: min.x, y: min.y, width: max.x - min.x, height: max.y - min.y };
 							});
 			const context = {
 				pageId: state.ui.currentPageId,
 				activeLayerId: state.ui.activeLayerId ?? null,
 				selectionIds: [...state.ui.selectionIds],
-				viewport: {
-					x: state.camera.x - width / 2,
-					y: state.camera.y - height / 2,
-					width,
-					height
-				},
+				viewport: { x: state.camera.x - width / 2, y: state.camera.y - height / 2, width, height },
 				camera: { ...state.camera },
 				occludedRegions
 			};
@@ -256,10 +227,7 @@ export function createCanvasController(
 		}
 		const cursor = computeCursor(
 			textEditor.isEditing || arrowLabelEditor.isEditing || markdownEditor.isEditing,
-			{
-				isPanning: runtime.getInteractionState().panning,
-				spaceHeld: runtime.getInteractionState().spaceHeld
-			},
+			{ isPanning: runtime.getInteractionState().panning, spaceHeld: runtime.getInteractionState().spaceHeld },
 			{ hover: handleState.hover, active: handleState.active },
 			runtime.getInteractionState().pointerDown
 		);
@@ -292,12 +260,7 @@ export function createCanvasController(
 
 	const selectTool = new SelectTool(handleMarqueeChange, (point) => {
 		const snap = snapStore.get();
-		if (
-			!snap.snapEnabled ||
-			!snap.gridEnabled ||
-			!Number.isFinite(snap.gridSize) ||
-			snap.gridSize <= 0
-		) {
+		if (!snap.snapEnabled || !snap.gridEnabled || !Number.isFinite(snap.gridSize) || snap.gridSize <= 0) {
 			return point;
 		}
 		return {
@@ -332,11 +295,7 @@ export function createCanvasController(
 	]);
 
 	const textEditor = new TextEditorController(store, getOverlayViewport, refreshCursor);
-	const arrowLabelEditor = new ArrowLabelEditorController(
-		store,
-		getOverlayViewport,
-		refreshCursor
-	);
+	const arrowLabelEditor = new ArrowLabelEditorController(store, getOverlayViewport, refreshCursor);
 	const markdownEditor = new MarkdownEditorController(store, getOverlayViewport, refreshCursor);
 	const toolController = new ToolController(store, tools);
 	const unsubscribeMarqueeCamera = store.subscribe((state) => {
@@ -398,17 +357,11 @@ export function createCanvasController(
 	}
 
 	function handleAction(action: import('@inkfinite/core').Action) {
-		if (
-			textEditor.isEditing &&
-			(action.type === 'pointer-down' || action.type === 'pointer-up')
-		) {
+		if (textEditor.isEditing && (action.type === 'pointer-down' || action.type === 'pointer-up')) {
 			textEditor.commit();
 		}
 
-		if (
-			markdownEditor.isEditing &&
-			(action.type === 'pointer-down' || action.type === 'pointer-up')
-		) {
+		if (markdownEditor.isEditing && (action.type === 'pointer-down' || action.type === 'pointer-up')) {
 			markdownEditor.commit();
 		}
 
@@ -417,8 +370,7 @@ export function createCanvasController(
 		}
 		if (
 			action.type === 'pointer-down' &&
-			(action.button === 1 ||
-				(action.button === 0 && runtime.getInteractionState().spaceHeld))
+			(action.button === 1 || (action.button === 0 && runtime.getInteractionState().spaceHeld))
 		) {
 			camera.cancelFit();
 		}
@@ -467,21 +419,93 @@ export function createCanvasController(
 		}
 	}
 
+	async function importBrowserSvgSource(source: { name: string; contents: string }) {
+		if (!repo || !sink) return;
+		const imported = importInterchange(source.contents, source.name);
+		await sink.flush();
+		const boardId = await repo.importBoard(imported.snapshot);
+		const doc = await repo.loadDoc(boardId);
+		setActiveBoardId(boardId);
+		applyLoadedDoc(doc, true);
+		interchangeNotice = {
+			title: 'SVG import complete',
+			message: `${source.name} is now an Inkfinite document.`,
+			warnings: imported.warnings,
+			error: false
+		};
+	}
+
+	async function importSvg() {
+		if (!repo || !sink || !platformSession?.interchange) return;
+		interchangeBusy = true;
+		try {
+			if (desktopRepo) {
+				const imported = await desktopRepo.importSvg();
+				if (!imported) return;
+				applyLoadedDoc(imported.doc, true);
+				interchangeNotice = {
+					title: 'SVG import complete',
+					message: 'The SVG was added to the current document as native shapes.',
+					warnings: [
+						...imported.warnings.map((message, index) => ({
+							code: `svg-warning-${index}`,
+							message,
+							count: 1
+						})),
+						...(imported.omitted_image_count > 0
+							? [
+									{
+										code: 'svg-images-omitted',
+										message:
+											'Embedded image nodes were omitted because image shapes are not available yet.',
+										count: imported.omitted_image_count
+									}
+								]
+							: [])
+					],
+					error: false
+				};
+				return;
+			}
+			const source = await platformSession.interchange.pickSvg?.();
+			if (source) await importBrowserSvgSource(source);
+		} catch (error) {
+			interchangeNotice = {
+				title: 'SVG import failed',
+				message: error instanceof Error ? error.message : String(error),
+				warnings: [],
+				error: true
+			};
+		} finally {
+			interchangeBusy = false;
+		}
+	}
+
+	async function importSvgFile(file: File) {
+		if (platform !== 'web' || !platformSession?.interchange) return;
+		interchangeBusy = true;
+		try {
+			await importBrowserSvgSource({ name: file.name, contents: await file.text() });
+		} catch (error) {
+			interchangeNotice = {
+				title: 'SVG import failed',
+				message: error instanceof Error ? error.message : String(error),
+				warnings: [],
+				error: true
+			};
+		} finally {
+			interchangeBusy = false;
+		}
+	}
+
 	async function exportEditableCanvas(format: InterchangeFormat) {
 		if (!activeBoardId || !repo || !sink || !platformSession?.interchange) return;
 		interchangeBusy = true;
 		try {
 			await sink.flush();
 			const snapshot = await repo.exportBoard(activeBoardId);
-			const exported = exportInterchange(
-				snapshot,
-				format,
-				store.getState().ui.currentPageId ?? undefined
-			);
-			const saved = await platformSession.interchange.saveExport(
-				exported,
-				snapshot.board.name
-			);
+			const exported = exportInterchange(snapshot, format, store.getState().ui.currentPageId ?? undefined);
+			const saved = await platformSession.interchange.saveExport(exported, snapshot.board.name);
 			if (!saved) return;
 			interchangeNotice = {
 				title: 'Export complete',
@@ -553,10 +577,7 @@ export function createCanvasController(
 		const clickedShape = shapes.some((shape) => {
 			const bounds = shapeBounds(shape);
 			return (
-				world.x >= bounds.min.x &&
-				world.x <= bounds.max.x &&
-				world.y >= bounds.min.y &&
-				world.y <= bounds.max.y
+				world.x >= bounds.min.x && world.x <= bounds.max.x && world.y >= bounds.min.y && world.y <= bounds.max.y
 			);
 		});
 		if (!clickedShape) {
@@ -609,8 +630,7 @@ export function createCanvasController(
 			onCursorUpdate: (world, screen) => cursorStore.updateCursor(world, screen)
 		});
 
-		const resizeObserver =
-			typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(handleResize);
+		const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(handleResize);
 		resizeObserver?.observe(canvas);
 
 		return () => {
@@ -669,6 +689,9 @@ export function createCanvasController(
 						break;
 					case 'import':
 						void importEditableCanvas();
+						break;
+					case 'import-svg':
+						void importSvg();
 						break;
 					case 'export-excalidraw':
 						void exportEditableCanvas('excalidraw');
@@ -775,6 +798,8 @@ export function createCanvasController(
 		insertStencil,
 		commitLayerState,
 		importEditableCanvas,
+		importSvg,
+		importSvgFile,
 		exportEditableCanvas,
 		interchangeBusy: () => interchangeBusy,
 		interchangeNotice: () => interchangeNotice,
@@ -795,12 +820,7 @@ export function createCanvasController(
 			state,
 			nextState,
 			'Insert Stencil',
-			Action.keyDown('InsertStencil', 'InsertStencil', {
-				ctrl: false,
-				shift: false,
-				alt: false,
-				meta: false
-			})
+			Action.keyDown('InsertStencil', 'InsertStencil', { ctrl: false, shift: false, alt: false, meta: false })
 		);
 	}
 }

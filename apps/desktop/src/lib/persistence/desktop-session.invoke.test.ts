@@ -7,13 +7,8 @@ const tauri = vi.hoisted(() => ({ invoke: vi.fn(), listen: vi.fn(async () => () 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: tauri.invoke }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: tauri.listen }));
 
-import {
-	createDesktopSessionRepo,
-	type SessionCommit,
-	type SessionOpened,
-	type SessionSaved,
-	type SessionStatus
-} from './desktop-session';
+import { createDesktopSessionRepo } from './desktop-session';
+import type { SessionCommit, SessionOpened, SessionSaved, SessionStatus } from './desktop-session';
 
 function snapshot(documentId: string): DocumentSnapshot {
 	const pageId = `page:${documentId}:1`;
@@ -50,6 +45,7 @@ function fileOps() {
 	const ops: DesktopFileOps = {
 		showOpenDialog: async () => null,
 		showSaveDialog: async () => savePath,
+		showSvgDialog: async () => null,
 		getRecentFiles: async () => [],
 		addRecentFile: async () => undefined,
 		removeRecentFile: async () => undefined,

@@ -1,13 +1,13 @@
 import { PageRecord, ShapeRecord, type BoardExport, type DesktopFileOps, type FileHandle } from '@inkfinite/core';
 import type { ChangeHash, DocumentSnapshot, Proposal, TransactionDraft } from '@inkfinite/bindings';
 import { beforeEach, describe, expect, it } from 'vitest';
-import {
-	createDesktopSessionRepo,
-	type SessionApi,
-	type SessionCommit,
-	type SessionOpened,
-	type SessionSaved,
-	type SessionStatus
+import { createDesktopSessionRepo } from '$lib/persistence/desktop-session';
+import type {
+	SessionApi,
+	SessionCommit,
+	SessionOpened,
+	SessionSaved,
+	SessionStatus
 } from '$lib/persistence/desktop-session';
 
 type FakeSession = { status: SessionStatus; undo: DocumentSnapshot[]; redo: DocumentSnapshot[] };
@@ -158,6 +158,10 @@ function createFakeSessionApi() {
 			next.heads = [`head:${++headNumber}`];
 			session.status = { ...session.status, snapshot: next, dirty: true, can_undo: true, can_redo: false };
 			return { commit: commitResult(args.transaction, next), status: statusFor(args.session_id, session) };
+		},
+
+		async importSvg(_args: Parameters<SessionApi['importSvg']>[0]) {
+			throw new Error('SVG import is not part of this fake session');
 		},
 
 		async propose(_args: Parameters<SessionApi['propose']>[0]): Promise<Proposal> {
@@ -323,6 +327,9 @@ function createFakeFileOps() {
 		async showSaveDialog() {
 			saveDialogCount += 1;
 			return savePath;
+		},
+		async showSvgDialog() {
+			return null;
 		},
 		async getRecentFiles() {
 			return [...recent];

@@ -9,7 +9,7 @@ use inkfinite_core::proto::{
 };
 use inkfinite_core::session::{
     EditorContextUpdate, SessionCommit, SessionError, SessionOpened, SessionSaved, SessionService, SessionStatus,
-    SessionSync,
+    SessionSync, SvgImportCommit,
 };
 use inkfinite_core::sync::SyncMessage;
 use inkfinite_core::{ActorId, ChangeHash, DocumentId};
@@ -184,6 +184,48 @@ pub fn commit(
 ) -> Result<SessionCommit> {
     lock_service(&state)?
         .commit(&SessionId(session_id), transaction)
+        .map_err(to_protocol_error)
+}
+
+/// Imports an SVG file into the active desktop layer through one transaction.
+#[tauri::command]
+pub async fn import_svg(state: State<'_, DesktopState>, session_id: String, path: String) -> Result<SvgImportCommit> {
+    let source_path = Path::new(&path);
+    if source_path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(str::to_ascii_lowercase)
+        != Some("svg".into())
+    {
+        return Err(ProtocolError {
+            code: "svg_import_failed".into(),
+            message: "SVG import requires a .svg file".into(),
+            details: None,
+        });
+    }
+    let metadata = fs::metadata(source_path).map_err(|error| ProtocolError {
+        code: "svg_import_failed".into(),
+        message: format!("could not inspect SVG file {path}: {error}"),
+        details: None,
+    })?;
+    if metadata.len() > inkfinite_core::svg_import::SVG_IMPORT_MAX_BYTES as u64 {
+        return Err(ProtocolError {
+            code: "svg_import_failed".into(),
+            message: format!(
+                "SVG input exceeds the {}-byte limit",
+                inkfinite_core::svg_import::SVG_IMPORT_MAX_BYTES
+            ),
+            details: None,
+        });
+    }
+    let source = fs::read(source_path).map_err(|error| ProtocolError {
+        code: "svg_import_failed".into(),
+        message: format!("could not read SVG file {path}: {error}"),
+        details: None,
+    })?;
+    let source_name = source_path.file_name().and_then(|name| name.to_str());
+    lock_service(&state)?
+        .import_svg(&SessionId(session_id), &source, source_name)
         .map_err(to_protocol_error)
 }
 

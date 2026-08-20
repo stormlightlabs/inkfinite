@@ -17,9 +17,7 @@ describe('Editor Toolbar', () => {
 
 		await screen.getByRole('button', { name: 'Rectangle' }).click();
 		expect(onToolChange).toHaveBeenCalledWith('rect');
-		await expect
-			.element(screen.getByRole('button', { name: 'Zoom level' }))
-			.not.toBeInTheDocument();
+		await expect.element(screen.getByRole('button', { name: 'Zoom level' })).not.toBeInTheDocument();
 	});
 
 	it('keeps drawing tools in one row when the window narrows', async () => {
@@ -45,15 +43,14 @@ describe('Editor Toolbar', () => {
 		const toolbar = screen.getByRole('toolbar', { name: 'Drawing tools' }).element();
 		const handle = screen.getByRole('button', { name: 'Drag toolbar' }).element();
 
-		handle.dispatchEvent(
-			new KeyboardEvent('keydown', { key: 'ArrowLeft', shiftKey: true, bubbles: true })
-		);
+		handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', shiftKey: true, bubbles: true }));
 
 		await vi.waitFor(() => expect(toolbar.style.left).toBe('8px'));
 	});
 
 	it('offers editable canvas import and export actions', async () => {
 		const onImportEditable = vi.fn();
+		const onImportSvg = vi.fn();
 		const onExportEditable = vi.fn();
 		const screen = render(Toolbar, {
 			currentTool: 'select',
@@ -61,6 +58,7 @@ describe('Editor Toolbar', () => {
 			store: new Store(),
 			brushStore: createBrushStore(),
 			onImportEditable,
+			onImportSvg,
 			onExportEditable
 		});
 
@@ -70,14 +68,12 @@ describe('Editor Toolbar', () => {
 				.element() as HTMLButtonElement
 		).click();
 		expect(onImportEditable).toHaveBeenCalledOnce();
+		(screen.getByRole('button', { name: 'Import SVG file' }).element() as HTMLButtonElement).click();
+		expect(onImportSvg).toHaveBeenCalledOnce();
 
-		(
-			screen.getByRole('button', { name: 'Export drawing' }).element() as HTMLButtonElement
-		).click();
+		(screen.getByRole('button', { name: 'Export drawing' }).element() as HTMLButtonElement).click();
 		await expect
-			.element(
-				screen.getByRole('menuitem', { name: 'Export as Excalidraw editable document' })
-			)
+			.element(screen.getByRole('menuitem', { name: 'Export as Excalidraw editable document' }))
 			.toBeInTheDocument();
 		(
 			screen
@@ -86,15 +82,9 @@ describe('Editor Toolbar', () => {
 		).click();
 		expect(onExportEditable).toHaveBeenCalledWith('excalidraw');
 
-		(
-			screen.getByRole('button', { name: 'Export drawing' }).element() as HTMLButtonElement
-		).click();
+		(screen.getByRole('button', { name: 'Export drawing' }).element() as HTMLButtonElement).click();
 		await expect
-			.element(
-				screen.getByRole('menuitem', {
-					name: 'Export as Obsidian Canvas editable document'
-				})
-			)
+			.element(screen.getByRole('menuitem', { name: 'Export as Obsidian Canvas editable document' }))
 			.toBeInTheDocument();
 		(
 			screen
@@ -112,14 +102,8 @@ describe('Editor Toolbar', () => {
 			brushStore: createBrushStore()
 		});
 
-		const penBounds = screen
-			.getByRole('button', { name: 'Pen' })
-			.element()
-			.getBoundingClientRect();
-		const brushBounds = screen
-			.getByRole('button', { name: 'Brush settings' })
-			.element()
-			.getBoundingClientRect();
+		const penBounds = screen.getByRole('button', { name: 'Pen' }).element().getBoundingClientRect();
+		const brushBounds = screen.getByRole('button', { name: 'Brush settings' }).element().getBoundingClientRect();
 
 		expect(brushBounds.top).toBeGreaterThan(penBounds.bottom);
 		expect(brushBounds.right).toBeCloseTo(penBounds.right, 0);
@@ -151,14 +135,10 @@ describe('Editor Toolbar', () => {
 			brushStore: createBrushStore()
 		});
 
-		const fill = screen
-			.getByRole('slider', { name: 'Fill opacity' })
-			.element() as HTMLInputElement;
+		const fill = screen.getByRole('slider', { name: 'Fill opacity' }).element() as HTMLInputElement;
 		fill.value = '0.4';
 		fill.dispatchEvent(new Event('change', { bubbles: true }));
-		const stroke = screen
-			.getByRole('slider', { name: 'Stroke opacity' })
-			.element() as HTMLInputElement;
+		const stroke = screen.getByRole('slider', { name: 'Stroke opacity' }).element() as HTMLInputElement;
 		stroke.value = '0.65';
 		stroke.dispatchEvent(new Event('change', { bubbles: true }));
 

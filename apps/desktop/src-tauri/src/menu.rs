@@ -9,6 +9,7 @@ const NEW_BOARD: &str = "file.new-board";
 const OPEN_BOARD: &str = "file.open-board";
 const SAVE_BOARD_AS: &str = "file.save-board-as";
 const IMPORT_CANVAS: &str = "file.import-canvas";
+const IMPORT_SVG: &str = "file.import-svg";
 const EXPORT_EXCALIDRAW: &str = "file.export-excalidraw";
 const EXPORT_JSON_CANVAS: &str = "file.export-json-canvas";
 
@@ -24,6 +25,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         let new_board = MenuItem::with_id(app, NEW_BOARD, "New Board", true, Some("CmdOrCtrl+N"))?;
         let open_board = MenuItem::with_id(app, OPEN_BOARD, "Open…", true, Some("CmdOrCtrl+O"))?;
         let import_canvas = MenuItem::with_id(app, IMPORT_CANVAS, "Import Editable Canvas…", true, None::<&str>)?;
+        let import_svg = MenuItem::with_id(app, IMPORT_SVG, "Import SVG…", true, None::<&str>)?;
         let save_board_as = MenuItem::with_id(app, SAVE_BOARD_AS, "Save As…", true, Some("CmdOrCtrl+Shift+S"))?;
         let export_excalidraw = MenuItem::with_id(app, EXPORT_EXCALIDRAW, "Export as Excalidraw…", true, None::<&str>)?;
         let export_json_canvas = MenuItem::with_id(
@@ -34,10 +36,11 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             None::<&str>,
         )?;
         let separator = PredefinedMenuItem::separator(app)?;
-        let items: [&dyn IsMenuItem<R>; 7] = [
+        let items: [&dyn IsMenuItem<R>; 8] = [
             &new_board,
             &open_board,
             &import_canvas,
+            &import_svg,
             &save_board_as,
             &export_excalidraw,
             &export_json_canvas,
@@ -60,6 +63,7 @@ pub fn handle_event<R: Runtime>(app: &AppHandle<R>, event: tauri::menu::MenuEven
         OPEN_BOARD => "open",
         SAVE_BOARD_AS => "save-as",
         IMPORT_CANVAS => "import",
+        IMPORT_SVG => "import-svg",
         EXPORT_EXCALIDRAW => "export-excalidraw",
         EXPORT_JSON_CANVAS => "export-json-canvas",
         _ => return,

@@ -16,7 +16,7 @@ export function blankSnapshot(fileName: string) {
 	const snapshot: BoardExport = {
 		board: {
 			id: boardId,
-			name: fileName.replace(/\.(?:excalidraw|canvas)$/i, '').trim() || 'Imported Board',
+			name: fileName.replace(/\.(?:excalidraw|canvas|svg)$/i, '').trim() || 'Imported Board',
 			createdAt: timestamp,
 			updatedAt: timestamp
 		},

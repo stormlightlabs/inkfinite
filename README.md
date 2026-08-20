@@ -72,6 +72,14 @@ inkfinite apply architecture.inkfinite --transaction transaction.json --dry-run
 cat transaction.json | inkfinite apply architecture.inkfinite --transaction - --json
 ```
 
+Import static SVG content through the same transaction engine. Use `--dry-run`
+to validate the source and target without saving it:
+
+```sh
+inkfinite import svg architecture.inkfinite --input icon.svg --dry-run
+inkfinite import svg architecture.inkfinite --input icon.svg
+```
+
 The structured mutation commands build ordinary transactions. They generate
 shape and binding IDs when you omit them. Shapes can be selected by exact ID,
 name, or semantic role:
@@ -81,10 +89,13 @@ inkfinite shape create architecture.inkfinite \
   --kind rect --layer layer:architecture:1 \
   --x 80 --y 120 --properties '{"width":240,"height":120}' \
   --role architecture.service
+
 inkfinite shape patch architecture.inkfinite --role architecture.service \
   --patch '{"properties":{"width":280,"height":120}}'
+
 inkfinite connect architecture.inkfinite --binding-id binding:api-db \
   --source shape:arrow --target-role architecture.database
+
 inkfinite layout align architecture.inkfinite \
   --role architecture.service --alignment top
 ```
@@ -147,13 +158,16 @@ inkfinite app query --role architecture.service --detail --limit 20 --json
 inkfinite app focus
 inkfinite shape patch --app --role architecture.service \
   --patch '@service-patch.json' --json
+
 inkfinite app propose --transaction transaction.json --json
 inkfinite app proposal wait --proposal-id proposal:1 --json
 inkfinite app proposal renew --proposal-id proposal:1 --json
 inkfinite app render --output current.svg --transaction transaction.json \
   --proposed-output proposed.png --json
+
 inkfinite app ui --page page:1 --layer layer:1 --select shape:service \
   --camera 640,360,1.25 --json
+
 inkfinite app apply --transaction transaction.json --json
 ```
 
@@ -227,4 +241,4 @@ pnpm dev:ui
 
 ## License
 
-Inkfinite is licensed under the [Apache-2.0](LICENSE).
+Inkfinite is licensed under [Apache-2.0](LICENSE).

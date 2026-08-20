@@ -16,13 +16,7 @@
 		TextShape,
 		ToolId
 	} from '@inkfinite/core';
-	import {
-		EditorState,
-		exportToSVG,
-		exportViewportToPNG,
-		getSelectedShapes,
-		SnapshotCommand
-	} from '@inkfinite/core';
+	import { EditorState, exportToSVG, exportViewportToPNG, getSelectedShapes, SnapshotCommand } from '@inkfinite/core';
 	import { fade } from 'svelte/transition';
 	import ArrowPopover from './ArrowPopover.svelte';
 
@@ -34,6 +28,7 @@
 		brushStore: BrushStore;
 		onStencilsClick?: () => void;
 		onImportEditable?: () => void;
+		onImportSvg?: () => void;
 		onExportEditable?: (format: InterchangeFormat) => void;
 		interchangeBusy?: boolean;
 	};
@@ -46,6 +41,7 @@
 		brushStore,
 		onStencilsClick,
 		onImportEditable,
+		onImportSvg,
 		onExportEditable,
 		interchangeBusy = false
 	}: Props = $props();
@@ -62,9 +58,7 @@
 	let strokeDisabled = $state(true);
 	let agentEditableValue = $state(true);
 	let brush = $derived<BrushSettings>(brushStore.get());
-	let hasArrowSelection = $derived(
-		getSelectedShapes(editorState).some((s) => s.type === 'arrow')
-	);
+	let hasArrowSelection = $derived(getSelectedShapes(editorState).some((s) => s.type === 'arrow'));
 
 	$effect(() => {
 		editorState = store.getState();
@@ -91,11 +85,7 @@
 		strokeDisabled = strokable.length === 0;
 		if (fillable.length > 0) {
 			const shared = getSharedColor(fillable, (shape) =>
-				shape.type === 'text'
-					? shape.props.color
-					: 'fill' in shape.props
-						? shape.props.fill
-						: null
+				shape.type === 'text' ? shape.props.color : 'fill' in shape.props ? shape.props.fill : null
 			);
 			if (shared) {
 				fillColorValue = shared;
@@ -112,9 +102,7 @@
 		fillOpacityValue = getSharedOpacity(fillOpacityTargets, (shape) => shape.fillOpacity) ?? 1;
 		strokeOpacityValue =
 			getSharedOpacity(strokeOpacityTargets, (shape) =>
-				shape.type === 'stroke'
-					? (shape.strokeOpacity ?? shape.props.style.opacity)
-					: shape.strokeOpacity
+				shape.type === 'stroke' ? (shape.strokeOpacity ?? shape.props.style.opacity) : shape.strokeOpacity
 			) ?? 1;
 		agentEditableValue = selection.every((shape) => shape.agentEditable !== false);
 	});
@@ -184,8 +172,7 @@
 		isDragging = false;
 		if (typeof document !== 'undefined') document.body.style.userSelect = '';
 		const handle = event.currentTarget as HTMLElement;
-		if (handle.hasPointerCapture(event.pointerId))
-			handle.releasePointerCapture(event.pointerId);
+		if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
 	}
 
 	function handleDragKeyDown(event: KeyboardEvent) {
@@ -261,26 +248,14 @@
 		return shape.type === 'rect' || shape.type === 'ellipse' || shape.type === 'text';
 	}
 
-	function shapeSupportsStroke(
-		shape: ShapeRecord
-	): shape is RectShape | EllipseShape | LineShape | ArrowShape {
-		return (
-			shape.type === 'rect' ||
-			shape.type === 'ellipse' ||
-			shape.type === 'line' ||
-			shape.type === 'arrow'
-		);
+	function shapeSupportsStroke(shape: ShapeRecord): shape is RectShape | EllipseShape | LineShape | ArrowShape {
+		return shape.type === 'rect' || shape.type === 'ellipse' || shape.type === 'line' || shape.type === 'arrow';
 	}
 
 	function shapeSupportsFillOpacity(
 		shape: ShapeRecord
 	): shape is RectShape | EllipseShape | TextShape | MarkdownShape {
-		return (
-			shape.type === 'rect' ||
-			shape.type === 'ellipse' ||
-			shape.type === 'text' ||
-			shape.type === 'markdown'
-		);
+		return shape.type === 'rect' || shape.type === 'ellipse' || shape.type === 'text' || shape.type === 'markdown';
 	}
 
 	function shapeSupportsStrokeOpacity(
@@ -345,12 +320,7 @@
 			}
 		}
 		const after = { ...state, doc: { ...state.doc, shapes: newShapes } };
-		const command = new SnapshotCommand(
-			'Set fill color',
-			'doc',
-			before,
-			EditorState.clone(after)
-		);
+		const command = new SnapshotCommand('Set fill color', 'doc', before, EditorState.clone(after));
 		store.executeCommand(command);
 	}
 
@@ -365,26 +335,17 @@
 		for (const shape of targets) {
 			switch (shape.type) {
 				case 'rect': {
-					const updated: RectShape = {
-						...shape,
-						props: { ...shape.props, stroke: color }
-					};
+					const updated: RectShape = { ...shape, props: { ...shape.props, stroke: color } };
 					newShapes[shape.id] = updated;
 					break;
 				}
 				case 'ellipse': {
-					const updated: EllipseShape = {
-						...shape,
-						props: { ...shape.props, stroke: color }
-					};
+					const updated: EllipseShape = { ...shape, props: { ...shape.props, stroke: color } };
 					newShapes[shape.id] = updated;
 					break;
 				}
 				case 'line': {
-					const updated: LineShape = {
-						...shape,
-						props: { ...shape.props, stroke: color }
-					};
+					const updated: LineShape = { ...shape, props: { ...shape.props, stroke: color } };
 					newShapes[shape.id] = updated;
 					break;
 				}
@@ -399,12 +360,7 @@
 			}
 		}
 		const after = { ...state, doc: { ...state.doc, shapes: newShapes } };
-		const command = new SnapshotCommand(
-			'Set stroke color',
-			'doc',
-			before,
-			EditorState.clone(after)
-		);
+		const command = new SnapshotCommand('Set stroke color', 'doc', before, EditorState.clone(after));
 		store.executeCommand(command);
 	}
 
@@ -510,11 +466,8 @@
 		</div>
 		<div style="display: flex; gap: 0.125rem; flex-direction:column;">
 			<div class="toolbar__name">Inkfinite</div>
-			<a
-				class="toolbar__tagline"
-				href="https://stormlightlabs.org"
-				target="_blank"
-				rel="noreferrer">Stormlight Labs</a>
+			<a class="toolbar__tagline" href="https://stormlightlabs.org" target="_blank" rel="noreferrer"
+				>Stormlight Labs</a>
 		</div>
 	</div>
 	<div class="toolbar__divider toolbar__brand-divider"></div>
@@ -553,10 +506,7 @@
 	{/each}
 
 	{#if showContextControls}
-		<div
-			class="toolbar__context-panel"
-			aria-label="Contextual tool controls"
-			transition:fade={{ duration: 150 }}>
+		<div class="toolbar__context-panel" aria-label="Contextual tool controls" transition:fade={{ duration: 150 }}>
 			{#if showColorControls}
 				<div class="toolbar__colors" aria-label="Color controls">
 					{#if getSelectedShapes(editorState).some(shapeSupportsFill)}
@@ -617,10 +567,7 @@
 				<ArrowPopover {store} />
 			{/if}
 			<label class="toolbar__agent-control">
-				<input
-					type="checkbox"
-					checked={agentEditableValue}
-					onchange={handleAgentEditableChange} />
+				<input type="checkbox" checked={agentEditableValue} onchange={handleAgentEditableChange} />
 				<span>Agent editable</span>
 			</label>
 		</div>
@@ -634,6 +581,13 @@
 		onclick={() => onImportEditable?.()}
 		aria-label="Import Excalidraw or Obsidian Canvas document">
 		{interchangeBusy ? 'Working…' : 'Import'}
+	</button>
+	<button
+		class="toolbar__import-svg-button"
+		disabled={interchangeBusy}
+		onclick={() => onImportSvg?.()}
+		aria-label="Import SVG file">
+		SVG
 	</button>
 
 	<div class="toolbar__export">
@@ -649,11 +603,7 @@
 		</button>
 
 		{#if exportMenuOpen}
-			<div
-				class="toolbar__export-menu"
-				bind:this={exportMenuEl}
-				role="menu"
-				aria-label="Export options">
+			<div class="toolbar__export-menu" bind:this={exportMenuEl} role="menu" aria-label="Export options">
 				<button
 					class="toolbar__menu-item"
 					role="menuitem"
@@ -906,6 +856,7 @@
 	}
 
 	.toolbar__import-button,
+	.toolbar__import-svg-button,
 	.toolbar__export-button {
 		border: 1px solid var(--ink-border);
 		background: var(--ink-canvas);
@@ -920,13 +871,19 @@
 		transition-duration: 0.2s;
 	}
 
+	.toolbar__import-svg-button {
+		min-width: 3.25rem;
+	}
+
 	.toolbar__import-button:hover,
+	.toolbar__import-svg-button:hover,
 	.toolbar__export-button:hover {
 		background: var(--ink-surface-hover);
 		border-color: var(--ink-text-muted);
 	}
 
 	.toolbar__import-button:disabled,
+	.toolbar__import-svg-button:disabled,
 	.toolbar__export-button:disabled {
 		cursor: wait;
 		opacity: 0.55;
@@ -1110,6 +1067,7 @@
 		}
 
 		.toolbar__import-button,
+		.toolbar__import-svg-button,
 		.toolbar__export-button {
 			height: 42px;
 			min-width: 60px;

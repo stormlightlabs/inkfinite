@@ -699,6 +699,7 @@ pub fn session_protocol_error(error: &SessionError) -> ProtocolError {
         SessionError::Engine(EngineError::Precondition(_)) => "precondition_failed",
         SessionError::Engine(EngineError::Permission(_)) => "permission_denied",
         SessionError::Engine(_) => "document_engine_error",
+        SessionError::SvgImport(_) => "svg_import_failed",
     };
     let details = match error {
         SessionError::ProposalStale { proposal, .. } => serde_json::to_value(proposal).ok(),

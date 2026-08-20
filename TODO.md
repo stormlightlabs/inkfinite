@@ -67,11 +67,11 @@ Completed work is in [CHANGELOG.md](CHANGELOG.md).
 
 #### Transactions and entry points
 
-- [ ] Commit imports through one validated transaction
-- [ ] Add desktop SVG file import
-- [ ] Add web-app SVG file import
-  - [ ] Add drag-and-drop SVG import
-- [ ] Add CLI SVG import
+- [x] Commit imports through one validated transaction
+- [x] Add desktop SVG file import
+- [x] Add web-app SVG file import
+    - [x] Add drag-and-drop SVG import
+- [x] Add CLI SVG import
 
 #### Import fixtures
 

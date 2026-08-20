@@ -11,6 +11,9 @@ function createWorkspaceOps() {
 		async showSaveDialog() {
 			return '/workspace/new.inkfinite';
 		},
+		async showSvgDialog() {
+			return null;
+		},
 		async getRecentFiles() {
 			return [];
 		},
@@ -62,6 +65,9 @@ describe('desktop workspace adapter', () => {
 					throw new Error('not used');
 				},
 				commit: async () => {
+					throw new Error('not used');
+				},
+				importSvg: async () => {
 					throw new Error('not used');
 				},
 				propose: async () => {

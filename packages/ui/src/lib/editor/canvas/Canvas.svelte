@@ -24,6 +24,7 @@
 	let contextMenuOpen = $state(false);
 	let contextMenuPoint = $state({ x: 0, y: 0 });
 	let contextMenuItems = $state<ContextMenuEntry[]>([]);
+	let svgDragActive = $state(false);
 
 	// The composition root fixes the platform adapter for this component's lifetime.
 	// svelte-ignore state_referenced_locally
@@ -65,6 +66,13 @@
 
 	function handleDrop(e: DragEvent) {
 		e.preventDefault();
+		svgDragActive = false;
+
+		const droppedFile = e.dataTransfer?.files?.[0];
+		if (!draggingStencil.current && droppedFile?.name.toLowerCase().endsWith('.svg')) {
+			void c.importSvgFile(droppedFile);
+			return;
+		}
 
 		let stencil = draggingStencil.current;
 
@@ -116,9 +124,7 @@
 					ui: {
 						...state.ui,
 						activeLayerId: shape?.layerId ?? state.ui.activeLayerId,
-						selectionIds: state.ui.selectionIds.includes(shapeId)
-							? state.ui.selectionIds
-							: [shapeId],
+						selectionIds: state.ui.selectionIds.includes(shapeId) ? state.ui.selectionIds : [shapeId],
 						toolId: 'select'
 					}
 				};
@@ -126,12 +132,7 @@
 			contextMenuItems = [
 				{ id: 'duplicate', label: 'Duplicate', icon: 'add', shortcut: '⌘/Ctrl D' },
 				{ id: 'forward', label: 'Bring forward', icon: 'arrow-up', shortcut: '⌘/Ctrl ]' },
-				{
-					id: 'backward',
-					label: 'Send backward',
-					icon: 'arrow-down',
-					shortcut: '⌘/Ctrl ['
-				},
+				{ id: 'backward', label: 'Send backward', icon: 'arrow-down', shortcut: '⌘/Ctrl [' },
 				{ type: 'separator' },
 				{ id: 'delete', label: 'Delete', icon: 'delete', shortcut: '⌫', danger: true }
 			];
@@ -158,12 +159,7 @@
 				break;
 			case 'delete':
 				c.handleAction(
-					Action.keyDown('Delete', 'Delete', {
-						ctrl: false,
-						shift: false,
-						alt: false,
-						meta: false
-					})
+					Action.keyDown('Delete', 'Delete', { ctrl: false, shift: false, alt: false, meta: false })
 				);
 				break;
 			case 'stencils':
@@ -182,13 +178,21 @@
 		canvas={canvasEl ?? undefined}
 		brushStore={c.brushStore}
 		onImportEditable={c.importEditableCanvas}
+		onImportSvg={c.importSvg}
 		onExportEditable={c.exportEditableCanvas}
 		interchangeBusy={c.interchangeBusy()} />
 	<div
 		class="canvas-container"
+		data-svg-drag-active={svgDragActive}
+		ondragenter={(e) => {
+			if (e.dataTransfer?.types.includes('Files')) svgDragActive = true;
+		}}
 		ondragover={(e) => {
 			e.preventDefault();
 			if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+		}}
+		ondragleave={(e) => {
+			if (e.currentTarget === e.target) svgDragActive = false;
 		}}
 		ondrop={handleDrop}
 		role="application">
@@ -198,10 +202,7 @@
 			oncontextmenu={handleCanvasContextMenu}
 			onpointerleave={c.handlePointerLeave}></canvas>
 		{#if liveProposal}
-			<ProposalGhostLayer
-				proposal={liveProposal}
-				camera={c.store.getState().camera}
-				viewport={c.getViewport()} />
+			<ProposalGhostLayer proposal={liveProposal} camera={c.store.getState().camera} viewport={c.getViewport()} />
 		{/if}
 		<NavigationControls store={c.store} camera={c.camera} />
 		<LayerPanel store={c.store} onCommit={c.commitLayerState} />
@@ -317,19 +318,14 @@
 			bind:open={c.fileBrowser.open}
 			onUpdate={c.fileBrowser.handleUpdate}
 			onClose={c.fileBrowser.handleClose}
-			fetchInspectorData={platformKind === 'web'
-				? c.fileBrowser.fetchInspectorData
-				: undefined}
+			fetchInspectorData={platformKind === 'web' ? c.fileBrowser.fetchInspectorData : undefined}
 			desktopRepo={c.desktop.repo} />
 	{/if}
 	<StencilPalette
 		bind:open={c.stencilPaletteOpen}
 		onClose={() => (c.stencilPaletteOpen = false)}
 		onStencilClick={handleInsertStencilAtCenter} />
-	<Dialog
-		open={Boolean(interchangeNotice)}
-		onClose={c.closeInterchangeNotice}
-		title={interchangeNotice?.title}>
+	<Dialog open={Boolean(interchangeNotice)} onClose={c.closeInterchangeNotice} title={interchangeNotice?.title}>
 		{#if interchangeNotice}
 			<div class="interchange-notice" data-error={interchangeNotice.error}>
 				<h2>{interchangeNotice.title}</h2>
@@ -366,6 +362,27 @@
 		flex: 1;
 		min-height: 0;
 		position: relative;
+	}
+
+	.canvas-container::after {
+		content: 'Drop an SVG to import';
+		position: absolute;
+		inset: var(--ink-space-5);
+		display: grid;
+		place-items: center;
+		border: 1px dashed var(--ink-accent);
+		border-radius: var(--ink-radius-panel-small);
+		background: color-mix(in srgb, var(--ink-accent) 10%, var(--ink-canvas));
+		color: var(--ink-text);
+		font: 600 var(--ink-type-sm) / 1.3 var(--ink-font-body);
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity var(--ink-duration-fast) var(--ink-ease-out);
+		z-index: 3;
+	}
+
+	.canvas-container[data-svg-drag-active='true']::after {
+		opacity: 1;
 	}
 
 	.canvas-container canvas {
@@ -474,5 +491,11 @@
 		box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2) inset;
 		pointer-events: none;
 		z-index: 1;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.canvas-container::after {
+			transition: none;
+		}
 	}
 </style>

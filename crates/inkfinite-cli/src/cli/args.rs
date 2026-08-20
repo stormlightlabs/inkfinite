@@ -11,6 +11,7 @@ use super::{ArgGroup, Args, Bounds, CameraState, Parser, PathBuf, Subcommand, Va
   inkfinite new architecture.inkfinite
   inkfinite inspect architecture.inkfinite --json
   inkfinite apply architecture.inkfinite --transaction transaction.json --dry-run
+  inkfinite import svg architecture.inkfinite --input icon.svg
   inkfinite render architecture.inkfinite --output architecture.svg
   inkfinite app status --json
 
@@ -78,6 +79,9 @@ pub enum Command {
     cat transaction.json | inkfinite apply architecture.inkfinite --transaction - --json
 ")]
     Apply(ApplyArgs),
+    /// Import external formats through the transaction engine.
+    #[command(subcommand)]
+    Import(ImportCommand),
     /// Create, patch, or delete a shape through the transaction engine.
     #[command(subcommand)]
     Shape(ShapeCommand),
@@ -159,6 +163,35 @@ pub struct ApplyArgs {
     /// Validate and report the result without saving the document.
     #[arg(long)]
     pub dry_run: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ImportCommand {
+    /// Import a static SVG into a document or open desktop session.
+    #[command(after_help = "Examples:
+
+    inkfinite import svg architecture.inkfinite --input icon.svg
+    inkfinite import svg architecture.inkfinite --input logo.svg --layer layer:architecture:1 --dry-run
+")]
+    Svg(SvgImportArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct SvgImportArgs {
+    /// Canonical .inkfinite document to change. Omit when using --app.
+    #[arg(value_name = "FILE")]
+    pub path: Option<PathBuf>,
+    /// SVG file to import.
+    #[arg(long, value_name = "SVG_FILE")]
+    pub input: PathBuf,
+    /// Target page. Defaults to the active page or first page.
+    #[arg(long, value_name = "PAGE_ID")]
+    pub page: Option<String>,
+    /// Target layer. Defaults to the active layer or first layer on the page.
+    #[arg(long, value_name = "LAYER_ID")]
+    pub layer: Option<String>,
+    #[command(flatten)]
+    pub mutation: MutationOptions,
 }
 
 #[derive(Debug, Subcommand)]

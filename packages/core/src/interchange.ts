@@ -1,16 +1,24 @@
 import type { BoardExport } from './persistence/document';
 import { exportExcalidraw, importExcalidraw } from './interchange/excalidraw';
 import { exportJsonCanvas, importJsonCanvas } from './interchange/json-canvas';
+import { importSvg } from './interchange/svg';
 import { object } from './interchange/shared';
 
 /** External editable document formats supported by Inkfinite. */
 export type InterchangeFormat = 'excalidraw' | 'json-canvas';
 
+/** Formats accepted by the import boundary. */
+export type InterchangeImportFormat = InterchangeFormat | 'svg';
+
 /** A non-fatal loss or compatibility decision made during conversion. */
 export type InterchangeWarning = { code: string; message: string; count: number };
 
 /** A converted document and the losses encountered while reading it. */
-export type InterchangeImport = { format: InterchangeFormat; snapshot: BoardExport; warnings: InterchangeWarning[] };
+export type InterchangeImport = {
+	format: InterchangeImportFormat;
+	snapshot: BoardExport;
+	warnings: InterchangeWarning[];
+};
 
 /** Serialized external content and the losses encountered while writing it. */
 export type InterchangeExport = {
@@ -27,6 +35,9 @@ const MAX_IMPORT_BYTES = 16 * 1024 * 1024;
 export function importInterchange(contents: string, fileName: string): InterchangeImport {
 	if (new TextEncoder().encode(contents).byteLength > MAX_IMPORT_BYTES) {
 		throw new Error('The selected file is larger than the 16 MB import limit.');
+	}
+	if (fileName.toLowerCase().endsWith('.svg') || contents.trimStart().startsWith('<svg')) {
+		return importSvg(contents, fileName);
 	}
 	let value: unknown;
 	try {

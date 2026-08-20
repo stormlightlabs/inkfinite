@@ -29,6 +29,7 @@ pub fn run() {
             session::snapshot,
             session::update_context,
             session::commit,
+            session::import_svg,
             session::propose,
             session::accept_proposal,
             session::reject_proposal,

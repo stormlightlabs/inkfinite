@@ -42,6 +42,14 @@ impl StructuredMutationTarget {
         Ok(Self::File(Box::new(super::support::open_document(path)?)))
     }
 
+    /// Returns the actor that owns the target mutation stream.
+    pub fn actor_id(&self) -> inkfinite_core::ActorId {
+        match self {
+            Self::File(file) => file.actor_id().clone(),
+            Self::App { status, .. } => status.actor_id.clone(),
+        }
+    }
+
     /// Returns the document state used for selectors and generated IDs.
     pub fn snapshot(&mut self) -> Result<DocumentSnapshot> {
         match self {
@@ -83,12 +91,21 @@ impl StructuredMutationTarget {
     pub fn finish(
         self, transaction: TransactionDraft, options: &MutationOptions, json_output: bool, stdout: &mut dyn Write,
     ) -> Result<()> {
+        self.finish_with_warnings(transaction, options, json_output, stdout, Vec::new())
+    }
+
+    /// Applies a mutation while retaining non-fatal import diagnostics in file-mode output.
+    pub fn finish_with_warnings(
+        self, transaction: TransactionDraft, options: &MutationOptions, json_output: bool, stdout: &mut dyn Write,
+        warnings: Vec<String>,
+    ) -> Result<()> {
         match self {
             Self::File(mut file) => commit_mutation(
                 &mut file,
                 transaction,
                 options.dry_run,
                 options.transaction_out.as_deref(),
+                warnings,
                 json_output,
                 stdout,
             ),
@@ -115,7 +132,7 @@ struct MutationResult {
 
 pub fn commit_mutation(
     file: &mut DocumentFile, transaction: TransactionDraft, dry_run: bool, transaction_output: Option<&Path>,
-    json_output: bool, stdout: &mut dyn Write,
+    warnings: Vec<String>, json_output: bool, stdout: &mut dyn Write,
 ) -> Result<()> {
     let transaction_json = transaction_output
         .map(|_| serde_json::to_vec_pretty(&transaction))
@@ -173,7 +190,7 @@ pub fn commit_mutation(
         updated: commit.patch.changed,
         deleted: commit.patch.deleted,
         repairs: commit.warnings,
-        warnings: Vec::new(),
+        warnings,
         dry_run: effective_dry_run,
         transaction_output: transaction_output.map(portable_path),
     };
@@ -188,6 +205,9 @@ pub fn commit_mutation(
         writeln!(stdout, "Created: {}", result.created.len()).map_err(map_output_error)?;
         writeln!(stdout, "Updated: {}", result.updated.len()).map_err(map_output_error)?;
         writeln!(stdout, "Deleted: {}", result.deleted.len()).map_err(map_output_error)?;
+        for warning in &result.warnings {
+            writeln!(stdout, "Warning: {warning}").map_err(map_output_error)?;
+        }
         write_heads(stdout, &result.current_heads)
     }
 }

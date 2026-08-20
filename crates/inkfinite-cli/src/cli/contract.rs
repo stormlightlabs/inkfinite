@@ -36,7 +36,7 @@ pub fn print_schema(kind: SchemaKind, stdout: &mut dyn Write) -> Result<(), CliE
 
 pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(), CliError> {
     let capabilities = json!({
-        "commands": ["new", "inspect", "query", "app", "validate", "apply", "shape", "connect", "layout", "render", "schema", "capabilities"],
+        "commands": ["new", "inspect", "query", "app", "validate", "apply", "import", "shape", "connect", "layout", "render", "schema", "capabilities"],
         "exit_codes": {
             "conflict": EXIT_CONFLICT,
             "input": EXIT_INPUT,
@@ -64,6 +64,7 @@ pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(
         },
         "mutation_commands": {
             "apply": ["--transaction", "--dry-run"],
+            "import svg": ["--input", "--page", "--layer", "--dry-run", "--transaction-out", "--app"],
             "connect": ["--binding-id", "--source", "--source-role", "--target", "--target-role", "--dry-run", "--transaction-out", "--app"],
             "layout": ["align", "distribute"],
             "shape": ["create", "patch", "delete", "kinds", "describe"],
@@ -90,7 +91,7 @@ pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(
     .map_err(map_output_error)?;
     writeln!(
         stdout,
-        "Commands: new, inspect, query, app, validate, apply, shape, connect, layout, render, schema, capabilities"
+        "Commands: new, inspect, query, app, validate, apply, import, shape, connect, layout, render, schema, capabilities"
     )
     .map_err(map_output_error)?;
     writeln!(

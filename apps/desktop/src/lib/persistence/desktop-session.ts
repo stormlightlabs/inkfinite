@@ -80,21 +80,19 @@ export type SyncMessage = {
 export type SyncDisposition = 'applied' | 'duplicate' | 'deferred' | 'quarantined';
 
 /** Document patch and validation result returned by a peer merge. */
-export type SyncApplyResult = {
-	disposition: SyncDisposition;
-	adopted_messages: number;
-	heads: ChangeHash[];
-	patch: CommitResult['patch'];
-	affected_ids: CommitResult['affected_ids'];
-	affected_regions: CommitResult['affected_regions'];
-	warnings: CommitResult['warnings'];
-};
+export type SyncApplyResult = { disposition: SyncDisposition; adopted_messages: number; heads: ChangeHash[] } & Pick<
+	CommitResult,
+	'patch' | 'affected_ids' | 'affected_regions' | 'warnings'
+>;
 
 /** Result returned after creating or opening a desktop session. */
 export type SessionOpened = { session_id: string; status: SessionStatus };
 
 /** Result returned after committing, undoing, or redoing a transaction. */
 export type SessionCommit = { commit: CommitResult; status: SessionStatus };
+
+/** Result returned after importing an SVG through the Rust session service. */
+export type SvgImportResult = { doc: LoadedDoc; warnings: string[]; omitted_image_count: number; shape_ids: string[] };
 
 /** Result returned after persisting a session. */
 export type SessionSaved = { save: { path: string; heads: ChangeHash[] }; status: SessionStatus };
@@ -134,6 +132,16 @@ export interface SessionApi {
 		occluded_regions: Array<{ x: number; y: number; width: number; height: number }>;
 	}): Promise<void>;
 	commit(args: { session_id: string; transaction: TransactionDraft }): Promise<SessionCommit>;
+	importSvg(args: {
+		session_id: string;
+		path: string;
+	}): Promise<{
+		session: SessionCommit;
+		warnings: string[];
+		omitted_image_count: number;
+		shape_ids: string[];
+		source_asset_id: string;
+	}>;
 	propose(args: { session_id: string; transaction: TransactionDraft }): Promise<Proposal>;
 	acceptProposal(args: {
 		session_id: string;
@@ -187,6 +195,11 @@ function createSessionApi(): SessionApi {
 			}),
 		commit: (args) =>
 			invokeSession<SessionCommit>('commit', { sessionId: args.session_id, transaction: args.transaction }),
+		importSvg: (args) =>
+			invokeSession<Awaited<ReturnType<SessionApi['importSvg']>>>('import_svg', {
+				sessionId: args.session_id,
+				path: args.path
+			}),
 		propose: (args) =>
 			invokeSession<Proposal>('propose', { sessionId: args.session_id, transaction: args.transaction }),
 		acceptProposal: (args) =>
@@ -248,7 +261,7 @@ function describeError(error: unknown): string {
 	return String(error);
 }
 
-function invokeSession<T>(command: string, args: Record<string, unknown>): Promise<T> {
+async function invokeSession<T>(command: string, args: Record<string, unknown>): Promise<T> {
 	return invoke<T>(command, args).catch((error: unknown) => {
 		const detail = describeError(error);
 		const message = `${command} failed: ${detail}`;
@@ -263,6 +276,7 @@ export type DesktopSessionRepo = PersistentDocRepo & {
 	openDraft(): Promise<{ boardId: string; doc: LoadedDoc }>;
 	isDraft(): boolean;
 	getCurrentFile(): FileHandle | null;
+	importSvg(): Promise<SvgImportResult | null>;
 	openFromDialog(prepareToOpen?: () => Promise<void>): Promise<{ boardId: string; doc: LoadedDoc }>;
 	saveAs(prepareToSave?: () => Promise<void>): Promise<{ boardId: string; doc: LoadedDoc }>;
 	getWorkspaceDir(): Promise<string | null>;
@@ -298,9 +312,9 @@ export type DesktopSessionRepo = PersistentDocRepo & {
 };
 
 /**
- * Creates the desktop repository adapter. Document bytes cross the Tauri
- * command boundary only; this adapter keeps the editor projection in memory
- * until the backend returns a committed snapshot.
+ * Creates the desktop repository adapter. Document bytes cross the Tauri command boundary only.
+ *
+ * This adapter keeps the editor projection in memory until the backend returns a committed snapshot.
  */
 export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: SessionApi } = {}): DesktopSessionRepo {
 	const api = opts.api ?? createSessionApi();
@@ -519,6 +533,22 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		setCurrentState(opened.status, boardName);
 		if (!workspace && currentFile) await fileOps.addRecentFile(currentFile);
 		return opened.status.snapshot.document_id;
+	}
+
+	async function importSvg(): Promise<SvgImportResult | null> {
+		if (!currentStatus || !currentDoc) throw new Error('No board loaded');
+		const path = await fileOps.showSvgDialog();
+		if (!path) return null;
+		const result = await api.importSvg({ session_id: currentStatus.session_id, path });
+		updateStatus(result.session.status);
+		await saveCurrentSession();
+		if (!currentDoc) throw new Error('SVG import did not return a document');
+		return {
+			doc: currentDoc,
+			warnings: result.warnings,
+			omitted_image_count: result.omitted_image_count,
+			shape_ids: result.shape_ids
+		};
 	}
 
 	async function renameBoard(boardId: string, name: string): Promise<void> {
@@ -823,6 +853,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		exportBoard,
 		importBoard,
 		getCurrentFile: () => (currentIsDraft ? null : currentFile),
+		importSvg,
 		openFromDialog,
 		saveAs,
 		getWorkspaceDir: () => fileOps.getWorkspaceDir(),
