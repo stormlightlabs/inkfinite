@@ -21,6 +21,9 @@ tokio.workspace = true
 ts-rs.workspace = true
 thiserror.workspace = true
 
+[target.'cfg(any(unix, windows))'.dependencies]
+tokio = { workspace = true, features = ["net"] }
+
 [dev-dependencies]
 proptest = "1.7"
 

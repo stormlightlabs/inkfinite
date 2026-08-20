@@ -6,7 +6,9 @@ import {
 	type PageRecord,
 	PageRecord as PageOps,
 	type ShapeRecord,
-	ShapeRecord as ShapeOps
+	ShapeRecord as ShapeOps,
+	type ImportedAsset,
+	type ImportedGroup
 } from '../model';
 import type { BoardMeta, DocRepo } from './repo';
 
@@ -32,6 +34,8 @@ export type LoadedDoc = {
 	layers?: Record<string, LayerRecord>;
 	shapes: Record<string, ShapeRecord>;
 	bindings: Record<string, BindingRecord>;
+	assets?: Record<string, ImportedAsset>;
+	svgGroups?: Record<string, ImportedGroup>;
 	order: DocOrder;
 };
 

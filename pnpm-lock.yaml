@@ -83,6 +83,9 @@ importers:
             '@inkfinite/core':
                 specifier: workspace:*
                 version: link:../../packages/core
+            '@inkfinite/wasm':
+                specifier: workspace:*
+                version: link:../../packages/wasm
             '@inkfinite/ui':
                 specifier: workspace:*
                 version: link:../../packages/ui
@@ -176,6 +179,9 @@ importers:
 
     packages/core:
         dependencies:
+            '@inkfinite/bindings':
+                specifier: workspace:*
+                version: link:../bindings
             perfect-freehand:
                 specifier: ^1.2.2
                 version: 1.2.2
@@ -216,6 +222,16 @@ importers:
             vitest:
                 specifier: ^4.0.16
                 version: 4.0.16(@types/node@25.0.3)(@vitest/browser-playwright@4.0.16)(jiti@2.6.1)(jsdom@27.3.0)(yaml@2.8.2)
+
+    packages/wasm:
+        dependencies:
+            '@inkfinite/bindings':
+                specifier: workspace:*
+                version: link:../bindings
+        devDependencies:
+            typescript:
+                specifier: ^5.9.3
+                version: 5.9.3
 
     packages/input-dom:
         dependencies:

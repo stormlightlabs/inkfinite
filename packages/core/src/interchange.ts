@@ -1,7 +1,9 @@
 import type { BoardExport } from './persistence/document';
 import { exportExcalidraw, importExcalidraw } from './interchange/excalidraw';
 import { exportJsonCanvas, importJsonCanvas } from './interchange/json-canvas';
-import { importSvg } from './interchange/svg';
+import { projectSvgImport, type SvgImportResult } from './interchange/svg';
+export { projectSvgImport } from './interchange/svg';
+export type { SvgImportResult } from './interchange/svg';
 import { object } from './interchange/shared';
 
 /** External editable document formats supported by Inkfinite. */
@@ -31,13 +33,20 @@ export type InterchangeExport = {
 
 const MAX_IMPORT_BYTES = 16 * 1024 * 1024;
 
-/** Detects and imports a supported editable canvas document. */
+/** Returns whether a filename or text prefix identifies an SVG source. */
+export function isSvgImport(contents: string | Uint8Array, fileName: string): boolean {
+	if (fileName.toLowerCase().endsWith('.svg')) return true;
+	if (typeof contents !== 'string') return false;
+	return contents.trimStart().startsWith('<svg');
+}
+
+/** Detects and imports a supported editable canvas document synchronously. */
 export function importInterchange(contents: string, fileName: string): InterchangeImport {
-	if (new TextEncoder().encode(contents).byteLength > MAX_IMPORT_BYTES) {
+	if (byteLength(contents) > MAX_IMPORT_BYTES) {
 		throw new Error('The selected file is larger than the 16 MB import limit.');
 	}
-	if (fileName.toLowerCase().endsWith('.svg') || contents.trimStart().startsWith('<svg')) {
-		return importSvg(contents, fileName);
+	if (isSvgImport(contents, fileName)) {
+		throw new Error('SVG imports must use the asynchronous browser importer.');
 	}
 	let value: unknown;
 	try {
@@ -53,6 +62,30 @@ export function importInterchange(contents: string, fileName: string): Interchan
 		return importJsonCanvas(root, fileName);
 	}
 	throw new Error('Choose an Excalidraw (.excalidraw) or Obsidian Canvas (.canvas) file.');
+}
+
+/** Imports SVG bytes through the caller-owned shared Rust/WASM importer. */
+export async function importInterchangeAsync(
+	contents: string | Uint8Array,
+	fileName: string,
+	importSvg: (source: Uint8Array) => Promise<SvgImportResult>
+): Promise<InterchangeImport> {
+	if (byteLength(contents) > MAX_IMPORT_BYTES) {
+		throw new Error('The selected file is larger than the 16 MB import limit.');
+	}
+	if (isSvgImport(contents, fileName)) {
+		const source = typeof contents === 'string' ? new TextEncoder().encode(contents) : contents;
+		const response = await importSvg(source);
+		return projectSvgImport(response, fileName);
+	}
+	if (typeof contents !== 'string') {
+		throw new Error('Non-SVG interchange imports require text content.');
+	}
+	return importInterchange(contents, fileName);
+}
+
+function byteLength(contents: string | Uint8Array) {
+	return typeof contents === 'string' ? new TextEncoder().encode(contents).byteLength : contents.byteLength;
 }
 
 /** Exports one Inkfinite page to a supported editable canvas format. */

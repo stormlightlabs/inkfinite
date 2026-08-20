@@ -90,6 +90,61 @@ The [native path geometry guide](apps/web/src/content/docs/internals/native-path
 documents the native representation, fill rules, validation, exact bounds,
 rendering, hit testing, and fixture coverage used by later import and editing work.
 
+### WASM
+
+Use WebAssembly to bring Inkfinite's canonical Rust semantics to the browser,
+not to replace the browser editor. Rust should own document meaning while
+TypeScript continues to own immediate interaction and browser APIs.
+
+The web app currently persists a TypeScript document graph in Dexie, while the
+desktop app and CLI use the Rust transaction engine and Automerge document.
+Desktop projection also flattens native hierarchy without composing every
+ancestor transform, and its reverse mirror can delete and recreate the scene for
+an ordinary edit. Shared TypeScript types do not prevent these execution paths
+from diverging.
+
+The first step is a thin `inkfinite-wasm` facade. SVG import establishes the
+build, packaging, worker, and binding path. Deterministic SVG export should use
+the Rust renderer through the same facade so browser, desktop, and CLI output
+share hierarchy, bounds, and serialization behavior. Canvas rendering and PNG
+export remain in TypeScript.
+
+The second step moves native-to-editor projection and editor-to-native
+reconciliation into Rust. Projection must compose hierarchy transforms into a
+consistent editor view. Editor commits should describe semantic changes such as
+moving, resizing, restyling, reparenting, or changing path geometry. Rust should
+translate those changes into minimal validated transactions instead of replacing
+the scene. Native and WASM callers should exercise the same projection and
+reconciliation fixtures.
+
+The third step makes the browser document session stateful in WASM. It should
+open, mutate, undo, redo, and save the same canonical Automerge document used by
+native entry points. IndexedDB remains the browser storage adapter, but stores
+canonical document bytes rather than acting as a second shape graph. Existing
+browser documents need an explicit migration before the Dexie graph can stop
+being the source of truth.
+
+The JS/WASM boundary should carry coarse operations and batches. Strings,
+objects, and arrays may require conversion or copying, so pointer movement,
+hover, selection, camera state, drag previews, snap guides, Canvas rendering,
+and DOM/Svelte work remain in TypeScript. A persistent WASM session avoids
+serializing the complete document for each operation.
+
+Rust remains authoritative for committed path geometry, exact bounds,
+transforms, reparenting, topology, arc conversion, validation, and final
+freehand normalization. TypeScript may keep fast previews, cached bounds, hit
+testing, and selection geometry for responsive interaction. Shared fixtures
+must keep those previews acceptably aligned with committed results. Batched WASM
+geometry queries should be considered only when profiling shows a need.
+
+Excalidraw and JSON Canvas conversion can remain TypeScript-only while they are
+browser conveniences. Move them into Rust when desktop, CLI, or MCP also need
+them. TypeScript history likewise continues to own ephemeral editor state;
+durable document undo and redo belong to the Rust session.
+
+This sequencing leads to one document engine across browser, desktop, CLI, and
+future MCP access without placing the frame-by-frame editor loop behind WASM.
+
 ### Vector editing
 
 Build native vector editing on top of the path representation introduced for

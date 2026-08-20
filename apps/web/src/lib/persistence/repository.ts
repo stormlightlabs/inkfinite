@@ -17,6 +17,8 @@ import type {
 	Document,
 	LoadedDoc,
 	LayerRecord,
+	ImportedAsset,
+	ImportedGroup,
 	PageRecord,
 	PersistenceSink,
 	PersistentDocRepo,
@@ -50,12 +52,18 @@ const DEFAULT_BOARD_NAME = 'Untitled Board';
 const PAGE_ORDER_META_PREFIX = 'page-order:';
 const SHAPE_ORDER_META_PREFIX = 'shape-order:';
 const LAYERS_META_PREFIX = 'layers:';
+const ASSETS_META_PREFIX = 'assets:';
+const SVG_GROUPS_META_PREFIX = 'svg-groups:';
 
 const pageOrderKey = (boardId: string) => `${PAGE_ORDER_META_PREFIX}${boardId}`;
 
 const shapeOrderKey = (boardId: string) => `${SHAPE_ORDER_META_PREFIX}${boardId}`;
 
 const layersKey = (boardId: string) => `${LAYERS_META_PREFIX}${boardId}`;
+
+const assetsKey = (boardId: string) => `${ASSETS_META_PREFIX}${boardId}`;
+
+const svgGroupsKey = (boardId: string) => `${SVG_GROUPS_META_PREFIX}${boardId}`;
 
 /**
  * Create a Dexie-backed persistent DocRepo used by the web app.
@@ -126,16 +134,20 @@ export function createDexieDocRepo(
 				await meta().delete(pageOrderKey(boardId));
 				await meta().delete(shapeOrderKey(boardId));
 				await meta().delete(layersKey(boardId));
+				await meta().delete(assetsKey(boardId));
+				await meta().delete(svgGroupsKey(boardId));
 			}
 		);
 	}
 
 	async function loadDoc(boardId: string): Promise<LoadedDoc> {
 		const pageRows = await pages().where('boardId').equals(boardId).toArray();
-		const [shapeRows, bindingRows, order] = await Promise.all([
+		const [shapeRows, bindingRows, order, assetsRow, svgGroupsRow] = await Promise.all([
 			shapes().where('boardId').equals(boardId).toArray(),
 			bindings().where('boardId').equals(boardId).toArray(),
-			loadOrder(boardId, pageRows)
+			loadOrder(boardId, pageRows),
+			meta().get(assetsKey(boardId)),
+			meta().get(svgGroupsKey(boardId))
 		]);
 
 		const docPages: Record<string, PageRecord> = {};
@@ -158,6 +170,8 @@ export function createDexieDocRepo(
 			layers: order.layers,
 			shapes: docShapes,
 			bindings: docBindings,
+			assets: assetsRow?.value as Record<string, ImportedAsset> | undefined,
+			svgGroups: svgGroupsRow?.value as Record<string, ImportedGroup> | undefined,
 			order
 		};
 	}
@@ -248,8 +262,16 @@ export function createDexieDocRepo(
 			throw new Error(`Board ${boardId} not found`);
 		}
 
-		const { pages, layers, shapes, bindings, order } = await loadDoc(boardId);
-		const doc: Document = { pages, ...(layers ? { layers } : {}), shapes, bindings };
+		const { pages, layers, shapes, bindings, assets, svgGroups, order } =
+			await loadDoc(boardId);
+		const doc: Document = {
+			pages,
+			...(layers ? { layers } : {}),
+			...(assets ? { assets } : {}),
+			...(svgGroups ? { svgGroups } : {}),
+			shapes,
+			bindings
+		};
 		return { board, doc, order };
 	}
 
@@ -295,6 +317,15 @@ export function createDexieDocRepo(
 				const importedLayers = snapshot.doc.layers ?? order.layers;
 				if (importedLayers && Object.keys(importedLayers).length > 0) {
 					await meta().put({ key: layersKey(boardId), value: importedLayers });
+				}
+				if (snapshot.doc.assets && Object.keys(snapshot.doc.assets).length > 0) {
+					await meta().put({ key: assetsKey(boardId), value: snapshot.doc.assets });
+				}
+				if (snapshot.doc.svgGroups && Object.keys(snapshot.doc.svgGroups).length > 0) {
+					await meta().put({
+						key: svgGroupsKey(boardId),
+						value: snapshot.doc.svgGroups
+					});
 				}
 			}
 		);
@@ -561,7 +592,13 @@ export async function getSchemaInfo(database: Dexie): Promise<SchemaInfo> {
 }
 
 /** Fetch complete inspector data for a board. */
-export async function getBoardInspectorData(database: Dexie, boardId: string): Promise<BoardInspectorData> {
-	const [stats, schema] = await Promise.all([getBoardStats(database, boardId), getSchemaInfo(database)]);
+export async function getBoardInspectorData(
+	database: Dexie,
+	boardId: string
+): Promise<BoardInspectorData> {
+	const [stats, schema] = await Promise.all([
+		getBoardStats(database, boardId),
+		getSchemaInfo(database)
+	]);
 	return { storageType: 'IndexedDB (Dexie)', stats, schema };
 }

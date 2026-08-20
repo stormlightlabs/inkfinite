@@ -44,6 +44,7 @@
     "vitest": "^4.0.16"
   },
   "dependencies": {
+    "@inkfinite/bindings": "workspace:*",
     "perfect-freehand": "^1.2.2",
     "rxjs": "^7.8.2",
     "uuid": "^13.0.0"

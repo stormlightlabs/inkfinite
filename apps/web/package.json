@@ -4,6 +4,7 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
+		"prebuild": "pnpm --filter @inkfinite/wasm build",
 		"dev": "pnpm pagefind:dev && vite dev",
 		"dev:plain": "vite dev",
 		"pagefind:dev": "vite build && pagefind --site build --output-path static/pagefind --quiet",
@@ -20,6 +21,7 @@
 	},
 	"dependencies": {
 		"@inkfinite/core": "workspace:*",
+		"@inkfinite/wasm": "workspace:*",
 		"@inkfinite/ui": "workspace:*",
 		"dexie": "^4.2.1"
 	},

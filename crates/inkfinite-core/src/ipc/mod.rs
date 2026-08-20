@@ -340,6 +340,10 @@ pub fn endpoint_name() -> String {
     {
         format!(r"\\.\pipe\inkfinite-{}", user_component())
     }
+    #[cfg(not(any(unix, windows)))]
+    {
+        format!("inkfinite-{}", user_component())
+    }
 }
 
 /// Creates and protects the per-user IPC directory.
@@ -717,6 +721,7 @@ pub fn session_protocol_error(error: &SessionError) -> ProtocolError {
 /// # Errors
 ///
 /// Returns discovery, connection, framing, or response-correlation failures.
+#[cfg(any(unix, windows))]
 pub async fn send(request: AppRequest) -> Result<ResponseEnvelope, IpcError> {
     let discovery = read_discovery(&discovery_path())?;
     if discovery.endpoint != endpoint_name() {
@@ -739,6 +744,13 @@ pub async fn send(request: AppRequest) -> Result<ResponseEnvelope, IpcError> {
         ));
     }
     Ok(response)
+}
+
+#[cfg(not(any(unix, windows)))]
+pub async fn send(_request: AppRequest) -> Result<ResponseEnvelope, IpcError> {
+    Err(IpcError::Unavailable(
+        "local IPC is not available on this target".into(),
+    ))
 }
 
 #[cfg(unix)]

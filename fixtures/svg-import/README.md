@@ -1,6 +1,7 @@
 # SVG import fixtures
 
-- `icons/` contains one Catppuccin icon and one Simple Icons logo.
+- `icons/` contains the Bootstrap `filetype-svg` regression icon, one Catppuccin
+  icon, and one Simple Icons logo.
 - `logos/` contains Skill Icons and Devicon Plain logos. Both use the
   `currentColor` paint form used by many SVG icon packages.
 - `nested-groups/` checks group-local transforms, inherited paint, and opacity.
@@ -17,6 +18,7 @@ The icon bodies are derived from the Iconify icon sets repository:
 - [Skill Icons](https://github.com/iconify/icon-sets/blob/master/json/skill-icons.json)
 - [Devicon Plain](https://github.com/iconify/icon-sets/blob/master/json/devicon-plain.json)
 
-Those sets provide MIT-licensed source material. The fixture wrappers keep the
-source view boxes and retain the original SVG input so importer behavior can be
-reproduced without a network request.
+Those sets provide MIT-licensed source material. The Bootstrap fixture comes
+from the [Bootstrap Icons filetype-svg page](https://icons.getbootstrap.com/icons/filetype-svg/).
+The fixture wrappers keep the source view boxes and retain the original SVG
+input so importer behavior can be reproduced without a network request.

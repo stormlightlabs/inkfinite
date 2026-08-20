@@ -4,7 +4,8 @@ import type {
 	InterchangeExport,
 	PersistenceSink,
 	PersistenceStatus,
-	PersistentDocRepo
+	PersistentDocRepo,
+	SvgImportResult
 } from '@inkfinite/core';
 import type { StatusStore } from './status';
 
@@ -15,8 +16,15 @@ export type EditorPlatform = 'web' | 'desktop';
 export type LiveProposal = {
 	id: string;
 	transaction: { operations: readonly unknown[] };
-	preview: { created: readonly unknown[]; changed: readonly unknown[]; deleted: readonly unknown[] };
-	affected_regions: Array<{ page_id: string; bounds: { x: number; y: number; width: number; height: number } }>;
+	preview: {
+		created: readonly unknown[];
+		changed: readonly unknown[];
+		deleted: readonly unknown[];
+	};
+	affected_regions: Array<{
+		page_id: string;
+		bounds: { x: number; y: number; width: number; height: number };
+	}>;
 	operation_previews?: Array<{
 		position: number;
 		label: string;
@@ -61,11 +69,16 @@ export type NativeFileMenuAction =
 /** User-selected external editable document. */
 export type InterchangeSourceFile = { name: string; contents: string };
 
+/** User-selected SVG bytes kept out of the main-thread parser. */
+export type SvgSourceFile = { name: string; bytes: Uint8Array };
+
 /** Platform file operations used by shared editable-format import and export. */
 export interface InterchangeFileAccess {
 	pickImport(): Promise<InterchangeSourceFile | null>;
-	/** Picks an SVG source for the browser import path. */
-	pickSvg?(): Promise<InterchangeSourceFile | null>;
+	/** Picks SVG bytes for the browser import path. */
+	pickSvg?(): Promise<SvgSourceFile | null>;
+	/** Parses SVG bytes through the application's shared Rust/WASM worker. */
+	importSvg?(source: Uint8Array): Promise<SvgImportResult>;
 	saveExport(file: InterchangeExport, defaultStem: string): Promise<boolean>;
 }
 
@@ -89,7 +102,9 @@ export interface DesktopDocumentRepo extends PersistentDocRepo {
 		prepareToOpen?: () => Promise<void>
 	): Promise<{ boardId: string; doc: import('@inkfinite/core').LoadedDoc }>;
 	/** Opens the native dialog, then waits for pending editor writes before saving the selected path. */
-	saveAs(prepareToSave?: () => Promise<void>): Promise<{ boardId: string; doc: import('@inkfinite/core').LoadedDoc }>;
+	saveAs(
+		prepareToSave?: () => Promise<void>
+	): Promise<{ boardId: string; doc: import('@inkfinite/core').LoadedDoc }>;
 	getWorkspaceDir(): Promise<string | null>;
 	setWorkspaceDir(path: string | null): Promise<void>;
 	pickWorkspaceDir(): Promise<string | null>;
@@ -98,12 +113,19 @@ export interface DesktopDocumentRepo extends PersistentDocRepo {
 	getAgentAccess(): 'review' | 'direct';
 	subscribeProposal(listener: (update: ProposalUpdate) => void): () => void;
 	/** Receives document snapshots committed by the live CLI or trusted sync peers. */
-	subscribeLiveDocument(listener: (doc: import('@inkfinite/core').LoadedDoc) => void): () => void;
+	subscribeLiveDocument(
+		listener: (doc: import('@inkfinite/core').LoadedDoc) => void
+	): () => void;
 	/** Receives authenticated live CLI navigation without changing document history. */
 	subscribeAgentUi(listener: (control: AgentUiControl) => void): () => void;
-	acceptProposal(proposalId: string, operationPositions?: number[]): Promise<import('@inkfinite/core').LoadedDoc>;
+	acceptProposal(
+		proposalId: string,
+		operationPositions?: number[]
+	): Promise<import('@inkfinite/core').LoadedDoc>;
 	rejectProposal(proposalId: string): Promise<void>;
-	setAgentAccess(agentAccess: 'review' | 'direct'): Promise<{ agent_access: 'review' | 'direct' }>;
+	setAgentAccess(
+		agentAccess: 'review' | 'direct'
+	): Promise<{ agent_access: 'review' | 'direct' }>;
 	/** Publishes the current page, selection, and visible world-space rectangle. */
 	updateAgentContext(context: AgentEditorContext): Promise<void>;
 }
@@ -129,5 +151,9 @@ export interface EditorPlatformAdapter {
 
 /** Creates the initial status shown while an application adapter connects. */
 export function initialPersistenceStatus(platform: EditorPlatform): PersistenceStatus {
-	return { backend: platform === 'desktop' ? 'filesystem' : 'indexeddb', state: 'saved', pendingWrites: 0 };
+	return {
+		backend: platform === 'desktop' ? 'filesystem' : 'indexeddb',
+		state: 'saved',
+		pendingWrites: 0
+	};
 }

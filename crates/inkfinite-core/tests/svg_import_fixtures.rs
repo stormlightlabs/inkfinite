@@ -3,6 +3,12 @@ use inkfinite_core::{PathFillRule, path_geometry_from_properties};
 
 const VALID_FIXTURES: &[(&str, &str, usize, usize)] = &[
     (
+        "Bootstrap filetype SVG icon",
+        include_str!("../../../fixtures/svg-import/icons/bootstrap-filetype-svg.svg"),
+        0,
+        1,
+    ),
+    (
         "Catppuccin Android icon",
         include_str!("../../../fixtures/svg-import/icons/catppuccin-android.svg"),
         0,
@@ -118,6 +124,28 @@ fn current_color_from_icon_sets_resolves_to_the_inherited_svg_color() {
     };
     assert_eq!(shape.properties["fill"], "#ed8796");
     assert_eq!(shape.properties["stroke"], "#ed8796");
+}
+
+#[test]
+fn bootstrap_filetype_svg_preserves_browser_regression_semantics() {
+    let import = parse_svg(include_str!(
+        "../../../fixtures/svg-import/icons/bootstrap-filetype-svg.svg"
+    ))
+    .expect("Bootstrap fixture should import");
+    let SvgImportNode::Shape(shape) = &import.root.children[0] else {
+        panic!("Bootstrap path missing")
+    };
+    let geometry = path_geometry_from_properties(&shape.properties).expect("Bootstrap path should validate");
+    assert_eq!(shape.properties["fill"], "#000000");
+    assert_eq!(geometry.fill_rule, PathFillRule::EvenOdd);
+    assert!(geometry.subpaths.len() >= 2);
+    assert!(
+        geometry
+            .subpaths
+            .iter()
+            .flat_map(|subpath| &subpath.segments)
+            .any(|segment| { matches!(segment, inkfinite_core::PathSegment::Quadratic { .. }) })
+    );
 }
 
 #[test]

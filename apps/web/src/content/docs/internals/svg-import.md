@@ -138,9 +138,13 @@ the imported subtree movable as one object.
 
 Desktop imports use the native Tauri dialog plugin to select a path, then Rust
 reads, parses, and commits the file through the active session. The browser adapter exposes an Import menu with editable-document, SVG file,
-and pasted SVG code/markup options. It uses the supported element mapping for
-file selection, pasted markup, and SVG drop, then persists the imported board in
-one IndexedDB operation. The CLI accepts
+and pasted SVG code/markup options. SVG file bytes and pasted markup cross one
+reusable worker, which lazy-loads the Rust WASM facade and returns the normalized
+result. The browser projects that result into its local document model, retains
+source and embedded assets, and persists the imported board in one IndexedDB
+operation. File selection, drag-and-drop, and pasted markup use this path. The
+web build runs `scripts/build-wasm.mjs` before Vite packages the worker; it
+requires the matching `wasm-bindgen` CLI. The CLI accepts
 `inkfinite import svg FILE --input ARTWORK.svg` and can validate the transaction
 with `--dry-run` before saving.
 
@@ -155,4 +159,7 @@ input data for provenance and future re-import, not executable document content.
 
 The parser accepts at most 16 MiB of UTF-8 input. XML, numeric attributes,
 transforms, path data, and embedded image data are validated before they enter
-the result. Malformed input returns an error rather than a partial import.
+the result. Malformed input returns an error rather than a partial import. The
+WASM response preserves the parser's structured error code and message across
+the worker boundary, and a failed import leaves the editor's busy state and
+current document unchanged.

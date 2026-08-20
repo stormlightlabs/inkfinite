@@ -8,109 +8,92 @@ Completed work is in [CHANGELOG.md](CHANGELOG.md).
 
 ### Native path geometry
 
-#### Representation and validation
-
-- [x] Add a native `path` shape kind
-- [x] Define normalized path and subpath representation
-- [x] Support move segments
-- [x] Support line segments
-- [x] Support quadratic curves
-- [x] Support cubic curves
-- [x] Support closed subpaths
-- [x] Define compound-path fill rules
-- [x] Generate TypeScript bindings for path geometry
-- [x] Implement Rust path validation
-
-#### Geometry, rendering, and fixtures
-
-- [x] Implement path bounds
-- [x] Include quadratic and cubic extrema in bounds
-- [x] Implement Canvas path rendering
-- [x] Implement path fill hit testing
-- [x] Implement path stroke hit testing
-- [x] Implement deterministic SVG path rendering
-- [x] Support parent-relative path transforms
-- [x] Add shared Rust/TypeScript path fixtures
-- [x] Add invalid-path fixtures
+Inkfinite now supports validated native paths across Rust and TypeScript, including compound geometry, transforms, bounds, rendering, hit testing, and shared fixtures.
 
 ### SVG import
 
-#### Parsing and native mapping
-
-- [x] Add an SVG import boundary
-- [x] Parse SVG into a normalized intermediate representation
-- [x] Import `<g>` as containers
-- [x] Import `<rect>` as rect shapes
-- [x] Import `<circle>` as ellipse shapes
-- [x] Import `<ellipse>` as ellipse shapes
-- [x] Import `<line>` as line shapes
-- [x] Import `<polygon>` as path shapes
-- [x] Import `<polyline>` as path shapes
-- [x] Import `<path>` as path shapes
-- [x] Preserve nested transforms
-- [x] Preserve supported fill styles
-- [x] Preserve supported stroke styles
-- [x] Preserve opacity
-- [x] Define SVG text import behavior
-- [x] Import supported embedded raster images as assets
-
-#### Unsupported content and security
-
-- [x] Preserve original SVG source as an asset
-- [x] Define warnings for unsupported SVG features
-- [x] Define opaque fallback behavior for unsupported visual subtrees
-- [x] Handle gradients explicitly
-- [x] Handle clip paths explicitly
-- [x] Handle masks explicitly
-- [x] Handle filters explicitly
-- [x] Reject or ignore scripts and animation explicitly
-
-#### Transactions and entry points
-
-- [x] Commit imports through one validated transaction
-- [x] Add desktop SVG file import
-- [x] Add web-app SVG file import
-    - [x] Add drag-and-drop SVG import
-- [x] Add CLI SVG import
-
-#### Import fixtures
-
-- [x] Add SVG import fixtures for icons
-- [x] Add SVG import fixtures for logos
-- [x] Add SVG import fixtures for nested groups
-- [x] Add SVG import fixtures for compound paths
-- [x] Add SVG import fixtures for unsupported features
-- [x] Add malformed SVG fixtures
-
-#### Shared Importer
-
-- [ ] Expose the Rust SVG importer to the browser through WASM
-- [ ] Run browser SVG imports in a reusable web worker
-- [ ] Project shared import results into browser documents
-- [ ] Route every web SVG entry point through the shared importer
-- [ ] Remove the handwritten TypeScript SVG parser
-- [ ] Test browser WASM imports with the shared fixture corpus
-- [ ] Add Bootstrap `filetype-svg` regression coverage
+Inkfinite now imports SVGs through one validated Rust pipeline across desktop, web, and CLI while preserving supported content and safely retaining unsupported visual content.
 
 ### SVG round-trip
 
 #### Document workflows
 
 - [ ] Test SVG import → save → reopen
+    - Import representative SVGs, save each document, and reopen it. Confirm the scene
+      hierarchy, geometry, styles, and fallback content match the imported state.
 - [ ] Test SVG import → edit → SVG export
+    - Import an SVG, modify its shapes in Inkfinite, and export it as SVG. Confirm the
+      export includes the edits and remains valid when opened by an independent SVG renderer.
 - [ ] Test SVG import → undo → redo
+    - Import an SVG, undo the import, and redo it. Verify both operations restore the
+      expected document state without missing or duplicated shapes.
 - [ ] Test imported content through CRDT merge
+    - Import SVG content into one replica, merge it with concurrent changes from another replica,
+      and verify convergence. Cover native shapes, hierarchy, styles, and opaque fallback content.
 - [ ] Test imported shapes through CLI inspect
+    - Import an SVG and use the CLI inspection commands to examine the resulting document.
+      Confirm imported shape types, properties, hierarchy, and source metadata are reported correctly.
 - [ ] Test imported shapes through CLI query
+    - Query an imported document for representative native and fallback shapes.
+      Verify filters and selectors return the expected shapes and expose the properties needed by CLI users.
 - [ ] Test imported shapes through CLI mutation
+    - Apply CLI mutations to imported shapes, then inspect and render the result.
+      Confirm supported properties change correctly without corrupting unrelated SVG data or hierarchy.
 
 #### Export fidelity
 
 - [ ] Verify native vector geometry exports without rasterization
+    - Import supported SVG geometry and export it again. Assert that paths and native
+      primitives remain vector elements rather than images or other rasterized output.
 - [ ] Verify nested transforms export deterministically
+    - Round-trip fixtures with multiple transform levels and compare repeated exports.
+      Confirm transform composition preserves visual placement and produces identical serialized
+      output each time.
 - [ ] Verify compound fill rules survive import and export
+    - Round-trip compound paths that use both `nonzero` and `evenodd` fill rules. Render
+      or inspect the exports to confirm holes and overlapping regions retain their original fill behavior.
 - [ ] Verify opaque fallback content remains visually stable
+    - Round-trip unsupported SVG elements stored as opaque fallback content. Compare renders
+      before and after export to catch changes in appearance, placement, clipping, or styling.
 - [ ] Add deterministic round-trip fixtures
+    - Add focused fixtures for native geometry, transforms, compound fills, and opaque fallbacks. Make
+      tests compare canonical exports or renders so regressions produce stable, reviewable failures.
+
+## WASM
+
+### Browser facade
+
+- [ ] Establish the `inkfinite-wasm` build and TypeScript bindings
+- [ ] Expose deterministic Rust SVG rendering to the browser
+- [ ] Route browser SVG export through Rust
+- [ ] Keep Canvas and PNG rendering in TypeScript
+
+### Editor projection and reconciliation
+
+- [ ] Move native-to-editor projection into Rust
+- [ ] Compose ancestor transforms in editor projections
+- [ ] Define semantic editor patches for durable changes
+- [ ] Reconcile editor patches into minimal native transactions
+- [ ] Stop rebuilding the native scene for ordinary edits
+- [ ] Test native and WASM projection parity
+
+### Browser document engine
+
+- [ ] Add a stateful WASM document session
+- [ ] Open and save canonical Automerge document bytes
+- [ ] Apply validated Rust transactions in the browser
+- [ ] Use Rust undo and redo for durable changes
+- [ ] Persist canonical document state to IndexedDB
+- [ ] Migrate existing browser documents to canonical state
+- [ ] Retire the Dexie shape graph as the browser source of truth
+- [ ] Keep ephemeral editor history in TypeScript
+
+### Canonical geometry
+
+- [ ] Commit path geometry through Rust validation
+- [ ] Commit freehand strokes through Rust normalization
+- [ ] Keep gesture previews and hit testing in TypeScript
+- [ ] Add committed-geometry parity fixtures
 
 ## Vector Editing
 

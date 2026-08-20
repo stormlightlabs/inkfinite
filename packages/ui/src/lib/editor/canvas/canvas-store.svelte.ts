@@ -1,6 +1,11 @@
 import { createInputAdapter, type InputAdapter } from '../input';
 import { initialPersistenceStatus } from '../platform';
-import type { DesktopDocumentRepo, EditorPlatformAdapter, EditorPlatformSession, LiveProposal } from '../platform';
+import type {
+	DesktopDocumentRepo,
+	EditorPlatformAdapter,
+	EditorPlatformSession,
+	LiveProposal
+} from '../platform';
 import { createBrushStore, createSnapStore, createStatusStore } from '../status';
 import type { BrushStore, SnapStore, StatusStore } from '../status';
 import { themeStore } from '../theme.svelte';
@@ -16,6 +21,7 @@ import {
 	LayerRecord,
 	exportInterchange,
 	importInterchange,
+	importInterchangeAsync,
 	MarkdownTool,
 	PageRecord,
 	PenTool,
@@ -57,7 +63,10 @@ export type CanvasControllerBindings = { setHistoryViewerOpen(value: boolean): v
 
 export type CanvasController = ReturnType<typeof createCanvasController>;
 
-export function createCanvasController(platformAdapter: EditorPlatformAdapter, bindings: CanvasControllerBindings) {
+export function createCanvasController(
+	platformAdapter: EditorPlatformAdapter,
+	bindings: CanvasControllerBindings
+) {
 	let repo: PersistentDocRepo | null = null;
 	let sink: PersistenceSink | null = null;
 	let platformSession: EditorPlatformSession | null = null;
@@ -115,7 +124,12 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 				shapes: {},
 				bindings: {}
 			},
-			ui: { currentPageId: initialPage.id, activeLayerId: initialLayer.id, selectionIds: [], toolId: 'select' },
+			ui: {
+				currentPageId: initialPage.id,
+				activeLayerId: initialLayer.id,
+				selectionIds: [],
+				toolId: 'select'
+			},
 			camera: Camera.create()
 		},
 		{
@@ -188,21 +202,37 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 								const rect = element.getBoundingClientRect();
 								const min = Camera.screenToWorld(
 									state.camera,
-									{ x: rect.left - canvasRect.left, y: rect.top - canvasRect.top },
+									{
+										x: rect.left - canvasRect.left,
+										y: rect.top - canvasRect.top
+									},
 									viewport
 								);
 								const max = Camera.screenToWorld(
 									state.camera,
-									{ x: rect.right - canvasRect.left, y: rect.bottom - canvasRect.top },
+									{
+										x: rect.right - canvasRect.left,
+										y: rect.bottom - canvasRect.top
+									},
 									viewport
 								);
-								return { x: min.x, y: min.y, width: max.x - min.x, height: max.y - min.y };
+								return {
+									x: min.x,
+									y: min.y,
+									width: max.x - min.x,
+									height: max.y - min.y
+								};
 							});
 			const context = {
 				pageId: state.ui.currentPageId,
 				activeLayerId: state.ui.activeLayerId ?? null,
 				selectionIds: [...state.ui.selectionIds],
-				viewport: { x: state.camera.x - width / 2, y: state.camera.y - height / 2, width, height },
+				viewport: {
+					x: state.camera.x - width / 2,
+					y: state.camera.y - height / 2,
+					width,
+					height
+				},
 				camera: { ...state.camera },
 				occludedRegions
 			};
@@ -227,7 +257,10 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 		}
 		const cursor = computeCursor(
 			textEditor.isEditing || arrowLabelEditor.isEditing || markdownEditor.isEditing,
-			{ isPanning: runtime.getInteractionState().panning, spaceHeld: runtime.getInteractionState().spaceHeld },
+			{
+				isPanning: runtime.getInteractionState().panning,
+				spaceHeld: runtime.getInteractionState().spaceHeld
+			},
 			{ hover: handleState.hover, active: handleState.active },
 			runtime.getInteractionState().pointerDown
 		);
@@ -246,6 +279,8 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 			doc: {
 				pages: doc.pages,
 				layers: doc.layers ?? doc.order.layers,
+				...(doc.assets ? { assets: doc.assets } : {}),
+				...(doc.svgGroups ? { svgGroups: doc.svgGroups } : {}),
 				shapes: doc.shapes,
 				bindings: doc.bindings
 			},
@@ -260,7 +295,12 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 
 	const selectTool = new SelectTool(handleMarqueeChange, (point) => {
 		const snap = snapStore.get();
-		if (!snap.snapEnabled || !snap.gridEnabled || !Number.isFinite(snap.gridSize) || snap.gridSize <= 0) {
+		if (
+			!snap.snapEnabled ||
+			!snap.gridEnabled ||
+			!Number.isFinite(snap.gridSize) ||
+			snap.gridSize <= 0
+		) {
 			return point;
 		}
 		return {
@@ -295,7 +335,11 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 	]);
 
 	const textEditor = new TextEditorController(store, getOverlayViewport, refreshCursor);
-	const arrowLabelEditor = new ArrowLabelEditorController(store, getOverlayViewport, refreshCursor);
+	const arrowLabelEditor = new ArrowLabelEditorController(
+		store,
+		getOverlayViewport,
+		refreshCursor
+	);
 	const markdownEditor = new MarkdownEditorController(store, getOverlayViewport, refreshCursor);
 	const toolController = new ToolController(store, tools);
 	const unsubscribeMarqueeCamera = store.subscribe((state) => {
@@ -357,11 +401,17 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 	}
 
 	function handleAction(action: import('@inkfinite/core').Action) {
-		if (textEditor.isEditing && (action.type === 'pointer-down' || action.type === 'pointer-up')) {
+		if (
+			textEditor.isEditing &&
+			(action.type === 'pointer-down' || action.type === 'pointer-up')
+		) {
 			textEditor.commit();
 		}
 
-		if (markdownEditor.isEditing && (action.type === 'pointer-down' || action.type === 'pointer-up')) {
+		if (
+			markdownEditor.isEditing &&
+			(action.type === 'pointer-down' || action.type === 'pointer-up')
+		) {
 			markdownEditor.commit();
 		}
 
@@ -370,7 +420,8 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 		}
 		if (
 			action.type === 'pointer-down' &&
-			(action.button === 1 || (action.button === 0 && runtime.getInteractionState().spaceHeld))
+			(action.button === 1 ||
+				(action.button === 0 && runtime.getInteractionState().spaceHeld))
 		) {
 			camera.cancelFit();
 		}
@@ -419,12 +470,21 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 		}
 	}
 
-	async function importBrowserSvgSource(source: { name: string; contents: string }) {
+	async function importBrowserSvgSource(source: {
+		name: string;
+		contents: string | Uint8Array;
+	}) {
 		if (!repo || !sink) return;
-		if (new Blob([source.contents]).size > 16 * 1024 * 1024) {
+		const importSvg = platformSession?.interchange?.importSvg;
+		if (!importSvg) throw new Error('The browser SVG importer is not available.');
+		const size =
+			typeof source.contents === 'string'
+				? new TextEncoder().encode(source.contents).byteLength
+				: source.contents.byteLength;
+		if (size > 16 * 1024 * 1024) {
 			throw new Error('The SVG source is larger than the 16 MB import limit.');
 		}
-		const imported = importInterchange(source.contents, source.name);
+		const imported = await importInterchangeAsync(source.contents, source.name, importSvg);
 		await sink.flush();
 		const boardId = await repo.importBoard(imported.snapshot);
 		const doc = await repo.loadDoc(boardId);
@@ -471,7 +531,8 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 				return;
 			}
 			const source = await platformSession.interchange.pickSvg?.();
-			if (source) await importBrowserSvgSource(source);
+			if (source)
+				await importBrowserSvgSource({ name: source.name, contents: source.bytes });
 		} catch (error) {
 			interchangeNotice = {
 				title: 'SVG import failed',
@@ -485,7 +546,9 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 	}
 
 	async function importBrowserSvgSourceWithStatus(
-		source: { name: string; contents: string } | Promise<{ name: string; contents: string }>
+		source:
+			| { name: string; contents: string | Uint8Array }
+			| Promise<{ name: string; contents: string | Uint8Array }>
 	) {
 		if (platform !== 'web' || !platformSession?.interchange) return;
 		interchangeBusy = true;
@@ -508,7 +571,11 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 	}
 
 	async function importSvgFile(file: File) {
-		await importBrowserSvgSourceWithStatus(file.text().then((contents) => ({ name: file.name, contents })));
+		await importBrowserSvgSourceWithStatus(
+			file
+				.arrayBuffer()
+				.then((bytes) => ({ name: file.name, contents: new Uint8Array(bytes) }))
+		);
 	}
 
 	async function exportEditableCanvas(format: InterchangeFormat) {
@@ -517,8 +584,15 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 		try {
 			await sink.flush();
 			const snapshot = await repo.exportBoard(activeBoardId);
-			const exported = exportInterchange(snapshot, format, store.getState().ui.currentPageId ?? undefined);
-			const saved = await platformSession.interchange.saveExport(exported, snapshot.board.name);
+			const exported = exportInterchange(
+				snapshot,
+				format,
+				store.getState().ui.currentPageId ?? undefined
+			);
+			const saved = await platformSession.interchange.saveExport(
+				exported,
+				snapshot.board.name
+			);
 			if (!saved) return;
 			interchangeNotice = {
 				title: 'Export complete',
@@ -590,7 +664,10 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 		const clickedShape = shapes.some((shape) => {
 			const bounds = shapeBounds(shape);
 			return (
-				world.x >= bounds.min.x && world.x <= bounds.max.x && world.y >= bounds.min.y && world.y <= bounds.max.y
+				world.x >= bounds.min.x &&
+				world.x <= bounds.max.x &&
+				world.y >= bounds.min.y &&
+				world.y <= bounds.max.y
 			);
 		});
 		if (!clickedShape) {
@@ -643,7 +720,8 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 			onCursorUpdate: (world, screen) => cursorStore.updateCursor(world, screen)
 		});
 
-		const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(handleResize);
+		const resizeObserver =
+			typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(handleResize);
 		resizeObserver?.observe(canvas);
 
 		return () => {
@@ -834,7 +912,12 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 			state,
 			nextState,
 			'Insert Stencil',
-			Action.keyDown('InsertStencil', 'InsertStencil', { ctrl: false, shift: false, alt: false, meta: false })
+			Action.keyDown('InsertStencil', 'InsertStencil', {
+				ctrl: false,
+				shift: false,
+				alt: false,
+				meta: false
+			})
 		);
 	}
 }

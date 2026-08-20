@@ -13,10 +13,12 @@ use std::str::FromStr;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use roxmltree::{Document as XmlDocument, Node};
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use svgtypes::{PathParser, PathSegment};
 use thiserror::Error;
+use ts_rs::TS;
 
 use crate::engine::geometry::{Affine, path_bounds, union};
 use crate::proto::Bounds;
@@ -36,7 +38,9 @@ enum PreviousSegment {
 }
 
 /// An unsupported SVG feature identified during static import.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(rename_all = "snake_case")]
 pub enum SvgUnsupportedFeature {
     /// A linear, radial, or mesh gradient.
     Gradient,
@@ -59,7 +63,9 @@ pub enum SvgUnsupportedFeature {
 }
 
 /// Action taken for unsupported SVG content during static import.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(rename_all = "snake_case")]
 pub enum SvgUnsupportedAction {
     /// Leave the content out of the normalized native tree.
     Omitted,
@@ -90,7 +96,9 @@ impl fmt::Display for SvgUnsupportedAction {
 }
 
 /// A non-fatal condition encountered while importing an SVG.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+#[ts(rename_all = "snake_case")]
 pub enum SvgImportWarning {
     /// An SVG element was skipped because it has no native mapping in this slice.
     UnsupportedElement {
@@ -208,7 +216,7 @@ enum Axis {
 }
 
 /// A view box declared by the source SVG.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize, TS)]
 pub struct SvgViewBox {
     /// Horizontal origin in SVG user units.
     pub x: f64,
@@ -221,7 +229,7 @@ pub struct SvgViewBox {
 }
 
 /// A parsed SVG asset, either the original source or embedded raster data.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
 pub struct SvgAsset {
     /// Deterministic asset identifier derived from the bytes.
     pub id: AssetId,
@@ -252,7 +260,7 @@ impl SvgAsset {
 }
 
 /// One native shape produced by SVG mapping.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, TS)]
 pub struct SvgShape {
     /// The source element's `id`, when present.
     pub source_id: Option<String>,
@@ -267,7 +275,7 @@ pub struct SvgShape {
 }
 
 /// A parsed group mapped to a native container candidate.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, TS)]
 pub struct SvgGroup {
     /// The source group or root element's `id`, when present.
     pub source_id: Option<String>,
@@ -282,7 +290,7 @@ pub struct SvgGroup {
 }
 
 /// An image node referencing an extracted embedded raster asset.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, TS)]
 pub struct SvgImage {
     /// The source image element's `id`, when present.
     pub source_id: Option<String>,
@@ -297,7 +305,9 @@ pub struct SvgImage {
 }
 
 /// A normalized SVG node.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, TS)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
+#[ts(rename_all = "snake_case")]
 pub enum SvgImportNode {
     /// A group mapped to a container candidate.
     Group(Box<SvgGroup>),
@@ -320,7 +330,7 @@ impl SvgImportNode {
 }
 
 /// A normalized SVG import result.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, TS)]
 pub struct SvgImport {
     /// Root view box, when the source declared one.
     pub view_box: Option<SvgViewBox>,
@@ -861,8 +871,11 @@ pub fn parse_svg(source: &str) -> Result<SvgImport, SvgImportError> {
 ///
 /// Returns [`SvgImportError`] when [`parse_svg`] rejects the source.
 pub fn import_svg(source: impl AsRef<[u8]>) -> Result<SvgImport, SvgImportError> {
-    let source =
-        std::str::from_utf8(source.as_ref()).map_err(|error| SvgImportError::InvalidUtf8(error.to_string()))?;
+    let bytes = source.as_ref();
+    if bytes.len() > SVG_IMPORT_MAX_BYTES {
+        return Err(SvgImportError::InputTooLarge { limit: SVG_IMPORT_MAX_BYTES });
+    }
+    let source = std::str::from_utf8(bytes).map_err(|error| SvgImportError::InvalidUtf8(error.to_string()))?;
     parse_svg(source)
 }
 

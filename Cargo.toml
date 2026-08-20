@@ -3,6 +3,7 @@ members = [
   "apps/desktop/src-tauri",
   "crates/inkfinite-cli",
   "crates/inkfinite-core",
+  "crates/inkfinite-wasm",
 ]
 resolver = "2"
 
@@ -24,10 +25,11 @@ roxmltree = "0.21.1"
 schemars = "1.2.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-getrandom = "0.4.3"
+getrandom = { version = "0.4.3", features = ["wasm_js"] }
 sha2 = "0.10.9"
+wasm-bindgen = "=0.2.126"
 svgtypes = "0.16.1"
-tokio = { version = "1.48", features = ["io-util", "macros", "net", "rt-multi-thread", "sync"] }
+tokio = { version = "1.48", default-features = false, features = ["io-util", "macros", "rt", "sync"] }
 ts-rs = { version = "12.0.1", features = ["no-serde-warnings", "serde-json-impl"] }
 thiserror = "2.0"
 

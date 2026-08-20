@@ -1,0 +1,26 @@
+{
+	"name": "@inkfinite/wasm",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"default": "./src/index.ts"
+		}
+	},
+	"scripts": {
+		"build": "node ../../scripts/build-wasm.mjs",
+		"typecheck": "tsc --noEmit -p tsconfig.json"
+	},
+	"files": [
+		"src",
+		"dist"
+	],
+	"dependencies": {
+		"@inkfinite/bindings": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "^5.9.3"
+	}
+}

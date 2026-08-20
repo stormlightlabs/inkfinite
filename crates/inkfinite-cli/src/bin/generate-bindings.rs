@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use inkfinite_core::proto::*;
+use inkfinite_core::svg_import::*;
 use inkfinite_core::*;
 use schemars::JsonSchema;
 use serde_json::{Value, json};
@@ -140,6 +141,10 @@ fn artifacts() -> Result<BTreeMap<PathBuf, String>, Box<dyn Error>> {
     );
     artifacts.insert(PathBuf::from("packages/bindings/src/protocol.ts"), protocol_bindings());
     artifacts.insert(PathBuf::from("packages/bindings/src/registry.ts"), registry_bindings());
+    artifacts.insert(
+        PathBuf::from("packages/bindings/src/svg-import.ts"),
+        svg_import_bindings(),
+    );
     artifacts.insert(PathBuf::from("packages/bindings/src/index.ts"), index_bindings());
     Ok(artifacts)
 }
@@ -272,9 +277,26 @@ fn registry_bindings() -> String {
     )
 }
 
+fn svg_import_bindings() -> String {
+    let config = ts_config();
+    let mut output = GENERATED_TS_HEADER.to_owned();
+    output.push_str("import type { AssetId, JsonValue, ShapeKind, ShapeStyle, Transform } from './model.js';\n\n");
+    append_declaration::<SvgUnsupportedFeature>(&mut output, &config);
+    append_declaration::<SvgUnsupportedAction>(&mut output, &config);
+    append_clean_declaration::<SvgImportWarning>(&mut output, &config);
+    append_declaration::<SvgViewBox>(&mut output, &config);
+    append_declaration::<SvgAsset>(&mut output, &config);
+    append_declaration::<SvgShape>(&mut output, &config);
+    append_declaration::<SvgGroup>(&mut output, &config);
+    append_declaration::<SvgImage>(&mut output, &config);
+    append_clean_declaration::<SvgImportNode>(&mut output, &config);
+    append_declaration::<SvgImport>(&mut output, &config);
+    output
+}
+
 fn index_bindings() -> String {
     format!(
-        "{GENERATED_TS_HEADER}export * from './model.js';\nexport * from './protocol.js';\nexport * from './registry.js';\nexport * from './transaction.js';\n"
+        "{GENERATED_TS_HEADER}export * from './model.js';\nexport * from './protocol.js';\nexport * from './registry.js';\nexport * from './svg-import.js';\nexport * from './transaction.js';\n"
     )
 }
 

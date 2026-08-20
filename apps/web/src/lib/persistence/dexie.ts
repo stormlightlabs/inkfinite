@@ -9,6 +9,7 @@ import type { EditorPlatformAdapter, EditorPlatformSession } from '@inkfinite/ui
 import { liveQuery } from 'dexie';
 import { InkfiniteDB } from './database';
 import { createDexieDocRepo, createPersistenceSink, getBoardInspectorData } from './repository';
+import { importSvgInWorker } from './svg-import';
 import type { PersistenceSinkOptions } from './repository';
 
 type LiveQueryFactory = typeof liveQuery;
@@ -156,9 +157,51 @@ export function createBrowserInterchangeFiles() {
 		});
 	}
 
+	function pickSvgFile(): Promise<{ name: string; bytes: Uint8Array } | null> {
+		return new Promise((resolve, reject) => {
+			const input = document.createElement('input');
+			input.type = 'file';
+			input.accept = '.svg,image/svg+xml';
+			input.hidden = true;
+			const finish = (value: { name: string; bytes: Uint8Array } | null) => {
+				input.remove();
+				resolve(value);
+			};
+			input.addEventListener('cancel', () => finish(null), { once: true });
+			input.addEventListener(
+				'change',
+				() => {
+					const file = input.files?.[0];
+					if (!file) {
+						finish(null);
+						return;
+					}
+					if (file.size > 16 * 1024 * 1024) {
+						input.remove();
+						reject(
+							new Error('The selected file is larger than the 16 MB import limit.')
+						);
+						return;
+					}
+					void file.arrayBuffer().then(
+						(bytes) => finish({ name: file.name, bytes: new Uint8Array(bytes) }),
+						(error) => {
+							input.remove();
+							reject(new Error(`Failed to read the selected SVG: ${String(error)}`));
+						}
+					);
+				},
+				{ once: true }
+			);
+			document.body.appendChild(input);
+			input.click();
+		});
+	}
+
 	return {
 		pickImport: () => pickTextFile('.excalidraw,.canvas,application/json'),
-		pickSvg: () => pickTextFile('.svg,image/svg+xml'),
+		pickSvg: pickSvgFile,
+		importSvg: importSvgInWorker,
 		async saveExport(file: InterchangeExport, defaultStem: string): Promise<boolean> {
 			const blob = new Blob([file.contents], { type: file.mimeType });
 			const url = URL.createObjectURL(blob);
