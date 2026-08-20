@@ -5,6 +5,7 @@ import {
   boundsForShape,
   BUILTIN_SHAPE_KINDS,
   GEOMETRY_CONVENTION,
+  validatePathGeometry,
   validateShapeProperties,
 } from "../packages/bindings/dist/index.js";
 
@@ -20,6 +21,8 @@ assert.deepEqual(GEOMETRY_CONVENTION, {
 for (const testCase of fixture.property_cases) {
   assert.equal(validateShapeProperties(testCase.kind, testCase.properties), testCase.valid, testCase.kind);
 }
+
+assert.ok(validatePathGeometry(fixture.path_geometry));
 
 for (const testCase of fixture.geometry_cases) {
   const actual = boundsForShape({

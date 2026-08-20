@@ -1,11 +1,5 @@
 # Changelog
 
-All notable changes to Inkfinite will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/),
-and this project adheres to
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
 ## [Unreleased]
 
 ### Added
@@ -39,6 +33,11 @@ and this project adheres to
   recovery.
 - Tauri desktop document sessions owned by Rust: create, open, snapshot,
   commit, undo, redo, save, query, and validate.
+
+#### SVG Interop
+
+- Native path shape representation with normalized move, line, quadratic, and
+  cubic subpaths, closed-path flags, compound fill rules, & generated bindings
 
 ### Changed
 

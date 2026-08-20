@@ -67,7 +67,9 @@ the generated Rust contracts in `@inkfinite/bindings` and the editor projection.
 the projected state for low-latency interaction; Rust remains authoritative for the native session
 and `.inkfinite` file.
 
-For the durable record structure, see [Documents](/docs/concepts/documents/).
+For the durable record structure, see [Documents](/docs/concepts/documents/). The [native path
+geometry guide](/docs/internals/native-path-geometry/) documents the path representation used by
+SVG interoperability and future vector editing.
 
 ## Edit flow
 

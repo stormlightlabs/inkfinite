@@ -14,9 +14,10 @@ use inkfinite_core::proto::{
 use inkfinite_core::{
     ActorId, AssetId, AssetRecord, AssetSource, BindingAnchor, BindingId, BindingKind, BindingRecord, ChangeHash,
     ContainerLayout, Document, DocumentId, DocumentSnapshot, FormatId, GEOMETRY_BOUNDS, GEOMETRY_COORDINATE_SYSTEM,
-    GEOMETRY_ROTATION, Insets, LayerId, LayerRecord, LayoutAlignment, Opacity, Origin, PageId, PageRecord, Provenance,
-    RecordVersion, SemanticMetadata, ShapeId, ShapeKind, ShapeParent, ShapeRecord, ShapeStyle, SiblingAnchor,
-    StackDirection, Timestamp, Transform, Vec2, builtin_shape_kinds, validate_shape_properties,
+    GEOMETRY_ROTATION, Insets, LayerId, LayerRecord, LayoutAlignment, Opacity, Origin, PageId, PageRecord,
+    PathFillRule, PathGeometry, PathSegment, PathSubpath, Provenance, RecordVersion, SemanticMetadata, ShapeId,
+    ShapeKind, ShapeParent, ShapeRecord, ShapeStyle, SiblingAnchor, StackDirection, Timestamp, Transform, Vec2,
+    builtin_shape_kinds, validate_shape_properties,
 };
 use schemars::JsonSchema;
 use serde_json::{Value, json};
@@ -142,6 +143,10 @@ fn model_bindings() -> String {
     append_declaration::<Opacity>(&mut output, &config);
     append_declaration::<SiblingAnchor<ShapeId>>(&mut output, &config);
     append_declaration::<Vec2>(&mut output, &config);
+    append_clean_declaration::<PathFillRule>(&mut output, &config);
+    append_clean_declaration::<PathSegment>(&mut output, &config);
+    append_clean_declaration::<PathSubpath>(&mut output, &config);
+    append_clean_declaration::<PathGeometry>(&mut output, &config);
     append_declaration::<Transform>(&mut output, &config);
     append_declaration::<Origin>(&mut output, &config);
     append_declaration::<Provenance>(&mut output, &config);
@@ -226,7 +231,7 @@ fn registry_bindings() -> String {
         .collect::<Vec<_>>()
         .join(", ");
     format!(
-        "{GENERATED_TS_HEADER}import type {{ JsonValue, Transform }} from \"./model.js\";\nimport type {{ Bounds }} from \"./transaction.js\";\n\nexport const BUILTIN_SHAPE_KINDS = [{kinds}] as const;\nexport type BuiltinShapeKind = typeof BUILTIN_SHAPE_KINDS[number];\n\nexport const GEOMETRY_CONVENTION = {{\n  coordinateSystem: \"{GEOMETRY_COORDINATE_SYSTEM}\",\n  rotation: \"{GEOMETRY_ROTATION}\",\n  bounds: \"{GEOMETRY_BOUNDS}\",\n}} as const;\n\nexport const SHAPE_REGISTRY = BUILTIN_SHAPE_KINDS.map((kind) => ({{\n  kind,\n  dimensions: [\"width\", \"height\"] as const,\n  allowsChildren: kind === \"container\",\n}}));\n\nfunction numericProperty(properties: Record<string, JsonValue>, name: string): number {{\n  const value = properties[name];\n  return typeof value === \"number\" && Number.isFinite(value) ? value : 0;\n}}\n\nexport function validateShapeProperties(kind: string, properties: Record<string, JsonValue>): boolean {{\n  if (!(BUILTIN_SHAPE_KINDS as readonly string[]).includes(kind)) return false;\n  return [\"width\", \"height\"].every((name) => {{\n    const value = properties[name];\n    return value === undefined || (typeof value === \"number\" && Number.isFinite(value) && value >= 0);\n  }});\n}}\n\nexport type RegistryShape = {{\n  kind: string;\n  properties: Record<string, JsonValue>;\n  transform: Transform;\n}};\n\nexport function boundsForShape(shape: RegistryShape): Bounds {{\n  const width = Math.abs(numericProperty(shape.properties, \"width\"));\n  const height = Math.abs(numericProperty(shape.properties, \"height\"));\n  const {{ translation, rotation, scale_x: scaleX, scale_y: scaleY }} = shape.transform;\n  const cos = Math.cos(rotation);\n  const sin = Math.sin(rotation);\n  const points = [[0, 0], [width, 0], [0, height], [width, height]].map(([x, y]) => [\n    translation.x + x * scaleX * cos - y * scaleY * sin,\n    translation.y + x * scaleX * sin + y * scaleY * cos,\n  ]);\n  const xs = points.map(([x]) => x);\n  const ys = points.map(([, y]) => y);\n  const minX = Math.min(...xs);\n  const maxX = Math.max(...xs);\n  const minY = Math.min(...ys);\n  const maxY = Math.max(...ys);\n  return {{ x: minX, y: minY, width: maxX - minX, height: maxY - minY }};\n}}\n"
+        "{GENERATED_TS_HEADER}import type {{ JsonValue, PathGeometry, Transform }} from \"./model.js\";\nimport type {{ Bounds }} from \"./transaction.js\";\n\nexport const BUILTIN_SHAPE_KINDS = [{kinds}] as const;\nexport type BuiltinShapeKind = typeof BUILTIN_SHAPE_KINDS[number];\n\nexport const GEOMETRY_CONVENTION = {{\n  coordinateSystem: \"{GEOMETRY_COORDINATE_SYSTEM}\",\n  rotation: \"{GEOMETRY_ROTATION}\",\n  bounds: \"{GEOMETRY_BOUNDS}\",\n}} as const;\n\nexport const SHAPE_REGISTRY = BUILTIN_SHAPE_KINDS.map((kind) => ({{\n  kind,\n  dimensions: [\"width\", \"height\"] as const,\n  allowsChildren: kind === \"container\",\n}}));\n\nfunction isRecord(value: unknown): value is Record<string, unknown> {{\n  return typeof value === \"object\" && value !== null;\n}}\n\nfunction isFinitePoint(value: unknown): boolean {{\n  if (!isRecord(value)) return false;\n  return typeof value.x === \"number\" && Number.isFinite(value.x)\n    && typeof value.y === \"number\" && Number.isFinite(value.y);\n}}\n\nfunction isPathSegment(value: unknown): boolean {{\n  if (!isRecord(value) || typeof value.type !== \"string\") return false;\n  switch (value.type) {{\n    case \"move\":\n    case \"line\":\n      return isFinitePoint(value.to);\n    case \"quadratic\":\n      return isFinitePoint(value.control) && isFinitePoint(value.to);\n    case \"cubic\":\n      return isFinitePoint(value.control_1) && isFinitePoint(value.control_2) && isFinitePoint(value.to);\n    default:\n      return false;\n  }}\n}}\n\nexport function validatePathGeometry(value: unknown): value is PathGeometry {{\n  if (!isRecord(value) || !Array.isArray(value.subpaths) || value.subpaths.length === 0) return false;\n  if (value.fill_rule !== \"nonzero\" && value.fill_rule !== \"evenodd\") return false;\n  return value.subpaths.every((subpath) => {{\n    if (!isRecord(subpath) || typeof subpath.closed !== \"boolean\" || !Array.isArray(subpath.segments) || subpath.segments.length === 0) return false;\n    const first = subpath.segments[0];\n    if (!isRecord(first) || first.type !== \"move\") return false;\n    return subpath.segments.every((segment, index) => (index === 0 || (isRecord(segment) && segment.type !== \"move\")) && isPathSegment(segment));\n  }});\n}}\n\nfunction numericProperty(properties: Record<string, JsonValue>, name: string): number {{\n  const value = properties[name];\n  return typeof value === \"number\" && Number.isFinite(value) ? value : 0;\n}}\n\nexport function validateShapeProperties(kind: string, properties: Record<string, JsonValue>): boolean {{\n  if (!(BUILTIN_SHAPE_KINDS as readonly string[]).includes(kind)) return false;\n  if (kind === \"path\" && !validatePathGeometry({{ subpaths: properties.subpaths, fill_rule: properties.fill_rule }})) return false;\n  return [\"width\", \"height\"].every((name) => {{\n    const value = properties[name];\n    return value === undefined || (typeof value === \"number\" && Number.isFinite(value) && value >= 0);\n  }});\n}}\n\nexport type RegistryShape = {{\n  kind: string;\n  properties: Record<string, JsonValue>;\n  transform: Transform;\n}};\n\nexport function boundsForShape(shape: RegistryShape): Bounds {{\n  const width = Math.abs(numericProperty(shape.properties, \"width\"));\n  const height = Math.abs(numericProperty(shape.properties, \"height\"));\n  const {{ translation, rotation, scale_x: scaleX, scale_y: scaleY }} = shape.transform;\n  const cos = Math.cos(rotation);\n  const sin = Math.sin(rotation);\n  const points = [[0, 0], [width, 0], [0, height], [width, height]].map(([x, y]) => [\n    translation.x + x * scaleX * cos - y * scaleY * sin,\n    translation.y + x * scaleX * sin + y * scaleY * cos,\n  ]);\n  const xs = points.map(([x]) => x);\n  const ys = points.map(([, y]) => y);\n  const minX = Math.min(...xs);\n  const maxX = Math.max(...xs);\n  const minY = Math.min(...ys);\n  const maxY = Math.max(...ys);\n  return {{ x: minX, y: minY, width: maxX - minX, height: maxY - minY }};\n}}\n"
     )
 }
 
@@ -266,8 +271,29 @@ fn fixture_json() -> Result<String, Box<dyn Error>> {
     let transaction = fixture_transaction();
     let transform = shape.transform;
     let expected_bounds = transformed_bounds(40.0, 20.0, transform);
+    let path_geometry = PathGeometry {
+        subpaths: vec![PathSubpath {
+            segments: vec![
+                PathSegment::Move { to: Vec2 { x: 0.0, y: 0.0 } },
+                PathSegment::Line { to: Vec2 { x: 40.0, y: 0.0 } },
+                PathSegment::Quadratic { control: Vec2 { x: 50.0, y: 10.0 }, to: Vec2 { x: 40.0, y: 20.0 } },
+                PathSegment::Cubic {
+                    control_1: Vec2 { x: 40.0, y: 30.0 },
+                    control_2: Vec2 { x: 0.0, y: 30.0 },
+                    to: Vec2 { x: 0.0, y: 20.0 },
+                },
+            ],
+            closed: true,
+        }],
+        fill_rule: PathFillRule::EvenOdd,
+    };
+    let path_properties = json!({
+        "subpaths": path_geometry.subpaths,
+        "fill_rule": path_geometry.fill_rule,
+    });
     let property_cases = [
         (RECTANGLE_KIND, json!({"width": 40.0, "height": 20.0})),
+        (inkfinite_core::PATH_KIND, path_properties),
         (RECTANGLE_KIND, json!({"width": -1.0, "height": 20.0})),
         (RECTANGLE_KIND, json!({"width": "40", "height": 20.0})),
         ("unknown", json!({})),
@@ -294,6 +320,7 @@ fn fixture_json() -> Result<String, Box<dyn Error>> {
             "rotation": GEOMETRY_ROTATION,
             "bounds": GEOMETRY_BOUNDS,
         },
+        "path_geometry": serde_json::to_value(path_geometry)?,
         "property_cases": property_cases,
         "geometry_cases": [{
             "kind": shape.kind,

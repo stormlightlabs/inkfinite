@@ -94,6 +94,71 @@ x: number,
 y: number, };
 
 /**
+ * Fill rule used to determine the interior of a compound path.
+ */
+export type PathFillRule = "nonzero" | "evenodd";
+
+/**
+ * One normalized drawing command in a path subpath.
+ */
+export type PathSegment = { "type": "move",
+/**
+ * Destination point.
+ */
+to: Vec2, } | { "type": "line",
+/**
+ * Destination point.
+ */
+to: Vec2, } | { "type": "quadratic",
+/**
+ * Quadratic control point.
+ */
+control: Vec2,
+/**
+ * Destination point.
+ */
+to: Vec2, } | { "type": "cubic",
+/**
+ * First cubic control point.
+ */
+control_1: Vec2,
+/**
+ * Second cubic control point.
+ */
+control_2: Vec2,
+/**
+ * Destination point.
+ */
+to: Vec2, };
+
+/**
+ * One normalized subpath. Its first segment must be a move command; later
+ * segments continue from the previous segment's destination.
+ */
+export type PathSubpath = {
+/**
+ * Ordered move, line, and Bézier segments.
+ */
+segments: Array<PathSegment>,
+/**
+ * Whether the final point connects back to the subpath's move point.
+ */
+closed: boolean, };
+
+/**
+ * Normalized geometry for a native path shape.
+ */
+export type PathGeometry = {
+/**
+ * Independent subpaths in document-local coordinates.
+ */
+subpaths: Array<PathSubpath>,
+/**
+ * Rule used when filling the compound path.
+ */
+fill_rule: PathFillRule, };
+
+/**
  * Transform relative to a shape's parent container or layer.
  */
 export type Transform = { 

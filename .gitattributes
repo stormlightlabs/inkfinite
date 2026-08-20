@@ -1,0 +1,6 @@
+# Generated Rust-to-TypeScript bindings should not affect GitHub language statistics.
+packages/bindings/src/index.ts linguist-generated
+packages/bindings/src/model.ts linguist-generated
+packages/bindings/src/protocol.ts linguist-generated
+packages/bindings/src/registry.ts linguist-generated
+packages/bindings/src/transaction.ts linguist-generated

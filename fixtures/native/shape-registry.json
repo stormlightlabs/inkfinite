@@ -38,15 +38,120 @@
     "arrow",
     "text",
     "stroke",
+    "path",
     "markdown",
     "container"
   ],
+  "path_geometry": {
+    "fill_rule": "evenodd",
+    "subpaths": [
+      {
+        "closed": true,
+        "segments": [
+          {
+            "to": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "type": "move"
+          },
+          {
+            "to": {
+              "x": 40.0,
+              "y": 0.0
+            },
+            "type": "line"
+          },
+          {
+            "control": {
+              "x": 50.0,
+              "y": 10.0
+            },
+            "to": {
+              "x": 40.0,
+              "y": 20.0
+            },
+            "type": "quadratic"
+          },
+          {
+            "control_1": {
+              "x": 40.0,
+              "y": 30.0
+            },
+            "control_2": {
+              "x": 0.0,
+              "y": 30.0
+            },
+            "to": {
+              "x": 0.0,
+              "y": 20.0
+            },
+            "type": "cubic"
+          }
+        ]
+      }
+    ]
+  },
   "property_cases": [
     {
       "kind": "rect",
       "properties": {
         "height": 20.0,
         "width": 40.0
+      },
+      "valid": true
+    },
+    {
+      "kind": "path",
+      "properties": {
+        "fill_rule": "evenodd",
+        "subpaths": [
+          {
+            "closed": true,
+            "segments": [
+              {
+                "to": {
+                  "x": 0.0,
+                  "y": 0.0
+                },
+                "type": "move"
+              },
+              {
+                "to": {
+                  "x": 40.0,
+                  "y": 0.0
+                },
+                "type": "line"
+              },
+              {
+                "control": {
+                  "x": 50.0,
+                  "y": 10.0
+                },
+                "to": {
+                  "x": 40.0,
+                  "y": 20.0
+                },
+                "type": "quadratic"
+              },
+              {
+                "control_1": {
+                  "x": 40.0,
+                  "y": 30.0
+                },
+                "control_2": {
+                  "x": 0.0,
+                  "y": 30.0
+                },
+                "to": {
+                  "x": 0.0,
+                  "y": 20.0
+                },
+                "type": "cubic"
+              }
+            ]
+          }
+        ]
       },
       "valid": true
     },

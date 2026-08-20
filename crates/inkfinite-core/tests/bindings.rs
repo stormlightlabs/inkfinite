@@ -1,7 +1,7 @@
 use inkfinite_core::proto::{Bounds, TransactionDraft};
 use inkfinite_core::{
-    GEOMETRY_BOUNDS, GEOMETRY_COORDINATE_SYSTEM, GEOMETRY_ROTATION, ShapeProperties, ShapeRecord, builtin_shape_kinds,
-    validate_shape_properties,
+    GEOMETRY_BOUNDS, GEOMETRY_COORDINATE_SYSTEM, GEOMETRY_ROTATION, PathGeometry, ShapeProperties, ShapeRecord,
+    builtin_shape_kinds, validate_path_geometry, validate_shape_properties,
 };
 use serde_json::Value;
 
@@ -20,6 +20,14 @@ fn shared_shape_fixture_matches_the_rust_registry_and_bindings() {
     assert_eq!(fixture["geometry"]["bounds"], GEOMETRY_BOUNDS);
     assert_eq!(fixture["geometry"]["coordinate_system"], GEOMETRY_COORDINATE_SYSTEM);
     assert_eq!(fixture["geometry"]["rotation"], GEOMETRY_ROTATION);
+
+    let path_geometry: PathGeometry = serde_json::from_value(fixture["path_geometry"].clone())
+        .expect("path geometry should use the normalized representation");
+    validate_path_geometry(&path_geometry).expect("fixture path geometry should validate");
+    assert_eq!(
+        serde_json::to_value(&path_geometry).expect("path geometry should reserialize"),
+        fixture["path_geometry"]
+    );
 
     for case in fixture["property_cases"]
         .as_array()

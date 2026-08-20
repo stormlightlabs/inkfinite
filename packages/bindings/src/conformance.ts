@@ -1,7 +1,7 @@
-import { boundsForShape, validateShapeProperties } from "./registry.js";
+import { boundsForShape, validatePathGeometry, validateShapeProperties } from "./registry.js";
 import type { RegistryShape } from "./registry.js";
 import type { Request, Response } from "./protocol.js";
-import type { ShapeRecord, ShapeProperties, Transform } from "./model.js";
+import type { PathGeometry, ShapeRecord, ShapeProperties, Transform } from "./model.js";
 import type { Bounds, ShapePatch, TransactionDraft } from "./transaction.js";
 
 const transform: Transform = {
@@ -12,6 +12,26 @@ const transform: Transform = {
 };
 
 const properties: ShapeProperties = { width: 40, height: 20 };
+
+const pathGeometry: PathGeometry = {
+  subpaths: [
+    {
+      segments: [
+        { type: "move", to: { x: 0, y: 0 } },
+        { type: "line", to: { x: 40, y: 0 } },
+        { type: "quadratic", control: { x: 50, y: 10 }, to: { x: 40, y: 20 } },
+        {
+          type: "cubic",
+          control_1: { x: 40, y: 30 },
+          control_2: { x: 0, y: 30 },
+          to: { x: 0, y: 20 },
+        },
+      ],
+      closed: true,
+    },
+  ],
+  fill_rule: "evenodd",
+};
 
 const shape: ShapeRecord = {
   id: "shape:fixture",
@@ -62,7 +82,12 @@ const response: Response = { type: "valid" };
 const protocolShape: RegistryShape = { kind: shape.kind, properties, transform };
 const bounds: Bounds = boundsForShape(protocolShape);
 
-if (!validateShapeProperties(shape.kind, properties) || bounds.width <= 0 || bounds.height <= 0) {
+if (
+  !validateShapeProperties(shape.kind, properties) ||
+  !validatePathGeometry(pathGeometry) ||
+  bounds.width <= 0 ||
+  bounds.height <= 0
+) {
   throw new Error("generated binding conformance fixture is invalid");
 }
 

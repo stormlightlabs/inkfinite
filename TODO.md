@@ -10,16 +10,16 @@ Completed work is in [CHANGELOG.md](CHANGELOG.md).
 
 #### Representation and validation
 
-- [ ] Add a native `path` shape kind
-- [ ] Define normalized path and subpath representation
-- [ ] Support move segments
-- [ ] Support line segments
-- [ ] Support quadratic curves
-- [ ] Support cubic curves
-- [ ] Support closed subpaths
-- [ ] Define compound-path fill rules
-- [ ] Generate TypeScript bindings for path geometry
-- [ ] Implement Rust path validation
+- [x] Add a native `path` shape kind
+- [x] Define normalized path and subpath representation
+- [x] Support move segments
+- [x] Support line segments
+- [x] Support quadratic curves
+- [x] Support cubic curves
+- [x] Support closed subpaths
+- [x] Define compound-path fill rules
+- [x] Generate TypeScript bindings for path geometry
+- [x] Implement Rust path validation
 
 #### Geometry, rendering, and fixtures
 

@@ -1,4 +1,4 @@
-//! Durable, transport-independent contracts and services for Inkfinite.
+//! Transport-independent contracts and services for Inkfinite.
 
 #![forbid(unsafe_code)]
 
@@ -49,6 +49,8 @@ pub enum BuiltinShapeKind {
     Text,
     /// Freehand stroke shape.
     Stroke,
+    /// Native path geometry shape.
+    Path,
     /// Markdown shape.
     Markdown,
     /// Container shape.
@@ -57,13 +59,14 @@ pub enum BuiltinShapeKind {
 
 impl BuiltinShapeKind {
     /// Built-in kinds in their stable serialized order.
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::Rectangle,
         Self::Ellipse,
         Self::Line,
         Self::Arrow,
         Self::Text,
         Self::Stroke,
+        Self::Path,
         Self::Markdown,
         Self::Container,
     ];
@@ -78,6 +81,7 @@ impl BuiltinShapeKind {
             Self::Arrow => "arrow",
             Self::Text => "text",
             Self::Stroke => "stroke",
+            Self::Path => "path",
             Self::Markdown => "markdown",
             Self::Container => "container",
         }
@@ -93,6 +97,7 @@ impl BuiltinShapeKind {
             b"arrow" => Some(Self::Arrow),
             b"text" => Some(Self::Text),
             b"stroke" => Some(Self::Stroke),
+            b"path" => Some(Self::Path),
             b"markdown" => Some(Self::Markdown),
             b"container" => Some(Self::Container),
             _ => None,
@@ -118,6 +123,8 @@ pub const ARROW_KIND: &str = BuiltinShapeKind::Arrow.as_str();
 pub const TEXT_KIND: &str = BuiltinShapeKind::Text.as_str();
 /// Built-in freehand stroke shape kind.
 pub const STROKE_KIND: &str = BuiltinShapeKind::Stroke.as_str();
+/// Built-in native path geometry shape kind.
+pub const PATH_KIND: &str = BuiltinShapeKind::Path.as_str();
 /// Built-in Markdown shape kind.
 pub const MARKDOWN_KIND: &str = BuiltinShapeKind::Markdown.as_str();
 /// Built-in container shape kind.
@@ -131,6 +138,7 @@ pub const BUILTIN_SHAPE_KINDS: &[&str] = &[
     ARROW_KIND,
     TEXT_KIND,
     STROKE_KIND,
+    PATH_KIND,
     MARKDOWN_KIND,
     CONTAINER_KIND,
 ];
@@ -204,6 +212,9 @@ pub enum ShapePropertyError {
     /// A dimension property was negative.
     #[error("shape kind {kind} property {property} must not be negative")]
     NegativeNumber { kind: String, property: String },
+    /// Native path properties do not decode or fail path geometry validation.
+    #[error("shape kind {kind} has invalid path geometry: {message}")]
+    InvalidPath { kind: String, message: String },
 }
 
 /// Anchor used to place an item in an ordered child list without numeric indexes.
@@ -220,7 +231,7 @@ pub enum SiblingAnchor<Id> {
     After(Id),
 }
 
-/// Origin of a durable record or transaction.
+/// Origin of a record or transaction.
 #[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
 pub enum Origin {
@@ -360,7 +371,7 @@ string_id!(BindingKind, "Registry key for a binding definition.");
 #[ts(type = "number")]
 pub struct Timestamp(pub i64);
 
-/// Monotonic version of a durable record within the document history.
+/// Monotonic version of a record within the document history.
 #[derive(Clone, Copy, Debug, Eq, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS)]
 #[serde(transparent)]
 #[ts(type = "number")]
@@ -437,6 +448,183 @@ pub struct Vec2 {
     pub y: f64,
 }
 
+/// Fill rule used to determine the interior of a compound path.
+#[derive(Clone, Copy, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+pub enum PathFillRule {
+    /// Fill according to the non-zero winding number rule.
+    #[serde(rename = "nonzero")]
+    #[ts(rename = "nonzero")]
+    NonZero,
+    /// Fill alternating nested regions according to their crossing count.
+    #[serde(rename = "evenodd")]
+    #[ts(rename = "evenodd")]
+    EvenOdd,
+}
+
+/// One normalized drawing command in a path subpath.
+#[derive(Clone, Copy, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+#[serde(tag = "type")]
+pub enum PathSegment {
+    /// Start a subpath at `to`.
+    #[serde(rename = "move")]
+    #[ts(rename = "move")]
+    Move {
+        /// Destination point.
+        to: Vec2,
+    },
+    /// Draw a straight segment to `to`.
+    #[serde(rename = "line")]
+    #[ts(rename = "line")]
+    Line {
+        /// Destination point.
+        to: Vec2,
+    },
+    /// Draw a quadratic Bézier segment.
+    #[serde(rename = "quadratic")]
+    #[ts(rename = "quadratic")]
+    Quadratic {
+        /// Quadratic control point.
+        control: Vec2,
+        /// Destination point.
+        to: Vec2,
+    },
+    /// Draw a cubic Bézier segment.
+    #[serde(rename = "cubic")]
+    #[ts(rename = "cubic")]
+    Cubic {
+        /// First cubic control point.
+        control_1: Vec2,
+        /// Second cubic control point.
+        control_2: Vec2,
+        /// Destination point.
+        to: Vec2,
+    },
+}
+
+/// One normalized subpath. Its first segment must be a move command; later
+/// segments continue from the previous segment's destination.
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+pub struct PathSubpath {
+    /// Ordered move, line, and Bézier segments.
+    pub segments: Vec<PathSegment>,
+    /// Whether the final point connects back to the subpath's move point.
+    pub closed: bool,
+}
+
+/// Normalized geometry for a native path shape.
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+pub struct PathGeometry {
+    /// Independent subpaths in document-local coordinates.
+    pub subpaths: Vec<PathSubpath>,
+    /// Rule used when filling the compound path.
+    pub fill_rule: PathFillRule,
+}
+
+/// Error returned when normalized path geometry violates its representation.
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+pub enum PathGeometryError {
+    /// A path without subpaths cannot represent native geometry.
+    #[error("path must contain at least one subpath")]
+    Empty,
+    /// A subpath must contain its initial move command.
+    #[error("path subpath {subpath} must contain at least one segment")]
+    EmptySubpath {
+        /// Invalid subpath index.
+        subpath: usize,
+    },
+    /// The first segment of a subpath is not a move command.
+    #[error("path subpath {subpath} must begin with a move segment")]
+    MissingMove {
+        /// Invalid subpath index.
+        subpath: usize,
+    },
+    /// A move command appeared after the initial move command.
+    #[error("path subpath {subpath} contains a move segment at index {segment}")]
+    MoveNotFirst {
+        /// Invalid subpath index.
+        subpath: usize,
+        /// Invalid segment index.
+        segment: usize,
+    },
+    /// A point in a path command is not finite.
+    #[error("path subpath {subpath} segment {segment} has a non-finite {component} coordinate")]
+    NonFiniteCoordinate {
+        /// Invalid subpath index.
+        subpath: usize,
+        /// Invalid segment index.
+        segment: usize,
+        /// Invalid coordinate component.
+        component: &'static str,
+    },
+    /// Path properties could not be decoded into the normalized representation.
+    #[error("path properties could not be decoded: {0}")]
+    InvalidProperties(String),
+}
+
+/// Validates normalized path geometry before it enters a shape record.
+///
+/// Every subpath has exactly one initial move segment. Later segments are line,
+/// quadratic, or cubic commands, and every coordinate is finite.
+///
+/// # Errors
+///
+/// Returns [`PathGeometryError`] when the path is empty, has an invalid segment
+/// order, or contains a non-finite coordinate.
+pub fn validate_path_geometry(geometry: &PathGeometry) -> Result<(), PathGeometryError> {
+    if geometry.subpaths.is_empty() {
+        return Err(PathGeometryError::Empty);
+    }
+    for (subpath_index, subpath) in geometry.subpaths.iter().enumerate() {
+        let Some(first) = subpath.segments.first() else {
+            return Err(PathGeometryError::EmptySubpath { subpath: subpath_index });
+        };
+        if !matches!(first, PathSegment::Move { .. }) {
+            return Err(PathGeometryError::MissingMove { subpath: subpath_index });
+        }
+        for (segment_index, segment) in subpath.segments.iter().enumerate() {
+            if segment_index > 0 && matches!(segment, PathSegment::Move { .. }) {
+                return Err(PathGeometryError::MoveNotFirst { subpath: subpath_index, segment: segment_index });
+            }
+            let points = match segment {
+                PathSegment::Move { to } | PathSegment::Line { to } => [to, to, to],
+                PathSegment::Quadratic { control, to } => [control, to, to],
+                PathSegment::Cubic { control_1, control_2, to } => [control_1, control_2, to],
+            };
+            let point_count = match segment {
+                PathSegment::Move { .. } | PathSegment::Line { .. } => 1,
+                PathSegment::Quadratic { .. } => 2,
+                PathSegment::Cubic { .. } => 3,
+            };
+            for point in points.into_iter().take(point_count) {
+                for (value, component) in [(point.x, "x"), (point.y, "y")] {
+                    if !value.is_finite() {
+                        return Err(PathGeometryError::NonFiniteCoordinate {
+                            subpath: subpath_index,
+                            segment: segment_index,
+                            component,
+                        });
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Decodes the canonical path geometry stored in a path shape's properties.
+///
+/// Path properties store `subpaths` and `fill_rule` alongside any future
+/// path-specific painting properties. Unknown properties are ignored here.
+///
+/// # Errors
+///
+/// Returns [`PathGeometryError::InvalidProperties`] when those fields do not
+/// decode into [`PathGeometry`].
+pub fn path_geometry_from_properties(properties: &ShapeProperties) -> Result<PathGeometry, PathGeometryError> {
+    serde_json::from_value(Value::Object(properties.clone().into_iter().collect()))
+        .map_err(|error| PathGeometryError::InvalidProperties(error.to_string()))
+}
+
 /// Transform relative to a shape's parent container or layer.
 #[derive(Clone, Copy, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct Transform {
@@ -450,7 +638,7 @@ pub struct Transform {
     pub scale_y: f64,
 }
 
-/// Attribution retained with durable content.
+/// Attribution retained with content.
 #[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct Provenance {
     /// Actor responsible for the record's current form.
@@ -506,7 +694,7 @@ pub struct Insets {
     pub left: f64,
 }
 
-/// Durable shape record shared by all built-in shape definitions.
+/// A shape record shared by all built-in shape definitions.
 #[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct ShapeRecord {
     /// Stable record identifier.
@@ -532,7 +720,7 @@ pub struct ShapeRecord {
     pub version: RecordVersion,
 }
 
-/// Durable page record and its ordered layer list.
+/// A page record and its ordered layer list.
 #[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct PageRecord {
     /// Stable record identifier.
@@ -545,7 +733,7 @@ pub struct PageRecord {
     pub version: RecordVersion,
 }
 
-/// Durable layer record and its ordered root-shape list.
+/// A layer record and its ordered root-shape list.
 #[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct LayerRecord {
     /// Stable record identifier.
@@ -566,7 +754,7 @@ pub struct LayerRecord {
     pub version: RecordVersion,
 }
 
-/// Durable relationship between two shapes.
+/// Relationship between two shapes.
 #[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct BindingRecord {
     /// Stable record identifier.
@@ -585,7 +773,7 @@ pub struct BindingRecord {
     pub version: RecordVersion,
 }
 
-/// Durable image, font, or other binary asset.
+/// Image, font, or other binary asset.
 #[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct AssetRecord {
     /// Stable record identifier.
@@ -677,8 +865,9 @@ pub fn blank_document(document_id: &DocumentId, page_name: Option<&str>) -> Docu
 /// Validates the property rules shared by the Rust and TypeScript registries.
 ///
 /// Unknown properties remain available for shape-specific extensions. The
-/// registry currently gives common `width` and `height` properties their
-/// cross-language numeric and non-negative constraints.
+/// registry gives common `width` and `height` properties cross-language numeric
+/// and non-negative constraints, and validates the normalized geometry of path
+/// shapes.
 ///
 /// # Errors
 ///
@@ -702,6 +891,12 @@ pub fn validate_shape_properties(kind: &str, properties: &ShapeProperties) -> Re
         if number < 0.0 {
             return Err(ShapePropertyError::NegativeNumber { kind: kind.to_owned(), property: property.to_owned() });
         }
+    }
+    if kind == PATH_KIND {
+        let geometry = path_geometry_from_properties(properties)
+            .map_err(|error| ShapePropertyError::InvalidPath { kind: kind.to_owned(), message: error.to_string() })?;
+        validate_path_geometry(&geometry)
+            .map_err(|error| ShapePropertyError::InvalidPath { kind: kind.to_owned(), message: error.to_string() })?;
     }
     Ok(())
 }
@@ -744,6 +939,7 @@ mod tests {
                 ARROW_KIND,
                 TEXT_KIND,
                 STROKE_KIND,
+                PATH_KIND,
                 MARKDOWN_KIND,
                 CONTAINER_KIND,
             ]
@@ -766,7 +962,56 @@ mod tests {
             validate_shape_properties("unknown", &BTreeMap::new()),
             Err(ShapePropertyError::UnknownKind { .. })
         ));
+        let mut geometry = PathGeometry {
+            subpaths: vec![PathSubpath {
+                segments: vec![
+                    PathSegment::Move { to: Vec2 { x: 0.0, y: 0.0 } },
+                    PathSegment::Line { to: Vec2 { x: 10.0, y: 0.0 } },
+                    PathSegment::Quadratic { control: Vec2 { x: 15.0, y: 5.0 }, to: Vec2 { x: 10.0, y: 10.0 } },
+                    PathSegment::Cubic {
+                        control_1: Vec2 { x: 10.0, y: 15.0 },
+                        control_2: Vec2 { x: 0.0, y: 15.0 },
+                        to: Vec2 { x: 0.0, y: 10.0 },
+                    },
+                ],
+                closed: true,
+            }],
+            fill_rule: PathFillRule::EvenOdd,
+        };
+        assert!(validate_path_geometry(&geometry).is_ok());
+        let properties = BTreeMap::from([
+            (
+                "subpaths".into(),
+                serde_json::to_value(&geometry.subpaths).expect("subpaths serialize"),
+            ),
+            (
+                "fill_rule".into(),
+                serde_json::to_value(geometry.fill_rule).expect("fill rule serializes"),
+            ),
+        ]);
+        assert!(validate_shape_properties(PATH_KIND, &properties).is_ok());
+
+        geometry.subpaths[0]
+            .segments
+            .insert(1, PathSegment::Move { to: Vec2 { x: 1.0, y: 1.0 } });
+        assert!(matches!(
+            validate_path_geometry(&geometry),
+            Err(PathGeometryError::MoveNotFirst { .. })
+        ));
+        geometry.subpaths[0].segments.remove(1);
+        geometry.subpaths[0].segments[0] = PathSegment::Move { to: Vec2 { x: f64::NAN, y: 0.0 } };
+        assert!(matches!(
+            validate_path_geometry(&geometry),
+            Err(PathGeometryError::NonFiniteCoordinate { component: "x", .. })
+        ));
+        let invalid_properties = BTreeMap::from([("subpaths".into(), serde_json::json!([]))]);
+        assert!(matches!(
+            validate_shape_properties(PATH_KIND, &invalid_properties),
+            Err(ShapePropertyError::InvalidPath { .. })
+        ));
+
         assert_eq!(BuiltinShapeKind::parse("rect"), Some(BuiltinShapeKind::Rectangle));
+        assert_eq!(BuiltinShapeKind::parse("path"), Some(BuiltinShapeKind::Path));
         assert_eq!(BuiltinShapeKind::Rectangle.to_string(), RECTANGLE_KIND);
         assert_eq!(
             serde_json::to_value(BuiltinShapeKind::Rectangle).expect("built-in kind should serialize"),

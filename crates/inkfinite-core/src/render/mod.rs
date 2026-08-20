@@ -378,6 +378,7 @@ impl Renderer<'_> {
                     ).expect("writing to a String cannot fail");
                 }
             }
+            Some(BuiltinShapeKind::Path) => {}
             None => {}
         }
         Ok(output)
@@ -725,6 +726,21 @@ fn shape_local_bounds(shape: &ShapeRecord) -> Result<Bounds, SvgRenderError> {
         Some(BuiltinShapeKind::Stroke) => {
             let props: StrokeProps = properties(shape)?;
             bounds_from_points(&stroke_outline(&props))
+        }
+        Some(BuiltinShapeKind::Path) => {
+            let geometry = crate::path_geometry_from_properties(&shape.properties).map_err(|error| {
+                SvgRenderError::InvalidShapeProperties {
+                    shape_id: shape.id.clone(),
+                    kind: shape.kind.to_string(),
+                    message: error.to_string(),
+                }
+            })?;
+            crate::validate_path_geometry(&geometry).map_err(|error| SvgRenderError::InvalidShapeProperties {
+                shape_id: shape.id.clone(),
+                kind: shape.kind.to_string(),
+                message: error.to_string(),
+            })?;
+            Bounds { x: 0.0, y: 0.0, width: 0.0, height: 0.0 }
         }
         None => Bounds { x: 0.0, y: 0.0, width: 0.0, height: 0.0 },
     };
