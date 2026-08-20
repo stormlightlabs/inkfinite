@@ -48,8 +48,8 @@
 				<h1>Give your ideas</h1>
 				<h1><em>infinite room.</em></h1>
 				<p class="tagline">
-					Inkfinite is an open canvas for people and coding agents to sketch, connect,
-					and refine ideas together.
+					Inkfinite is an open canvas for people and agents to sketch, connect, and
+					refine ideas together.
 				</p>
 				<div class="hero-actions">
 					<a class="primary-action" href={resolve('/app')}>

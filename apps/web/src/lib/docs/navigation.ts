@@ -50,7 +50,8 @@ export const DOCS_MANIFEST: DocsPage[] = [
 		title: 'Agent workflows',
 		href: '/docs/reference/agents/',
 		description: 'Reviewable document changes for coding agents.'
-	}
+	},
+	{ title: 'Internals', href: '/docs/internals/', description: 'Inkfinite under the hood' }
 ];
 
 const docsByHref = new Map(DOCS_MANIFEST.map((page) => [page.href, page]));
@@ -68,7 +69,11 @@ export const DOCS_GROUPS: DocsGroup[] = [
 	{ title: 'Start here', pages: docs('/docs/introduction/', '/docs/getting-started/') },
 	{
 		title: 'Concepts',
-		pages: docs('/docs/concepts/documents/', '/docs/concepts/transactions-and-sync/')
+		pages: docs(
+			'/docs/concepts/documents/',
+			'/docs/concepts/transactions-and-sync/',
+			'/docs/internals/'
+		)
 	},
 	{
 		title: 'Applications',

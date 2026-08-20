@@ -1,53 +1,326 @@
-# Inkfinite implementation tickets
+# Inkfinite TODO
 
-These tickets implement [ROADMAP.md](ROADMAP.md).
+Active implementation work for [ROADMAP.md](ROADMAP.md).
 
-## Completed Work
+Completed work belongs in [CHANGELOG.md](CHANGELOG.md).
 
-- Completed work is logged in the [changelog](CHANGELOG.md)
-    - CLI and headless rendering
-    - Live control and CRDT sync
-    - Agent and release readiness
-    - Bundled Inkfinite agent skill
-    - Collapse to one native Inkfinite model
+## SVG Interoperability
 
-## Parking Lot
+### Native path geometry
 
-- The web app could be made into a PWA.
-    1. add webmanifest
-    2. add a _kit_ service worker
-    3. make it offline-first
+- [ ] Add a native `path` shape kind
+- [ ] Define normalized path and subpath representation
+- [ ] Support move segments
+- [ ] Support line segments
+- [ ] Support quadratic curves
+- [ ] Support cubic curves
+- [ ] Support closed subpaths
+- [ ] Define compound-path fill rules
+- [ ] Generate TypeScript bindings for path geometry
+- [ ] Implement Rust path validation
+- [ ] Implement path bounds
+- [ ] Include quadratic and cubic extrema in bounds
+- [ ] Implement Canvas path rendering
+- [ ] Implement path fill hit testing
+- [ ] Implement path stroke hit testing
+- [ ] Implement deterministic SVG path rendering
+- [ ] Support parent-relative path transforms
+- [ ] Add shared Rust/TypeScript path fixtures
+- [ ] Add invalid-path fixtures
 
-### Fixtures
+### SVG import
 
-- Fixtures should live in an unpublished fixtures crate (sort of like lectito),
-  that acts as an executable performance corpus
+- [ ] Add an SVG import boundary
+- [ ] Parse SVG into a normalized intermediate representation
+- [ ] Import `<g>` as containers
+- [ ] Import `<rect>` as rect shapes
+- [ ] Import `<circle>` as ellipse shapes
+- [ ] Import `<ellipse>` as ellipse shapes
+- [ ] Import `<line>` as line shapes
+- [ ] Import `<polygon>` as path shapes
+- [ ] Import `<polyline>` as path shapes
+- [ ] Import `<path>` as path shapes
+- [ ] Preserve nested transforms
+- [ ] Preserve supported fill styles
+- [ ] Preserve supported stroke styles
+- [ ] Preserve opacity
+- [ ] Define SVG text import behavior
+- [ ] Import supported embedded raster images as assets
+- [ ] Preserve original SVG source as an asset
+- [ ] Define warnings for unsupported SVG features
+- [ ] Define opaque fallback behavior for unsupported visual subtrees
+- [ ] Handle gradients explicitly
+- [ ] Handle clip paths explicitly
+- [ ] Handle masks explicitly
+- [ ] Handle filters explicitly
+- [ ] Reject or ignore scripts and animation explicitly
+- [ ] Commit imports through one validated transaction
+- [ ] Add desktop SVG file import
+- [ ] Add drag-and-drop SVG import
+- [ ] Add CLI SVG import
+- [ ] Add SVG import fixtures for icons
+- [ ] Add SVG import fixtures for logos
+- [ ] Add SVG import fixtures for nested groups
+- [ ] Add SVG import fixtures for compound paths
+- [ ] Add SVG import fixtures for unsupported features
+- [ ] Add malformed SVG fixtures
 
-### Features
+### SVG round-trip
 
-- SVG Editing
-- MCP (see below)
+- [ ] Test SVG import → save → reopen
+- [ ] Test SVG import → edit → SVG export
+- [ ] Test SVG import → undo → redo
+- [ ] Test imported content through CRDT merge
+- [ ] Test imported shapes through CLI inspect
+- [ ] Test imported shapes through CLI query
+- [ ] Test imported shapes through CLI mutation
+- [ ] Verify native vector geometry exports without rasterization
+- [ ] Verify nested transforms export deterministically
+- [ ] Verify compound fill rules survive import and export
+- [ ] Verify opaque fallback content remains visually stable
+- [ ] Add deterministic round-trip fixtures
 
-### Bundling/Packaging
+## Vector Editing
 
-- How should this work?
-    - CLI & core to crates.io
-    - Applications to GH releases
+### Hierarchical object editing
 
-### Skill
+- [ ] Audit current nested-transform selection behavior
+- [ ] Select an imported SVG container as one object
+- [ ] Enter a container for child selection
+- [ ] Leave a container and return to parent selection
+- [ ] Move nested child shapes
+- [ ] Resize nested child shapes
+- [ ] Rotate nested child shapes
+- [ ] Restyle nested child shapes
+- [ ] Reparent shapes while preserving world-space appearance
+- [ ] Define selection behavior across different parents
+- [ ] Define multi-selection behavior across different parents
+- [ ] Ensure hit testing maps through nested transforms correctly
+- [ ] Ensure gesture previews use the same transform semantics as commits
+- [ ] Preserve locked and hidden hierarchy behavior
+- [ ] Add nested-selection runtime tests
+- [ ] Add nested-transform renderer tests
 
-- Does the skill really need fixtures? Could those live in the above mentioned
-  fixture crate?
-- Can/should the skill be split up?
-- If/when SVG editing is added, we maybe should make multiple skills for drawing,
-  wireframing, svg editing, etc. Pixijs, Remotion, and Cloudflare do a good job
-  of separating skills.
+### Direct selection
 
-### MCP
+- [ ] Add a direct-selection tool
+- [ ] Select complete subpaths
+- [ ] Select individual anchors
+- [ ] Select multiple anchors
+- [ ] Move selected anchors
+- [ ] Move complete subpaths
+- [ ] Render quadratic control handles
+- [ ] Render cubic control handles
+- [ ] Drag quadratic control handles
+- [ ] Drag cubic control handles
+- [ ] Update bounds during path-edit previews
+- [ ] Update hit regions during path-edit previews
+- [ ] Commit one transaction per completed geometry gesture
+- [ ] Make one direct-edit gesture one undo step
+- [ ] Add direct-selection interaction tests
 
-- The CLI should probably be more permissive and permissioned usage should
-  stick with the MCP. That would give a developer more flexibility to choose
-  how an agent interacts with documents.
-    - Permissions pollute the CLI's signature and make its scriptability tedious
+### Path topology
 
-### QA
+- [ ] Add anchors to path segments
+- [ ] Delete anchors
+- [ ] Convert straight segments to curves
+- [ ] Convert curves to straight segments
+- [ ] Break Bezier handles
+- [ ] Join Bezier handles
+- [ ] Open closed paths
+- [ ] Close open paths
+- [ ] Join compatible endpoints
+- [ ] Preserve compound-path fill behavior during topology changes
+- [ ] Reject invalid durable path topology
+- [ ] Add topology-edit fixtures and tests
+
+## Direct CLI Control
+
+### Separate capability from policy
+
+- [ ] Audit all `Origin::Agent` behavior
+- [ ] Separate document invariants from agent authorization
+- [ ] Separate ordinary document locks from agent policy
+- [ ] Remove `agent_editable` restrictions from direct CLI operations
+- [ ] Remove hidden-from-agent restrictions from direct CLI operations
+- [ ] Decide whether `Origin` remains provenance-only
+- [ ] Keep causal-head checks
+- [ ] Keep record-version checks
+- [ ] Keep transaction validation
+- [ ] Keep atomic mutation behavior
+- [ ] Keep ordinary shape locks
+- [ ] Keep ordinary layer locks
+
+### Simplify CLI and live control
+
+- [ ] Remove Review/Direct authorization concepts from general CLI behavior
+- [ ] Simplify live apply semantics
+- [ ] Keep proposal behavior only where it remains independently useful
+- [ ] Update `capabilities --json`
+- [ ] Update generated protocol/schema contracts as needed
+- [ ] Update CLI help
+- [ ] Update CLI documentation
+- [ ] Update bundled skill guidance
+- [ ] Replace permission-oriented CLI tests with direct-control tests
+- [ ] Add regression coverage for unrestricted scripted mutation
+
+## Permissioned MCP
+
+### Server
+
+- [ ] Choose the Rust MCP SDK or implementation approach
+- [ ] Add an `inkfinite-mcp` crate or binary
+- [ ] Start with stdio transport
+- [ ] Reuse `inkfinite-core` query APIs
+- [ ] Reuse `inkfinite-core` transaction APIs
+- [ ] Avoid shelling out to the CLI from the MCP server
+- [ ] Expose Inkfinite capability metadata
+
+### Resources and discovery
+
+- [ ] Discover open desktop sessions
+- [ ] Discover accessible Inkfinite files where appropriate
+- [ ] Inspect document metadata
+- [ ] Inspect causal heads
+- [ ] Query document records
+- [ ] Query by semantic role
+- [ ] Query by shape kind
+- [ ] Query by parent
+- [ ] Query by bounds
+
+### Mutation tools
+
+- [ ] Create shapes
+- [ ] Patch shapes
+- [ ] Move/reparent shapes
+- [ ] Delete shapes
+- [ ] Create and patch layers
+- [ ] Create containers
+- [ ] Apply layout operations
+- [ ] Create connections
+- [ ] Delete connections
+- [ ] Import SVG where appropriate
+- [ ] Return affected IDs and heads from every mutation
+- [ ] Expose dry-run or preview behavior where useful
+
+### Permission model
+
+- [ ] Define read permission
+- [ ] Define create permission
+- [ ] Define modify permission
+- [ ] Define delete permission
+- [ ] Define structural/layout permission
+- [ ] Define per-document policy
+- [ ] Define per-session policy
+- [ ] Apply `agent_editable` policy at the MCP boundary
+- [ ] Decide hidden-layer visibility policy for MCP clients
+- [ ] Decide how ordinary shape/layer locks interact with MCP permissions
+- [ ] Decide whether proposal/review mode belongs in MCP
+- [ ] Return explicit authorization errors
+- [ ] Keep authorization separate from document validation
+
+### Verification and skills
+
+- [ ] Add MCP integration fixtures
+- [ ] Test read-only sessions
+- [ ] Test restricted write sessions
+- [ ] Test denied mutations
+- [ ] Test stale-head recovery
+- [ ] Test invalid transactions
+- [ ] Test document locks
+- [ ] Test `agent_editable`
+- [ ] Update or split Inkfinite agent skills for CLI and MCP usage
+
+## Performance Profiling
+
+### Fixture corpus
+
+- [ ] Turn representative fixtures into an executable performance corpus
+- [ ] Add a small document fixture
+- [ ] Add a medium document fixture
+- [ ] Add a large document fixture
+- [ ] Retain a 10,000-shape fixture
+- [ ] Add a vector-heavy fixture
+- [ ] Add a deeply nested hierarchy fixture
+- [ ] Add a large imported SVG fixture
+- [ ] Add a connection-heavy diagram fixture
+- [ ] Record reference hardware
+- [ ] Record benchmark methodology
+
+### Document and CRDT profiling
+
+- [ ] Profile document open
+- [ ] Profile document save
+- [ ] Profile Automerge load
+- [ ] Profile Automerge materialization
+- [ ] Profile transaction validation
+- [ ] Profile transaction commit
+- [ ] Profile undo/redo
+- [ ] Profile CRDT merge
+- [ ] Profile query latency
+- [ ] Profile memory use at representative document sizes
+
+### Renderer and interaction profiling
+
+- [ ] Profile Canvas frame time
+- [ ] Profile viewport culling
+- [ ] Profile hit testing
+- [ ] Profile nested-transform traversal
+- [ ] Profile path rendering
+- [ ] Profile compound paths
+- [ ] Profile selection overlays
+- [ ] Profile vector-edit previews
+- [ ] Profile text and Markdown alongside vector-heavy scenes
+
+### Interop and tooling profiling
+
+- [ ] Profile SVG parse time
+- [ ] Profile SVG import time
+- [ ] Profile SVG export time
+- [ ] Profile CLI startup
+- [ ] Profile common CLI queries
+- [ ] Profile common CLI mutations
+- [ ] Profile local IPC round trips
+- [ ] Profile MCP startup
+- [ ] Profile MCP queries and mutations
+
+### Optimization
+
+- [ ] Record baseline measurements before architecture changes
+- [ ] Identify dominant costs
+- [ ] Establish regression budgets for measured bottlenecks
+- [ ] Evaluate spatial indexing only if hit testing warrants it
+- [ ] Evaluate path caches only if vector rendering warrants them
+- [ ] Evaluate render caches only if profiling warrants them
+- [ ] Evaluate incremental materialization only if CRDT costs warrant it
+- [ ] Evaluate alternate rendering backends only with benchmark evidence
+
+## Backlog
+
+### Vector features
+
+- [ ] Boolean path operations
+- [ ] Gradient editor
+- [ ] Clip-path editing
+- [ ] Mask editing
+- [ ] SVG filter editing
+- [ ] Variable-width strokes
+- [ ] Text on path
+
+### Web
+
+- [ ] Add web manifest
+- [ ] Add service worker
+- [ ] Make the web app installable as a PWA
+- [ ] Improve offline-first web behavior
+
+### Packaging
+
+- [ ] Decide crates.io publication strategy for CLI and core crates
+- [ ] Decide desktop release packaging
+- [ ] Automate GitHub release artifacts
+
+### Agent tooling
+
+- [ ] Revisit skill organization after SVG and MCP workflows stabilize
+- [ ] Consider separate drawing, wireframing, SVG, and MCP skills
