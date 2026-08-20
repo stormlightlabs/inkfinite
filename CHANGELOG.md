@@ -21,7 +21,7 @@
 - Live agent proposal workflow with ghost preview, partial acceptance, and
   explicit-apply Direct mode.
 - Offline Automerge sync between trusted peers through a transport-neutral
-  envelope and bounded per-peer checkpoints.
+  envelope and per-peer checkpoints.
 - Bundled agent skill with worked examples covering file edits, proposal
   review, and stale-head recovery.
 - Excalidraw and Obsidian Canvas (JSON Canvas) import and export.
@@ -37,7 +37,10 @@
 #### SVG Interop
 
 - Native path shape representation with normalized move, line, quadratic, and
-  cubic subpaths, closed-path flags, compound fill rules, & generated bindings
+  cubic subpaths, closed-path flags, compound fill rules, and generated bindings.
+- Native path bounds with Bézier extrema, Canvas rendering, fill and stroke hit
+  testing, parent-relative transforms, deterministic SVG output, and shared
+  valid/invalid geometry fixtures.
 
 ### Changed
 

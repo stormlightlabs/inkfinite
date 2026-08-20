@@ -567,6 +567,79 @@ fn render_is_deterministic_and_covers_every_visual_builtin() {
 }
 
 #[test]
+fn renders_native_path_geometry_with_curves_and_fill_rule() {
+    let mut snapshot = fixture_snapshot();
+    let layer_id = LayerId::from("layer:page:fixtures:default");
+    let path_id = ShapeId::from("shape:path");
+    add_shape(
+        &mut snapshot.document.shapes,
+        shape(
+            "shape:path",
+            "path",
+            ShapeParent::Shape(ShapeId::from("group:path")),
+            10.0,
+            20.0,
+            0.0,
+            props([
+                (
+                    "subpaths",
+                    serde_json::json!([{
+                        "segments": [
+                            { "type": "move", "to": { "x": 0, "y": 0 } },
+                            { "type": "line", "to": { "x": 40, "y": 0 } },
+                            { "type": "quadratic", "control": { "x": 50, "y": 10 }, "to": { "x": 40, "y": 20 } },
+                            { "type": "cubic", "control_1": { "x": 40, "y": 30 }, "control_2": { "x": 0, "y": 30 }, "to": { "x": 0, "y": 20 } }
+                        ],
+                        "closed": true
+                    }]),
+                ),
+                ("fill_rule", serde_json::json!("evenodd")),
+                ("fill", serde_json::json!("#fef08a")),
+                ("stroke", serde_json::json!("#854d0e")),
+                ("stroke_width", serde_json::json!(3)),
+            ]),
+            Vec::new(),
+        ),
+    );
+    add_shape(
+        &mut snapshot.document.shapes,
+        shape(
+            "group:path",
+            "container",
+            ShapeParent::Layer(layer_id.clone()),
+            5.0,
+            6.0,
+            0.0,
+            props([("w", serde_json::json!(100)), ("h", serde_json::json!(100))]),
+            vec![path_id],
+        ),
+    );
+    snapshot
+        .document
+        .layers
+        .get_mut(&layer_id)
+        .expect("fixture layer")
+        .shape_ids
+        .push(ShapeId::from("group:path"));
+
+    let output = render_svg(
+        &snapshot,
+        &SvgRenderOptions {
+            page_id: Some(PageId::from("page:fixtures")),
+            selection: BTreeSet::from([ShapeId::from("shape:path")]),
+            region: Some(Bounds { x: 0.0, y: 0.0, width: 100.0, height: 100.0 }),
+            ..SvgRenderOptions::default()
+        },
+    )
+    .expect("path renders");
+
+    assert_eq!(
+        output.svg,
+        include_str!("../../../../fixtures/native/rendering/path.svg")
+    );
+}
+
+#[test]
 fn filters_page_layer_selection_and_region_without_changing_order() {
     let mut snapshot = fixture_snapshot();
     let page_id = PageId::from("page:ordering");

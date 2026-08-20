@@ -23,15 +23,15 @@ Completed work is in [CHANGELOG.md](CHANGELOG.md).
 
 #### Geometry, rendering, and fixtures
 
-- [ ] Implement path bounds
-- [ ] Include quadratic and cubic extrema in bounds
-- [ ] Implement Canvas path rendering
-- [ ] Implement path fill hit testing
-- [ ] Implement path stroke hit testing
-- [ ] Implement deterministic SVG path rendering
-- [ ] Support parent-relative path transforms
-- [ ] Add shared Rust/TypeScript path fixtures
-- [ ] Add invalid-path fixtures
+- [x] Implement path bounds
+- [x] Include quadratic and cubic extrema in bounds
+- [x] Implement Canvas path rendering
+- [x] Implement path fill hit testing
+- [x] Implement path stroke hit testing
+- [x] Implement deterministic SVG path rendering
+- [x] Support parent-relative path transforms
+- [x] Add shared Rust/TypeScript path fixtures
+- [x] Add invalid-path fixtures
 
 ### SVG import
 

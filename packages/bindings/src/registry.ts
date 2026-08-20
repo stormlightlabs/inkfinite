@@ -60,6 +60,85 @@ function numericProperty(properties: Record<string, JsonValue>, name: string): n
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
+type PathPoint = { x: number; y: number };
+
+function quadraticPoint(start: PathPoint, control: PathPoint, end: PathPoint, t: number): PathPoint {
+  const inverse = 1 - t;
+  return {
+    x: inverse * inverse * start.x + 2 * inverse * t * control.x + t * t * end.x,
+    y: inverse * inverse * start.y + 2 * inverse * t * control.y + t * t * end.y,
+  };
+}
+
+function cubicPoint(start: PathPoint, control1: PathPoint, control2: PathPoint, end: PathPoint, t: number): PathPoint {
+  const inverse = 1 - t;
+  return {
+    x: inverse ** 3 * start.x + 3 * inverse ** 2 * t * control1.x + 3 * inverse * t ** 2 * control2.x + t ** 3 * end.x,
+    y: inverse ** 3 * start.y + 3 * inverse ** 2 * t * control1.y + 3 * inverse * t ** 2 * control2.y + t ** 3 * end.y,
+  };
+}
+
+function quadraticRoots(a: number, b: number, c: number): number[] {
+  if (Math.abs(a) <= Number.EPSILON) return Math.abs(b) > Number.EPSILON ? [-c / b] : [];
+  const discriminant = b * b - 4 * a * c;
+  if (discriminant < 0) return [];
+  const root = Math.sqrt(discriminant);
+  return [(-b - root) / (2 * a), (-b + root) / (2 * a)];
+}
+
+/** Returns exact local bounds, including Bézier derivative extrema. */
+export function pathBounds(geometry: PathGeometry): Bounds {
+  const points: PathPoint[] = [];
+  for (const subpath of geometry.subpaths) {
+    const first = subpath.segments[0];
+    if (!first || first.type !== 'move') continue;
+    const start = first.to;
+    let current = start;
+    points.push(current);
+    for (const segment of subpath.segments.slice(1)) {
+      if (segment.type === 'move') {
+        current = segment.to;
+        points.push(current);
+      } else if (segment.type === 'line') {
+        points.push(current, segment.to);
+        current = segment.to;
+      } else if (segment.type === 'quadratic') {
+        points.push(current, segment.to);
+        for (const value of [
+          (current.x - segment.control.x) / (current.x - 2 * segment.control.x + segment.to.x),
+          (current.y - segment.control.y) / (current.y - 2 * segment.control.y + segment.to.y),
+        ]) {
+          if (Number.isFinite(value) && value > 0 && value < 1) points.push(quadraticPoint(current, segment.control, segment.to, value));
+        }
+        current = segment.to;
+      } else {
+        points.push(current, segment.to);
+        for (const [startValue, control1, control2, endValue] of [
+          [current.x, segment.control_1.x, segment.control_2.x, segment.to.x],
+          [current.y, segment.control_1.y, segment.control_2.y, segment.to.y],
+        ]) {
+          const a = -startValue + 3 * control1 - 3 * control2 + endValue;
+          const b = 2 * (startValue - 2 * control1 + control2);
+          const c = control1 - startValue;
+          for (const value of quadraticRoots(a, b, c)) {
+            if (value > 0 && value < 1) points.push(cubicPoint(current, segment.control_1, segment.control_2, segment.to, value));
+          }
+        }
+        current = segment.to;
+      }
+    }
+    if (subpath.closed) points.push(current, start);
+  }
+  if (points.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
 export function validateShapeProperties(kind: string, properties: Record<string, JsonValue>): boolean {
   if (!(BUILTIN_SHAPE_KINDS as readonly string[]).includes(kind)) return false;
   if (kind === "path" && !validatePathGeometry({ subpaths: properties.subpaths, fill_rule: properties.fill_rule })) return false;
@@ -76,12 +155,17 @@ export type RegistryShape = {
 };
 
 export function boundsForShape(shape: RegistryShape): Bounds {
-  const width = Math.abs(numericProperty(shape.properties, "width"));
-  const height = Math.abs(numericProperty(shape.properties, "height"));
+  const pathValue: PathGeometry = {
+    subpaths: shape.properties.subpaths as PathGeometry['subpaths'],
+    fill_rule: shape.properties.fill_rule as PathGeometry['fill_rule'],
+  };
+  const local = shape.kind === 'path' && validatePathGeometry(pathValue)
+    ? pathBounds(pathValue)
+    : { x: 0, y: 0, width: Math.abs(numericProperty(shape.properties, "width")), height: Math.abs(numericProperty(shape.properties, "height")) };
   const { translation, rotation, scale_x: scaleX, scale_y: scaleY } = shape.transform;
   const cos = Math.cos(rotation);
   const sin = Math.sin(rotation);
-  const points = [[0, 0], [width, 0], [0, height], [width, height]].map(([x, y]) => [
+  const points = [[local.x, local.y], [local.x + local.width, local.y], [local.x, local.y + local.height], [local.x + local.width, local.y + local.height]].map(([x, y]) => [
     translation.x + x * scaleX * cos - y * scaleY * sin,
     translation.y + x * scaleX * sin + y * scaleY * cos,
   ]);

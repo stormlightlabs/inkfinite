@@ -71,5 +71,18 @@ The binding generator exports `PathFillRule`, `PathSegment`, `PathSubpath`, and 
 `@inkfinite/bindings`. Its registry also exposes `validatePathGeometry` and applies the same
 structural checks to serialized values.
 
-Path bounds, Bézier extrema, Canvas and SVG rendering, hit testing, SVG parsing, and direct path
-editing will consume this representation.
+## Geometry and rendering
+
+Path bounds use segment endpoints and the interior extrema of quadratic and cubic Bézier
+curves. A closed subpath contributes its implicit closing line. Shape transforms compose
+from the path to its parent and through the containing hierarchy.
+
+The Canvas renderer draws move, line, quadratic, and cubic segments and applies the stored
+compound fill rule. Fill hit testing uses the same rule. Stroke hit testing follows the
+flattened curve segments with the stored stroke width and selection tolerance. Headless SVG
+output serializes normalized commands with fixed numeric formatting, fill rules, painting
+properties, and composed transforms.
+
+Rust and TypeScript consume shared valid and invalid path fixtures. The fixtures cover curve
+bounds, compound geometry, nested transforms, and validation errors for malformed paths. SVG
+parsing and direct path editing build on these services.

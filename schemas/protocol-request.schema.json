@@ -30,7 +30,7 @@
       "type": "object"
     },
     "AssetRecord": {
-      "description": "Durable image, font, or other binary asset.",
+      "description": "Image, font, or other binary asset.",
       "properties": {
         "digest": {
           "description": "Content digest including its algorithm prefix.",
@@ -171,7 +171,7 @@
       "type": "string"
     },
     "BindingRecord": {
-      "description": "Durable relationship between two shapes.",
+      "description": "Relationship between two shapes.",
       "properties": {
         "anchor": {
           "$ref": "#/$defs/BindingAnchor",
@@ -461,7 +461,7 @@
       "type": "object"
     },
     "LayerRecord": {
-      "description": "Durable layer record and its ordered root-shape list.",
+      "description": "A layer record and its ordered root-shape list.",
       "properties": {
         "id": {
           "$ref": "#/$defs/LayerId",
@@ -1096,7 +1096,7 @@
       ]
     },
     "Origin": {
-      "description": "Origin of a durable record or transaction.",
+      "description": "Origin of a record or transaction.",
       "oneOf": [
         {
           "const": "human",
@@ -1125,7 +1125,7 @@
       "type": "string"
     },
     "PageRecord": {
-      "description": "Durable page record and its ordered layer list.",
+      "description": "A page record and its ordered layer list.",
       "properties": {
         "id": {
           "$ref": "#/$defs/PageId",
@@ -1160,7 +1160,7 @@
       "type": "string"
     },
     "Provenance": {
-      "description": "Attribution retained with durable content.",
+      "description": "Attribution retained with content.",
       "properties": {
         "actor_id": {
           "$ref": "#/$defs/ActorId",
@@ -1286,7 +1286,7 @@
       "type": "object"
     },
     "RecordVersion": {
-      "description": "Monotonic version of a durable record within the document history.",
+      "description": "Monotonic version of a record within the document history.",
       "format": "uint64",
       "minimum": 0,
       "type": "integer"
@@ -1488,7 +1488,7 @@
       "type": "object"
     },
     "ShapeRecord": {
-      "description": "Durable shape record shared by all built-in shape definitions.",
+      "description": "A shape record shared by all built-in shape definitions.",
       "properties": {
         "child_ids": {
           "description": "Ordered children when this shape is a container.",

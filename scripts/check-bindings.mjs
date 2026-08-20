@@ -5,6 +5,7 @@ import {
   boundsForShape,
   BUILTIN_SHAPE_KINDS,
   GEOMETRY_CONVENTION,
+  pathBounds,
   validatePathGeometry,
   validateShapeProperties,
 } from "../packages/bindings/dist/index.js";
@@ -23,6 +24,9 @@ for (const testCase of fixture.property_cases) {
 }
 
 assert.ok(validatePathGeometry(fixture.path_geometry));
+for (const testCase of fixture.invalid_path_cases) {
+  assert.equal(validatePathGeometry(testCase.geometry), testCase.valid, testCase.name);
+}
 
 for (const testCase of fixture.geometry_cases) {
   const actual = boundsForShape({
@@ -30,6 +34,10 @@ for (const testCase of fixture.geometry_cases) {
     properties: testCase.properties,
     transform: testCase.transform,
   });
+  if (testCase.kind === "path") {
+    const local = pathBounds(testCase.properties);
+    assert.ok(local.width > 0 && local.height > 0);
+  }
   for (const key of ["x", "y", "width", "height"]) {
     assert.ok(Math.abs(actual[key] - testCase.expected_bounds[key]) < 1e-9, `${key} differs`);
   }

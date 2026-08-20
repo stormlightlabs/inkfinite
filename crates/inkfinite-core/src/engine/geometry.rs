@@ -1,5 +1,5 @@
 use super::{Bounds, Document, EngineError, ShapeId, ShapeParent, ShapeRecord};
-use crate::{Transform, Vec2};
+use crate::{PathGeometry, PathSegment, Transform, Vec2};
 
 /// A two-dimensional affine transform shared by document geometry consumers.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -88,9 +88,17 @@ impl Affine {
 /// Returns a shape's axis-aligned bounds in its parent's coordinate space.
 #[must_use]
 pub fn local_shape_bounds(shape: &ShapeRecord) -> Bounds {
-    let width = numeric_property(shape, "width").unwrap_or(0.0).abs();
-    let height = numeric_property(shape, "height").unwrap_or(0.0).abs();
-    Affine::from_transform(shape.transform).transform_bounds(Bounds { x: 0.0, y: 0.0, width, height })
+    let local = if shape.kind.as_str() == crate::PATH_KIND {
+        crate::path_geometry_from_properties(&shape.properties)
+            .map_or(Bounds { x: 0.0, y: 0.0, width: 0.0, height: 0.0 }, |geometry| {
+                path_bounds(&geometry)
+            })
+    } else {
+        let width = numeric_property(shape, "width").unwrap_or(0.0).abs();
+        let height = numeric_property(shape, "height").unwrap_or(0.0).abs();
+        Bounds { x: 0.0, y: 0.0, width, height }
+    };
+    Affine::from_transform(shape.transform).transform_bounds(local)
 }
 
 /// Returns a shape's axis-aligned bounds in document coordinates.
@@ -99,9 +107,62 @@ pub fn world_shape_bounds(document: &Document, shape_id: &ShapeId) -> Bounds {
     let Some(shape) = document.shapes.get(shape_id) else {
         return Bounds { x: 0.0, y: 0.0, width: 0.0, height: 0.0 };
     };
-    let width = numeric_property(shape, "width").unwrap_or(0.0).abs();
-    let height = numeric_property(shape, "height").unwrap_or(0.0).abs();
-    world_transform(document, shape).transform_bounds(Bounds { x: 0.0, y: 0.0, width, height })
+    let parent_transform = match &shape.parent {
+        ShapeParent::Layer(_) => Affine::IDENTITY,
+        ShapeParent::Shape(parent_id) => document
+            .shapes
+            .get(parent_id)
+            .map(|parent| world_transform(document, parent))
+            .unwrap_or(Affine::IDENTITY),
+    };
+    parent_transform.transform_bounds(local_shape_bounds(shape))
+}
+
+/// Returns the exact axis-aligned bounds of normalized path geometry.
+///
+/// Quadratic and cubic Bézier derivative roots are included, so the bounds do
+/// not depend on a sampling step. A closed subpath contributes its implicit
+/// closing line; an open subpath contributes only its stored segments.
+#[must_use]
+pub fn path_bounds(geometry: &PathGeometry) -> Bounds {
+    let mut points = Vec::new();
+    for subpath in &geometry.subpaths {
+        let Some(PathSegment::Move { to: start }) = subpath.segments.first() else {
+            continue;
+        };
+        let mut current = *start;
+        points.push(current);
+        for segment in subpath.segments.iter().skip(1) {
+            match segment {
+                PathSegment::Move { to } => {
+                    current = *to;
+                    points.push(current);
+                }
+                PathSegment::Line { to } => {
+                    points.extend([current, *to]);
+                    current = *to;
+                }
+                PathSegment::Quadratic { control, to } => {
+                    points.extend([current, *to]);
+                    add_quadratic_extremum(&mut points, current, *control, *to, |t| {
+                        quadratic_point(current, *control, *to, t)
+                    });
+                    current = *to;
+                }
+                PathSegment::Cubic { control_1, control_2, to } => {
+                    points.extend([current, *to]);
+                    add_cubic_extrema(&mut points, current, *control_1, *control_2, *to, |t| {
+                        cubic_point(current, *control_1, *control_2, *to, t)
+                    });
+                    current = *to;
+                }
+            }
+        }
+        if subpath.closed {
+            points.extend([current, *start]);
+        }
+    }
+    bounds_from_points(&points)
 }
 
 /// Returns the complete local-to-world transform for a shape hierarchy.
@@ -201,6 +262,87 @@ pub fn union(left: Bounds, right_bounds: Bounds) -> Bounds {
     }
 }
 
+fn add_quadratic_extremum<F>(points: &mut Vec<Vec2>, start: Vec2, control: Vec2, end: Vec2, evaluate: F)
+where
+    F: Fn(f64) -> Vec2,
+{
+    for t in [
+        quadratic_extremum(start.x, control.x, end.x),
+        quadratic_extremum(start.y, control.y, end.y),
+    ]
+    .into_iter()
+    .flatten()
+    .filter(|t| *t > 0.0 && *t < 1.0)
+    {
+        points.push(evaluate(t));
+    }
+}
+
+fn quadratic_extremum(start: f64, control: f64, end: f64) -> Option<f64> {
+    let denominator = start - 2.0 * control + end;
+    if denominator.abs() <= f64::EPSILON { None } else { Some((start - control) / denominator) }
+}
+
+fn add_cubic_extrema<F>(points: &mut Vec<Vec2>, start: Vec2, control_1: Vec2, control_2: Vec2, end: Vec2, evaluate: F)
+where
+    F: Fn(f64) -> Vec2,
+{
+    for (a, b, c) in [
+        cubic_derivative_coefficients(start.x, control_1.x, control_2.x, end.x),
+        cubic_derivative_coefficients(start.y, control_1.y, control_2.y, end.y),
+    ] {
+        for t in quadratic_roots(a, b, c)
+            .into_iter()
+            .flatten()
+            .filter(|t| *t > 0.0 && *t < 1.0)
+        {
+            points.push(evaluate(t));
+        }
+    }
+}
+
+fn cubic_derivative_coefficients(start: f64, control_1: f64, control_2: f64, end: f64) -> (f64, f64, f64) {
+    (
+        -start + 3.0 * control_1 - 3.0 * control_2 + end,
+        2.0 * (start - 2.0 * control_1 + control_2),
+        control_1 - start,
+    )
+}
+
+fn quadratic_roots(a: f64, b: f64, c: f64) -> [Option<f64>; 2] {
+    if a.abs() <= f64::EPSILON {
+        return [if b.abs() > f64::EPSILON { Some(-c / b) } else { None }, None];
+    }
+    let discriminant = b * b - 4.0 * a * c;
+    if discriminant < 0.0 {
+        return [None, None];
+    }
+    let root = discriminant.sqrt();
+    [Some((-b - root) / (2.0 * a)), Some((-b + root) / (2.0 * a))]
+}
+
+fn quadratic_point(start: Vec2, control: Vec2, end: Vec2, t: f64) -> Vec2 {
+    let inverse = 1.0 - t;
+    Vec2 {
+        x: inverse * inverse * start.x + 2.0 * inverse * t * control.x + t * t * end.x,
+        y: inverse * inverse * start.y + 2.0 * inverse * t * control.y + t * t * end.y,
+    }
+}
+
+fn cubic_point(start: Vec2, control_1: Vec2, control_2: Vec2, end: Vec2, t: f64) -> Vec2 {
+    let inverse = 1.0 - t;
+    Vec2 {
+        x: inverse.powi(3) * start.x
+            + 3.0 * inverse.powi(2) * t * control_1.x
+            + 3.0 * inverse * t.powi(2) * control_2.x
+            + t.powi(3) * end.x,
+        y: inverse.powi(3) * start.y
+            + 3.0 * inverse.powi(2) * t * control_1.y
+            + 3.0 * inverse * t.powi(2) * control_2.y
+            + t.powi(3) * end.y,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -210,6 +352,50 @@ mod tests {
         let left = Bounds { x: 0.0, y: 2.0, width: 4.0, height: 3.0 };
         let right = Bounds { x: 3.0, y: 0.0, width: 5.0, height: 4.0 };
         assert_eq!(union(left, right), Bounds { x: 0.0, y: 0.0, width: 8.0, height: 5.0 });
+    }
+
+    #[test]
+    fn path_bounds_include_quadratic_and_cubic_extrema() {
+        let geometry = PathGeometry {
+            subpaths: vec![crate::PathSubpath {
+                segments: vec![
+                    PathSegment::Move { to: Vec2 { x: 0.0, y: 0.0 } },
+                    PathSegment::Quadratic { control: Vec2 { x: 10.0, y: 20.0 }, to: Vec2 { x: 20.0, y: 0.0 } },
+                    PathSegment::Cubic {
+                        control_1: Vec2 { x: 30.0, y: -20.0 },
+                        control_2: Vec2 { x: 40.0, y: 20.0 },
+                        to: Vec2 { x: 50.0, y: 0.0 },
+                    },
+                ],
+                closed: false,
+            }],
+            fill_rule: crate::PathFillRule::NonZero,
+        };
+        let bounds = path_bounds(&geometry);
+
+        assert!((bounds.x - 0.0).abs() < 1e-12);
+        assert!((bounds.y + 5.773502691896258).abs() < 1e-12);
+        assert!((bounds.width - 50.0).abs() < 1e-12);
+        assert!((bounds.height - 15.773502691896258).abs() < 1e-12);
+    }
+
+    #[test]
+    fn closed_path_bounds_include_the_implicit_closing_line() {
+        let geometry = PathGeometry {
+            subpaths: vec![crate::PathSubpath {
+                segments: vec![
+                    PathSegment::Move { to: Vec2 { x: 10.0, y: 20.0 } },
+                    PathSegment::Line { to: Vec2 { x: 30.0, y: 20.0 } },
+                ],
+                closed: true,
+            }],
+            fill_rule: crate::PathFillRule::EvenOdd,
+        };
+
+        assert_eq!(
+            path_bounds(&geometry),
+            Bounds { x: 10.0, y: 20.0, width: 20.0, height: 0.0 }
+        );
     }
 
     #[test]

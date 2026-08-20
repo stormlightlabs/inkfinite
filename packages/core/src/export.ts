@@ -1,7 +1,7 @@
 import { shapeBounds } from "./geom";
 import type { Box2 } from "./math";
 import { Box2 as Box2Ops } from "./math";
-import type { ArrowShape, EllipseShape, LineShape, MarkdownShape, RectShape, ShapeRecord, TextShape } from "./model";
+import type { ArrowShape, EllipseShape, LineShape, MarkdownShape, PathShape, RectShape, ShapeRecord, TextShape } from "./model";
 import type { EditorState } from "./reactivity";
 import { getSelectedShapes, getShapesOnCurrentPage } from "./reactivity";
 
@@ -168,6 +168,9 @@ function shapeToSVG(shape: ShapeRecord, state: EditorState): string | null {
     case "text": {
       return textToSVG(shape, transform);
     }
+    case "path": {
+      return pathToSVG(shape, transform);
+    }
     case "markdown": {
       return markdownToSVG(shape, transform);
     }
@@ -248,6 +251,29 @@ function textToSVG(shape: TextShape, transform: string): string {
   return `<text transform="${transform}" font-size="${fontSize}" font-family="${escapeXML(fontFamily)}" fill="${
     escapeXML(color)
   }">${escapeXML(text)}</text>`;
+}
+
+function pathToSVG(shape: PathShape, transform: string): string {
+  const commands = shape.props.subpaths.map((subpath) => {
+    const segments = subpath.segments.map((segment) => {
+      switch (segment.type) {
+        case "move": return `M ${svgNumber(segment.to.x)} ${svgNumber(segment.to.y)}`;
+        case "line": return `L ${svgNumber(segment.to.x)} ${svgNumber(segment.to.y)}`;
+        case "quadratic": return `Q ${svgNumber(segment.control.x)} ${svgNumber(segment.control.y)} ${svgNumber(segment.to.x)} ${svgNumber(segment.to.y)}`;
+        case "cubic": return `C ${svgNumber(segment.control_1.x)} ${svgNumber(segment.control_1.y)} ${svgNumber(segment.control_2.x)} ${svgNumber(segment.control_2.y)} ${svgNumber(segment.to.x)} ${svgNumber(segment.to.y)}`;
+      }
+    });
+    if (subpath.closed) segments.push("Z");
+    return segments.join(" ");
+  }).join(" ");
+  const fill = shape.props.fill ? escapeXML(shape.props.fill) : "none";
+  const stroke = shape.props.stroke ? ` stroke="${escapeXML(shape.props.stroke)}" stroke-width="${svgNumber(shape.props.stroke_width ?? 2)}"` : "";
+  return `<path transform="${transform}" d="${commands}" fill="${fill}" fill-rule="${shape.props.fill_rule}"${stroke}/>`;
+}
+
+function svgNumber(value: number): string {
+  if (Object.is(value, -0) || value === 0) return "0";
+  return value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 /**

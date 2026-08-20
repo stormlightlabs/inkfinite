@@ -28,6 +28,15 @@ fn shared_shape_fixture_matches_the_rust_registry_and_bindings() {
         serde_json::to_value(&path_geometry).expect("path geometry should reserialize"),
         fixture["path_geometry"]
     );
+    for case in fixture["invalid_path_cases"]
+        .as_array()
+        .expect("invalid path cases should be an array")
+    {
+        let geometry = serde_json::from_value::<PathGeometry>(case["geometry"].clone());
+        assert!(
+            geometry.is_err() || validate_path_geometry(&geometry.expect("invalid geometry should decode")).is_err()
+        );
+    }
 
     for case in fixture["property_cases"]
         .as_array()
@@ -56,23 +65,28 @@ fn shared_shape_fixture_matches_the_rust_registry_and_bindings() {
         fixture["serialization"]["transaction"]
     );
 
-    let geometry_case = &fixture["geometry_cases"][0];
-    let expected: Bounds = serde_json::from_value(geometry_case["expected_bounds"].clone())
-        .expect("expected bounds should use the protocol binding");
-    let actual = transformed_bounds(
-        shape
-            .properties
-            .get("width")
-            .and_then(Value::as_f64)
-            .expect("fixture width"),
-        shape
-            .properties
-            .get("height")
-            .and_then(Value::as_f64)
-            .expect("fixture height"),
-        shape.transform,
-    );
-    assert_bounds_close(actual, expected);
+    for geometry_case in fixture["geometry_cases"]
+        .as_array()
+        .expect("geometry cases should be an array")
+    {
+        let expected: Bounds = serde_json::from_value(geometry_case["expected_bounds"].clone())
+            .expect("expected bounds should use the protocol binding");
+        let transform: inkfinite_core::Transform =
+            serde_json::from_value(geometry_case["transform"].clone()).expect("fixture transform");
+        let actual = if geometry_case["kind"] == inkfinite_core::PATH_KIND {
+            let geometry: PathGeometry =
+                serde_json::from_value(geometry_case["properties"].clone()).expect("path properties should decode");
+            inkfinite_core::engine::geometry::Affine::from_transform(transform)
+                .transform_bounds(inkfinite_core::engine::geometry::path_bounds(&geometry))
+        } else {
+            transformed_bounds(
+                geometry_case["properties"]["width"].as_f64().expect("fixture width"),
+                geometry_case["properties"]["height"].as_f64().expect("fixture height"),
+                transform,
+            )
+        };
+        assert_bounds_close(actual, expected);
+    }
 }
 
 fn transformed_bounds(width: f64, height: f64, transform: inkfinite_core::Transform) -> Bounds {

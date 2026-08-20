@@ -118,6 +118,34 @@ describe("exportToSVG", () => {
     expect(svg).toContain(">Hello World</text>");
   });
 
+  it("should export native path commands and fill rules", () => {
+    const { state, pageId } = createTestState();
+    const path = ShapeRecord.createPath(pageId, 10, 20, {
+      subpaths: [{
+        segments: [
+          { type: "move", to: { x: 0, y: 0 } },
+          { type: "line", to: { x: 40, y: 0 } },
+          { type: "quadratic", control: { x: 50, y: 10 }, to: { x: 40, y: 20 } },
+          { type: "cubic", control_1: { x: 40, y: 30 }, control_2: { x: 0, y: 30 }, to: { x: 0, y: 20 } }
+        ],
+        closed: true
+      }],
+      fill_rule: "evenodd",
+      fill: "#fff",
+      stroke: "#000",
+      stroke_width: 3
+    }, "path:1");
+    state.doc.shapes[path.id] = path;
+    state.doc.pages[pageId].shapeIds.push(path.id);
+
+    const svg = exportToSVG(state);
+    expect(svg).toContain("<path");
+    expect(svg).toContain("Q 50 10 40 20");
+    expect(svg).toContain("C 40 30 0 30 0 20");
+    expect(svg).toContain("fill-rule=\"evenodd\"");
+    expect(svg).toContain("stroke-width=\"3\"");
+  });
+
   it("should export only selected shapes when selectedOnly is true", () => {
     const { state, pageId } = createTestState();
 

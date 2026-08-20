@@ -67,6 +67,25 @@ export type RectProps = { w: number; h: number; fill: string; stroke: string; ra
 export type EllipseProps = { w: number; h: number; fill: string; stroke: string };
 export type LineProps = { a: Vec2; b: Vec2; stroke: string; width: number };
 
+/** Fill rule for compound native paths. */
+export type PathFillRule = 'nonzero' | 'evenodd';
+
+/** A normalized native path segment. */
+export type PathSegment =
+	| { type: 'move'; to: Vec2 }
+	| { type: 'line'; to: Vec2 }
+	| { type: 'quadratic'; control: Vec2; to: Vec2 }
+	| { type: 'cubic'; control_1: Vec2; control_2: Vec2; to: Vec2 };
+
+/** One native path subpath. */
+export type PathSubpath = { segments: PathSegment[]; closed: boolean };
+
+/** Native path geometry and its compound fill rule. */
+export type PathGeometry = { subpaths: PathSubpath[]; fill_rule: PathFillRule };
+
+/** Native path painting properties stored alongside its geometry. */
+export type PathProps = PathGeometry & { fill?: string; stroke?: string; stroke_width?: number };
+
 /**
  * Arrow endpoint binding metadata
  */
@@ -150,7 +169,7 @@ export type StrokeStyle = { color: string; opacity: number };
  */
 export type StrokeProps = { points: StrokePoint[]; style: StrokeStyle; brush: BrushConfig };
 
-export type ShapeType = 'rect' | 'ellipse' | 'line' | 'arrow' | 'text' | 'stroke' | 'markdown';
+export type ShapeType = 'rect' | 'ellipse' | 'line' | 'arrow' | 'text' | 'stroke' | 'path' | 'markdown';
 export type BaseShape = {
 	id: string;
 	type: ShapeType;
@@ -176,9 +195,18 @@ export type LineShape = BaseShape & { type: 'line'; props: LineProps };
 export type ArrowShape = BaseShape & { type: 'arrow'; props: ArrowProps };
 export type TextShape = BaseShape & { type: 'text'; props: TextProps };
 export type StrokeShape = BaseShape & { type: 'stroke'; props: StrokeProps };
+export type PathShape = BaseShape & { type: 'path'; props: PathProps };
 export type MarkdownShape = BaseShape & { type: 'markdown'; props: MarkdownProps };
 
-export type ShapeRecord = RectShape | EllipseShape | LineShape | ArrowShape | TextShape | StrokeShape | MarkdownShape;
+export type ShapeRecord =
+	| RectShape
+	| EllipseShape
+	| LineShape
+	| ArrowShape
+	| TextShape
+	| StrokeShape
+	| PathShape
+	| MarkdownShape;
 
 export const ShapeRecord = {
 	/**
@@ -221,6 +249,11 @@ export const ShapeRecord = {
 	 */
 	createStroke(pageId: string, x: number, y: number, properties: StrokeProps, id?: string): StrokeShape {
 		return { id: id ?? createId('shape'), type: 'stroke', pageId, x, y, rot: 0, props: properties };
+	},
+
+	/** Create a native path shape. */
+	createPath(pageId: string, x: number, y: number, properties: PathProps, id?: string): PathShape {
+		return { id: id ?? createId('shape'), type: 'path', pageId, x, y, rot: 0, props: properties };
 	},
 
 	/**
@@ -266,6 +299,25 @@ export const ShapeRecord = {
 		}
 		if (shape.type === 'markdown') {
 			return { ...shape, props: { ...shape.props } };
+		}
+		if (shape.type === 'path') {
+			return {
+				...shape,
+				props: {
+					...shape.props,
+					subpaths: shape.props.subpaths.map((subpath) => ({
+						...subpath,
+						segments: subpath.segments.map((segment) => ({
+							...segment,
+							to: { ...segment.to },
+							...('control' in segment ? { control: { ...segment.control } } : {}),
+							...('control_1' in segment
+								? { control_1: { ...segment.control_1 }, control_2: { ...segment.control_2 } }
+								: {})
+						}))
+					}))
+				}
+			} as PathShape;
 		}
 		return { ...shape, props: { ...shape.props } } as ShapeRecord;
 	}
@@ -526,6 +578,26 @@ export function validateDoc(document: Document): ValidationResult {
 					errors.push(`Stroke shape '${shapeId}' has invalid opacity`);
 				}
 
+				break;
+			}
+			case 'path': {
+				if (shape.props.subpaths.length === 0) {
+					errors.push(`Path shape '${shapeId}' has no subpaths`);
+				}
+				if (shape.props.fill_rule !== 'nonzero' && shape.props.fill_rule !== 'evenodd') {
+					errors.push(`Path shape '${shapeId}' has an invalid fill rule`);
+				}
+				for (const [subpathIndex, subpath] of shape.props.subpaths.entries()) {
+					if (subpath.segments.length === 0 || subpath.segments[0]?.type !== 'move') {
+						errors.push(`Path shape '${shapeId}' subpath ${subpathIndex} must begin with a move`);
+					}
+					if (subpath.segments.slice(1).some((segment) => segment.type === 'move')) {
+						errors.push(`Path shape '${shapeId}' subpath ${subpathIndex} has a later move`);
+					}
+				}
+				if (shape.props.stroke_width !== undefined && shape.props.stroke_width < 0) {
+					errors.push(`Path shape '${shapeId}' has negative stroke width`);
+				}
 				break;
 			}
 			case 'markdown': {

@@ -66,7 +66,7 @@ export type BindingKind = string;
 export type Timestamp = number;
 
 /**
- * Monotonic version of a durable record within the document history.
+ * Monotonic version of a record within the document history.
  */
 export type RecordVersion = number;
 
@@ -78,506 +78,553 @@ export type Opacity = number;
 /**
  * Anchor used to place an item in an ordered child list without numeric indexes.
  */
-export type SiblingAnchor<Id> = { "position": "first" } | { "position": "last" } | { "position": "before", "sibling_id": Id } | { "position": "after", "sibling_id": Id };
+export type SiblingAnchor<Id> =
+	| { position: 'first' }
+	| { position: 'last' }
+	| { position: 'before'; sibling_id: Id }
+	| { position: 'after'; sibling_id: Id };
 
 /**
  * Two-dimensional point or vector in document coordinates.
  */
-export type Vec2 = { 
-/**
- * Horizontal component.
- */
-x: number, 
-/**
- * Vertical component.
- */
-y: number, };
+export type Vec2 = {
+	/**
+	 * Horizontal component.
+	 */
+	x: number;
+	/**
+	 * Vertical component.
+	 */
+	y: number;
+};
 
 /**
  * Fill rule used to determine the interior of a compound path.
  */
-export type PathFillRule = "nonzero" | "evenodd";
+export type PathFillRule = 'nonzero' | 'evenodd';
 
 /**
  * One normalized drawing command in a path subpath.
  */
-export type PathSegment = { "type": "move",
-/**
- * Destination point.
- */
-to: Vec2, } | { "type": "line",
-/**
- * Destination point.
- */
-to: Vec2, } | { "type": "quadratic",
-/**
- * Quadratic control point.
- */
-control: Vec2,
-/**
- * Destination point.
- */
-to: Vec2, } | { "type": "cubic",
-/**
- * First cubic control point.
- */
-control_1: Vec2,
-/**
- * Second cubic control point.
- */
-control_2: Vec2,
-/**
- * Destination point.
- */
-to: Vec2, };
+export type PathSegment =
+	| {
+			type: 'move';
+			/**
+			 * Destination point.
+			 */
+			to: Vec2;
+	  }
+	| {
+			type: 'line';
+			/**
+			 * Destination point.
+			 */
+			to: Vec2;
+	  }
+	| {
+			type: 'quadratic';
+			/**
+			 * Quadratic control point.
+			 */
+			control: Vec2;
+			/**
+			 * Destination point.
+			 */
+			to: Vec2;
+	  }
+	| {
+			type: 'cubic';
+			/**
+			 * First cubic control point.
+			 */
+			control_1: Vec2;
+			/**
+			 * Second cubic control point.
+			 */
+			control_2: Vec2;
+			/**
+			 * Destination point.
+			 */
+			to: Vec2;
+	  };
 
 /**
  * One normalized subpath. Its first segment must be a move command; later
  * segments continue from the previous segment's destination.
  */
 export type PathSubpath = {
-/**
- * Ordered move, line, and Bézier segments.
- */
-segments: Array<PathSegment>,
-/**
- * Whether the final point connects back to the subpath's move point.
- */
-closed: boolean, };
+	/**
+	 * Ordered move, line, and Bézier segments.
+	 */
+	segments: Array<PathSegment>;
+	/**
+	 * Whether the final point connects back to the subpath's move point.
+	 */
+	closed: boolean;
+};
 
 /**
  * Normalized geometry for a native path shape.
  */
 export type PathGeometry = {
-/**
- * Independent subpaths in document-local coordinates.
- */
-subpaths: Array<PathSubpath>,
-/**
- * Rule used when filling the compound path.
- */
-fill_rule: PathFillRule, };
+	/**
+	 * Independent subpaths in document-local coordinates.
+	 */
+	subpaths: Array<PathSubpath>;
+	/**
+	 * Rule used when filling the compound path.
+	 */
+	fill_rule: PathFillRule;
+};
 
 /**
  * Transform relative to a shape's parent container or layer.
  */
-export type Transform = { 
-/**
- * Translation in parent coordinates.
- */
-translation: Vec2, 
-/**
- * Clockwise rotation in radians.
- */
-rotation: number, 
-/**
- * Horizontal scale.
- */
-scale_x: number, 
-/**
- * Vertical scale.
- */
-scale_y: number, };
+export type Transform = {
+	/**
+	 * Translation in parent coordinates.
+	 */
+	translation: Vec2;
+	/**
+	 * Clockwise rotation in radians.
+	 */
+	rotation: number;
+	/**
+	 * Horizontal scale.
+	 */
+	scale_x: number;
+	/**
+	 * Vertical scale.
+	 */
+	scale_y: number;
+};
 
 /**
- * Origin of a durable record or transaction.
+ * Origin of a record or transaction.
  */
-export type Origin = "human" | "agent" | "sync" | "system";
+export type Origin = 'human' | 'agent' | 'sync' | 'system';
 
 /**
- * Attribution retained with durable content.
+ * Attribution retained with content.
  */
-export type Provenance = { 
-/**
- * Actor responsible for the record's current form.
- */
-actor_id: ActorId, 
-/**
- * Path by which the record entered the document.
- */
-origin: Origin, 
-/**
- * Time at which this provenance entry was recorded.
- */
-timestamp: Timestamp, 
-/**
- * Optional source identifier, such as an external reference or proposal ID.
- */
-source: string | null, };
+export type Provenance = {
+	/**
+	 * Actor responsible for the record's current form.
+	 */
+	actor_id: ActorId;
+	/**
+	 * Path by which the record entered the document.
+	 */
+	origin: Origin;
+	/**
+	 * Time at which this provenance entry was recorded.
+	 */
+	timestamp: Timestamp;
+	/**
+	 * Optional source identifier, such as an external reference or proposal ID.
+	 */
+	source: string | null;
+};
 
 /**
  * Human- and agent-readable meaning attached to a shape.
  */
-export type SemanticMetadata = { 
-/**
- * Optional display name.
- */
-name: string | null, 
-/**
- * Optional semantic selector such as `architecture.service`.
- */
-role: string | null, 
-/**
- * Optional longer description.
- */
-description: string | null, 
-/**
- * Searchable, user-defined tags.
- */
-tags: Array<string>, 
-/**
- * Whether direct edits to this shape are prohibited.
- */
-locked: boolean, 
-/**
- * Whether an agent may propose or apply edits to this shape.
- */
-agent_editable: boolean, 
-/**
- * Attribution for the record.
- */
-provenance: Provenance, };
+export type SemanticMetadata = {
+	/**
+	 * Optional display name.
+	 */
+	name: string | null;
+	/**
+	 * Optional semantic selector such as `architecture.service`.
+	 */
+	role: string | null;
+	/**
+	 * Optional longer description.
+	 */
+	description: string | null;
+	/**
+	 * Searchable, user-defined tags.
+	 */
+	tags: Array<string>;
+	/**
+	 * Whether direct edits to this shape are prohibited.
+	 */
+	locked: boolean;
+	/**
+	 * Whether an agent may propose or apply edits to this shape.
+	 */
+	agent_editable: boolean;
+	/**
+	 * Attribution for the record.
+	 */
+	provenance: Provenance;
+};
 
 /**
  * Common visual style shared by all shape kinds.
  */
-export type ShapeStyle = { 
-/**
- * Opacity applied to the complete shape.
- */
-opacity: Opacity, 
-/**
- * Optional opacity override for fills.
- */
-fill_opacity: Opacity | null, 
-/**
- * Optional opacity override for strokes.
- */
-stroke_opacity: Opacity | null, };
+export type ShapeStyle = {
+	/**
+	 * Opacity applied to the complete shape.
+	 */
+	opacity: Opacity;
+	/**
+	 * Optional opacity override for fills.
+	 */
+	fill_opacity: Opacity | null;
+	/**
+	 * Optional opacity override for strokes.
+	 */
+	stroke_opacity: Opacity | null;
+};
 
 /**
  * Parent that owns a shape's sole draw-order entry.
  */
-export type ShapeParent = { "kind": "layer", "id": LayerId } | { "kind": "shape", "id": ShapeId };
+export type ShapeParent = { kind: 'layer'; id: LayerId } | { kind: 'shape'; id: ShapeId };
 
 /**
  * Stack direction for container layout.
  */
-export type StackDirection = "horizontal" | "vertical";
+export type StackDirection = 'horizontal' | 'vertical';
 
 /**
  * Cross-axis alignment for laid-out children.
  */
-export type LayoutAlignment = "start" | "center" | "end" | "stretch";
+export type LayoutAlignment = 'start' | 'center' | 'end' | 'stretch';
 
 /**
  * Padding inside a layout container.
  */
-export type Insets = { 
-/**
- * Top inset.
- */
-top: number, 
-/**
- * Right inset.
- */
-right: number, 
-/**
- * Bottom inset.
- */
-bottom: number, 
-/**
- * Left inset.
- */
-left: number, };
+export type Insets = {
+	/**
+	 * Top inset.
+	 */
+	top: number;
+	/**
+	 * Right inset.
+	 */
+	right: number;
+	/**
+	 * Bottom inset.
+	 */
+	bottom: number;
+	/**
+	 * Left inset.
+	 */
+	left: number;
+};
 
 /**
  * Optional automatic layout applied by a container shape.
  */
-export type ContainerLayout = { "kind": "free" } | { "kind": "stack", 
-/**
- * Flow direction.
- */
-direction: StackDirection, 
-/**
- * Space between adjacent children.
- */
-gap: number, 
-/**
- * Space between children and container edges.
- */
-padding: Insets, 
-/**
- * Alignment on the cross axis.
- */
-alignment: LayoutAlignment, } | { "kind": "grid", 
-/**
- * Positive number of grid columns.
- */
-columns: number, 
-/**
- * Horizontal gap between cells.
- */
-column_gap: number, 
-/**
- * Vertical gap between cells.
- */
-row_gap: number, 
-/**
- * Space between children and container edges.
- */
-padding: Insets, 
-/**
- * Alignment within cells.
- */
-alignment: LayoutAlignment, };
+export type ContainerLayout =
+	| { kind: 'free' }
+	| {
+			kind: 'stack';
+			/**
+			 * Flow direction.
+			 */
+			direction: StackDirection;
+			/**
+			 * Space between adjacent children.
+			 */
+			gap: number;
+			/**
+			 * Space between children and container edges.
+			 */
+			padding: Insets;
+			/**
+			 * Alignment on the cross axis.
+			 */
+			alignment: LayoutAlignment;
+	  }
+	| {
+			kind: 'grid';
+			/**
+			 * Positive number of grid columns.
+			 */
+			columns: number;
+			/**
+			 * Horizontal gap between cells.
+			 */
+			column_gap: number;
+			/**
+			 * Vertical gap between cells.
+			 */
+			row_gap: number;
+			/**
+			 * Space between children and container edges.
+			 */
+			padding: Insets;
+			/**
+			 * Alignment within cells.
+			 */
+			alignment: LayoutAlignment;
+	  };
 
 /**
- * Durable shape record shared by all built-in shape definitions.
+ * A shape record shared by all built-in shape definitions.
  */
-export type ShapeRecord = { 
-/**
- * Stable record identifier.
- */
-id: ShapeId, 
-/**
- * Registry key. Built-in values are exposed as `*_KIND` constants.
- */
-kind: ShapeKind, 
-/**
- * Parent relation; ordering comes only from the parent's child list.
- */
-parent: ShapeParent, 
-/**
- * Transform relative to `parent`.
- */
-transform: Transform, 
-/**
- * Ordered children when this shape is a container.
- */
-child_ids: Array<ShapeId>, 
-/**
- * Optional automatic layout for container shapes.
- */
-layout: ContainerLayout | null, 
-/**
- * Kind-specific serialized properties validated by the registry.
- */
-properties: ShapeProperties, 
-/**
- * Human- and agent-readable semantics and permissions.
- */
-metadata: SemanticMetadata, 
-/**
- * Visual properties common to all kinds.
- */
-style: ShapeStyle, 
-/**
- * Version used by optimistic operation preconditions.
- */
-version: RecordVersion, };
+export type ShapeRecord = {
+	/**
+	 * Stable record identifier.
+	 */
+	id: ShapeId;
+	/**
+	 * Registry key. Built-in values are exposed as `*_KIND` constants.
+	 */
+	kind: ShapeKind;
+	/**
+	 * Parent relation; ordering comes only from the parent's child list.
+	 */
+	parent: ShapeParent;
+	/**
+	 * Transform relative to `parent`.
+	 */
+	transform: Transform;
+	/**
+	 * Ordered children when this shape is a container.
+	 */
+	child_ids: Array<ShapeId>;
+	/**
+	 * Optional automatic layout for container shapes.
+	 */
+	layout: ContainerLayout | null;
+	/**
+	 * Kind-specific serialized properties validated by the registry.
+	 */
+	properties: ShapeProperties;
+	/**
+	 * Human- and agent-readable semantics and permissions.
+	 */
+	metadata: SemanticMetadata;
+	/**
+	 * Visual properties common to all kinds.
+	 */
+	style: ShapeStyle;
+	/**
+	 * Version used by optimistic operation preconditions.
+	 */
+	version: RecordVersion;
+};
 
 /**
- * Durable page record and its ordered layer list.
+ * A page record and its ordered layer list.
  */
-export type PageRecord = { 
-/**
- * Stable record identifier.
- */
-id: PageId, 
-/**
- * User-visible page name.
- */
-name: string, 
-/**
- * Layer IDs in back-to-front draw order.
- */
-layer_ids: Array<LayerId>, 
-/**
- * Version used by optimistic operation preconditions.
- */
-version: RecordVersion, };
+export type PageRecord = {
+	/**
+	 * Stable record identifier.
+	 */
+	id: PageId;
+	/**
+	 * User-visible page name.
+	 */
+	name: string;
+	/**
+	 * Layer IDs in back-to-front draw order.
+	 */
+	layer_ids: Array<LayerId>;
+	/**
+	 * Version used by optimistic operation preconditions.
+	 */
+	version: RecordVersion;
+};
 
 /**
- * Durable layer record and its ordered root-shape list.
+ * A layer record and its ordered root-shape list.
  */
-export type LayerRecord = { 
-/**
- * Stable record identifier.
- */
-id: LayerId, 
-/**
- * Page that owns this layer.
- */
-page_id: PageId, 
-/**
- * User-visible layer name.
- */
-name: string, 
-/**
- * Root shape IDs in back-to-front draw order.
- */
-shape_ids: Array<ShapeId>, 
-/**
- * Whether descendants participate in rendering and hit testing.
- */
-visible: boolean, 
-/**
- * Whether descendants can be selected or changed.
- */
-locked: boolean, 
-/**
- * Opacity inherited by descendants.
- */
-opacity: Opacity, 
-/**
- * Version used by optimistic operation preconditions.
- */
-version: RecordVersion, };
+export type LayerRecord = {
+	/**
+	 * Stable record identifier.
+	 */
+	id: LayerId;
+	/**
+	 * Page that owns this layer.
+	 */
+	page_id: PageId;
+	/**
+	 * User-visible layer name.
+	 */
+	name: string;
+	/**
+	 * Root shape IDs in back-to-front draw order.
+	 */
+	shape_ids: Array<ShapeId>;
+	/**
+	 * Whether descendants participate in rendering and hit testing.
+	 */
+	visible: boolean;
+	/**
+	 * Whether descendants can be selected or changed.
+	 */
+	locked: boolean;
+	/**
+	 * Opacity inherited by descendants.
+	 */
+	opacity: Opacity;
+	/**
+	 * Version used by optimistic operation preconditions.
+	 */
+	version: RecordVersion;
+};
 
 /**
  * Attachment point on a bound shape.
  */
-export type BindingAnchor = { "kind": "center" } | { "kind": "edge", 
-/**
- * Normalized horizontal coordinate.
- */
-x: number, 
-/**
- * Normalized vertical coordinate.
- */
-y: number, };
+export type BindingAnchor =
+	| { kind: 'center' }
+	| {
+			kind: 'edge';
+			/**
+			 * Normalized horizontal coordinate.
+			 */
+			x: number;
+			/**
+			 * Normalized vertical coordinate.
+			 */
+			y: number;
+	  };
 
 /**
- * Durable relationship between two shapes.
+ * Relationship between two shapes.
  */
-export type BindingRecord = { 
-/**
- * Stable record identifier.
- */
-id: BindingId, 
-/**
- * Registry key describing binding behavior.
- */
-kind: BindingKind, 
-/**
- * Shape that owns the binding, such as an arrow.
- */
-source_shape_id: ShapeId, 
-/**
- * Shape to which the source is bound.
- */
-target_shape_id: ShapeId, 
-/**
- * Named source handle, such as `start` or `end`.
- */
-source_handle: string, 
-/**
- * Attachment point on the target.
- */
-anchor: BindingAnchor, 
-/**
- * Version used by optimistic operation preconditions.
- */
-version: RecordVersion, };
+export type BindingRecord = {
+	/**
+	 * Stable record identifier.
+	 */
+	id: BindingId;
+	/**
+	 * Registry key describing binding behavior.
+	 */
+	kind: BindingKind;
+	/**
+	 * Shape that owns the binding, such as an arrow.
+	 */
+	source_shape_id: ShapeId;
+	/**
+	 * Shape to which the source is bound.
+	 */
+	target_shape_id: ShapeId;
+	/**
+	 * Named source handle, such as `start` or `end`.
+	 */
+	source_handle: string;
+	/**
+	 * Attachment point on the target.
+	 */
+	anchor: BindingAnchor;
+	/**
+	 * Version used by optimistic operation preconditions.
+	 */
+	version: RecordVersion;
+};
 
 /**
  * Storage form for asset contents.
  */
-export type AssetSource = { "kind": "embedded", 
-/**
- * Raw asset bytes.
- */
-bytes: Array<number>, } | { "kind": "external", 
-/**
- * URI used to resolve the content.
- */
-uri: string, };
+export type AssetSource =
+	| {
+			kind: 'embedded';
+			/**
+			 * Raw asset bytes.
+			 */
+			bytes: Array<number>;
+	  }
+	| {
+			kind: 'external';
+			/**
+			 * URI used to resolve the content.
+			 */
+			uri: string;
+	  };
 
 /**
- * Durable image, font, or other binary asset.
+ * Image, font, or other binary asset.
  */
-export type AssetRecord = { 
-/**
- * Stable record identifier.
- */
-id: AssetId, 
-/**
- * User-visible asset name.
- */
-name: string, 
-/**
- * IANA media type.
- */
-media_type: string, 
-/**
- * Content digest including its algorithm prefix.
- */
-digest: string, 
-/**
- * Stored or linked content.
- */
-source: AssetSource, 
-/**
- * Attribution for the asset.
- */
-provenance: Provenance, 
-/**
- * Version used by optimistic operation preconditions.
- */
-version: RecordVersion, };
+export type AssetRecord = {
+	/**
+	 * Stable record identifier.
+	 */
+	id: AssetId;
+	/**
+	 * User-visible asset name.
+	 */
+	name: string;
+	/**
+	 * IANA media type.
+	 */
+	media_type: string;
+	/**
+	 * Content digest including its algorithm prefix.
+	 */
+	digest: string;
+	/**
+	 * Stored or linked content.
+	 */
+	source: AssetSource;
+	/**
+	 * Attribution for the asset.
+	 */
+	provenance: Provenance;
+	/**
+	 * Version used by optimistic operation preconditions.
+	 */
+	version: RecordVersion;
+};
 
 /**
  * Normalized, materialized Inkfinite document.
  */
-export type Document = { 
-/**
- * Pages indexed by their stable IDs.
- */
-pages: { [key in PageId]: PageRecord }, 
-/**
- * Pages in user-visible order.
- */
-page_ids: Array<PageId>, 
-/**
- * Layers indexed by their stable IDs.
- */
-layers: { [key in LayerId]: LayerRecord }, 
-/**
- * Shapes indexed by their stable IDs.
- */
-shapes: { [key in ShapeId]: ShapeRecord }, 
-/**
- * Bindings indexed by their stable IDs.
- */
-bindings: { [key in BindingId]: BindingRecord }, 
-/**
- * Assets indexed by their stable IDs.
- */
-assets: { [key in AssetId]: AssetRecord }, };
+export type Document = {
+	/**
+	 * Pages indexed by their stable IDs.
+	 */
+	pages: { [key in PageId]: PageRecord };
+	/**
+	 * Pages in user-visible order.
+	 */
+	page_ids: Array<PageId>;
+	/**
+	 * Layers indexed by their stable IDs.
+	 */
+	layers: { [key in LayerId]: LayerRecord };
+	/**
+	 * Shapes indexed by their stable IDs.
+	 */
+	shapes: { [key in ShapeId]: ShapeRecord };
+	/**
+	 * Bindings indexed by their stable IDs.
+	 */
+	bindings: { [key in BindingId]: BindingRecord };
+	/**
+	 * Assets indexed by their stable IDs.
+	 */
+	assets: { [key in AssetId]: AssetRecord };
+};
 
 /**
  * Materialized document plus its format and causal identity.
  */
-export type DocumentSnapshot = { 
-/**
- * Stable format identifier.
- */
-format: FormatId, 
-/**
- * Version of the document contract.
- */
-format_version: number, 
-/**
- * Stable document identifier.
- */
-document_id: DocumentId, 
-/**
- * Causal CRDT heads represented by this snapshot.
- */
-heads: Array<ChangeHash>, 
-/**
- * Normalized records.
- */
-document: Document, };
-
+export type DocumentSnapshot = {
+	/**
+	 * Stable format identifier.
+	 */
+	format: FormatId;
+	/**
+	 * Version of the document contract.
+	 */
+	format_version: number;
+	/**
+	 * Stable document identifier.
+	 */
+	document_id: DocumentId;
+	/**
+	 * Causal CRDT heads represented by this snapshot.
+	 */
+	heads: Array<ChangeHash>;
+	/**
+	 * Normalized records.
+	 */
+	document: Document;
+};

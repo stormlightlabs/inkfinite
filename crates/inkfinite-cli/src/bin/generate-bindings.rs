@@ -5,20 +5,8 @@ use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use inkfinite_core::proto::{
-    AffectedRegion, AgentAccessMode, AssetPatch, Bounds, CameraState, CommitResult, DocumentPatch, DocumentPath,
-    InverseMetadata, LayerContentsDisposition, LayerPatch, LayoutAxis, Operation, Proposal, ProposalId,
-    ProposalOperationPreview, ProtocolError, Query, QueryRecord, QueryResult, RecordId, Request, Response, SaveResult,
-    SessionId, ShapeAlignment, ShapePatch, TransactionDraft, TransactionId, Warning,
-};
-use inkfinite_core::{
-    ActorId, AssetId, AssetRecord, AssetSource, BindingAnchor, BindingId, BindingKind, BindingRecord, ChangeHash,
-    ContainerLayout, Document, DocumentId, DocumentSnapshot, FormatId, GEOMETRY_BOUNDS, GEOMETRY_COORDINATE_SYSTEM,
-    GEOMETRY_ROTATION, Insets, LayerId, LayerRecord, LayoutAlignment, Opacity, Origin, PageId, PageRecord,
-    PathFillRule, PathGeometry, PathSegment, PathSubpath, Provenance, RecordVersion, SemanticMetadata, ShapeId,
-    ShapeKind, ShapeParent, ShapeRecord, ShapeStyle, SiblingAnchor, StackDirection, Timestamp, Transform, Vec2,
-    builtin_shape_kinds, validate_shape_properties,
-};
+use inkfinite_core::proto::*;
+use inkfinite_core::*;
 use schemars::JsonSchema;
 use serde_json::{Value, json};
 use ts_rs::{Config, TS};
@@ -231,7 +219,7 @@ fn registry_bindings() -> String {
         .collect::<Vec<_>>()
         .join(", ");
     format!(
-        "{GENERATED_TS_HEADER}import type {{ JsonValue, PathGeometry, Transform }} from \"./model.js\";\nimport type {{ Bounds }} from \"./transaction.js\";\n\nexport const BUILTIN_SHAPE_KINDS = [{kinds}] as const;\nexport type BuiltinShapeKind = typeof BUILTIN_SHAPE_KINDS[number];\n\nexport const GEOMETRY_CONVENTION = {{\n  coordinateSystem: \"{GEOMETRY_COORDINATE_SYSTEM}\",\n  rotation: \"{GEOMETRY_ROTATION}\",\n  bounds: \"{GEOMETRY_BOUNDS}\",\n}} as const;\n\nexport const SHAPE_REGISTRY = BUILTIN_SHAPE_KINDS.map((kind) => ({{\n  kind,\n  dimensions: [\"width\", \"height\"] as const,\n  allowsChildren: kind === \"container\",\n}}));\n\nfunction isRecord(value: unknown): value is Record<string, unknown> {{\n  return typeof value === \"object\" && value !== null;\n}}\n\nfunction isFinitePoint(value: unknown): boolean {{\n  if (!isRecord(value)) return false;\n  return typeof value.x === \"number\" && Number.isFinite(value.x)\n    && typeof value.y === \"number\" && Number.isFinite(value.y);\n}}\n\nfunction isPathSegment(value: unknown): boolean {{\n  if (!isRecord(value) || typeof value.type !== \"string\") return false;\n  switch (value.type) {{\n    case \"move\":\n    case \"line\":\n      return isFinitePoint(value.to);\n    case \"quadratic\":\n      return isFinitePoint(value.control) && isFinitePoint(value.to);\n    case \"cubic\":\n      return isFinitePoint(value.control_1) && isFinitePoint(value.control_2) && isFinitePoint(value.to);\n    default:\n      return false;\n  }}\n}}\n\nexport function validatePathGeometry(value: unknown): value is PathGeometry {{\n  if (!isRecord(value) || !Array.isArray(value.subpaths) || value.subpaths.length === 0) return false;\n  if (value.fill_rule !== \"nonzero\" && value.fill_rule !== \"evenodd\") return false;\n  return value.subpaths.every((subpath) => {{\n    if (!isRecord(subpath) || typeof subpath.closed !== \"boolean\" || !Array.isArray(subpath.segments) || subpath.segments.length === 0) return false;\n    const first = subpath.segments[0];\n    if (!isRecord(first) || first.type !== \"move\") return false;\n    return subpath.segments.every((segment, index) => (index === 0 || (isRecord(segment) && segment.type !== \"move\")) && isPathSegment(segment));\n  }});\n}}\n\nfunction numericProperty(properties: Record<string, JsonValue>, name: string): number {{\n  const value = properties[name];\n  return typeof value === \"number\" && Number.isFinite(value) ? value : 0;\n}}\n\nexport function validateShapeProperties(kind: string, properties: Record<string, JsonValue>): boolean {{\n  if (!(BUILTIN_SHAPE_KINDS as readonly string[]).includes(kind)) return false;\n  if (kind === \"path\" && !validatePathGeometry({{ subpaths: properties.subpaths, fill_rule: properties.fill_rule }})) return false;\n  return [\"width\", \"height\"].every((name) => {{\n    const value = properties[name];\n    return value === undefined || (typeof value === \"number\" && Number.isFinite(value) && value >= 0);\n  }});\n}}\n\nexport type RegistryShape = {{\n  kind: string;\n  properties: Record<string, JsonValue>;\n  transform: Transform;\n}};\n\nexport function boundsForShape(shape: RegistryShape): Bounds {{\n  const width = Math.abs(numericProperty(shape.properties, \"width\"));\n  const height = Math.abs(numericProperty(shape.properties, \"height\"));\n  const {{ translation, rotation, scale_x: scaleX, scale_y: scaleY }} = shape.transform;\n  const cos = Math.cos(rotation);\n  const sin = Math.sin(rotation);\n  const points = [[0, 0], [width, 0], [0, height], [width, height]].map(([x, y]) => [\n    translation.x + x * scaleX * cos - y * scaleY * sin,\n    translation.y + x * scaleX * sin + y * scaleY * cos,\n  ]);\n  const xs = points.map(([x]) => x);\n  const ys = points.map(([, y]) => y);\n  const minX = Math.min(...xs);\n  const maxX = Math.max(...xs);\n  const minY = Math.min(...ys);\n  const maxY = Math.max(...ys);\n  return {{ x: minX, y: minY, width: maxX - minX, height: maxY - minY }};\n}}\n"
+        "{GENERATED_TS_HEADER}import type {{ JsonValue, PathGeometry, Transform }} from \"./model.js\";\nimport type {{ Bounds }} from \"./transaction.js\";\n\nexport const BUILTIN_SHAPE_KINDS = [{kinds}] as const;\nexport type BuiltinShapeKind = typeof BUILTIN_SHAPE_KINDS[number];\n\nexport const GEOMETRY_CONVENTION = {{\n  coordinateSystem: \"{GEOMETRY_COORDINATE_SYSTEM}\",\n  rotation: \"{GEOMETRY_ROTATION}\",\n  bounds: \"{GEOMETRY_BOUNDS}\",\n}} as const;\n\nexport const SHAPE_REGISTRY = BUILTIN_SHAPE_KINDS.map((kind) => ({{\n  kind,\n  dimensions: [\"width\", \"height\"] as const,\n  allowsChildren: kind === \"container\",\n}}));\n\nfunction isRecord(value: unknown): value is Record<string, unknown> {{\n  return typeof value === \"object\" && value !== null;\n}}\n\nfunction isFinitePoint(value: unknown): boolean {{\n  if (!isRecord(value)) return false;\n  return typeof value.x === \"number\" && Number.isFinite(value.x)\n    && typeof value.y === \"number\" && Number.isFinite(value.y);\n}}\n\nfunction isPathSegment(value: unknown): boolean {{\n  if (!isRecord(value) || typeof value.type !== \"string\") return false;\n  switch (value.type) {{\n    case \"move\":\n    case \"line\":\n      return isFinitePoint(value.to);\n    case \"quadratic\":\n      return isFinitePoint(value.control) && isFinitePoint(value.to);\n    case \"cubic\":\n      return isFinitePoint(value.control_1) && isFinitePoint(value.control_2) && isFinitePoint(value.to);\n    default:\n      return false;\n  }}\n}}\n\nexport function validatePathGeometry(value: unknown): value is PathGeometry {{\n  if (!isRecord(value) || !Array.isArray(value.subpaths) || value.subpaths.length === 0) return false;\n  if (value.fill_rule !== \"nonzero\" && value.fill_rule !== \"evenodd\") return false;\n  return value.subpaths.every((subpath) => {{\n    if (!isRecord(subpath) || typeof subpath.closed !== \"boolean\" || !Array.isArray(subpath.segments) || subpath.segments.length === 0) return false;\n    const first = subpath.segments[0];\n    if (!isRecord(first) || first.type !== \"move\") return false;\n    return subpath.segments.every((segment, index) => (index === 0 || (isRecord(segment) && segment.type !== \"move\")) && isPathSegment(segment));\n  }});\n}}\n\nfunction numericProperty(properties: Record<string, JsonValue>, name: string): number {{\n  const value = properties[name];\n  return typeof value === \"number\" && Number.isFinite(value) ? value : 0;\n}}\n\ntype PathPoint = {{ x: number; y: number }};\n\nfunction quadraticPoint(start: PathPoint, control: PathPoint, end: PathPoint, t: number): PathPoint {{\n  const inverse = 1 - t;\n  return {{\n    x: inverse * inverse * start.x + 2 * inverse * t * control.x + t * t * end.x,\n    y: inverse * inverse * start.y + 2 * inverse * t * control.y + t * t * end.y,\n  }};\n}}\n\nfunction cubicPoint(start: PathPoint, control1: PathPoint, control2: PathPoint, end: PathPoint, t: number): PathPoint {{\n  const inverse = 1 - t;\n  return {{\n    x: inverse ** 3 * start.x + 3 * inverse ** 2 * t * control1.x + 3 * inverse * t ** 2 * control2.x + t ** 3 * end.x,\n    y: inverse ** 3 * start.y + 3 * inverse ** 2 * t * control1.y + 3 * inverse * t ** 2 * control2.y + t ** 3 * end.y,\n  }};\n}}\n\nfunction quadraticRoots(a: number, b: number, c: number): number[] {{\n  if (Math.abs(a) <= Number.EPSILON) return Math.abs(b) > Number.EPSILON ? [-c / b] : [];\n  const discriminant = b * b - 4 * a * c;\n  if (discriminant < 0) return [];\n  const root = Math.sqrt(discriminant);\n  return [(-b - root) / (2 * a), (-b + root) / (2 * a)];\n}}\n\n/** Returns exact local bounds, including Bézier derivative extrema. */\nexport function pathBounds(geometry: PathGeometry): Bounds {{\n  const points: PathPoint[] = [];\n  for (const subpath of geometry.subpaths) {{\n    const first = subpath.segments[0];\n    if (!first || first.type !== 'move') continue;\n    const start = first.to;\n    let current = start;\n    points.push(current);\n    for (const segment of subpath.segments.slice(1)) {{\n      if (segment.type === 'move') {{\n        current = segment.to;\n        points.push(current);\n      }} else if (segment.type === 'line') {{\n        points.push(current, segment.to);\n        current = segment.to;\n      }} else if (segment.type === 'quadratic') {{\n        points.push(current, segment.to);\n        for (const value of [\n          (current.x - segment.control.x) / (current.x - 2 * segment.control.x + segment.to.x),\n          (current.y - segment.control.y) / (current.y - 2 * segment.control.y + segment.to.y),\n        ]) {{\n          if (Number.isFinite(value) && value > 0 && value < 1) points.push(quadraticPoint(current, segment.control, segment.to, value));\n        }}\n        current = segment.to;\n      }} else {{\n        points.push(current, segment.to);\n        for (const [startValue, control1, control2, endValue] of [\n          [current.x, segment.control_1.x, segment.control_2.x, segment.to.x],\n          [current.y, segment.control_1.y, segment.control_2.y, segment.to.y],\n        ]) {{\n          const a = -startValue + 3 * control1 - 3 * control2 + endValue;\n          const b = 2 * (startValue - 2 * control1 + control2);\n          const c = control1 - startValue;\n          for (const value of quadraticRoots(a, b, c)) {{\n            if (value > 0 && value < 1) points.push(cubicPoint(current, segment.control_1, segment.control_2, segment.to, value));\n          }}\n        }}\n        current = segment.to;\n      }}\n    }}\n    if (subpath.closed) points.push(current, start);\n  }}\n  if (points.length === 0) return {{ x: 0, y: 0, width: 0, height: 0 }};\n  const xs = points.map((point) => point.x);\n  const ys = points.map((point) => point.y);\n  const minX = Math.min(...xs);\n  const maxX = Math.max(...xs);\n  const minY = Math.min(...ys);\n  const maxY = Math.max(...ys);\n  return {{ x: minX, y: minY, width: maxX - minX, height: maxY - minY }};\n}}\n\nexport function validateShapeProperties(kind: string, properties: Record<string, JsonValue>): boolean {{\n  if (!(BUILTIN_SHAPE_KINDS as readonly string[]).includes(kind)) return false;\n  if (kind === \"path\" && !validatePathGeometry({{ subpaths: properties.subpaths, fill_rule: properties.fill_rule }})) return false;\n  return [\"width\", \"height\"].every((name) => {{\n    const value = properties[name];\n    return value === undefined || (typeof value === \"number\" && Number.isFinite(value) && value >= 0);\n  }});\n}}\n\nexport type RegistryShape = {{\n  kind: string;\n  properties: Record<string, JsonValue>;\n  transform: Transform;\n}};\n\nexport function boundsForShape(shape: RegistryShape): Bounds {{\n  const pathValue: PathGeometry = {{\n    subpaths: shape.properties.subpaths as PathGeometry['subpaths'],\n    fill_rule: shape.properties.fill_rule as PathGeometry['fill_rule'],\n  }};\n  const local = shape.kind === 'path' && validatePathGeometry(pathValue)\n    ? pathBounds(pathValue)\n    : {{ x: 0, y: 0, width: Math.abs(numericProperty(shape.properties, \"width\")), height: Math.abs(numericProperty(shape.properties, \"height\")) }};\n  const {{ translation, rotation, scale_x: scaleX, scale_y: scaleY }} = shape.transform;\n  const cos = Math.cos(rotation);\n  const sin = Math.sin(rotation);\n  const points = [[local.x, local.y], [local.x + local.width, local.y], [local.x, local.y + local.height], [local.x + local.width, local.y + local.height]].map(([x, y]) => [\n    translation.x + x * scaleX * cos - y * scaleY * sin,\n    translation.y + x * scaleX * sin + y * scaleY * cos,\n  ]);\n  const xs = points.map(([x]) => x);\n  const ys = points.map(([, y]) => y);\n  const minX = Math.min(...xs);\n  const maxX = Math.max(...xs);\n  const minY = Math.min(...ys);\n  const maxY = Math.max(...ys);\n  return {{ x: minX, y: minY, width: maxX - minX, height: maxY - minY }};\n}}\n"
     )
 }
 
@@ -288,12 +276,50 @@ fn fixture_json() -> Result<String, Box<dyn Error>> {
         fill_rule: PathFillRule::EvenOdd,
     };
     let path_properties = json!({
-        "subpaths": path_geometry.subpaths,
+        "subpaths": &path_geometry.subpaths,
         "fill_rule": path_geometry.fill_rule,
     });
+    let path_transform = Transform { translation: Vec2 { x: -5.0, y: 7.0 }, rotation: 0.3, scale_x: 1.2, scale_y: 0.8 };
+    let path_local_bounds = inkfinite_core::engine::geometry::path_bounds(&path_geometry);
+    let path_expected_bounds =
+        inkfinite_core::engine::geometry::Affine::from_transform(path_transform).transform_bounds(path_local_bounds);
+    let invalid_path_cases = [
+        ("empty", json!({ "subpaths": [], "fill_rule": "nonzero" })),
+        (
+            "empty_subpath",
+            json!({ "subpaths": [{ "segments": [], "closed": false }], "fill_rule": "nonzero" }),
+        ),
+        (
+            "missing_move",
+            json!({
+                "subpaths": [{ "segments": [{ "type": "line", "to": { "x": 1.0, "y": 2.0 } }], "closed": false }],
+                "fill_rule": "nonzero"
+            }),
+        ),
+        (
+            "move_not_first",
+            json!({
+                "subpaths": [{ "segments": [
+                    { "type": "move", "to": { "x": 0.0, "y": 0.0 } },
+                    { "type": "move", "to": { "x": 1.0, "y": 1.0 } }
+                ], "closed": false }],
+                "fill_rule": "nonzero"
+            }),
+        ),
+        (
+            "nonfinite_coordinate",
+            json!({
+                "subpaths": [{ "segments": [{ "type": "move", "to": { "x": null, "y": 0.0 } }], "closed": false }],
+                "fill_rule": "nonzero"
+            }),
+        ),
+    ]
+    .into_iter()
+    .map(|(name, geometry)| json!({ "name": name, "geometry": geometry, "valid": false }))
+    .collect::<Vec<_>>();
     let property_cases = [
         (RECTANGLE_KIND, json!({"width": 40.0, "height": 20.0})),
-        (inkfinite_core::PATH_KIND, path_properties),
+        (inkfinite_core::PATH_KIND, path_properties.clone()),
         (RECTANGLE_KIND, json!({"width": -1.0, "height": 20.0})),
         (RECTANGLE_KIND, json!({"width": "40", "height": 20.0})),
         ("unknown", json!({})),
@@ -320,14 +346,23 @@ fn fixture_json() -> Result<String, Box<dyn Error>> {
             "rotation": GEOMETRY_ROTATION,
             "bounds": GEOMETRY_BOUNDS,
         },
-        "path_geometry": serde_json::to_value(path_geometry)?,
+        "path_geometry": serde_json::to_value(&path_geometry)?,
+        "invalid_path_cases": invalid_path_cases,
         "property_cases": property_cases,
-        "geometry_cases": [{
-            "kind": shape.kind,
-            "properties": shape.properties,
-            "transform": shape.transform,
-            "expected_bounds": expected_bounds,
-        }],
+        "geometry_cases": [
+            {
+                "kind": shape.kind,
+                "properties": shape.properties,
+                "transform": shape.transform,
+                "expected_bounds": expected_bounds,
+            },
+            {
+                "kind": inkfinite_core::PATH_KIND,
+                "properties": path_properties,
+                "transform": path_transform,
+                "expected_bounds": path_expected_bounds,
+            }
+        ],
         "serialization": {
             "shape": serde_json::to_value(shape)?,
             "transaction": serde_json::to_value(transaction)?,

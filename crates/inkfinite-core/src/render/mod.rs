@@ -11,8 +11,8 @@ use thiserror::Error;
 use crate::engine::geometry::{Affine, bounds_from_points, intersects, union, world_transform};
 use crate::proto::Bounds;
 use crate::{
-    AssetId, AssetSource, BindingAnchor, BuiltinShapeKind, Document, DocumentSnapshot, LayerId, PageId, ShapeId,
-    ShapeRecord, Vec2,
+    AssetId, AssetSource, BindingAnchor, BuiltinShapeKind, Document, DocumentSnapshot, LayerId, PageId, PathFillRule,
+    PathGeometry, PathSegment, PathSubpath, ShapeId, ShapeRecord, Vec2,
 };
 
 const DEFAULT_PADDING: f64 = 20.0;
@@ -114,126 +114,6 @@ pub enum SvgRenderError {
         /// Property decoding error.
         message: String,
     },
-}
-
-/// Renders a materialized snapshot as deterministic SVG.
-///
-/// Layer and shape order come exclusively from the page, layer, and container
-/// child lists. Hidden layers are omitted; locked layers remain visible, as in
-/// the interactive renderer. The function performs no filesystem or font-system
-/// access, so equal snapshots and options produce byte-for-byte equal output.
-///
-/// # Errors
-///
-/// Returns [`SvgRenderError`] for an unknown page, invalid region, or malformed
-/// built-in shape properties.
-pub fn render_svg(snapshot: &DocumentSnapshot, options: &SvgRenderOptions) -> Result<SvgRenderOutput, SvgRenderError> {
-    validate_region(options.region)?;
-    let Some(page_id) = options.page_id.as_ref().or_else(|| snapshot.document.page_ids.first()) else {
-        return Ok(empty_svg());
-    };
-    let page = snapshot
-        .document
-        .pages
-        .get(page_id)
-        .ok_or_else(|| SvgRenderError::PageNotFound { page_id: page_id.clone() })?;
-
-    let mut renderer = Renderer {
-        document: &snapshot.document,
-        options,
-        warnings: BTreeSet::new(),
-        font_faces: BTreeMap::new(),
-        rendered_bounds: None,
-        body: String::new(),
-    };
-
-    for layer_id in &page.layer_ids {
-        if !options.layer_ids.is_empty() && !options.layer_ids.contains(layer_id) {
-            continue;
-        }
-        let Some(layer) = snapshot.document.layers.get(layer_id) else {
-            continue;
-        };
-        if !layer.visible {
-            continue;
-        }
-        let mut layer_body = String::new();
-        for shape_id in &layer.shape_ids {
-            renderer.render_shape(shape_id, Affine::IDENTITY, false, &mut layer_body)?;
-        }
-        if !layer_body.is_empty() {
-            writeln!(
-                renderer.body,
-                "  <g data-layer-id=\"{}\" opacity=\"{}\">",
-                escape_xml(layer.id.as_str()),
-                number(f64::from(layer.opacity.get()))
-            )
-            .expect("writing to a String cannot fail");
-            renderer.body.push_str(&layer_body);
-            renderer.body.push_str("  </g>\n");
-        }
-    }
-
-    let view_box = options.region.or(renderer.rendered_bounds).unwrap_or(Bounds {
-        x: 0.0,
-        y: 0.0,
-        width: EMPTY_SIZE,
-        height: EMPTY_SIZE,
-    });
-    let view_box = if options.region.is_some() { view_box } else { padded(view_box, DEFAULT_PADDING) };
-    let width = view_box.width.max(1.0);
-    let height = view_box.height.max(1.0);
-    let clip = options.region.map(|region| {
-        format!(
-            "  <defs><clipPath id=\"inkfinite-region\"><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"/></clipPath></defs>\n",
-            number(region.x), number(region.y), number(region.width), number(region.height)
-        )
-    });
-
-    let mut svg = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{} {} {} {}\" width=\"{}\" height=\"{}\">\n",
-        number(view_box.x),
-        number(view_box.y),
-        number(width),
-        number(height),
-        number(width),
-        number(height)
-    );
-    if !renderer.font_faces.is_empty() {
-        svg.push_str("  <defs><style>\n");
-        for (family, (media_type, bytes)) in &renderer.font_faces {
-            writeln!(
-                svg,
-                "    @font-face {{ font-family: '{}'; src: url(data:{};base64,{}) format('{}'); }}",
-                escape_css_string(family),
-                escape_xml(media_type),
-                base64(bytes),
-                font_format(media_type)
-            )
-            .expect("writing to a String cannot fail");
-        }
-        svg.push_str("  </style></defs>\n");
-    }
-    if let Some(clip) = clip {
-        svg.push_str(&clip);
-        svg.push_str("  <g clip-path=\"url(#inkfinite-region)\">\n");
-        svg.push_str(&indent(&renderer.body, 2));
-        svg.push_str("  </g>\n");
-    } else {
-        svg.push_str(&renderer.body);
-    }
-    svg.push_str("</svg>\n");
-
-    Ok(SvgRenderOutput { svg, warnings: renderer.warnings.into_iter().collect() })
-}
-
-fn empty_svg() -> SvgRenderOutput {
-    SvgRenderOutput {
-        svg:
-            "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" width=\"100\" height=\"100\">\n</svg>\n"
-                .into(),
-        warnings: Vec::new(),
-    }
 }
 
 struct Renderer<'a> {
@@ -378,7 +258,25 @@ impl Renderer<'_> {
                     ).expect("writing to a String cannot fail");
                 }
             }
-            Some(BuiltinShapeKind::Path) => {}
+            Some(BuiltinShapeKind::Path) => {
+                let props: PathProps = properties(shape)?;
+                let geometry = PathGeometry { subpaths: props.subpaths, fill_rule: props.fill_rule };
+                crate::validate_path_geometry(&geometry).map_err(|error| SvgRenderError::InvalidShapeProperties {
+                    shape_id: shape.id.clone(),
+                    kind: shape.kind.to_string(),
+                    message: error.to_string(),
+                })?;
+                writeln!(
+                    output,
+                    "      <path transform=\"{transform}\" d=\"{}\" fill=\"{}\" fill-rule=\"{}\" fill-opacity=\"{fill_opacity}\" stroke=\"{}\" stroke-opacity=\"{stroke_opacity}\" stroke-width=\"{}\"/>",
+                    path_data(&geometry),
+                    paint(props.fill.as_deref()),
+                    path_fill_rule(props.fill_rule),
+                    paint(props.stroke.as_deref()),
+                    number(props.stroke_width.unwrap_or(2.0).max(0.0)),
+                )
+                .expect("writing to a String cannot fail");
+            }
             None => {}
         }
         Ok(output)
@@ -664,16 +562,30 @@ struct MarkdownProps {
 }
 
 #[derive(Deserialize)]
+struct PathProps {
+    subpaths: Vec<PathSubpath>,
+    fill_rule: PathFillRule,
+    #[serde(default)]
+    fill: Option<String>,
+    #[serde(default)]
+    stroke: Option<String>,
+    #[serde(default, alias = "strokeWidth")]
+    stroke_width: Option<f64>,
+}
+
+#[derive(Deserialize)]
 struct StrokeProps {
     points: Vec<Vec<f64>>,
     style: StrokeStyle,
     brush: Brush,
 }
+
 #[derive(Deserialize)]
 struct StrokeStyle {
     color: String,
     opacity: f64,
 }
+
 #[derive(Deserialize)]
 struct Brush {
     size: f64,
@@ -682,6 +594,133 @@ struct Brush {
     streamline: f64,
     #[serde(rename = "simulatePressure")]
     simulate_pressure: bool,
+}
+
+struct MarkdownLine {
+    text: String,
+    font_size: f64,
+    bold: bool,
+    code: bool,
+}
+
+/// Renders a materialized snapshot as deterministic SVG.
+///
+/// Layer and shape order come exclusively from the page, layer, and container
+/// child lists. Hidden layers are omitted; locked layers remain visible, as in
+/// the interactive renderer. The function performs no filesystem or font-system
+/// access, so equal snapshots and options produce byte-for-byte equal output.
+///
+/// # Errors
+///
+/// Returns [`SvgRenderError`] for an unknown page, invalid region, or malformed
+/// built-in shape properties.
+pub fn render_svg(snapshot: &DocumentSnapshot, options: &SvgRenderOptions) -> Result<SvgRenderOutput, SvgRenderError> {
+    validate_region(options.region)?;
+    let Some(page_id) = options.page_id.as_ref().or_else(|| snapshot.document.page_ids.first()) else {
+        return Ok(empty_svg());
+    };
+    let page = snapshot
+        .document
+        .pages
+        .get(page_id)
+        .ok_or_else(|| SvgRenderError::PageNotFound { page_id: page_id.clone() })?;
+
+    let mut renderer = Renderer {
+        document: &snapshot.document,
+        options,
+        warnings: BTreeSet::new(),
+        font_faces: BTreeMap::new(),
+        rendered_bounds: None,
+        body: String::new(),
+    };
+
+    for layer_id in &page.layer_ids {
+        if !options.layer_ids.is_empty() && !options.layer_ids.contains(layer_id) {
+            continue;
+        }
+        let Some(layer) = snapshot.document.layers.get(layer_id) else {
+            continue;
+        };
+        if !layer.visible {
+            continue;
+        }
+        let mut layer_body = String::new();
+        for shape_id in &layer.shape_ids {
+            renderer.render_shape(shape_id, Affine::IDENTITY, false, &mut layer_body)?;
+        }
+        if !layer_body.is_empty() {
+            writeln!(
+                renderer.body,
+                "  <g data-layer-id=\"{}\" opacity=\"{}\">",
+                escape_xml(layer.id.as_str()),
+                number(f64::from(layer.opacity.get()))
+            )
+            .expect("writing to a String cannot fail");
+            renderer.body.push_str(&layer_body);
+            renderer.body.push_str("  </g>\n");
+        }
+    }
+
+    let view_box = options.region.or(renderer.rendered_bounds).unwrap_or(Bounds {
+        x: 0.0,
+        y: 0.0,
+        width: EMPTY_SIZE,
+        height: EMPTY_SIZE,
+    });
+    let view_box = if options.region.is_some() { view_box } else { padded(view_box, DEFAULT_PADDING) };
+    let width = view_box.width.max(1.0);
+    let height = view_box.height.max(1.0);
+    let clip = options.region.map(|region| {
+        format!(
+            "  <defs><clipPath id=\"inkfinite-region\"><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"/></clipPath></defs>\n",
+            number(region.x), number(region.y), number(region.width), number(region.height)
+        )
+    });
+
+    let mut svg = format!(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{} {} {} {}\" width=\"{}\" height=\"{}\">\n",
+        number(view_box.x),
+        number(view_box.y),
+        number(width),
+        number(height),
+        number(width),
+        number(height)
+    );
+    if !renderer.font_faces.is_empty() {
+        svg.push_str("  <defs><style>\n");
+        for (family, (media_type, bytes)) in &renderer.font_faces {
+            writeln!(
+                svg,
+                "    @font-face {{ font-family: '{}'; src: url(data:{};base64,{}) format('{}'); }}",
+                escape_css_string(family),
+                escape_xml(media_type),
+                base64(bytes),
+                font_format(media_type)
+            )
+            .expect("writing to a String cannot fail");
+        }
+        svg.push_str("  </style></defs>\n");
+    }
+    if let Some(clip) = clip {
+        svg.push_str(&clip);
+        svg.push_str("  <g clip-path=\"url(#inkfinite-region)\">\n");
+        svg.push_str(&indent(&renderer.body, 2));
+        svg.push_str("  </g>\n");
+    } else {
+        svg.push_str(&renderer.body);
+    }
+    svg.push_str("</svg>\n");
+
+    Ok(SvgRenderOutput { svg, warnings: renderer.warnings.into_iter().collect() })
+}
+
+fn empty_svg() -> SvgRenderOutput {
+    SvgRenderOutput {
+        svg:
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" width=\"100\" height=\"100\">\n</svg>\n"
+                .into(),
+        warnings: Vec::new(),
+    }
 }
 
 fn properties<T: for<'de> Deserialize<'de>>(shape: &ShapeRecord) -> Result<T, SvgRenderError> {
@@ -740,11 +779,53 @@ fn shape_local_bounds(shape: &ShapeRecord) -> Result<Bounds, SvgRenderError> {
                 kind: shape.kind.to_string(),
                 message: error.to_string(),
             })?;
-            Bounds { x: 0.0, y: 0.0, width: 0.0, height: 0.0 }
+            crate::engine::geometry::path_bounds(&geometry)
         }
         None => Bounds { x: 0.0, y: 0.0, width: 0.0, height: 0.0 },
     };
     Ok(bounds)
+}
+
+fn path_data(geometry: &PathGeometry) -> String {
+    let mut output = String::new();
+    for subpath in &geometry.subpaths {
+        for segment in &subpath.segments {
+            match segment {
+                PathSegment::Move { to } => write!(output, "M {} {} ", number(to.x), number(to.y)),
+                PathSegment::Line { to } => write!(output, "L {} {} ", number(to.x), number(to.y)),
+                PathSegment::Quadratic { control, to } => write!(
+                    output,
+                    "Q {} {} {} {} ",
+                    number(control.x),
+                    number(control.y),
+                    number(to.x),
+                    number(to.y)
+                ),
+                PathSegment::Cubic { control_1, control_2, to } => write!(
+                    output,
+                    "C {} {} {} {} {} {} ",
+                    number(control_1.x),
+                    number(control_1.y),
+                    number(control_2.x),
+                    number(control_2.y),
+                    number(to.x),
+                    number(to.y)
+                ),
+            }
+            .expect("writing to a String cannot fail");
+        }
+        if subpath.closed {
+            output.push_str("Z ");
+        }
+    }
+    output.trim_end().to_owned()
+}
+
+fn path_fill_rule(rule: PathFillRule) -> &'static str {
+    match rule {
+        PathFillRule::NonZero => "nonzero",
+        PathFillRule::EvenOdd => "evenodd",
+    }
 }
 
 fn stroke_outline(props: &StrokeProps) -> Vec<Vec2> {
@@ -842,13 +923,6 @@ fn point_at_distance(points: &[Vec2], target: f64) -> Vec2 {
         distance += length;
     }
     points.last().copied().unwrap_or(Vec2 { x: 0.0, y: 0.0 })
-}
-
-struct MarkdownLine {
-    text: String,
-    font_size: f64,
-    bold: bool,
-    code: bool,
 }
 
 fn markdown_lines(source: &str, base_size: f64) -> Vec<MarkdownLine> {

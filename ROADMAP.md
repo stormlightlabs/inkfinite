@@ -40,8 +40,8 @@ SVG interoperability must use the same transaction, persistence, undo/redo,
 CRDT, desktop, and CLI paths as content created directly in Inkfinite.
 
 The [native path geometry guide](apps/web/src/content/docs/internals/native-path-geometry.md)
-documents the durable representation, fill rules, validation, and the boundaries
-that later geometry and editing work builds on.
+documents the native representation, fill rules, validation, exact bounds,
+rendering, hit testing, and fixture coverage used by later import and editing work.
 
 ### Vector editing
 

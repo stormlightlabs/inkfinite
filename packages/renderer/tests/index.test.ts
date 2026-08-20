@@ -28,6 +28,8 @@ describe('Renderer', () => {
 			beginPath: vi.fn(),
 			moveTo: vi.fn(),
 			lineTo: vi.fn(),
+			quadraticCurveTo: vi.fn(),
+			bezierCurveTo: vi.fn(),
 			arc: vi.fn(),
 			arcTo: vi.fn(),
 			ellipse: vi.fn(),
@@ -399,6 +401,62 @@ describe('Renderer', () => {
 
 			await new Promise((resolve) => setTimeout(resolve, 50));
 
+			renderer.dispose();
+		});
+
+		it('renders native path segments with the stored fill rule', () => {
+			const scheduledFrames: FrameRequestCallback[] = [];
+			globalThis.requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+				scheduledFrames.push(callback);
+				return scheduledFrames.length;
+			});
+			const page = PageRecord.create('Page 1', 'page:1');
+			const path = ShapeRecord.createPath(
+				'page:1',
+				0,
+				0,
+				{
+					subpaths: [
+						{
+							segments: [
+								{ type: 'move', to: { x: 0, y: 0 } },
+								{ type: 'line', to: { x: 40, y: 0 } },
+								{ type: 'quadratic', control: { x: 50, y: 10 }, to: { x: 40, y: 20 } },
+								{
+									type: 'cubic',
+									control_1: { x: 40, y: 30 },
+									control_2: { x: 0, y: 30 },
+									to: { x: 0, y: 20 }
+								}
+							],
+							closed: true
+						}
+					],
+					fill_rule: 'evenodd',
+					fill: '#fff',
+					stroke: '#000',
+					stroke_width: 3
+				},
+				'path:1'
+			);
+			const store = new Store();
+			store.setState((state) => ({
+				...state,
+				doc: {
+					pages: { [page.id]: { ...page, shapeIds: [path.id] } },
+					shapes: { [path.id]: path },
+					bindings: {}
+				},
+				ui: { ...state.ui, currentPageId: page.id }
+			}));
+
+			const renderer = createRenderer(canvas, store);
+			scheduledFrames.shift()?.(0);
+
+			expect(context.quadraticCurveTo).toHaveBeenCalledWith(50, 10, 40, 20);
+			expect(context.bezierCurveTo).toHaveBeenCalledWith(40, 30, 0, 30, 0, 20);
+			expect(context.fill).toHaveBeenCalledWith('evenodd');
+			expect(context.lineWidth).toBe(3);
 			renderer.dispose();
 		});
 

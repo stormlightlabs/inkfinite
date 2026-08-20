@@ -6,6 +6,7 @@ import type {
 	EllipseShape,
 	LineShape,
 	MarkdownShape,
+	PathShape,
 	RectShape,
 	ShapeRecord,
 	Store,
@@ -489,6 +490,10 @@ function drawShape(
 		}
 		case 'stroke': {
 			drawStroke(context, shape);
+			break;
+		}
+		case 'path': {
+			drawPath(context, shape);
 			break;
 		}
 	}
@@ -994,6 +999,53 @@ function parseInlineStyles(text: string): Array<{ text: string; bold: boolean; i
 	return segments;
 }
 
+/** Draw a native path with Canvas' compound fill rule and stroke. */
+function drawPath(context: CanvasRenderingContext2D, shape: PathShape) {
+	const { subpaths, fill_rule: fillRule, fill, stroke, stroke_width: strokeWidth } = shape.props;
+	const shapeAlpha = context.globalAlpha;
+	context.beginPath();
+	for (const subpath of subpaths) {
+		const first = subpath.segments[0];
+		if (!first || first.type !== 'move') continue;
+		context.moveTo(first.to.x, first.to.y);
+		for (const segment of subpath.segments.slice(1)) {
+			switch (segment.type) {
+				case 'move':
+					context.moveTo(segment.to.x, segment.to.y);
+					break;
+				case 'line':
+					context.lineTo(segment.to.x, segment.to.y);
+					break;
+				case 'quadratic':
+					context.quadraticCurveTo(segment.control.x, segment.control.y, segment.to.x, segment.to.y);
+					break;
+				case 'cubic':
+					context.bezierCurveTo(
+						segment.control_1.x,
+						segment.control_1.y,
+						segment.control_2.x,
+						segment.control_2.y,
+						segment.to.x,
+						segment.to.y
+					);
+					break;
+			}
+		}
+		if (subpath.closed) context.closePath();
+	}
+	if (fill) {
+		context.globalAlpha = shapeAlpha * (shape.fillOpacity ?? 1);
+		context.fillStyle = fill;
+		context.fill(fillRule);
+	}
+	if (stroke) {
+		context.globalAlpha = shapeAlpha * (shape.strokeOpacity ?? 1);
+		context.strokeStyle = stroke;
+		context.lineWidth = Math.max(0, strokeWidth ?? 2);
+		context.stroke();
+	}
+}
+
 /**
  * Draw a stroke shape (freehand drawing)
  */
@@ -1107,6 +1159,17 @@ function drawSelection(
 					break;
 				}
 				case 'arrow': {
+					const bounds = shapeBounds(shape);
+					const padding = 5;
+					context.strokeRect(
+						bounds.min.x - shape.x - padding,
+						bounds.min.y - shape.y - padding,
+						bounds.max.x - bounds.min.x + padding * 2,
+						bounds.max.y - bounds.min.y + padding * 2
+					);
+					break;
+				}
+				case 'path': {
 					const bounds = shapeBounds(shape);
 					const padding = 5;
 					context.strokeRect(

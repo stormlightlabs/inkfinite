@@ -472,6 +472,9 @@ function excalidrawElement(
 			};
 			warnings.add('excalidraw-markdown', 'Markdown blocks were exported as literal text.');
 			break;
+		case 'path':
+			warnings.add('excalidraw-path', 'Native paths are omitted from Excalidraw export.');
+			return null;
 		case 'stroke': {
 			const points = shape.props.points.map(([x, y]) => ({ x, y }));
 			const normalized = normalizePoints(points, shape.x, shape.y, shape.rot);

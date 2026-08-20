@@ -7,6 +7,8 @@ import type {
 	EllipseShape,
 	LineShape,
 	MarkdownShape,
+	PathGeometry,
+	PathShape,
 	RectShape,
 	ShapeRecord,
 	StrokePoint,
@@ -46,6 +48,9 @@ export function shapeBounds(shape: ShapeRecord): Box2 {
 		}
 		case 'stroke': {
 			return strokeBounds(shape);
+		}
+		case 'path': {
+			return pathBounds(shape);
 		}
 		case 'markdown': {
 			return markdownBounds(shape);
@@ -158,6 +163,111 @@ function textBounds(shape: TextShape): Box2 {
 	const rotatedCorners = corners.map((corner) => Vec2Ops.rotate(corner, rot));
 	const translatedCorners = rotatedCorners.map((corner) => ({ x: corner.x + x, y: corner.y + y }));
 	return Box2Ops.fromPoints(translatedCorners);
+}
+
+/** Get bounds for a native path shape. */
+function pathBounds(shape: PathShape): Box2 {
+	const local = pathGeometryBounds(shape.props);
+	const { x, y, rot } = shape;
+	if (rot === 0) {
+		return Box2Ops.create(x + local.min.x, y + local.min.y, x + local.max.x, y + local.max.y);
+	}
+	const corners = [
+		{ x: local.min.x, y: local.min.y },
+		{ x: local.max.x, y: local.min.y },
+		{ x: local.max.x, y: local.max.y },
+		{ x: local.min.x, y: local.max.y }
+	];
+	return Box2Ops.fromPoints(
+		corners.map((corner) => {
+			const rotated = Vec2Ops.rotate(corner, rot);
+			return { x: rotated.x + x, y: rotated.y + y };
+		})
+	);
+}
+
+/** Return exact local bounds for path endpoints and Bézier extrema. */
+export function pathGeometryBounds(geometry: PathGeometry): Box2 {
+	const points: Vec2[] = [];
+	for (const subpath of geometry.subpaths) {
+		const first = subpath.segments[0];
+		if (!first || first.type !== 'move') continue;
+		const start = first.to;
+		let current = start;
+		points.push(current);
+		for (const segment of subpath.segments.slice(1)) {
+			if (segment.type === 'move') {
+				current = segment.to;
+				points.push(current);
+			} else if (segment.type === 'line') {
+				points.push(current, segment.to);
+				current = segment.to;
+			} else if (segment.type === 'quadratic') {
+				points.push(current, segment.to);
+				const tx = quadraticExtremum(current.x, segment.control.x, segment.to.x);
+				const ty = quadraticExtremum(current.y, segment.control.y, segment.to.y);
+				if (tx !== null && tx > 0 && tx < 1)
+					points.push(quadraticPoint(current, segment.control, segment.to, tx));
+				if (ty !== null && ty > 0 && ty < 1)
+					points.push(quadraticPoint(current, segment.control, segment.to, ty));
+				current = segment.to;
+			} else {
+				points.push(current, segment.to);
+				for (const [startValue, control1, control2, endValue] of [
+					[current.x, segment.control_1.x, segment.control_2.x, segment.to.x],
+					[current.y, segment.control_1.y, segment.control_2.y, segment.to.y]
+				]) {
+					const a = -startValue + 3 * control1 - 3 * control2 + endValue;
+					const b = 2 * (startValue - 2 * control1 + control2);
+					const c = control1 - startValue;
+					for (const t of quadraticRoots(a, b, c)) {
+						if (t > 0 && t < 1)
+							points.push(cubicPoint(current, segment.control_1, segment.control_2, segment.to, t));
+					}
+				}
+				current = segment.to;
+			}
+		}
+		if (subpath.closed) points.push(current, start);
+	}
+	return points.length === 0 ? Box2Ops.create(0, 0, 0, 0) : Box2Ops.fromPoints(points);
+}
+
+function quadraticExtremum(start: number, control: number, end: number): number | null {
+	const denominator = start - 2 * control + end;
+	return Math.abs(denominator) <= Number.EPSILON ? null : (start - control) / denominator;
+}
+
+function quadraticRoots(a: number, b: number, c: number): number[] {
+	if (Math.abs(a) <= Number.EPSILON) return Math.abs(b) > Number.EPSILON ? [-c / b] : [];
+	const discriminant = b * b - 4 * a * c;
+	if (discriminant < 0) return [];
+	const root = Math.sqrt(discriminant);
+	return [(-b - root) / (2 * a), (-b + root) / (2 * a)];
+}
+
+function quadraticPoint(start: Vec2, control: Vec2, end: Vec2, t: number): Vec2 {
+	const inverse = 1 - t;
+	return {
+		x: inverse * inverse * start.x + 2 * inverse * t * control.x + t * t * end.x,
+		y: inverse * inverse * start.y + 2 * inverse * t * control.y + t * t * end.y
+	};
+}
+
+function cubicPoint(start: Vec2, control1: Vec2, control2: Vec2, end: Vec2, t: number): Vec2 {
+	const inverse = 1 - t;
+	return {
+		x:
+			inverse ** 3 * start.x +
+			3 * inverse ** 2 * t * control1.x +
+			3 * inverse * t ** 2 * control2.x +
+			t ** 3 * end.x,
+		y:
+			inverse ** 3 * start.y +
+			3 * inverse ** 2 * t * control1.y +
+			3 * inverse * t ** 2 * control2.y +
+			t ** 3 * end.y
+	};
 }
 
 /**
@@ -420,6 +530,78 @@ function pointInPolygon(p: Vec2, polygon: Vec2[]): boolean {
 	return inside;
 }
 
+function pathPolylines(geometry: PathGeometry, closeOpenSubpaths: boolean): Vec2[][] {
+	const result: Vec2[][] = [];
+	for (const subpath of geometry.subpaths) {
+		const first = subpath.segments[0];
+		if (!first || first.type !== 'move') continue;
+		const points: Vec2[] = [first.to];
+		let current = first.to;
+		for (const segment of subpath.segments.slice(1)) {
+			if (segment.type === 'move') {
+				current = segment.to;
+				points.push(current);
+			} else if (segment.type === 'line') {
+				points.push(segment.to);
+				current = segment.to;
+			} else if (segment.type === 'quadratic') {
+				for (let step = 1; step <= 24; step += 1) {
+					points.push(quadraticPoint(current, segment.control, segment.to, step / 24));
+				}
+				current = segment.to;
+			} else {
+				for (let step = 1; step <= 32; step += 1) {
+					points.push(cubicPoint(current, segment.control_1, segment.control_2, segment.to, step / 32));
+				}
+				current = segment.to;
+			}
+		}
+		if ((closeOpenSubpaths || subpath.closed) && points.length > 1) points.push(first.to);
+		result.push(points);
+	}
+	return result;
+}
+
+/** Test a local point against a native path's compound fill. */
+export function pointInPath(point: Vec2, geometry: PathGeometry): boolean {
+	let crossings = 0;
+	let winding = 0;
+	for (const polyline of pathPolylines(geometry, true)) {
+		for (let index = 1; index < polyline.length; index += 1) {
+			const from = polyline[index - 1];
+			const to = polyline[index];
+			if (from.y > point.y === to.y > point.y) continue;
+			const x = from.x + ((point.y - from.y) * (to.x - from.x)) / (to.y - from.y);
+			if (x <= point.x) continue;
+			crossings += 1;
+			if (to.y > from.y) winding += 1;
+			else winding -= 1;
+		}
+	}
+	return geometry.fill_rule === 'evenodd' ? crossings % 2 === 1 : winding !== 0;
+}
+
+/** Test a world point against a native path's stroked segments. */
+export function pointNearPath(point: Vec2, shape: PathShape, tolerance = 5): boolean {
+	const local = worldToLocal(point, shape.x, shape.y, shape.rot);
+	const radius = Math.max(0, shape.props.stroke_width ?? 2) / 2 + tolerance;
+	for (const polyline of pathPolylines(shape.props, false)) {
+		for (let index = 1; index < polyline.length; index += 1) {
+			if (pointNearSegment(local, polyline[index - 1], polyline[index], radius)) return true;
+		}
+	}
+	return false;
+}
+
+/** Test a world point against either the fill or stroke of a native path. */
+export function hitTestPath(point: Vec2, shape: PathShape, tolerance = 5): boolean {
+	const local = worldToLocal(point, shape.x, shape.y, shape.rot);
+	return (
+		(Boolean(shape.props.fill) && pointInPath(local, shape.props)) ||
+		(Boolean(shape.props.stroke) && pointNearPath(point, shape, tolerance))
+	);
+}
+
 /**
  * Check if a point is inside a stroke shape
  *
@@ -516,6 +698,12 @@ export function hitTestPoint(state: EditorState, worldPoint: Vec2, tolerance = 5
 			}
 			case 'stroke': {
 				if (hitTestStroke(worldPoint, shape)) {
+					return shape.id;
+				}
+				break;
+			}
+			case 'path': {
+				if (hitTestPath(worldPoint, shape, tolerance)) {
 					return shape.id;
 				}
 				break;

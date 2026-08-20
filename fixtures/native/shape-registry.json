@@ -29,6 +29,167 @@
           "y": 20.0
         }
       }
+    },
+    {
+      "expected_bounds": {
+        "height": 36.97549392047567,
+        "width": 58.08961495933219,
+        "x": -11.50144454654947,
+        "y": 7.0
+      },
+      "kind": "path",
+      "properties": {
+        "fill_rule": "evenodd",
+        "subpaths": [
+          {
+            "closed": true,
+            "segments": [
+              {
+                "to": {
+                  "x": 0.0,
+                  "y": 0.0
+                },
+                "type": "move"
+              },
+              {
+                "to": {
+                  "x": 40.0,
+                  "y": 0.0
+                },
+                "type": "line"
+              },
+              {
+                "control": {
+                  "x": 50.0,
+                  "y": 10.0
+                },
+                "to": {
+                  "x": 40.0,
+                  "y": 20.0
+                },
+                "type": "quadratic"
+              },
+              {
+                "control_1": {
+                  "x": 40.0,
+                  "y": 30.0
+                },
+                "control_2": {
+                  "x": 0.0,
+                  "y": 30.0
+                },
+                "to": {
+                  "x": 0.0,
+                  "y": 20.0
+                },
+                "type": "cubic"
+              }
+            ]
+          }
+        ]
+      },
+      "transform": {
+        "rotation": 0.3,
+        "scale_x": 1.2,
+        "scale_y": 0.8,
+        "translation": {
+          "x": -5.0,
+          "y": 7.0
+        }
+      }
+    }
+  ],
+  "invalid_path_cases": [
+    {
+      "geometry": {
+        "fill_rule": "nonzero",
+        "subpaths": []
+      },
+      "name": "empty",
+      "valid": false
+    },
+    {
+      "geometry": {
+        "fill_rule": "nonzero",
+        "subpaths": [
+          {
+            "closed": false,
+            "segments": []
+          }
+        ]
+      },
+      "name": "empty_subpath",
+      "valid": false
+    },
+    {
+      "geometry": {
+        "fill_rule": "nonzero",
+        "subpaths": [
+          {
+            "closed": false,
+            "segments": [
+              {
+                "to": {
+                  "x": 1.0,
+                  "y": 2.0
+                },
+                "type": "line"
+              }
+            ]
+          }
+        ]
+      },
+      "name": "missing_move",
+      "valid": false
+    },
+    {
+      "geometry": {
+        "fill_rule": "nonzero",
+        "subpaths": [
+          {
+            "closed": false,
+            "segments": [
+              {
+                "to": {
+                  "x": 0.0,
+                  "y": 0.0
+                },
+                "type": "move"
+              },
+              {
+                "to": {
+                  "x": 1.0,
+                  "y": 1.0
+                },
+                "type": "move"
+              }
+            ]
+          }
+        ]
+      },
+      "name": "move_not_first",
+      "valid": false
+    },
+    {
+      "geometry": {
+        "fill_rule": "nonzero",
+        "subpaths": [
+          {
+            "closed": false,
+            "segments": [
+              {
+                "to": {
+                  "x": null,
+                  "y": 0.0
+                },
+                "type": "move"
+              }
+            ]
+          }
+        ]
+      },
+      "name": "nonfinite_coordinate",
+      "valid": false
     }
   ],
   "kind_names": [
