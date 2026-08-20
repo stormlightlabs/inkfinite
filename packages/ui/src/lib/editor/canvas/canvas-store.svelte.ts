@@ -421,6 +421,9 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 
 	async function importBrowserSvgSource(source: { name: string; contents: string }) {
 		if (!repo || !sink) return;
+		if (new Blob([source.contents]).size > 16 * 1024 * 1024) {
+			throw new Error('The SVG source is larger than the 16 MB import limit.');
+		}
 		const imported = importInterchange(source.contents, source.name);
 		await sink.flush();
 		const boardId = await repo.importBoard(imported.snapshot);
@@ -481,11 +484,13 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 		}
 	}
 
-	async function importSvgFile(file: File) {
+	async function importBrowserSvgSourceWithStatus(
+		source: { name: string; contents: string } | Promise<{ name: string; contents: string }>
+	) {
 		if (platform !== 'web' || !platformSession?.interchange) return;
 		interchangeBusy = true;
 		try {
-			await importBrowserSvgSource({ name: file.name, contents: await file.text() });
+			await importBrowserSvgSource(await source);
 		} catch (error) {
 			interchangeNotice = {
 				title: 'SVG import failed',
@@ -496,6 +501,14 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 		} finally {
 			interchangeBusy = false;
 		}
+	}
+
+	async function importSvgMarkup(contents: string) {
+		await importBrowserSvgSourceWithStatus({ name: 'pasted-svg.svg', contents });
+	}
+
+	async function importSvgFile(file: File) {
+		await importBrowserSvgSourceWithStatus(file.text().then((contents) => ({ name: file.name, contents })));
 	}
 
 	async function exportEditableCanvas(format: InterchangeFormat) {
@@ -799,6 +812,7 @@ export function createCanvasController(platformAdapter: EditorPlatformAdapter, b
 		commitLayerState,
 		importEditableCanvas,
 		importSvg,
+		importSvgMarkup,
 		importSvgFile,
 		exportEditableCanvas,
 		interchangeBusy: () => interchangeBusy,

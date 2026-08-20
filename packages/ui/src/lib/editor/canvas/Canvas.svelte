@@ -25,6 +25,10 @@
 	let contextMenuPoint = $state({ x: 0, y: 0 });
 	let contextMenuItems = $state<ContextMenuEntry[]>([]);
 	let svgDragActive = $state(false);
+	let svgMarkupDialogOpen = $state(false);
+	let svgMarkup = $state('');
+	let svgMarkupError = $state<string | null>(null);
+	let svgMarkupSubmitting = $state(false);
 
 	// The composition root fixes the platform adapter for this component's lifetime.
 	// svelte-ignore state_referenced_locally
@@ -98,6 +102,37 @@
 
 	function handleStencilsClick() {
 		c.stencilPaletteOpen = !c.stencilPaletteOpen;
+	}
+
+	function openSvgMarkupDialog() {
+		svgMarkupError = null;
+		svgMarkupDialogOpen = true;
+	}
+
+	function closeSvgMarkupDialog() {
+		if (svgMarkupSubmitting) return;
+		svgMarkupDialogOpen = false;
+		svgMarkup = '';
+		svgMarkupError = null;
+	}
+
+	async function submitSvgMarkup(event: SubmitEvent) {
+		event.preventDefault();
+		const contents = svgMarkup.trim();
+		if (!contents) {
+			svgMarkupError = 'Enter SVG markup before importing.';
+			return;
+		}
+
+		svgMarkupSubmitting = true;
+		svgMarkupError = null;
+		try {
+			await c.importSvgMarkup(contents);
+			svgMarkup = '';
+			svgMarkupDialogOpen = false;
+		} finally {
+			svgMarkupSubmitting = false;
+		}
 	}
 
 	// TODO: close palette on click? Users might want to add multiple.
@@ -179,6 +214,7 @@
 		brushStore={c.brushStore}
 		onImportEditable={c.importEditableCanvas}
 		onImportSvg={c.importSvg}
+		onImportSvgMarkup={platformKind === 'web' ? openSvgMarkupDialog : undefined}
 		onExportEditable={c.exportEditableCanvas}
 		interchangeBusy={c.interchangeBusy()} />
 	<div
@@ -302,6 +338,28 @@
 			onAgentAccessChange={c.setAgentAccess} />
 	{/if}
 	<HistoryViewer store={c.store} bind:open={historyViewerOpen} onClose={c.history.handleClose} />
+	<Dialog bind:open={svgMarkupDialogOpen} onClose={closeSvgMarkupDialog} title="Import SVG markup">
+		<form class="svg-markup-dialog" onsubmit={submitSvgMarkup}>
+			<div class="svg-markup-dialog__header">
+				<h2>Import SVG markup</h2>
+				<p>Paste SVG code to add its supported shapes as editable objects.</p>
+			</div>
+			<label class="svg-markup-dialog__field">
+				<span>SVG markup</span>
+				<textarea
+					bind:value={svgMarkup}
+					aria-label="SVG markup"
+					placeholder={'<svg viewBox="0 0 100 100">…</svg>'}
+					spellcheck="false"
+					rows="12"></textarea>
+			</label>
+			{#if svgMarkupError}<p class="svg-markup-dialog__error" role="alert">{svgMarkupError}</p>{/if}
+			<div class="svg-markup-dialog__actions">
+				<Button variant="ghost" onclick={closeSvgMarkupDialog} disabled={svgMarkupSubmitting}>Cancel</Button>
+				<Button variant="primary" type="submit" busy={svgMarkupSubmitting}>Import SVG</Button>
+			</div>
+		</form>
+	</Dialog>
 	<StatusBar
 		store={c.store}
 		cursor={c.cursorStore}
@@ -399,6 +457,67 @@
 	.interchange-notice {
 		width: min(32rem, calc(100vw - 3rem));
 		padding: var(--ink-space-6);
+	}
+
+	.svg-markup-dialog {
+		width: min(42rem, calc(100vw - 2rem));
+		padding: var(--ink-space-6);
+	}
+
+	.svg-markup-dialog__header h2,
+	.svg-markup-dialog__header p {
+		margin: 0;
+	}
+
+	.svg-markup-dialog__header h2 {
+		font: 700 var(--ink-type-xl) / 1.15 var(--ink-font-body);
+	}
+
+	.svg-markup-dialog__header p {
+		margin-top: var(--ink-space-2);
+		color: var(--ink-text-muted);
+		line-height: 1.5;
+	}
+
+	.svg-markup-dialog__field {
+		display: grid;
+		gap: var(--ink-space-2);
+		margin-top: var(--ink-space-5);
+		font: 650 var(--ink-type-sm) / 1.2 var(--ink-font-body);
+	}
+
+	.svg-markup-dialog__field textarea {
+		min-height: 16rem;
+		width: 100%;
+		resize: vertical;
+		padding: var(--ink-space-3);
+		border: var(--ink-line-width) solid var(--ink-border-strong);
+		border-radius: var(--ink-radius-panel-small);
+		background: var(--ink-canvas);
+		color: var(--ink-text);
+		font:
+			450 var(--ink-type-sm) / 1.5 ui-monospace,
+			SFMono-Regular,
+			Menlo,
+			monospace;
+	}
+
+	.svg-markup-dialog__field textarea:focus-visible {
+		outline: 3px solid var(--ink-focus);
+		outline-offset: 2px;
+	}
+
+	.svg-markup-dialog__error {
+		margin: var(--ink-space-2) 0 0;
+		color: var(--ink-danger);
+		font-size: var(--ink-type-sm);
+	}
+
+	.svg-markup-dialog__actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: var(--ink-space-3);
+		margin-top: var(--ink-space-6);
 	}
 
 	.interchange-notice h2,

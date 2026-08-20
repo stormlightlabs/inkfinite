@@ -42,7 +42,8 @@ export const ICONS = {
 	settings: 'i-bi-sliders',
 	sun: 'i-tabler-sun',
 	trash: 'i-bi-trash3',
-	undo: 'i-tabler-arrow-back-up'
+	undo: 'i-tabler-arrow-back-up',
+	svg: 'i-tabler-svg'
 } as const;
 
 /** A semantic icon name supported by the shared icon component. */

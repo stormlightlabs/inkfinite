@@ -48,9 +48,10 @@ describe('Editor Toolbar', () => {
 		await vi.waitFor(() => expect(toolbar.style.left).toBe('8px'));
 	});
 
-	it('offers editable canvas import and export actions', async () => {
+	it('offers import choices and editable export actions', async () => {
 		const onImportEditable = vi.fn();
 		const onImportSvg = vi.fn();
+		const onImportSvgMarkup = vi.fn();
 		const onExportEditable = vi.fn();
 		const screen = render(Toolbar, {
 			currentTool: 'select',
@@ -59,17 +60,22 @@ describe('Editor Toolbar', () => {
 			brushStore: createBrushStore(),
 			onImportEditable,
 			onImportSvg,
+			onImportSvgMarkup,
 			onExportEditable
 		});
 
-		(
-			screen
-				.getByRole('button', { name: 'Import Excalidraw or Obsidian Canvas document' })
-				.element() as HTMLButtonElement
-		).click();
+		(screen.getByRole('button', { name: 'Import' }).element() as HTMLButtonElement).click();
+		await expect.element(screen.getByRole('menuitem', { name: 'Editable document' })).toBeInTheDocument();
+		(screen.getByRole('menuitem', { name: 'Editable document' }).element() as HTMLButtonElement).click();
 		expect(onImportEditable).toHaveBeenCalledOnce();
-		(screen.getByRole('button', { name: 'Import SVG file' }).element() as HTMLButtonElement).click();
+
+		(screen.getByRole('button', { name: 'Import' }).element() as HTMLButtonElement).click();
+		(screen.getByRole('menuitem', { name: 'SVG file' }).element() as HTMLButtonElement).click();
 		expect(onImportSvg).toHaveBeenCalledOnce();
+
+		(screen.getByRole('button', { name: 'Import' }).element() as HTMLButtonElement).click();
+		(screen.getByRole('menuitem', { name: 'SVG code / markup' }).element() as HTMLButtonElement).click();
+		expect(onImportSvgMarkup).toHaveBeenCalledOnce();
 
 		(screen.getByRole('button', { name: 'Export drawing' }).element() as HTMLButtonElement).click();
 		await expect
