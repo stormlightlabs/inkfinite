@@ -2,9 +2,11 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { playwright } from '@vitest/browser-playwright';
 import devtoolsJson from 'vite-plugin-devtools-json';
 import { defineConfig } from 'vitest/config';
+import { searchForWorkspaceRoot } from 'vite';
 
 export default defineConfig({
 	plugins: [sveltekit(), devtoolsJson()],
+	server: { fs: { allow: [searchForWorkspaceRoot(process.cwd())] } },
 	resolve: {
 		alias: {
 			'@inkfinite/bindings': new URL('../../packages/bindings/src/index.ts', import.meta.url)
