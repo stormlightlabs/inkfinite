@@ -1,0 +1,60 @@
+# Changelog
+
+All notable changes to Inkfinite will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/),
+and this project adheres to
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- Automerge-backed CRDT transaction engine: validates, commits, and returns
+  patches, heads, inverse metadata, affected IDs, and warnings in one atomic
+  operation.
+- Rust document model with pages, layers, shapes, bindings, semantic metadata,
+  and stable IDs.
+- Typed schema generation and TypeScript bindings from Rust records.
+- Deterministic headless SVG rendering for all built-in shapes, layers,
+  bindings, transforms, opacity, text, and Markdown.
+- File-mode CLI commands: `new`, `inspect`, `query`, `validate`, `shape`,
+  `connect`, `layout`, `apply`, `render`, `schema`, `capabilities`.
+- Global `--json` and `--non-interactive` CLI options with `--dry-run` for
+  mutations and stable exit codes.
+- Authenticated local IPC between the desktop app and CLI using versioned
+  Unix-domain sockets or Windows named pipes.
+- Live agent proposal workflow with ghost preview, partial acceptance, and
+  explicit-apply Direct mode.
+- Offline Automerge sync between trusted peers through a transport-neutral
+  envelope and bounded per-peer checkpoints.
+- Bundled agent skill with worked examples covering file edits, proposal
+  review, and stale-head recovery.
+- Excalidraw and Obsidian Canvas (JSON Canvas) import and export.
+- Ordered layers with visibility, locking, active-layer state, opacity, and a
+  curated built-in stencil set.
+- Shape fill and stroke opacity controls.
+- 10,000-shape rendering and hit-testing budget met on reference hardware.
+- Atomic file writes with advisory lock, recovery data, and interrupted-write
+  recovery.
+- Tauri desktop document sessions owned by Rust: create, open, snapshot,
+  commit, undo, redo, save, query, and validate.
+
+### Changed
+
+- Editor runtime extracted to framework-neutral `@inkfinite/runtime` and
+  `@inkfinite/input-dom`; both web and desktop compose the shared
+  `@inkfinite/ui/editor` through platform-specific adapters.
+- Cursor mapping reimplemented with current-bound coordinate mapping, reactive
+  viewport invalidation, and pointer-capture cleanup across resize, scrolling,
+  and device-pixel-ratio changes.
+- Document model collapsed to a single native model, removing the
+  predecessor/current split.
+
+### Fixed
+
+- Concurrent merge deterministic repairs: missing parents move to a recovery
+  layer, broken bindings are removed, duplicate child references collapse, and
+  pages without layers gain a default.
+- Invalid documents rejected before any canonical file is changed.
+- Recovery data preserved on interrupted writes.
