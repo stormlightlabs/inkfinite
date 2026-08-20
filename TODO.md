@@ -70,12 +70,12 @@ Inkfinite now imports SVGs through one validated Rust pipeline across desktop, w
 
 ### Editor projection and reconciliation
 
-- [ ] Move native-to-editor projection into Rust
-- [ ] Compose ancestor transforms in editor projections
-- [ ] Define semantic editor patches for durable changes
-- [ ] Reconcile editor patches into minimal native transactions
-- [ ] Stop rebuilding the native scene for ordinary edits
-- [ ] Test native and WASM projection parity
+- [x] Move native-to-editor projection into Rust
+- [x] Compose ancestor transforms in editor projections
+- [x] Define semantic editor patches for durable changes
+- [x] Reconcile editor patches into minimal native transactions
+- [x] Stop rebuilding the native scene for ordinary edits
+- [x] Test native and WASM projection parity
 
 ### Browser document engine
 

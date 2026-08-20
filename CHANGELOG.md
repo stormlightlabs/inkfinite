@@ -33,6 +33,8 @@
   recovery.
 - Tauri desktop document sessions owned by Rust: create, open, snapshot,
   commit, undo, redo, save, query, and validate.
+- WASM (Rust-owned) editor projection and reconciliation bindings that handle composed
+  ancestor transforms, semantic editor patches, and minimal parent-relative native transactions.
 
 #### SVG Interop
 
@@ -65,6 +67,9 @@
   and device-pixel-ratio changes.
 - Document model collapsed to a single native model, removing the
   predecessor/current split.
+- Desktop ordinary editor updates now use Rust reconciliation instead of
+  deleting and recreating the native scene; full mirror replacement remains
+  only for structural page and layer changes not yet covered by semantic patches.
 
 ### Fixed
 

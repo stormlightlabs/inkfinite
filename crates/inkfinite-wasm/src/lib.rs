@@ -7,10 +7,14 @@
 
 use std::collections::BTreeSet;
 
+use inkfinite_core::editor::{
+    EditorProjection, EditorReconciliationError, EditorReconciliationRequest, project_editor as project_native,
+    reconcile_editor_patches as reconcile_native,
+};
 use inkfinite_core::proto::Bounds;
 use inkfinite_core::render::{SvgRenderError, SvgRenderOptions, SvgRenderWarning, render_svg as render_native_svg};
 use inkfinite_core::svg_import::{SvgImport, SvgImportError, SvgImportNode, import_svg as parse_svg};
-use inkfinite_core::{AssetId, LayerId, PageId, ShapeId};
+use inkfinite_core::{AssetId, DocumentSnapshot, LayerId, PageId, ShapeId};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -62,6 +66,57 @@ pub enum SvgRenderResponse {
 /// A stable render error crossing the WASM boundary.
 #[derive(Debug, Serialize)]
 pub struct SvgRenderFailure {
+    /// Machine-readable failure category.
+    pub code: &'static str,
+    /// Human-readable failure detail.
+    pub message: String,
+}
+
+/// The result envelope exchanged for editor projection.
+#[derive(Debug, Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum EditorProjectionResponse {
+    /// The native snapshot projected into editor records.
+    Success {
+        /// Flat editor projection with composed world transforms.
+        projection: EditorProjection,
+    },
+    /// The snapshot could not be decoded.
+    Error {
+        /// Projection failure details.
+        error: EditorProjectionFailure,
+    },
+}
+
+/// The result envelope exchanged for editor reconciliation.
+#[derive(Debug, Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum EditorReconciliationResponse {
+    /// Semantic patches translated into one native transaction draft.
+    Success {
+        /// Validated-shape transaction draft. The document engine performs
+        /// final optimistic and invariant validation when it is committed.
+        transaction: inkfinite_core::proto::TransactionDraft,
+    },
+    /// The patches could not be translated.
+    Error {
+        /// Reconciliation failure details.
+        error: EditorReconciliationFailure,
+    },
+}
+
+/// A stable editor projection error crossing the WASM boundary.
+#[derive(Debug, Serialize)]
+pub struct EditorProjectionFailure {
+    /// Machine-readable failure category.
+    pub code: &'static str,
+    /// Human-readable failure detail.
+    pub message: String,
+}
+
+/// A stable editor reconciliation error crossing the WASM boundary.
+#[derive(Debug, Serialize)]
+pub struct EditorReconciliationFailure {
     /// Machine-readable failure category.
     pub code: &'static str,
     /// Human-readable failure detail.
@@ -143,6 +198,57 @@ pub fn render_svg(snapshot_json: &str, options_json: &str) -> String {
     render_svg_json(snapshot_json, options_json)
 }
 
+/// Projects a canonical snapshot without requiring a WASM runtime.
+#[must_use]
+pub fn project_editor_json(snapshot_json: &str) -> String {
+    let snapshot = match serde_json::from_str::<DocumentSnapshot>(snapshot_json) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            return serialize_response(EditorProjectionResponse::Error {
+                error: EditorProjectionFailure { code: "invalid_snapshot", message: error.to_string() },
+            });
+        }
+    };
+    serialize_response(EditorProjectionResponse::Success { projection: project_native(&snapshot) })
+}
+
+/// Projects a canonical document snapshot into the flat editor view.
+#[wasm_bindgen]
+pub fn project_editor(snapshot_json: &str) -> String {
+    project_editor_json(snapshot_json)
+}
+
+/// Reconciles semantic editor patches without requiring a WASM runtime.
+#[must_use]
+pub fn reconcile_editor_patches_json(snapshot_json: &str, request_json: &str) -> String {
+    let snapshot = match serde_json::from_str::<DocumentSnapshot>(snapshot_json) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            return serialize_response(EditorReconciliationResponse::Error {
+                error: EditorReconciliationFailure { code: "invalid_snapshot", message: error.to_string() },
+            });
+        }
+    };
+    let request = match serde_json::from_str::<EditorReconciliationRequest>(request_json) {
+        Ok(request) => request,
+        Err(error) => {
+            return serialize_response(EditorReconciliationResponse::Error {
+                error: EditorReconciliationFailure { code: "invalid_request", message: error.to_string() },
+            });
+        }
+    };
+    match reconcile_native(&snapshot, request) {
+        Ok(transaction) => serialize_response(EditorReconciliationResponse::Success { transaction }),
+        Err(error) => serialize_response(EditorReconciliationResponse::Error { error: reconciliation_failure(&error) }),
+    }
+}
+
+/// Reconciles semantic editor patches into one native transaction draft.
+#[wasm_bindgen]
+pub fn reconcile_editor_patches(snapshot_json: &str, request_json: &str) -> String {
+    reconcile_editor_patches_json(snapshot_json, request_json)
+}
+
 /// Renders a canonical document snapshot without requiring a WASM runtime.
 #[must_use]
 pub fn render_svg_json(snapshot_json: &str, options_json: &str) -> String {
@@ -180,6 +286,19 @@ fn serialize_response<T: Serialize>(response: T) -> String {
             escape_json_string(&error.to_string())
         )
     })
+}
+
+fn reconciliation_failure(error: &EditorReconciliationError) -> EditorReconciliationFailure {
+    let code = match error {
+        EditorReconciliationError::UnknownShape(_) => "unknown_shape",
+        EditorReconciliationError::UnknownPage(_) => "unknown_page",
+        EditorReconciliationError::UnknownLayer(_) => "unknown_layer",
+        EditorReconciliationError::UnknownParent(_) => "unknown_parent",
+        EditorReconciliationError::UnknownBinding(_) => "unknown_binding",
+        EditorReconciliationError::SingularParent { .. } => "singular_parent",
+        EditorReconciliationError::UnsupportedShear { .. } => "unsupported_shear",
+    };
+    EditorReconciliationFailure { code, message: error.to_string() }
 }
 
 fn render_failure(error: &SvgRenderError) -> SvgRenderFailure {
@@ -341,5 +460,54 @@ mod tests {
             serde_json::from_str(&render_svg_json("{}", "[")).expect("render response should be JSON");
         assert_eq!(response["status"], "error");
         assert_eq!(response["error"]["code"], "invalid_snapshot");
+    }
+
+    #[test]
+    fn projects_and_reconciles_editor_changes() {
+        let snapshot = serde_json::json!({
+            "format": "inkfinite.document",
+            "format_version": 2,
+            "document_id": "document:wasm-editor",
+            "heads": ["head:one"],
+            "document": {
+                "pages": {"page:one": {"id": "page:one", "name": "Page 1", "layer_ids": ["layer:one"], "version": 1}},
+                "page_ids": ["page:one"],
+                "layers": {"layer:one": {"id": "layer:one", "page_id": "page:one", "name": "Default", "shape_ids": ["shape:rect"], "visible": true, "locked": false, "opacity": 1, "version": 1}},
+                "shapes": {"shape:rect": {
+                    "id": "shape:rect", "kind": "rect", "parent": {"kind": "layer", "id": "layer:one"},
+                    "transform": {"translation": {"x": 10, "y": 20}, "rotation": 0, "scale_x": 1, "scale_y": 1},
+                    "child_ids": [], "layout": null, "properties": {"width": 40, "height": 20},
+                    "metadata": {"name": null, "role": null, "description": null, "tags": [], "locked": false, "agent_editable": true,
+                        "provenance": {"actor_id": "browser", "origin": "human", "timestamp": 0, "source": null}},
+                    "style": {"opacity": 1, "fill_opacity": null, "stroke_opacity": null}, "version": 1
+                }},
+                "bindings": {}, "assets": {}
+            }
+        });
+        let projection: Value =
+            serde_json::from_str(&project_editor_json(&snapshot.to_string())).expect("projection JSON");
+        assert_eq!(projection["status"], "success");
+        assert_eq!(projection["projection"]["shapes"]["shape:rect"]["x"], 10.0);
+
+        let request = serde_json::json!({
+            "patches": [{
+                "type": "shape", "shape_id": "shape:rect",
+                "transform": {"a": 1, "b": 0, "c": 0, "d": 1, "e": 15, "f": 20},
+                "properties": null, "metadata": null, "style": null, "parent": null, "anchor": null
+            }],
+            "actor_id": "browser", "origin": "human", "transaction_id": "transaction:editor",
+            "description": "Move rectangle", "timestamp": 1
+        });
+        let reconciled: Value = serde_json::from_str(&reconcile_editor_patches_json(
+            &snapshot.to_string(),
+            &request.to_string(),
+        ))
+        .expect("reconciliation JSON");
+        assert_eq!(reconciled["status"], "success");
+        assert_eq!(
+            reconciled["transaction"]["operations"].as_array().map(Vec::len),
+            Some(1)
+        );
+        assert_eq!(reconciled["transaction"]["base_heads"][0], "head:one");
     }
 }

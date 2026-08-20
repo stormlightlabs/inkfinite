@@ -6,6 +6,8 @@ type Listener = (event: { data: unknown; message?: string }) => void;
 
 type FakeMessage =
 	| { type: 'import'; id: number; source: ArrayBuffer }
+	| { type: 'project'; id: number; snapshot: unknown }
+	| { type: 'reconcile'; id: number; snapshot: unknown; request: unknown }
 	| { type: 'render'; id: number; snapshot: unknown; options: unknown };
 
 class FakeWorker {
@@ -42,14 +44,34 @@ class FakeWorker {
 											omitted_image_count: 0
 										}
 									}
-								: {
-										id: message.id,
-										response: {
-											status: 'success',
-											svg: '<svg/>',
-											warnings: []
+								: message.type === 'render'
+									? {
+											id: message.id,
+											response: {
+												status: 'success',
+												svg: '<svg/>',
+												warnings: []
+											}
 										}
-									}
+									: message.type === 'project'
+										? {
+												id: message.id,
+												response: {
+													pages: {},
+													layers: {},
+													shapes: {},
+													bindings: {},
+													order: {
+														page_ids: [],
+														shape_order: {},
+														layers: {}
+													}
+												}
+											}
+										: {
+												id: message.id,
+												response: { id: 'transaction:one', operations: [] }
+											}
 					})
 				)
 		);
@@ -80,6 +102,20 @@ describe('SVG import worker client', () => {
 		expect(source).toEqual(new Uint8Array([60, 115, 118, 103]));
 		client.dispose();
 		expect(worker.terminated).toBe(true);
+	});
+
+	it('routes projection and reconciliation requests through the same worker', async () => {
+		const worker = new FakeWorker();
+		const client = new SvgImportWorkerClient(worker as unknown as Worker);
+
+		const projection = await client.project({} as DocumentSnapshot);
+		expect(worker.lastMessage).toMatchObject({ type: 'project' });
+		expect(projection.order.page_ids).toEqual([]);
+
+		const transaction = await client.reconcile({} as DocumentSnapshot, {} as never);
+		expect(worker.lastMessage).toMatchObject({ type: 'reconcile' });
+		expect(transaction.id).toBe('transaction:one');
+		client.dispose();
 	});
 
 	it('routes canonical render requests through the same worker', async () => {

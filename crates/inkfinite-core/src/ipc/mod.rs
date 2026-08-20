@@ -667,6 +667,7 @@ pub fn session_protocol_error(error: &SessionError) -> ProtocolError {
         SessionError::SessionSelectionRequired { open_sessions: 0 } => "app_session_unavailable",
         SessionError::SessionSelectionRequired { .. } => "session_selection_required",
         SessionError::InvalidContext(_) => "invalid_context",
+        SessionError::EditorReconciliation(_) => "editor_reconciliation_error",
         SessionError::Render(_) => "render_error",
         SessionError::ActorMismatch { .. } => "actor_mismatch",
         SessionError::StaleHeads => "stale_heads",

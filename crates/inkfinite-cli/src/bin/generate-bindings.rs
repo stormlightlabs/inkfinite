@@ -7,6 +7,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+use inkfinite_core::editor::*;
 use inkfinite_core::proto::*;
 use inkfinite_core::svg_import::*;
 use inkfinite_core::*;
@@ -145,6 +146,7 @@ fn artifacts() -> Result<BTreeMap<PathBuf, String>, Box<dyn Error>> {
         PathBuf::from("packages/bindings/src/svg-import.ts"),
         svg_import_bindings(),
     );
+    artifacts.insert(PathBuf::from("packages/bindings/src/editor.ts"), editor_bindings());
     artifacts.insert(PathBuf::from("packages/bindings/src/index.ts"), index_bindings());
     Ok(artifacts)
 }
@@ -294,9 +296,29 @@ fn svg_import_bindings() -> String {
     output
 }
 
+fn editor_bindings() -> String {
+    let config = ts_config();
+    let mut output = GENERATED_TS_HEADER.to_owned();
+    output.push_str(
+        "import type { ActorId, BindingAnchor, BindingId, BindingKind, BindingRecord, ContainerLayout, LayerId, Opacity, Origin, PageId, SemanticMetadata, ShapeId, ShapeKind, ShapeParent, ShapeProperties, ShapeStyle, SiblingAnchor, Timestamp } from './model.js';\n",
+    );
+    output.push_str("import type { LayerPatch, TransactionId } from './transaction.js';\n\n");
+    append_declaration::<EditorTransform>(&mut output, &config);
+    append_declaration::<EditorShape>(&mut output, &config);
+    append_declaration::<EditorShapeDraft>(&mut output, &config);
+    append_declaration::<EditorPage>(&mut output, &config);
+    append_declaration::<EditorLayer>(&mut output, &config);
+    append_declaration::<EditorBinding>(&mut output, &config);
+    append_declaration::<EditorOrder>(&mut output, &config);
+    append_declaration::<EditorProjection>(&mut output, &config);
+    append_clean_declaration::<EditorPatch>(&mut output, &config);
+    append_declaration::<EditorReconciliationRequest>(&mut output, &config);
+    output
+}
+
 fn index_bindings() -> String {
     format!(
-        "{GENERATED_TS_HEADER}export * from './model.js';\nexport * from './protocol.js';\nexport * from './registry.js';\nexport * from './svg-import.js';\nexport * from './transaction.js';\n"
+        "{GENERATED_TS_HEADER}export * from './model.js';\nexport * from './protocol.js';\nexport * from './registry.js';\nexport * from './svg-import.js';\nexport * from './editor.js';\nexport * from './transaction.js';\n"
     )
 }
 

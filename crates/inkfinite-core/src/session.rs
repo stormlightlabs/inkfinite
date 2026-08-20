@@ -13,6 +13,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::editor::{
+    EditorPatch, EditorProjection, EditorReconciliationRequest, project_editor, reconcile_editor_patches,
+};
 use crate::engine::geometry::world_shape_bounds;
 use crate::engine::{EngineError, SyncApplyResult, validate_document};
 use crate::file::{DocumentFile, FileError};
@@ -69,6 +72,8 @@ pub struct SessionStatus {
     pub agent_access: AgentAccessMode,
     /// Current materialized CRDT snapshot.
     pub snapshot: DocumentSnapshot,
+    /// Rust-owned flat editor projection of the current snapshot.
+    pub editor_projection: EditorProjection,
     /// Whether the current heads differ from the last successful save.
     pub dirty: bool,
     /// Whether this service instance still owns the advisory lock.
@@ -245,6 +250,9 @@ pub enum SessionError {
     /// The frontend reported editor context that does not belong to the session document.
     #[error("invalid editor context: {0}")]
     InvalidContext(String),
+    /// A semantic editor patch could not be translated to native operations.
+    #[error("editor reconciliation failed: {0}")]
+    EditorReconciliation(String),
     /// Deterministic SVG rendering rejected the requested live projection.
     #[error(transparent)]
     Render(#[from] SvgRenderError),
@@ -562,6 +570,36 @@ impl SessionService {
     ) -> Result<SessionCommit, SessionError> {
         let session = self.session_mut(session_id)?;
         ensure_actor(session.file.actor_id(), &transaction.actor_id)?;
+        let commit = session.file.commit(transaction)?;
+        let status = session.status(session_id)?;
+        Ok(SessionCommit { commit, status })
+    }
+
+    /// Reconciles semantic editor changes through the native transaction engine.
+    ///
+    /// The editor supplies world-space transforms and field-level changes. Rust
+    /// converts those changes to parent-relative operations without rebuilding
+    /// unrelated scene records.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed reconciliation, transaction, or persistence error.
+    pub fn reconcile_editor_patches(
+        &mut self, session_id: &SessionId, patches: Vec<EditorPatch>,
+    ) -> Result<SessionCommit, SessionError> {
+        let session = self.session_mut(session_id)?;
+        let snapshot = session.file.snapshot()?;
+        let timestamp = timestamp_now();
+        let request = EditorReconciliationRequest {
+            patches,
+            actor_id: session.file.actor_id().clone(),
+            origin: Origin::Human,
+            transaction_id: TransactionId(format!("transaction:editor:{}", timestamp.0)),
+            description: "Update editor document".into(),
+            timestamp,
+        };
+        let transaction = reconcile_editor_patches(&snapshot, request)
+            .map_err(|error| SessionError::EditorReconciliation(error.to_string()))?;
         let commit = session.file.commit(transaction)?;
         let status = session.status(session_id)?;
         Ok(SessionCommit { commit, status })
@@ -1172,6 +1210,7 @@ impl DocumentSession {
             path: DocumentPath(self.file.path().to_string_lossy().into_owned()),
             actor_id: self.file.actor_id().clone(),
             agent_access: self.agent_access,
+            editor_projection: project_editor(&snapshot),
             snapshot,
             dirty,
             lock_held: true,

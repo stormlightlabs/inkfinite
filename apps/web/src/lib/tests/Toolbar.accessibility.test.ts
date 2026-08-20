@@ -9,7 +9,10 @@ function renderToolbar(store: Store) {
 	const target = document.createElement('div');
 	document.body.appendChild(target);
 	const brushStore = createBrushStore();
-	return render(Toolbar, { target, props: { currentTool: 'select', onToolChange: () => {}, store, brushStore } });
+	return render(Toolbar, {
+		target,
+		props: { currentTool: 'select', onToolChange: () => {}, store, brushStore }
+	});
 }
 
 describe('Toolbar accessibility', () => {
@@ -48,7 +51,9 @@ describe('Toolbar accessibility', () => {
 		const store = new Store();
 		const { container } = renderToolbar(store);
 
-		const exportButton = container.querySelector('.toolbar__export-button') as HTMLButtonElement;
+		const exportButton = container.querySelector(
+			'.toolbar__export-button'
+		) as HTMLButtonElement;
 		exportButton.click();
 
 		await new Promise((resolve) => setTimeout(resolve, 0));
@@ -87,11 +92,11 @@ describe('Toolbar accessibility', () => {
 
 		const menu = document.querySelector('[aria-label="Import options"]');
 		expect(menu?.getAttribute('role')).toBe('menu');
-		expect([...menu!.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent?.trim())).toEqual([
-			'Editable document',
-			'SVG file',
-			'SVG code / markup'
-		]);
+		expect(
+			[...menu!.querySelectorAll('[role="menuitem"]')].map((item) =>
+				item.textContent?.trim()
+			)
+		).toEqual(['Editable document', 'SVG file', 'SVG code / markup']);
 	});
 
 	it('should have visible focus states on buttons', () => {

@@ -1,25 +1,53 @@
-import { importSvgInWorkerRuntime, renderSvgInWorkerRuntime } from './svg-import';
+/// <reference lib="webworker" />
+
+import type {
+	DocumentSnapshot,
+	EditorReconciliationRequest,
+	SvgRenderOptions
+} from '@inkfinite/wasm';
+import {
+	importSvgInWorkerRuntime,
+	projectEditorInWorkerRuntime,
+	reconcileEditorPatchesInWorkerRuntime,
+	renderSvgInWorkerRuntime
+} from './svg-import';
 
 type Request =
 	| { type: 'import'; id: number; source: ArrayBuffer }
+	| { type: 'project'; id: number; snapshot: DocumentSnapshot }
 	| {
-			type: 'render';
+			type: 'reconcile';
 			id: number;
-			snapshot: import('@inkfinite/wasm').DocumentSnapshot;
-			options: import('@inkfinite/wasm').SvgRenderOptions;
-	  };
-type WorkerScope = {
-	onmessage: ((event: MessageEvent<Request>) => void) | null;
-	postMessage(message: unknown): void;
-};
+			snapshot: DocumentSnapshot;
+			request: EditorReconciliationRequest;
+	  }
+	| { type: 'render'; id: number; snapshot: DocumentSnapshot; options: SvgRenderOptions };
 
-const scope = globalThis as unknown as WorkerScope;
-scope.onmessage = async (event) => {
+const scope = globalThis as unknown as DedicatedWorkerGlobalScope;
+scope.onmessage = async (event: MessageEvent<Request>) => {
 	try {
-		const response =
-			event.data.type === 'import'
-				? await importSvgInWorkerRuntime(new Uint8Array(event.data.source))
-				: await renderSvgInWorkerRuntime(event.data.snapshot, event.data.options);
+		let response: unknown;
+		switch (event.data.type) {
+			case 'import': {
+				response = await importSvgInWorkerRuntime(new Uint8Array(event.data.source));
+				break;
+			}
+			case 'project': {
+				response = await projectEditorInWorkerRuntime(event.data.snapshot);
+				break;
+			}
+			case 'reconcile': {
+				response = await reconcileEditorPatchesInWorkerRuntime(
+					event.data.snapshot,
+					event.data.request
+				);
+				break;
+			}
+			case 'render': {
+				response = await renderSvgInWorkerRuntime(event.data.snapshot, event.data.options);
+				break;
+			}
+		}
 		scope.postMessage({ id: event.data.id, response });
 	} catch (error) {
 		scope.postMessage({

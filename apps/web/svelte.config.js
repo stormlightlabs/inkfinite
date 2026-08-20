@@ -8,10 +8,7 @@ const config = {
 	extensions: ['.svelte', '.svx', '.md'],
 	preprocess: [
 		vitePreprocess(),
-		mdsvex({
-			extensions: ['.svx', '.md'],
-			rehypePlugins: [extractTableOfContents]
-		})
+		mdsvex({ extensions: ['.svx', '.md'], rehypePlugins: [extractTableOfContents] })
 	],
 	kit: {
 		adapter: adapter(),

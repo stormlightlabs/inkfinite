@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 pub mod crdt;
+pub mod editor;
 pub mod engine;
 pub mod file;
 pub mod ipc;

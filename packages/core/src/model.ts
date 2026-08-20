@@ -170,6 +170,10 @@ export type StrokeStyle = { color: string; opacity: number };
 export type StrokeProps = { points: StrokePoint[]; style: StrokeStyle; brush: BrushConfig };
 
 export type ShapeType = 'rect' | 'ellipse' | 'line' | 'arrow' | 'text' | 'stroke' | 'path' | 'markdown';
+
+/** Full world transform retained when a native projection contains scale or shear. */
+export type EditorTransform = { a: number; b: number; c: number; d: number; e: number; f: number };
+
 export type BaseShape = {
 	id: string;
 	type: ShapeType;
@@ -177,6 +181,8 @@ export type BaseShape = {
 	x: number;
 	y: number;
 	rot: number;
+	/** Full projected transform used to preserve native ancestor composition. */
+	editorTransform?: EditorTransform;
 	/** Opacity applied to the complete shape; omitted values use `1`. */
 	opacity?: number;
 	/** Opacity applied only to fills; omitted values use `1`. */

@@ -1,9 +1,17 @@
-import { importSvg as importSvgWasm, renderSvg as renderSvgWasm } from '@inkfinite/wasm';
+import {
+	importSvg as importSvgWasm,
+	projectEditor as projectEditorWasm,
+	reconcileEditorPatches as reconcileEditorPatchesWasm,
+	renderSvg as renderSvgWasm
+} from '@inkfinite/wasm';
 import type {
 	DocumentSnapshot,
+	EditorProjection,
+	EditorReconciliationRequest,
 	SvgImportResponse,
 	SvgRenderOptions,
-	SvgRenderResponse
+	SvgRenderResponse,
+	TransactionDraft
 } from '@inkfinite/wasm';
 import type { SvgImportResult } from '@inkfinite/core';
 
@@ -20,6 +28,8 @@ export class SvgImportWorkerError extends Error {
 
 type WorkerRequestBody =
 	| { type: 'import'; source: ArrayBuffer }
+	| { type: 'project'; snapshot: DocumentSnapshot }
+	| { type: 'reconcile'; snapshot: DocumentSnapshot; request: EditorReconciliationRequest }
 	| { type: 'render'; snapshot: DocumentSnapshot; options: SvgRenderOptions };
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -29,7 +39,11 @@ type WorkerResponse =
 	| { id: number; response: SvgImportResponse | SvgRenderResponse }
 	| { id: number; error: string };
 
-type WorkerResponseValue = SvgImportResponse | SvgRenderResponse;
+type WorkerResponseValue =
+	| SvgImportResponse
+	| SvgRenderResponse
+	| EditorProjection
+	| TransactionDraft;
 
 /** A worker boundary that keeps SVG decoding, parsing, and rendering off the UI thread. */
 export class SvgImportWorkerClient {
@@ -56,6 +70,19 @@ export class SvgImportWorkerClient {
 			throw new SvgImportWorkerError(response.error.code, response.error.message);
 		}
 		return { ...response.import, omitted_image_count: response.omitted_image_count };
+	}
+
+	/** Projects one canonical snapshot into the shared flat editor view. */
+	project(snapshot: DocumentSnapshot): Promise<EditorProjection> {
+		return this.request<EditorProjection>({ type: 'project', snapshot });
+	}
+
+	/** Reconciles semantic editor changes into one native transaction draft. */
+	reconcile(
+		snapshot: DocumentSnapshot,
+		request: EditorReconciliationRequest
+	): Promise<TransactionDraft> {
+		return this.request<TransactionDraft>({ type: 'reconcile', snapshot, request });
 	}
 
 	/** Renders one canonical snapshot through the Rust SVG renderer. */
@@ -132,6 +159,19 @@ export function importSvgInWorker(source: Uint8Array) {
 	return getSharedSvgImportWorker().import(source);
 }
 
+/** Projects a canonical snapshot through the shared worker. */
+export function projectEditorInWorker(snapshot: DocumentSnapshot) {
+	return getSharedSvgImportWorker().project(snapshot);
+}
+
+/** Reconciles semantic editor patches through the shared worker. */
+export function reconcileEditorPatchesInWorker(
+	snapshot: DocumentSnapshot,
+	request: EditorReconciliationRequest
+) {
+	return getSharedSvgImportWorker().reconcile(snapshot, request);
+}
+
 /** Renders a canonical snapshot through the shared worker. */
 export function renderSvgInWorker(snapshot: DocumentSnapshot, options: SvgRenderOptions = {}) {
 	return getSharedSvgImportWorker().render(snapshot, options);
@@ -140,6 +180,19 @@ export function renderSvgInWorker(snapshot: DocumentSnapshot, options: SvgRender
 /** Used by the worker entry point to run the generated Rust/WASM bindings. */
 export async function importSvgInWorkerRuntime(source: Uint8Array) {
 	return importSvgWasm(source);
+}
+
+/** Used by the worker entry point to run the generated Rust/WASM bindings. */
+export async function projectEditorInWorkerRuntime(snapshot: DocumentSnapshot) {
+	return projectEditorWasm(snapshot);
+}
+
+/** Used by the worker entry point to run the generated Rust/WASM bindings. */
+export async function reconcileEditorPatchesInWorkerRuntime(
+	snapshot: DocumentSnapshot,
+	request: EditorReconciliationRequest
+) {
+	return reconcileEditorPatchesWasm(snapshot, request);
 }
 
 /** Used by the worker entry point to run the generated Rust/WASM bindings. */

@@ -4,6 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use inkfinite_core::editor::EditorPatch;
 use inkfinite_core::proto::{
     AgentAccessMode, DocumentPath, Proposal, ProposalId, ProtocolError, Query, QueryResult, SessionId, TransactionDraft,
 };
@@ -184,6 +185,16 @@ pub fn commit(
 ) -> Result<SessionCommit> {
     lock_service(&state)?
         .commit(&SessionId(session_id), transaction)
+        .map_err(to_protocol_error)
+}
+
+/// Reconciles semantic editor changes through the native transaction engine.
+#[tauri::command]
+pub fn reconcile_editor_patches(
+    state: State<'_, DesktopState>, session_id: String, patches: Vec<EditorPatch>,
+) -> Result<SessionCommit> {
+    lock_service(&state)?
+        .reconcile_editor_patches(&SessionId(session_id), patches)
         .map_err(to_protocol_error)
 }
 
