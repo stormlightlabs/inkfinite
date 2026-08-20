@@ -67,6 +67,9 @@ describe('desktop workspace adapter', () => {
 				commit: async () => {
 					throw new Error('not used');
 				},
+				reconcileEditorPatches: async () => {
+					throw new Error('not used');
+				},
 				importSvg: async () => {
 					throw new Error('not used');
 				},

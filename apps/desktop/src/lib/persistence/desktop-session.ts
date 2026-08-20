@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { createEditorReconciliationRequest, createId } from '@inkfinite/core';
 import type {
 	BoardExport,
 	BoardMeta,
@@ -15,25 +16,18 @@ import type {
 	PersistentDocRepo,
 	ShapeRecord as EditorShapeRecord
 } from '@inkfinite/core';
-import { createId } from '@inkfinite/core';
 import type {
-	BindingRecord as SnapshotBindingRecord,
 	ChangeHash,
 	CommitResult,
-	ContainerLayout,
 	DocumentSnapshot,
+	JsonValue,
 	Query,
 	QueryResult,
-	Provenance,
 	Proposal,
-	ShapeProperties,
 	ShapeRecord,
-	ShapeStyle,
-	TransactionDraft,
-	Transform,
-	JsonValue
+	TransactionDraft
 } from '@inkfinite/bindings';
-import type { EditorPatch, EditorProjection, EditorTransform } from '@inkfinite/bindings/editor';
+import type { EditorPatch, EditorProjection } from '@inkfinite/bindings/editor';
 
 const ACTOR_ID = 'actor:desktop';
 
@@ -135,7 +129,7 @@ export interface SessionApi {
 		occluded_regions: Array<{ x: number; y: number; width: number; height: number }>;
 	}): Promise<void>;
 	commit(args: { session_id: string; transaction: TransactionDraft }): Promise<SessionCommit>;
-	reconcileEditorPatches?(args: { session_id: string; patches: EditorPatch[] }): Promise<SessionCommit>;
+	reconcileEditorPatches(args: { session_id: string; patches: EditorPatch[] }): Promise<SessionCommit>;
 	importSvg(args: {
 		session_id: string;
 		path: string;
@@ -610,30 +604,18 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		await ensureBoardLoaded(boardId);
 		if (!currentStatus || !currentDoc) throw new Error('No board loaded');
 		const nextDoc = applyPatch(currentDoc, patch);
-		const editorPatches = editorPatchesForDocuments(currentDoc, nextDoc);
-		if (editorPatches && editorPatches.length === 0) return;
-
-		let committed: SessionCommit;
-		if (editorPatches && api.reconcileEditorPatches) {
-			committed = await api.reconcileEditorPatches({
-				session_id: currentStatus.session_id,
-				patches: editorPatches
-			});
-		} else {
-			const target = documentFromLoadedDoc(nextDoc, currentStatus.snapshot, ACTOR_ID);
-			const operations = operationsForMirror(currentStatus.snapshot, target);
-			if (operations.length === 0) return;
-			const transaction: TransactionDraft = {
-				id: createId('transaction'),
-				actor_id: ACTOR_ID,
-				origin: 'human',
-				base_heads: currentStatus.snapshot.heads,
-				description: 'Update desktop document mirror',
-				operations,
-				timestamp: Date.now()
-			};
-			committed = await api.commit({ session_id: currentStatus.session_id, transaction });
-		}
+		const request = createEditorReconciliationRequest(currentDoc, nextDoc, {
+			actor_id: ACTOR_ID,
+			origin: 'human',
+			transaction_id: createId('transaction'),
+			description: 'Update desktop document',
+			timestamp: Date.now()
+		});
+		if (request.patches.length === 0) return;
+		const committed = await api.reconcileEditorPatches({
+			session_id: currentStatus.session_id,
+			patches: request.patches
+		});
 		updateStatus(committed.status);
 		if (currentProposal) {
 			notifyProposal({
@@ -1160,7 +1142,16 @@ function applyPatch(doc: LoadedDoc, patch: DocPatch): LoadedDoc {
 	for (const id of patch.deletes?.pageIds ?? []) delete next.pages[id];
 	for (const id of patch.deletes?.shapeIds ?? []) delete next.shapes[id];
 	for (const id of patch.deletes?.bindingIds ?? []) delete next.bindings[id];
-	for (const page of patch.upserts?.pages ?? []) next.pages[page.id] = page;
+	for (const page of patch.upserts?.pages ?? []) {
+		const previous = next.pages[page.id];
+		next.pages[page.id] = previous
+			? {
+					...previous,
+					...page,
+					...(page.layerIds === undefined && previous.layerIds ? { layerIds: [...previous.layerIds] } : {})
+				}
+			: page;
+	}
 	for (const shape of patch.upserts?.shapes ?? []) next.shapes[shape.id] = shape;
 	for (const binding of patch.upserts?.bindings ?? []) next.bindings[binding.id] = binding;
 	if (patch.order?.pageIds) next.order.pageIds = [...patch.order.pageIds];
@@ -1224,367 +1215,6 @@ function rebaseImportedDocument(snapshot: BoardExport, destination: LoadedDoc): 
 			layers: { [destinationLayerId]: layer }
 		}
 	};
-}
-
-function editorPatchesForDocuments(before: LoadedDoc, after: LoadedDoc): EditorPatch[] | null {
-	const beforePageIds = Object.keys(before.pages).sort();
-	const afterPageIds = Object.keys(after.pages).sort();
-	const beforeLayerIds = Object.keys(before.layers ?? {}).sort();
-	const afterLayerIds = Object.keys(after.layers ?? {}).sort();
-	// Page/layer creation and deletion still use the complete document adapter
-	// until their semantic operations are needed by the editor.
-	if (JSON.stringify(beforePageIds) !== JSON.stringify(afterPageIds)) return null;
-	if (JSON.stringify(beforeLayerIds) !== JSON.stringify(afterLayerIds)) return null;
-
-	const patches: EditorPatch[] = [];
-	for (const pageId of after.order.pageIds) {
-		const previous = before.pages[pageId];
-		const next = after.pages[pageId];
-		if (previous && next && previous.name !== next.name) {
-			patches.push({ type: 'rename_page', page_id: pageId, name: next.name });
-		}
-	}
-	for (const layerId of after.order.layers ? Object.keys(after.order.layers) : Object.keys(after.layers ?? {})) {
-		const previous = before.layers?.[layerId];
-		const next = after.layers?.[layerId];
-		if (!previous || !next) continue;
-		if (
-			previous.name !== next.name ||
-			previous.visible !== next.visible ||
-			previous.locked !== next.locked ||
-			previous.opacity !== next.opacity
-		) {
-			patches.push({
-				type: 'patch_layer',
-				layer_id: layerId,
-				patch: {
-					name: previous.name === next.name ? null : next.name,
-					visible: previous.visible === next.visible ? null : next.visible,
-					locked: previous.locked === next.locked ? null : next.locked,
-					opacity: previous.opacity === next.opacity ? null : next.opacity
-				}
-			});
-		}
-	}
-
-	for (const shapeId of Object.keys(before.shapes)) {
-		const previous = before.shapes[shapeId];
-		const next = after.shapes[shapeId];
-		if (!next) {
-			patches.push({ type: 'delete_shape', shape_id: shapeId });
-			continue;
-		}
-		const transformChanged = previous.x !== next.x || previous.y !== next.y || previous.rot !== next.rot;
-		const parentChanged = previous.groupId !== next.groupId || previous.layerId !== next.layerId;
-		const orderChanged =
-			JSON.stringify(siblingAnchorForShape(before, previous)) !==
-			JSON.stringify(siblingAnchorForShape(after, next));
-		const propertiesChanged = !jsonEqual(previous.props, next.props);
-		const styleChanged =
-			(previous.opacity ?? 1) !== (next.opacity ?? 1) ||
-			(previous.fillOpacity ?? null) !== (next.fillOpacity ?? null) ||
-			(previous.strokeOpacity ?? null) !== (next.strokeOpacity ?? null);
-		if (transformChanged || parentChanged || orderChanged || propertiesChanged || styleChanged) {
-			patches.push({
-				type: 'shape',
-				shape_id: shapeId,
-				transform: transformChanged || parentChanged ? affineForEditorShape(next) : null,
-				properties: propertiesChanged ? (structuredClone(next.props) as ShapeProperties) : null,
-				metadata: null,
-				style: styleChanged
-					? {
-							opacity: next.opacity ?? 1,
-							fill_opacity: next.fillOpacity ?? null,
-							stroke_opacity: next.strokeOpacity ?? null
-						}
-					: null,
-				parent: parentChanged ? editorParent(next) : null,
-				anchor: orderChanged ? siblingAnchorForShape(after, next) : null
-			});
-		}
-	}
-	for (const shape of Object.values(after.shapes)) {
-		if (before.shapes[shape.id]) continue;
-		patches.push({
-			type: 'create_shape',
-			shape: {
-				id: shape.id,
-				kind: shape.type,
-				properties: structuredClone(shape.props) as ShapeProperties,
-				metadata: null,
-				style: {
-					opacity: shape.opacity ?? 1,
-					fill_opacity: shape.fillOpacity ?? null,
-					stroke_opacity: shape.strokeOpacity ?? null
-				},
-				layout: null
-			},
-			parent: editorParent(shape),
-			transform: affineForEditorShape(shape),
-			anchor: siblingAnchorForShape(after, shape)
-		});
-	}
-	for (const bindingId of Object.keys(before.bindings)) {
-		if (!after.bindings[bindingId]) patches.push({ type: 'delete_binding', binding_id: bindingId });
-	}
-	for (const binding of Object.values(after.bindings)) {
-		if (before.bindings[binding.id]) continue;
-		patches.push({
-			type: 'create_binding',
-			binding: {
-				id: binding.id,
-				kind: binding.type,
-				source_shape_id: binding.fromShapeId,
-				target_shape_id: binding.toShapeId,
-				source_handle: binding.handle,
-				anchor:
-					binding.anchor.kind === 'center'
-						? { kind: 'center' }
-						: { kind: 'edge', x: binding.anchor.nx, y: binding.anchor.ny },
-				version: 1
-			}
-		});
-	}
-	return patches;
-}
-
-function editorParent(shape: EditorShapeRecord): { kind: 'layer'; id: string } | { kind: 'shape'; id: string } {
-	return shape.groupId ? { kind: 'shape', id: shape.groupId } : { kind: 'layer', id: shape.layerId ?? '' };
-}
-
-function affineForEditorShape(shape: EditorShapeRecord): EditorTransform {
-	const projected = shape.editorTransform;
-	if (projected) {
-		const projectedRotation = Math.atan2(projected.b, projected.a);
-		if (Math.abs(projectedRotation - shape.rot) <= 1e-9) {
-			return { ...projected, e: shape.x, f: shape.y };
-		}
-		const scaleX = Math.hypot(projected.a, projected.b);
-		const scaleY = scaleX > Number.EPSILON ? (projected.a * projected.d - projected.b * projected.c) / scaleX : 1;
-		const cos = Math.cos(shape.rot);
-		const sin = Math.sin(shape.rot);
-		return { a: cos * scaleX, b: sin * scaleX, c: -sin * scaleY, d: cos * scaleY, e: shape.x, f: shape.y };
-	}
-	const cos = Math.cos(shape.rot);
-	const sin = Math.sin(shape.rot);
-	return { a: cos, b: sin, c: -sin, d: cos, e: shape.x, f: shape.y };
-}
-
-function siblingAnchorForShape(
-	doc: LoadedDoc,
-	shape: EditorShapeRecord
-): { position: 'last' } | { position: 'before'; sibling_id: string } {
-	const layer = shape.layerId ? doc.layers?.[shape.layerId] : undefined;
-	const siblings = layer?.shapeIds.filter((id) => doc.shapes[id]?.groupId === shape.groupId) ?? [];
-	const nextId = siblings[siblings.indexOf(shape.id) + 1];
-	return nextId ? { position: 'before', sibling_id: nextId } : { position: 'last' };
-}
-
-function jsonEqual(left: unknown, right: unknown): boolean {
-	return JSON.stringify(left) === JSON.stringify(right);
-}
-
-function documentFromLoadedDoc(doc: LoadedDoc, current: DocumentSnapshot, actor: string): DocumentSnapshot {
-	const pages = structuredClone(current.document.pages);
-	const layers = structuredClone(current.document.layers);
-	const shapes: Record<string, ShapeRecord> = {};
-	const groupChildren = new Map<string, string[]>();
-	const shapePages = new Map<string, { pageId: string; layerId: string }>();
-
-	for (const pageId of doc.order.pageIds) {
-		const page = doc.pages[pageId];
-		const currentPage = pages[pageId];
-		if (!page || !currentPage) {
-			throw new Error(`Desktop mirror cannot update unknown page ${pageId}`);
-		}
-		const layerIds = page.layerIds?.length ? page.layerIds : currentPage.layer_ids;
-		for (const layerId of layerIds) {
-			const editorLayer = doc.layers?.[layerId];
-			const currentLayer = current.document.layers[layerId];
-			if (!editorLayer && !currentLayer) continue;
-			const layerShapeIds =
-				editorLayer?.shapeIds ?? page.shapeIds.filter((id) => doc.shapes[id]?.layerId === layerId);
-			const roots: string[] = [];
-			for (const shapeId of layerShapeIds) {
-				const shape = doc.shapes[shapeId];
-				if (!shape) continue;
-				if (shape.groupId) {
-					const children = groupChildren.get(shape.groupId) ?? [];
-					children.push(shape.id);
-					groupChildren.set(shape.groupId, children);
-					if (!roots.includes(shape.groupId)) roots.push(shape.groupId);
-				} else {
-					roots.push(shape.id);
-				}
-				shapePages.set(shape.id, { pageId, layerId });
-			}
-			layers[layerId] = {
-				id: layerId,
-				page_id: pageId,
-				name: editorLayer?.name ?? currentLayer?.name ?? 'Layer',
-				shape_ids: roots,
-				visible: editorLayer?.visible ?? currentLayer?.visible ?? true,
-				locked: editorLayer?.locked ?? currentLayer?.locked ?? false,
-				opacity: editorLayer?.opacity ?? currentLayer?.opacity ?? 1,
-				version: currentLayer?.version ?? 1
-			};
-		}
-		pages[pageId] = { ...currentPage, name: page.name, layer_ids: [...layerIds] };
-	}
-	const retainedLayerIds = new Set(Object.values(pages).flatMap((page) => page.layer_ids));
-	for (const layerId of Object.keys(layers)) {
-		if (!retainedLayerIds.has(layerId)) delete layers[layerId];
-	}
-
-	for (const shape of Object.values(doc.shapes)) {
-		const location = shapePages.get(shape.id);
-		if (!location) continue;
-		const existing = current.document.shapes[shape.id];
-		shapes[shape.id] = shapeFromEditor(shape, location, existing, actor);
-	}
-	for (const [groupId, childIds] of groupChildren) {
-		const location = shapePages.get(childIds[0]);
-		if (!location) continue;
-		const existing = current.document.shapes[groupId];
-		shapes[groupId] = {
-			id: groupId,
-			kind: 'container',
-			parent: { kind: 'layer', id: location.layerId },
-			transform: identityTransform(),
-			child_ids: childIds,
-			layout: { kind: 'free' } satisfies ContainerLayout,
-			properties: {},
-			metadata: existing?.metadata ?? defaultMetadata(actor),
-			style: existing?.style ?? defaultStyle(),
-			version: existing?.version ?? 1
-		};
-	}
-
-	const bindings: Record<string, SnapshotBindingRecord> = {};
-	for (const binding of Object.values(doc.bindings)) {
-		bindings[binding.id] = {
-			id: binding.id,
-			kind: binding.type,
-			source_shape_id: binding.fromShapeId,
-			target_shape_id: binding.toShapeId,
-			source_handle: binding.handle,
-			anchor:
-				binding.anchor.kind === 'center'
-					? { kind: 'center' }
-					: { kind: 'edge', x: binding.anchor.nx, y: binding.anchor.ny },
-			version: current.document.bindings[binding.id]?.version ?? 1
-		};
-	}
-
-	return {
-		...current,
-		document: { ...current.document, page_ids: [...doc.order.pageIds], pages, layers, shapes, bindings }
-	};
-}
-
-function shapeFromEditor(
-	shape: EditorShapeRecord,
-	location: { pageId: string; layerId: string },
-	existing: ShapeRecord | undefined,
-	actor: string
-): ShapeRecord {
-	const properties = structuredClone(shape.props) as Record<string, JsonValue>;
-	if ('w' in properties) {
-		properties.width = properties.w;
-		delete properties.w;
-	}
-	if ('h' in properties) {
-		properties.height = properties.h;
-		delete properties.h;
-	}
-	const strokeStyle = shape.type === 'stroke' ? shape.props.style : undefined;
-	const strokeOpacity =
-		shape.strokeOpacity ??
-		(strokeStyle && typeof strokeStyle.opacity === 'number' ? strokeStyle.opacity : undefined) ??
-		existing?.style.stroke_opacity ??
-		null;
-	return {
-		id: shape.id,
-		kind: shape.type,
-		parent: shape.groupId ? { kind: 'shape', id: shape.groupId } : { kind: 'layer', id: location.layerId },
-		transform: {
-			translation: { x: shape.x, y: shape.y },
-			rotation: shape.rot,
-			scale_x: existing?.transform.scale_x ?? 1,
-			scale_y: existing?.transform.scale_y ?? 1
-		} satisfies Transform,
-		child_ids: [],
-		layout: null,
-		properties: properties as ShapeProperties,
-		metadata: {
-			...(existing?.metadata ?? defaultMetadata(actor)),
-			agent_editable: shape.agentEditable ?? existing?.metadata.agent_editable ?? true
-		},
-		style: {
-			opacity: shape.opacity ?? existing?.style.opacity ?? 1,
-			fill_opacity: shape.fillOpacity ?? existing?.style.fill_opacity ?? null,
-			stroke_opacity: strokeOpacity
-		},
-		version: existing?.version ?? 1
-	};
-}
-
-function operationsForMirror(current: DocumentSnapshot, target: DocumentSnapshot): TransactionDraft['operations'] {
-	const operations: TransactionDraft['operations'] = [];
-	for (const binding of Object.values(current.document.bindings)) {
-		operations.push({ type: 'delete_binding', binding_id: binding.id, expected_version: binding.version });
-	}
-	for (const page of Object.values(current.document.pages)) {
-		if (target.document.pages[page.id]?.name !== page.name) {
-			operations.push({
-				type: 'rename_page',
-				page_id: page.id,
-				name: target.document.pages[page.id]?.name ?? page.name,
-				expected_version: page.version
-			});
-		}
-	}
-	const currentRoots = Object.values(current.document.layers).flatMap((layer) => layer.shape_ids);
-	for (const shapeId of currentRoots) {
-		const shape = current.document.shapes[shapeId];
-		if (shape) operations.push({ type: 'delete_shape', shape_id: shape.id, expected_version: shape.version });
-	}
-	const created = new Set<string>();
-	const createShape = (shapeId: string) => {
-		if (created.has(shapeId)) return;
-		const shape = target.document.shapes[shapeId];
-		if (!shape) return;
-		if (shape.parent.kind === 'shape') createShape(shape.parent.id);
-		operations.push({ type: 'create_shape', shape, anchor: { position: 'last' } });
-		created.add(shapeId);
-	};
-	for (const layer of Object.values(target.document.layers)) {
-		for (const shapeId of layer.shape_ids) createShape(shapeId);
-	}
-	for (const binding of Object.values(target.document.bindings)) {
-		operations.push({ type: 'create_binding', binding });
-	}
-	return operations;
-}
-
-function defaultMetadata(actor: string) {
-	return {
-		name: null,
-		role: null,
-		description: null,
-		tags: [],
-		locked: false,
-		agent_editable: true,
-		provenance: { actor_id: actor, origin: 'human', timestamp: Date.now(), source: null } satisfies Provenance
-	};
-}
-
-function defaultStyle(): ShapeStyle {
-	return { opacity: 1, fill_opacity: null, stroke_opacity: null };
-}
-
-function identityTransform(): Transform {
-	return { translation: { x: 0, y: 0 }, rotation: 0, scale_x: 1, scale_y: 1 };
 }
 
 function fileName(path: string): string {

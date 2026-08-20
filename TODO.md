@@ -78,10 +78,10 @@ interaction state, previews, hit testing, Canvas rendering, and browser APIs.
 
 #### Shared reconciliation
 
-- [ ] Use one TypeScript editor-patch builder across web and desktop
-- [ ] Reconcile desktop page and layer changes through Rust
-- [ ] Retire the desktop whole-document mirror fallback
-- [ ] Reuse generated native geometry and transform types in the editor model
+- [x] Use one TypeScript editor-patch builder across web and desktop
+- [x] Reconcile desktop page and layer changes through Rust
+- [x] Retire the desktop whole-document mirror fallback
+- [x] Reuse generated native geometry and transform types in the editor model
 
 #### Worker verification and cleanup
 

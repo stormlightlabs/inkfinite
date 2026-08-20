@@ -6,7 +6,7 @@
 //! world-space transforms, and editor patches are converted back into minimal
 //! native operations.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -481,6 +481,9 @@ pub fn reconcile_editor_patches(
 ) -> Result<TransactionDraft, EditorReconciliationError> {
     let document = &snapshot.document;
     let mut operations = Vec::new();
+    let mut created_layers = BTreeSet::new();
+    let mut touched_layers = BTreeSet::new();
+    let mut touched_pages = BTreeSet::new();
     let default_metadata = default_metadata(&request);
 
     for patch in request.patches {
@@ -491,15 +494,23 @@ pub fn reconcile_editor_patches(
                     .pages
                     .get(&page_id)
                     .ok_or_else(|| EditorReconciliationError::UnknownPage(page_id.clone()))?;
-                operations.push(Operation::DeletePage { page_id, expected_version: Some(page.version) });
+                let expected_version = (!touched_pages.contains(&page_id)).then_some(page.version);
+                operations.push(Operation::DeletePage { page_id, expected_version });
             }
-            EditorPatch::CreateLayer { layer, anchor } => operations.push(Operation::CreateLayer { layer, anchor }),
+            EditorPatch::CreateLayer { layer, anchor } => {
+                created_layers.insert(layer.id.clone());
+                touched_pages.insert(layer.page_id.clone());
+                operations.push(Operation::CreateLayer { layer, anchor });
+            }
             EditorPatch::DeleteLayer { layer_id, contents } => {
                 let layer = document
                     .layers
                     .get(&layer_id)
                     .ok_or_else(|| EditorReconciliationError::UnknownLayer(layer_id.clone()))?;
-                operations.push(Operation::DeleteLayer { layer_id, contents, expected_version: Some(layer.version) });
+                let expected_version = (!touched_layers.contains(&layer_id)).then_some(layer.version);
+                touched_pages.insert(layer.page_id.clone());
+                operations.push(Operation::DeleteLayer { layer_id: layer_id.clone(), contents, expected_version });
+                touched_layers.insert(layer_id);
             }
             EditorPatch::Shape { shape_id, transform, properties, metadata, style, parent, anchor } => {
                 reconcile_shape(
@@ -511,11 +522,12 @@ pub fn reconcile_editor_patches(
                     style,
                     parent.as_ref(),
                     anchor,
+                    &created_layers,
                     &mut operations,
                 )?;
             }
             EditorPatch::CreateShape { shape, parent, transform, anchor } => {
-                let local_transform = local_transform(document, &shape.id, &parent, transform)?;
+                let local_transform = local_transform(document, &shape.id, &parent, transform, &created_layers)?;
                 let metadata = shape.metadata.unwrap_or_else(|| default_metadata.clone());
                 let native_shape = ShapeRecord {
                     id: shape.id,
@@ -544,7 +556,8 @@ pub fn reconcile_editor_patches(
                     .get(&page_id)
                     .ok_or_else(|| EditorReconciliationError::UnknownPage(page_id.clone()))?;
                 if page.name != name {
-                    operations.push(Operation::RenamePage { page_id, name, expected_version: Some(page.version) });
+                    let expected_version = (!touched_pages.contains(&page_id)).then_some(page.version);
+                    operations.push(Operation::RenamePage { page_id, name, expected_version });
                 }
             }
             EditorPatch::PatchLayer { layer_id, patch } => {
@@ -553,7 +566,9 @@ pub fn reconcile_editor_patches(
                     .get(&layer_id)
                     .ok_or_else(|| EditorReconciliationError::UnknownLayer(layer_id.clone()))?;
                 if layer_patch_changes(layer, &patch) {
-                    operations.push(Operation::PatchLayer { layer_id, patch, expected_version: Some(layer.version) });
+                    let expected_version = (!touched_layers.contains(&layer_id)).then_some(layer.version);
+                    operations.push(Operation::PatchLayer { layer_id: layer_id.clone(), patch, expected_version });
+                    touched_layers.insert(layer_id);
                 }
             }
             EditorPatch::ReorderLayer { layer_id, anchor } => {
@@ -561,7 +576,10 @@ pub fn reconcile_editor_patches(
                     .layers
                     .get(&layer_id)
                     .ok_or_else(|| EditorReconciliationError::UnknownLayer(layer_id.clone()))?;
-                operations.push(Operation::ReorderLayer { layer_id, anchor, expected_version: Some(layer.version) });
+                let expected_version = (!touched_layers.contains(&layer_id)).then_some(layer.version);
+                touched_pages.insert(layer.page_id.clone());
+                operations.push(Operation::ReorderLayer { layer_id: layer_id.clone(), anchor, expected_version });
+                touched_layers.insert(layer_id);
             }
             EditorPatch::CreateBinding { binding } => operations.push(Operation::CreateBinding { binding }),
             EditorPatch::DeleteBinding { binding_id } => {
@@ -590,7 +608,7 @@ pub fn reconcile_editor_patches(
 fn reconcile_shape(
     document: &Document, shape_id: ShapeId, transform: Option<EditorTransform>, properties: Option<ShapeProperties>,
     metadata: Option<SemanticMetadata>, style: Option<ShapeStyle>, parent: Option<&ShapeParent>,
-    anchor: Option<SiblingAnchor<ShapeId>>, operations: &mut Vec<Operation>,
+    anchor: Option<SiblingAnchor<ShapeId>>, created_layers: &BTreeSet<LayerId>, operations: &mut Vec<Operation>,
 ) -> Result<(), EditorReconciliationError> {
     let shape = document
         .shapes
@@ -602,7 +620,7 @@ fn reconcile_shape(
     let mut shape_patch = NativeShapePatch::default();
 
     if let Some(world) = transform {
-        let local = local_transform(document, &shape_id, &target_parent, world)?;
+        let local = local_transform(document, &shape_id, &target_parent, world, created_layers)?;
         let current_world = world_transform(document, shape);
         if !same_affine(current_world, world.into()) || parent_changed {
             shape_patch.transform = Some(local);
@@ -652,10 +670,11 @@ fn reconcile_shape(
 
 fn local_transform(
     document: &Document, shape_id: &ShapeId, parent: &ShapeParent, world: EditorTransform,
+    created_layers: &BTreeSet<LayerId>,
 ) -> Result<Transform, EditorReconciliationError> {
     let parent_world = match parent {
         ShapeParent::Layer(layer_id) => {
-            if !document.layers.contains_key(layer_id) {
+            if !document.layers.contains_key(layer_id) && !created_layers.contains(layer_id) {
                 return Err(EditorReconciliationError::UnknownLayer(layer_id.clone()));
             }
             Affine::IDENTITY
@@ -921,6 +940,106 @@ mod tests {
         )
         .expect("no-op should reconcile");
         assert!(transaction.operations.is_empty());
+    }
+
+    #[test]
+    fn reconciliation_accepts_shapes_in_new_layers() {
+        let snapshot = nested_snapshot();
+        let page_id = snapshot.document.page_ids[0].clone();
+        let layer_id = LayerId::from("layer:new");
+        let shape_id = ShapeId::from("shape:new");
+        let layer = LayerRecord {
+            id: layer_id.clone(),
+            page_id,
+            name: "New layer".into(),
+            shape_ids: Vec::new(),
+            visible: true,
+            locked: false,
+            opacity: Opacity::OPAQUE,
+            version: RecordVersion(1),
+        };
+        let transaction = reconcile_editor_patches(
+            &snapshot,
+            request(vec![
+                EditorPatch::CreateLayer { layer, anchor: SiblingAnchor::Last },
+                EditorPatch::CreateShape {
+                    shape: EditorShapeDraft {
+                        id: shape_id,
+                        kind: ShapeKind::from("rect"),
+                        properties: BTreeMap::from([
+                            ("width".into(), Value::from(20.0)),
+                            ("height".into(), Value::from(10.0)),
+                        ]),
+                        metadata: None,
+                        style: style(),
+                        layout: None,
+                    },
+                    parent: ShapeParent::Layer(layer_id),
+                    transform: EditorTransform { a: 1.0, b: 0.0, c: 0.0, d: 1.0, e: 25.0, f: 30.0 },
+                    anchor: SiblingAnchor::Last,
+                },
+            ]),
+        )
+        .expect("a new layer can receive a shape in the same editor change");
+
+        assert_eq!(transaction.operations.len(), 2);
+        assert!(matches!(transaction.operations[0], Operation::CreateLayer { .. }));
+        assert!(matches!(transaction.operations[1], Operation::CreateShape { .. }));
+    }
+
+    #[test]
+    fn reconciliation_allows_layer_patch_and_reorder_in_one_change() {
+        let mut snapshot = nested_snapshot();
+        let page_id = snapshot.document.page_ids[0].clone();
+        let layer_id = LayerId::from("layer:second");
+        snapshot
+            .document
+            .pages
+            .get_mut(&page_id)
+            .unwrap()
+            .layer_ids
+            .push(layer_id.clone());
+        snapshot.document.layers.insert(
+            layer_id.clone(),
+            LayerRecord {
+                id: layer_id.clone(),
+                page_id: page_id.clone(),
+                name: "Second".into(),
+                shape_ids: Vec::new(),
+                visible: true,
+                locked: false,
+                opacity: Opacity::OPAQUE,
+                version: RecordVersion(1),
+            },
+        );
+
+        let transaction = reconcile_editor_patches(
+            &snapshot,
+            request(vec![
+                EditorPatch::PatchLayer {
+                    layer_id: layer_id.clone(),
+                    patch: LayerPatch { name: Some("Renamed".into()), visible: None, locked: None, opacity: None },
+                },
+                EditorPatch::ReorderLayer { layer_id: layer_id.clone(), anchor: SiblingAnchor::First },
+                EditorPatch::RenamePage { page_id, name: "Renamed page".into() },
+            ]),
+        )
+        .expect("layer fields and order should reconcile together");
+
+        assert_eq!(transaction.operations.len(), 3);
+        let Operation::PatchLayer { expected_version, .. } = &transaction.operations[0] else {
+            panic!("expected a layer patch")
+        };
+        assert_eq!(*expected_version, Some(RecordVersion(1)));
+        let Operation::ReorderLayer { layer_id: reordered, expected_version, .. } = &transaction.operations[1] else {
+            panic!("expected a layer reorder")
+        };
+        assert_eq!(reordered, &layer_id);
+        assert_eq!(*expected_version, None);
+        let Operation::RenamePage { expected_version, .. } = &transaction.operations[2] else {
+            panic!("expected a page rename")
+        };
+        assert_eq!(*expected_version, None);
     }
 
     #[test]

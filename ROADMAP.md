@@ -116,12 +116,10 @@ and returns the updated snapshot, projection, assets, and diagnostics. SVG group
 compatibility metadata and the TypeScript SVG projector are no longer part of the
 browser document model.
 
-Desktop reconciliation has a related fallback. Page or layer creation and
-deletion can still trigger the whole-document mirror even though Rust supports
-semantic structural patches. Web and desktop should use one TypeScript
-before-and-after patch builder, then let Rust reconcile and commit those patches.
-The mirror fallback can be removed once all supported structural edits use that
-path.
+Desktop reconciliation uses the same TypeScript before-and-after patch
+builder as the web editor. Page, layer, and shape changes become semantic
+patches, then Rust reconciles and commits them through the native transaction
+engine.
 
 The WASM request and response payloads now use generated TypeScript types, and
 native editor types are reused where the representations match. The shared worker

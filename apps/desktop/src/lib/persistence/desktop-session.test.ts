@@ -1,5 +1,5 @@
 import { PageRecord, ShapeRecord, type BoardExport, type DesktopFileOps, type FileHandle } from '@inkfinite/core';
-import type { ChangeHash, DocumentSnapshot, Proposal, TransactionDraft } from '@inkfinite/bindings';
+import type { ChangeHash, DocumentSnapshot, Proposal, ShapeProperties, TransactionDraft } from '@inkfinite/bindings';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createDesktopSessionRepo } from '$lib/persistence/desktop-session';
 import type {
@@ -47,6 +47,7 @@ function createFakeSessionApi() {
 	const files = new Map<string, DocumentSnapshot>();
 	const sessions = new Map<string, FakeSession>();
 	const agentContexts: Array<Parameters<SessionApi['updateContext']>[0]> = [];
+	const editorPatchBatches: Array<Parameters<SessionApi['reconcileEditorPatches']>[0]['patches']> = [];
 	let sessionNumber = 0;
 	let headNumber = 0;
 
@@ -158,6 +159,87 @@ function createFakeSessionApi() {
 			next.heads = [`head:${++headNumber}`];
 			session.status = { ...session.status, snapshot: next, dirty: true, can_undo: true, can_redo: false };
 			return { commit: commitResult(args.transaction, next), status: statusFor(args.session_id, session) };
+		},
+
+		async reconcileEditorPatches(
+			args: Parameters<SessionApi['reconcileEditorPatches']>[0]
+		): Promise<SessionCommit> {
+			editorPatchBatches.push(structuredClone(args.patches));
+			const session = sessions.get(args.session_id);
+			if (!session) throw new Error('Missing fake session');
+			const next = structuredClone(session.status.snapshot);
+			for (const patch of args.patches) {
+				if (patch.type === 'rename_page') {
+					const page = next.document.pages[patch.page_id];
+					if (page) page.name = patch.name;
+				} else if (patch.type === 'create_shape') {
+					const properties = structuredClone(patch.shape.properties) as Record<string, unknown>;
+					if ('w' in properties) {
+						properties.width = properties.w;
+						delete properties.w;
+					}
+					if ('h' in properties) {
+						properties.height = properties.h;
+						delete properties.h;
+					}
+					const scaleX = Math.hypot(patch.transform.a, patch.transform.b);
+					const scaleY =
+						scaleX > Number.EPSILON
+							? (patch.transform.a * patch.transform.d - patch.transform.b * patch.transform.c) / scaleX
+							: 1;
+					next.document.shapes[patch.shape.id] = {
+						id: patch.shape.id,
+						kind: patch.shape.kind,
+						parent: patch.parent,
+						transform: {
+							translation: { x: patch.transform.e, y: patch.transform.f },
+							rotation: Math.atan2(patch.transform.b, patch.transform.a),
+							scale_x: scaleX,
+							scale_y: scaleY
+						},
+						child_ids: [],
+						layout: patch.shape.layout,
+						properties: properties as ShapeProperties,
+						metadata: patch.shape.metadata ?? {
+							name: null,
+							role: null,
+							description: null,
+							tags: [],
+							locked: false,
+							agent_editable: true,
+							provenance: { actor_id: 'actor:desktop', origin: 'human', timestamp: 0, source: null }
+						},
+						style: patch.shape.style,
+						version: 1
+					};
+					if (patch.parent.kind === 'layer') {
+						next.document.layers[patch.parent.id]?.shape_ids.push(patch.shape.id);
+					} else {
+						next.document.shapes[patch.parent.id]?.child_ids.push(patch.shape.id);
+					}
+				} else if (patch.type === 'create_binding') {
+					next.document.bindings[patch.binding.id] = structuredClone(patch.binding);
+				}
+			}
+			next.heads = [`head:${++headNumber}`];
+			session.undo.push(structuredClone(session.status.snapshot));
+			session.redo = [];
+			session.status = { ...session.status, snapshot: next, dirty: true, can_undo: true, can_redo: false };
+			return {
+				commit: commitResult(
+					{
+						id: 'transaction:editor',
+						actor_id: 'actor:desktop',
+						origin: 'human',
+						base_heads: session.status.snapshot.heads,
+						description: 'Editor patches',
+						operations: [],
+						timestamp: Date.now()
+					},
+					next
+				),
+				status: statusFor(args.session_id, session)
+			};
 		},
 
 		async importSvg(_args: Parameters<SessionApi['importSvg']>[0]) {
@@ -309,7 +391,7 @@ function createFakeSessionApi() {
 		}
 	} satisfies SessionApi;
 
-	return { api, files, draftPath, agentContexts };
+	return { api, files, draftPath, agentContexts, editorPatchBatches };
 }
 
 function createFakeFileOps() {
@@ -436,6 +518,36 @@ describe('Rust-backed desktop session repository', () => {
 		await repo.closeSession();
 		const reopened = await repo.loadDoc(boards[0].id);
 		expect(reopened.pages[pageId].name).toBe('Renamed');
+	});
+
+	it('routes layer changes through the Rust reconciliation command', async () => {
+		const repo = createDesktopSessionRepo(fileOps.ops, { api: session.api });
+		const opened = await repo.openDraft();
+		const pageId = opened.doc.order.pageIds[0];
+		const existingLayerId = opened.doc.pages[pageId].layerIds?.[0];
+		expect(existingLayerId).toBeDefined();
+		const newLayer = {
+			id: 'layer:desktop:new',
+			pageId,
+			name: 'New layer',
+			shapeIds: [],
+			visible: true,
+			locked: false,
+			opacity: 1
+		};
+
+		await repo.applyDocPatch(opened.boardId, {
+			upserts: {
+				pages: [{ ...opened.doc.pages[pageId], layerIds: [existingLayerId!, newLayer.id], shapeIds: [] }]
+			},
+			order: { layers: { [existingLayerId!]: opened.doc.layers![existingLayerId!]!, [newLayer.id]: newLayer } }
+		});
+
+		expect(session.editorPatchBatches.at(-1)).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ type: 'create_layer', layer: expect.objectContaining({ id: newLayer.id }) })
+			])
+		);
 	});
 
 	it('publishes editor context only after a desktop session is open', async () => {

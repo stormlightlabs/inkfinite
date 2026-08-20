@@ -1,4 +1,7 @@
-export type Vec2 = { x: number; y: number };
+import type { Vec2 as NativeVec2 } from '@inkfinite/bindings/model';
+
+/** Two-dimensional point shared with the native document model. */
+export type Vec2 = NativeVec2;
 
 /** Constrain a number to an inclusive range. */
 export function clamp(value: number, minimum: number, maximum: number): number {

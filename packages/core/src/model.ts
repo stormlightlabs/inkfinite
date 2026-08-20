@@ -1,3 +1,10 @@
+import type { EditorTransform as GeneratedEditorTransform } from '@inkfinite/bindings/editor';
+import type {
+	PathFillRule as NativePathFillRule,
+	PathGeometry as NativePathGeometry,
+	PathSegment as NativePathSegment,
+	PathSubpath as NativePathSubpath
+} from '@inkfinite/bindings/model';
 import { v4 } from 'uuid';
 import type { Vec2 } from './math';
 /**
@@ -68,20 +75,16 @@ export type EllipseProps = { w: number; h: number; fill: string; stroke: string 
 export type LineProps = { a: Vec2; b: Vec2; stroke: string; width: number };
 
 /** Fill rule for compound native paths. */
-export type PathFillRule = 'nonzero' | 'evenodd';
+export type PathFillRule = NativePathFillRule;
 
 /** A normalized native path segment. */
-export type PathSegment =
-	| { type: 'move'; to: Vec2 }
-	| { type: 'line'; to: Vec2 }
-	| { type: 'quadratic'; control: Vec2; to: Vec2 }
-	| { type: 'cubic'; control_1: Vec2; control_2: Vec2; to: Vec2 };
+export type PathSegment = NativePathSegment;
 
 /** One native path subpath. */
-export type PathSubpath = { segments: PathSegment[]; closed: boolean };
+export type PathSubpath = NativePathSubpath;
 
 /** Native path geometry and its compound fill rule. */
-export type PathGeometry = { subpaths: PathSubpath[]; fill_rule: PathFillRule };
+export type PathGeometry = NativePathGeometry;
 
 /** Native path painting properties stored alongside its geometry. */
 export type PathProps = PathGeometry & { fill?: string; stroke?: string; stroke_width?: number };
@@ -171,8 +174,8 @@ export type StrokeProps = { points: StrokePoint[]; style: StrokeStyle; brush: Br
 
 export type ShapeType = 'rect' | 'ellipse' | 'line' | 'arrow' | 'text' | 'stroke' | 'path' | 'markdown';
 
-/** Full world transform retained when a native projection contains scale or shear. */
-export type EditorTransform = { a: number; b: number; c: number; d: number; e: number; f: number };
+/** Full projected transform shared with the Rust editor projection. */
+export type EditorTransform = GeneratedEditorTransform;
 
 export type BaseShape = {
 	id: string;

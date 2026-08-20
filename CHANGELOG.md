@@ -68,12 +68,10 @@
   and device-pixel-ratio changes.
 - Document model collapsed to a single native model, removing the
   predecessor/current split.
-- Desktop ordinary editor updates now use Rust reconciliation instead of
-  deleting and recreating the native scene; full mirror replacement remains
-  only for structural page and layer changes not yet covered by semantic patches.
+- Desktop editor updates now use the shared TypeScript patch builder and Rust
+  reconciliation for page, layer, and shape changes
 - Browser canonical state now caches the Rust editor projection with Automerge
-  bytes. The browser SVG projector and imported-group metadata were removed, and
-  WASM request and response payloads are generated from Rust.
+  bytes. WASM request and response payloads are generated from Rust.
 
 ### Fixed
 

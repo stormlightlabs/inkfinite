@@ -33,10 +33,9 @@ export type CanonicalSnapshotOptions = { documentId: string; heads?: readonly st
  * Converts the browser editor document into the JSON shape consumed by Rust
  * and the browser WASM renderer.
  *
- * The editor model is intentionally flat today. Each shape therefore becomes
- * a root child of its owning layer; its local transform preserves the editor's
- * position and rotation. The native hierarchy can replace this adapter when
- * browser projection moves into Rust.
+ * Legacy flat editor documents are normalized into root children of their
+ * owning layers. Active browser sessions use the Rust projection and do not
+ * rebuild this hierarchy in TypeScript.
  */
 export function toCanonicalDocumentSnapshot(
 	input: BoardExport | Document,
