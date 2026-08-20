@@ -82,6 +82,7 @@ document lifecycle, including SVG import and rendering.
 
 #### Hierarchy semantics and tests
 
+- [ ] Route committed hierarchy operations through canonical Rust geometry APIs
 - [ ] Reparent shapes while preserving world-space appearance
 - [ ] Define selection behavior across different parents
 - [ ] Define multi-selection behavior across different parents
@@ -118,6 +119,7 @@ document lifecycle, including SVG import and rendering.
 
 #### Segment editing
 
+- [ ] Route committed topology operations through canonical Rust geometry APIs
 - [ ] Add anchors to path segments
 - [ ] Delete anchors
 - [ ] Convert straight segments to curves
@@ -374,30 +376,3 @@ document lifecycle, including SVG import and rendering.
 
 - [ ] Revisit skill organization after SVG and MCP workflows stabilize
 - [ ] Consider separate drawing, wireframing, SVG, and MCP skills
-
-### Color Scheme/"Vibe" Shift
-
-| Mode      | Background              | Accent               |
-| --------- | ----------------------- | -------------------- |
-| **Light** | `#E0E0FE` soft lavender | `#EB4999` vivid pink |
-| **Dark**  | `#292E6E` deep indigo   | `#EB4999` vivid pink |
-
-The palette is based on Skeleton's **Modern** theme: `surface-50` / `surface-950` for the light and dark backgrounds, with `primary-500` as the shared brand accent.
-
-```css
-/* Light */
---bg: #e0e0fe;
---surface: #c7c8fb;
---text: #292e6e;
---muted: #575ad9;
---accent: #eb4999;
---link: #c92f7d;
-
-/* Dark */
---bg: #292e6e;
---surface: #353988;
---text: #e0e0fe;
---muted: #aeb0f6;
---accent: #eb4999;
---link: #f06bad;
-```

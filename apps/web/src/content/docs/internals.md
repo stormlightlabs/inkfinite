@@ -1,8 +1,8 @@
 ---
 title: Internals
 description: "How Inkfinite's Rust document engine, TypeScript editor, desktop bridge, renderer, and CLI fit together."
-section: Concepts
-group: Concepts
+section: Internals
+group: Internals
 order: 10
 ---
 

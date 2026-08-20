@@ -65,7 +65,10 @@ Direct path editing follows:
 
 Path anchors, handles, and subpath selections are ephemeral editor state.
 They are geometry owned by a path shape rather than independent durable
-document records.
+document records. Rust owns the deterministic path and hierarchy operations
+that produce committed geometry; TypeScript owns tool state and low-latency
+previews. The [native path geometry guide](apps/web/src/content/docs/internals/native-path-geometry.md)
+defines this editing boundary.
 
 Advanced vector operations such as boolean geometry, masks, gradients,
 filters, and variable-width strokes can follow once the native path model and

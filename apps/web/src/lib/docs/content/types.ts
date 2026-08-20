@@ -1,7 +1,14 @@
 import type { Component } from 'svelte';
 
 /** Sidebar sections used to organize the documentation. */
-export const docSections = ['Get started', 'Concepts', 'Applications', 'Reference'] as const;
+export const docSections = [
+	'Get started',
+	'Concepts',
+	'Applications',
+	'Reference',
+	'Internals'
+] as const;
+
 export type DocSection = (typeof docSections)[number];
 
 /** A heading shown in a document's table of contents. */

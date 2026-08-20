@@ -1,8 +1,8 @@
 ---
 title: Testing
 description: 'How Inkfinite uses shared fixtures and tests to protect document and interchange behavior.'
-section: Concepts
-group: Concepts
+section: Internals
+group: Internals
 order: 13
 ---
 

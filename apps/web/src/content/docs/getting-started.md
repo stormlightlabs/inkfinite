@@ -12,12 +12,21 @@ to keep your documents.
 ## Requirements
 
 You need Node.js 18 or newer, pnpm, and Rust 1.89. Building the desktop app also requires the
-[Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) for your operating system.
+[Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS.
 
 Clone the repository, open a terminal in its root directory, and install the JavaScript packages:
 
 ```sh
 pnpm install
+```
+
+The web editor also needs the Rust WebAssembly target and the `wasm-bindgen` CLI version used by
+`Cargo.lock`. Set them up and compile the browser document engine once after a fresh checkout:
+
+```sh
+rustup target add wasm32-unknown-unknown
+cargo install wasm-bindgen-cli --version 0.2.126 --locked
+pnpm wasm:build
 ```
 
 ## Installation

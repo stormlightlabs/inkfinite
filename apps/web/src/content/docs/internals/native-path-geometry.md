@@ -1,8 +1,8 @@
 ---
 title: Native path geometry
 description: 'The path representation used by SVG interoperability and vector editing.'
-section: Concepts
-group: Concepts
+section: Internals
+group: Internals
 order: 11
 ---
 
@@ -77,6 +77,27 @@ the document.
 The binding generator exports `PathFillRule`, `PathSegment`, `PathSubpath`, and `PathGeometry` to
 `@inkfinite/bindings`. Its registry also exposes `validatePathGeometry` and applies the same
 structural checks to serialized values.
+
+## Editing ownership
+
+`inkfinite-core` owns deterministic operations that produce committed path geometry or hierarchy
+changes. This includes splitting curves to add anchors, deleting anchors, converting segment types,
+opening and closing subpaths, joining endpoints, and computing parent-relative transforms when
+reparenting a shape without changing its world-space appearance. These operations are exposed to
+interactive clients through generated bindings and WASM where needed. CLI, MCP, desktop, and web
+edits therefore use the same implementations rather than replacing complete paths with geometry
+constructed independently by each interface.
+
+TypeScript owns direct-selection tool state, selected anchors and handles, pointer interpretation,
+overlays, and frame-by-frame gesture previews. A preview may mirror a Rust calculation to avoid a
+round trip during pointer movement, but it does not define committed geometry. Shared fixtures must
+compare preview results with the canonical Rust operation for curve splitting, topology changes,
+and nested transforms.
+
+A completed gesture submits one operation in one transaction through the Rust document session. Rust
+applies the operation, validates the resulting path and hierarchy, computes committed bounds and
+invalidated regions, and returns the updated editor projection. One completed gesture therefore
+produces one undo step.
 
 ## Geometry and rendering
 

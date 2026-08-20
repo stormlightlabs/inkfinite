@@ -10,10 +10,13 @@ The web editor provides the full canvas interface without access to native `.ink
 
 ## Open the editor
 
-The hosted editor lives at [`/app`](/app). To run it from a source checkout:
+The hosted editor lives at [`/app`](/app). To run it from source:
 
 ```sh
 pnpm install
+rustup target add wasm32-unknown-unknown
+cargo install wasm-bindgen-cli --version 0.2.126 --locked
+pnpm wasm:build
 pnpm dev:web
 ```
 

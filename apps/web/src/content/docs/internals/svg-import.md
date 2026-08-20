@@ -1,8 +1,8 @@
 ---
 title: SVG import
 description: 'How static SVG content is parsed into Inkfinite native shapes and assets.'
-section: Concepts
-group: Concepts
+section: Internals
+group: Internals
 order: 12
 ---
 
