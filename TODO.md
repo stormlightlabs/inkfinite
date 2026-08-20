@@ -63,10 +63,10 @@ Inkfinite now imports SVGs through one validated Rust pipeline across desktop, w
 
 ### Browser facade
 
-- [ ] Establish the `inkfinite-wasm` build and TypeScript bindings
-- [ ] Expose deterministic Rust SVG rendering to the browser
-- [ ] Route browser SVG export through Rust
-- [ ] Keep Canvas and PNG rendering in TypeScript
+- [x] Establish the `inkfinite-wasm` build and TypeScript bindings
+- [x] Expose deterministic Rust SVG rendering to the browser
+- [x] Route browser SVG export through Rust
+- [x] Keep Canvas and PNG rendering in TypeScript
 
 ### Editor projection and reconciliation
 

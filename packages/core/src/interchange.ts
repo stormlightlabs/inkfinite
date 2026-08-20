@@ -31,6 +31,23 @@ export type InterchangeExport = {
 	warnings: InterchangeWarning[];
 };
 
+/** Selection and page options for browser Rust/WASM SVG rendering. */
+export type SvgExportOptions = {
+	pageId?: string;
+	selectionIds?: string[];
+	/** Preserve selected-only semantics when no shape is selected. */
+	selectionOnly?: boolean;
+};
+
+/** Deterministic SVG output returned by a browser platform adapter. */
+export type SvgExport = {
+	format: 'svg';
+	contents: string;
+	extension: 'svg';
+	mimeType: 'image/svg+xml';
+	warnings: InterchangeWarning[];
+};
+
 const MAX_IMPORT_BYTES = 16 * 1024 * 1024;
 
 /** Returns whether a filename or text prefix identifies an SVG source. */

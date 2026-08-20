@@ -8,3 +8,4 @@ __screenshots__
 target/
 .vscode
 .agents
+!AGENTS.md

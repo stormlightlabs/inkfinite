@@ -47,14 +47,13 @@
   valid/invalid geometry fixtures.
 - SVG imports committed as one validated transaction from the desktop file menu,
   browser file and drop entry points, and the CLI.
-- SVG import fixture corpus covering Iconify-derived icons and logos, the
-  Bootstrap `filetype-svg` regression icon, nested groups, compound paths,
-  unsupported content, and malformed inputs, with importer regression tests for
-  native mappings, `currentColor`, warnings, and typed failures.
-- Browser SVG imports now use the Rust importer through a lazy WASM facade and
+- Browser SVG imports use the Rust importer through a lazy WASM facade and
   reusable worker. The normalized result retains groups, composed transforms,
   styles, fill rules, source assets, embedded assets, warnings, and structured
   failures before one IndexedDB board import.
+- Browser SVG exports project the current board into the canonical snapshot,
+  render it through the Rust SVG renderer in the shared worker, and preserve
+  warnings.
 
 ### Changed
 

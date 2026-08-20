@@ -36,6 +36,7 @@
 		onImportEditable?: () => void;
 		onImportSvg?: () => void;
 		onImportSvgMarkup?: () => void;
+		onExportSvg?: (selectedOnly: boolean) => Promise<void>;
 		onExportEditable?: (format: InterchangeFormat) => void;
 		interchangeBusy?: boolean;
 	};
@@ -50,6 +51,7 @@
 		onImportEditable,
 		onImportSvg,
 		onImportSvgMarkup,
+		onExportSvg,
 		onExportEditable,
 		interchangeBusy = false
 	}: Props = $props();
@@ -231,15 +233,23 @@
 		}
 	}
 
-	function exportSVGAll() {
-		const svg = exportToSVG(editorState, { selectedOnly: false });
-		downloadText(svg, 'drawing.svg');
+	async function exportSVGAll() {
+		if (onExportSvg) {
+			await onExportSvg(false);
+		} else {
+			const svg = exportToSVG(editorState, { selectedOnly: false });
+			downloadText(svg, 'drawing.svg');
+		}
 		exportMenuOpen = false;
 	}
 
-	function exportSVGSelection() {
-		const svg = exportToSVG(editorState, { selectedOnly: true });
-		downloadText(svg, 'selection.svg');
+	async function exportSVGSelection() {
+		if (onExportSvg) {
+			await onExportSvg(true);
+		} else {
+			const svg = exportToSVG(editorState, { selectedOnly: true });
+			downloadText(svg, 'selection.svg');
+		}
 		exportMenuOpen = false;
 	}
 

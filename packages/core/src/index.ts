@@ -9,6 +9,7 @@ export * from './layers';
 export * from './math';
 export * from './model';
 export * from './persistence/desktop';
+export * from './persistence/canonical';
 export * from './persistence/document';
 export * from './persistence/repo';
 export * from './persistence/stats';

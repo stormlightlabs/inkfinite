@@ -1,11 +1,16 @@
+import type { DocumentSnapshot } from '@inkfinite/wasm';
 import { describe, expect, it } from 'vitest';
 import { SvgImportWorkerClient } from './svg-import';
 
 type Listener = (event: { data: unknown; message?: string }) => void;
 
+type FakeMessage =
+	| { type: 'import'; id: number; source: ArrayBuffer }
+	| { type: 'render'; id: number; snapshot: unknown; options: unknown };
+
 class FakeWorker {
 	private listeners = new Map<string, Set<Listener>>();
-	lastMessage: { id: number; source: ArrayBuffer } | null = null;
+	lastMessage: FakeMessage | null = null;
 	lastTransfer: ArrayBuffer[] = [];
 	terminated = false;
 
@@ -19,7 +24,7 @@ class FakeWorker {
 		this.listeners.get(type)?.delete(listener);
 	}
 
-	postMessage(message: { id: number; source: ArrayBuffer }, transfer: ArrayBuffer[]) {
+	postMessage(message: FakeMessage, transfer: ArrayBuffer[]) {
 		this.lastMessage = message;
 		this.lastTransfer = transfer;
 		queueMicrotask(() =>
@@ -27,10 +32,24 @@ class FakeWorker {
 				.get('message')
 				?.forEach((listener) =>
 					listener({
-						data: {
-							id: message.id,
-							response: { status: 'success', import: {}, omitted_image_count: 0 }
-						}
+						data:
+							message.type === 'import'
+								? {
+										id: message.id,
+										response: {
+											status: 'success',
+											import: {},
+											omitted_image_count: 0
+										}
+									}
+								: {
+										id: message.id,
+										response: {
+											status: 'success',
+											svg: '<svg/>',
+											warnings: []
+										}
+									}
 					})
 				)
 		);
@@ -49,12 +68,31 @@ describe('SVG import worker client', () => {
 
 		const result = await client.import(source);
 
-		expect(worker.lastMessage?.source).toBeInstanceOf(ArrayBuffer);
+		expect(worker.lastMessage?.type).toBe('import');
+		expect(
+			worker.lastMessage && 'source' in worker.lastMessage ? worker.lastMessage.source : null
+		).toBeInstanceOf(ArrayBuffer);
 		expect(worker.lastTransfer).toHaveLength(1);
-		expect(worker.lastTransfer[0]).toBe(worker.lastMessage?.source);
+		expect(worker.lastTransfer[0]).toBe(
+			worker.lastMessage && 'source' in worker.lastMessage ? worker.lastMessage.source : null
+		);
 		expect(result.omitted_image_count).toBe(0);
 		expect(source).toEqual(new Uint8Array([60, 115, 118, 103]));
 		client.dispose();
 		expect(worker.terminated).toBe(true);
+	});
+
+	it('routes canonical render requests through the same worker', async () => {
+		const worker = new FakeWorker();
+		const client = new SvgImportWorkerClient(worker as unknown as Worker);
+
+		const result = await client.render({} as DocumentSnapshot, { page_id: 'page:one' });
+
+		expect(worker.lastMessage).toMatchObject({
+			type: 'render',
+			options: { page_id: 'page:one' }
+		});
+		expect(result).toEqual({ status: 'success', svg: '<svg/>', warnings: [] });
+		client.dispose();
 	});
 });

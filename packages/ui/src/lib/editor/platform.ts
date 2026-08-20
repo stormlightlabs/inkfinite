@@ -1,7 +1,10 @@
 import type {
+	BoardExport,
 	BoardInspectorData,
 	FileHandle,
 	InterchangeExport,
+	SvgExport,
+	SvgExportOptions,
 	PersistenceSink,
 	PersistenceStatus,
 	PersistentDocRepo,
@@ -79,7 +82,9 @@ export interface InterchangeFileAccess {
 	pickSvg?(): Promise<SvgSourceFile | null>;
 	/** Parses SVG bytes through the application's shared Rust/WASM worker. */
 	importSvg?(source: Uint8Array): Promise<SvgImportResult>;
-	saveExport(file: InterchangeExport, defaultStem: string): Promise<boolean>;
+	/** Renders a browser document through the application's shared Rust/WASM worker. */
+	exportSvg?(snapshot: BoardExport, options?: SvgExportOptions): Promise<SvgExport>;
+	saveExport(file: InterchangeExport | SvgExport, defaultStem: string): Promise<boolean>;
 }
 
 /**

@@ -37,6 +37,7 @@ import type {
 	InterchangeFormat,
 	InterchangeWarning,
 	LoadedDoc,
+	SvgExportOptions,
 	PersistenceSink,
 	PersistentDocRepo,
 	Viewport
@@ -578,6 +579,45 @@ export function createCanvasController(
 		);
 	}
 
+	async function exportSvg(selectedOnly: boolean) {
+		const exportFunction = platformSession?.interchange?.exportSvg;
+		if (!exportFunction || !activeBoardId || !repo || !sink || !platformSession?.interchange) {
+			throw new Error('The browser SVG exporter is not available.');
+		}
+		interchangeBusy = true;
+		try {
+			await sink.flush();
+			const snapshot = await repo.exportBoard(activeBoardId);
+			const state = store.getState();
+			const options: SvgExportOptions = {
+				pageId: state.ui.currentPageId ?? undefined,
+				selectionIds: selectedOnly ? [...state.ui.selectionIds] : [],
+				selectionOnly: selectedOnly
+			};
+			const exported = await exportFunction(snapshot, options);
+			const saved = await platformSession.interchange.saveExport(
+				exported,
+				snapshot.board.name
+			);
+			if (!saved) return;
+			interchangeNotice = {
+				title: 'Export complete',
+				message: `${snapshot.board.name}.svg was saved.`,
+				warnings: exported.warnings,
+				error: false
+			};
+		} catch (error) {
+			interchangeNotice = {
+				title: 'Export failed',
+				message: error instanceof Error ? error.message : String(error),
+				warnings: [],
+				error: true
+			};
+		} finally {
+			interchangeBusy = false;
+		}
+	}
+
 	async function exportEditableCanvas(format: InterchangeFormat) {
 		if (!activeBoardId || !repo || !sink || !platformSession?.interchange) return;
 		interchangeBusy = true;
@@ -892,6 +932,7 @@ export function createCanvasController(
 		importSvg,
 		importSvgMarkup,
 		importSvgFile,
+		exportSvg,
 		exportEditableCanvas,
 		interchangeBusy: () => interchangeBusy,
 		interchangeNotice: () => interchangeNotice,

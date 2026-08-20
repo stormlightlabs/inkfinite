@@ -1,15 +1,19 @@
-import type {
-	DocPatch,
-	InterchangeExport,
-	PersistenceSink,
-	PersistentDocRepo
+import {
+	toCanonicalDocumentSnapshot,
+	type BoardExport,
+	type DocPatch,
+	type InterchangeExport,
+	type PersistenceSink,
+	type PersistentDocRepo,
+	type SvgExport,
+	type SvgExportOptions
 } from '@inkfinite/core';
 import { createStatusStore } from '@inkfinite/ui/editor';
 import type { EditorPlatformAdapter, EditorPlatformSession } from '@inkfinite/ui/editor';
 import { liveQuery } from 'dexie';
 import { InkfiniteDB } from './database';
 import { createDexieDocRepo, createPersistenceSink, getBoardInspectorData } from './repository';
-import { importSvgInWorker } from './svg-import';
+import { importSvgInWorker, renderSvgInWorker } from './svg-import';
 import type { PersistenceSinkOptions } from './repository';
 
 type LiveQueryFactory = typeof liveQuery;
@@ -202,7 +206,47 @@ export function createBrowserInterchangeFiles() {
 		pickImport: () => pickTextFile('.excalidraw,.canvas,application/json'),
 		pickSvg: pickSvgFile,
 		importSvg: importSvgInWorker,
-		async saveExport(file: InterchangeExport, defaultStem: string): Promise<boolean> {
+		async exportSvg(
+			snapshot: BoardExport,
+			options: SvgExportOptions = {}
+		): Promise<SvgExport> {
+			const canonical = toCanonicalDocumentSnapshot(snapshot);
+			if (options.selectionOnly && !(options.selectionIds?.length ?? 0)) {
+				canonical.document = {
+					...canonical.document,
+					layers: Object.fromEntries(
+						Object.entries(canonical.document.layers).map(([id, layer]) => [
+							id,
+							{ ...layer, shape_ids: [] }
+						])
+					),
+					shapes: {},
+					bindings: {}
+				};
+			}
+			const response = await renderSvgInWorker(canonical, {
+				page_id: options.pageId,
+				selection: options.selectionIds ?? []
+			});
+			if (response.status === 'error') {
+				throw new Error(`${response.error.code}: ${response.error.message}`);
+			}
+			return {
+				format: 'svg',
+				contents: response.svg,
+				extension: 'svg',
+				mimeType: 'image/svg+xml',
+				warnings: response.warnings.map((warning) => ({
+					code: `svg-${warning.code}`,
+					message: warning.message,
+					count: 1
+				}))
+			};
+		},
+		async saveExport(
+			file: InterchangeExport | SvgExport,
+			defaultStem: string
+		): Promise<boolean> {
 			const blob = new Blob([file.contents], { type: file.mimeType });
 			const url = URL.createObjectURL(blob);
 			const anchor = document.createElement('a');

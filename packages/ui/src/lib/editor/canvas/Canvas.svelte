@@ -159,7 +159,9 @@
 					ui: {
 						...state.ui,
 						activeLayerId: shape?.layerId ?? state.ui.activeLayerId,
-						selectionIds: state.ui.selectionIds.includes(shapeId) ? state.ui.selectionIds : [shapeId],
+						selectionIds: state.ui.selectionIds.includes(shapeId)
+							? state.ui.selectionIds
+							: [shapeId],
 						toolId: 'select'
 					}
 				};
@@ -167,7 +169,12 @@
 			contextMenuItems = [
 				{ id: 'duplicate', label: 'Duplicate', icon: 'add', shortcut: '⌘/Ctrl D' },
 				{ id: 'forward', label: 'Bring forward', icon: 'arrow-up', shortcut: '⌘/Ctrl ]' },
-				{ id: 'backward', label: 'Send backward', icon: 'arrow-down', shortcut: '⌘/Ctrl [' },
+				{
+					id: 'backward',
+					label: 'Send backward',
+					icon: 'arrow-down',
+					shortcut: '⌘/Ctrl ['
+				},
 				{ type: 'separator' },
 				{ id: 'delete', label: 'Delete', icon: 'delete', shortcut: '⌫', danger: true }
 			];
@@ -194,7 +201,12 @@
 				break;
 			case 'delete':
 				c.handleAction(
-					Action.keyDown('Delete', 'Delete', { ctrl: false, shift: false, alt: false, meta: false })
+					Action.keyDown('Delete', 'Delete', {
+						ctrl: false,
+						shift: false,
+						alt: false,
+						meta: false
+					})
 				);
 				break;
 			case 'stencils':
@@ -215,6 +227,7 @@
 		onImportEditable={c.importEditableCanvas}
 		onImportSvg={c.importSvg}
 		onImportSvgMarkup={platformKind === 'web' ? openSvgMarkupDialog : undefined}
+		onExportSvg={platformKind === 'web' ? c.exportSvg : undefined}
 		onExportEditable={c.exportEditableCanvas}
 		interchangeBusy={c.interchangeBusy()} />
 	<div
@@ -238,7 +251,10 @@
 			oncontextmenu={handleCanvasContextMenu}
 			onpointerleave={c.handlePointerLeave}></canvas>
 		{#if liveProposal}
-			<ProposalGhostLayer proposal={liveProposal} camera={c.store.getState().camera} viewport={c.getViewport()} />
+			<ProposalGhostLayer
+				proposal={liveProposal}
+				camera={c.store.getState().camera}
+				viewport={c.getViewport()} />
 		{/if}
 		<NavigationControls store={c.store} camera={c.camera} />
 		<LayerPanel store={c.store} onCommit={c.commitLayerState} />
@@ -338,7 +354,10 @@
 			onAgentAccessChange={c.setAgentAccess} />
 	{/if}
 	<HistoryViewer store={c.store} bind:open={historyViewerOpen} onClose={c.history.handleClose} />
-	<Dialog bind:open={svgMarkupDialogOpen} onClose={closeSvgMarkupDialog} title="Import SVG markup">
+	<Dialog
+		bind:open={svgMarkupDialogOpen}
+		onClose={closeSvgMarkupDialog}
+		title="Import SVG markup">
 		<form class="svg-markup-dialog" onsubmit={submitSvgMarkup}>
 			<div class="svg-markup-dialog__header">
 				<h2>Import SVG markup</h2>
@@ -353,10 +372,16 @@
 					spellcheck="false"
 					rows="12"></textarea>
 			</label>
-			{#if svgMarkupError}<p class="svg-markup-dialog__error" role="alert">{svgMarkupError}</p>{/if}
+			{#if svgMarkupError}<p class="svg-markup-dialog__error" role="alert">
+					{svgMarkupError}
+				</p>{/if}
 			<div class="svg-markup-dialog__actions">
-				<Button variant="ghost" onclick={closeSvgMarkupDialog} disabled={svgMarkupSubmitting}>Cancel</Button>
-				<Button variant="primary" type="submit" busy={svgMarkupSubmitting}>Import SVG</Button>
+				<Button
+					variant="ghost"
+					onclick={closeSvgMarkupDialog}
+					disabled={svgMarkupSubmitting}>Cancel</Button>
+				<Button variant="primary" type="submit" busy={svgMarkupSubmitting}
+					>Import SVG</Button>
 			</div>
 		</form>
 	</Dialog>
@@ -376,14 +401,19 @@
 			bind:open={c.fileBrowser.open}
 			onUpdate={c.fileBrowser.handleUpdate}
 			onClose={c.fileBrowser.handleClose}
-			fetchInspectorData={platformKind === 'web' ? c.fileBrowser.fetchInspectorData : undefined}
+			fetchInspectorData={platformKind === 'web'
+				? c.fileBrowser.fetchInspectorData
+				: undefined}
 			desktopRepo={c.desktop.repo} />
 	{/if}
 	<StencilPalette
 		bind:open={c.stencilPaletteOpen}
 		onClose={() => (c.stencilPaletteOpen = false)}
 		onStencilClick={handleInsertStencilAtCenter} />
-	<Dialog open={Boolean(interchangeNotice)} onClose={c.closeInterchangeNotice} title={interchangeNotice?.title}>
+	<Dialog
+		open={Boolean(interchangeNotice)}
+		onClose={c.closeInterchangeNotice}
+		title={interchangeNotice?.title}>
 		{#if interchangeNotice}
 			<div class="interchange-notice" data-error={interchangeNotice.error}>
 				<h2>{interchangeNotice.title}</h2>

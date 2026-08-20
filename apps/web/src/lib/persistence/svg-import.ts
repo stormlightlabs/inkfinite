@@ -1,4 +1,10 @@
-import { importSvg as importSvgWasm, type SvgImportResponse } from '@inkfinite/wasm';
+import { importSvg as importSvgWasm, renderSvg as renderSvgWasm } from '@inkfinite/wasm';
+import type {
+	DocumentSnapshot,
+	SvgImportResponse,
+	SvgRenderOptions,
+	SvgRenderResponse
+} from '@inkfinite/wasm';
 import type { SvgImportResult } from '@inkfinite/core';
 
 /** A structured parser failure returned by the SVG worker. */
@@ -12,12 +18,25 @@ export class SvgImportWorkerError extends Error {
 	}
 }
 
-/** A worker boundary that keeps SVG decoding and Rust parsing off the UI thread. */
+type WorkerRequestBody =
+	| { type: 'import'; source: ArrayBuffer }
+	| { type: 'render'; snapshot: DocumentSnapshot; options: SvgRenderOptions };
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type WorkerRequest = WorkerRequestBody & { id: number };
+
+type WorkerResponse =
+	| { id: number; response: SvgImportResponse | SvgRenderResponse }
+	| { id: number; error: string };
+
+type WorkerResponseValue = SvgImportResponse | SvgRenderResponse;
+
+/** A worker boundary that keeps SVG decoding, parsing, and rendering off the UI thread. */
 export class SvgImportWorkerClient {
 	private nextRequestId = 0;
 	private readonly pending = new Map<
 		number,
-		{ resolve: (value: SvgImportResult) => void; reject: (error: Error) => void }
+		{ resolve: (value: WorkerResponseValue) => void; reject: (error: Error) => void }
 	>();
 
 	constructor(private readonly worker: Worker) {
@@ -26,13 +45,25 @@ export class SvgImportWorkerClient {
 	}
 
 	/** Imports one transferred byte buffer. */
-	import(source: Uint8Array): Promise<SvgImportResult> {
-		const id = ++this.nextRequestId;
-		return new Promise((resolve, reject) => {
-			this.pending.set(id, { resolve, reject });
-			const transferable = source.slice();
-			this.worker.postMessage({ id, source: transferable.buffer }, [transferable.buffer]);
-		});
+	async import(source: Uint8Array): Promise<SvgImportResult> {
+		const transferable = source.slice();
+		const response = await this.request<SvgImportResponse>(
+			{ type: 'import', source: transferable.buffer },
+			[transferable.buffer]
+		);
+
+		if (response.status === 'error') {
+			throw new SvgImportWorkerError(response.error.code, response.error.message);
+		}
+		return { ...response.import, omitted_image_count: response.omitted_image_count };
+	}
+
+	/** Renders one canonical snapshot through the Rust SVG renderer. */
+	render(
+		snapshot: DocumentSnapshot,
+		options: SvgRenderOptions = {}
+	): Promise<SvgRenderResponse> {
+		return this.request<SvgRenderResponse>({ type: 'render', snapshot, options });
 	}
 
 	/** Stops the shared worker and rejects requests that have not completed. */
@@ -40,7 +71,18 @@ export class SvgImportWorkerClient {
 		this.worker.removeEventListener('message', this.handleMessage);
 		this.worker.removeEventListener('error', this.handleError);
 		this.worker.terminate();
-		this.rejectPending(new Error('The SVG import worker was stopped.'));
+		this.rejectPending(new Error('The SVG worker was stopped.'));
+	}
+
+	private request<T extends WorkerResponseValue>(
+		message: WorkerRequestBody,
+		transfer: Transferable[] = []
+	): Promise<T> {
+		const id = ++this.nextRequestId;
+		return new Promise((resolve, reject) => {
+			this.pending.set(id, { resolve: (value) => resolve(value as T), reject });
+			this.worker.postMessage({ ...message, id }, transfer);
+		});
 	}
 
 	private readonly handleMessage = (event: MessageEvent<WorkerResponse>) => {
@@ -51,16 +93,11 @@ export class SvgImportWorkerClient {
 			request.reject(new Error(event.data.error));
 			return;
 		}
-		const response = event.data.response;
-		if (response.status === 'error') {
-			request.reject(new SvgImportWorkerError(response.error.code, response.error.message));
-			return;
-		}
-		request.resolve({ ...response.import, omitted_image_count: response.omitted_image_count });
+		request.resolve(event.data.response);
 	};
 
 	private readonly handleError = (event: ErrorEvent) => {
-		this.rejectPending(new Error(event.message || 'The SVG import worker failed.'));
+		this.rejectPending(new Error(event.message || 'The SVG worker failed.'));
 	};
 
 	private rejectPending(error: Error) {
@@ -69,18 +106,16 @@ export class SvgImportWorkerClient {
 	}
 }
 
-type WorkerResponse = { id: number; response: SvgImportResponse } | { id: number; error: string };
-
 let sharedClient: SvgImportWorkerClient | null = null;
 
-/** Returns the one SVG worker shared by browser file, drop, and markup imports. */
+/** Returns the one SVG worker shared by browser file, drop, markup, and export actions. */
 export function getSharedSvgImportWorker(): SvgImportWorkerClient {
 	if (typeof Worker === 'undefined')
-		throw new Error('SVG import workers are unavailable in this environment.');
+		throw new Error('SVG workers are unavailable in this environment.');
 	sharedClient ??= new SvgImportWorkerClient(
 		new Worker(new URL('./svg-import.worker.ts', import.meta.url), {
 			type: 'module',
-			name: 'inkfinite-svg-import'
+			name: 'inkfinite-svg'
 		})
 	);
 	return sharedClient;
@@ -97,7 +132,20 @@ export function importSvgInWorker(source: Uint8Array) {
 	return getSharedSvgImportWorker().import(source);
 }
 
-/** Used by the worker entry point to run the generated Rust binding. */
+/** Renders a canonical snapshot through the shared worker. */
+export function renderSvgInWorker(snapshot: DocumentSnapshot, options: SvgRenderOptions = {}) {
+	return getSharedSvgImportWorker().render(snapshot, options);
+}
+
+/** Used by the worker entry point to run the generated Rust/WASM bindings. */
 export async function importSvgInWorkerRuntime(source: Uint8Array) {
 	return importSvgWasm(source);
+}
+
+/** Used by the worker entry point to run the generated Rust/WASM bindings. */
+export async function renderSvgInWorkerRuntime(
+	snapshot: DocumentSnapshot,
+	options: SvgRenderOptions
+) {
+	return renderSvgWasm(snapshot, options);
 }

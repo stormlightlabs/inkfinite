@@ -1,6 +1,13 @@
-import { importSvgInWorkerRuntime } from './svg-import';
+import { importSvgInWorkerRuntime, renderSvgInWorkerRuntime } from './svg-import';
 
-type Request = { id: number; source: ArrayBuffer };
+type Request =
+	| { type: 'import'; id: number; source: ArrayBuffer }
+	| {
+			type: 'render';
+			id: number;
+			snapshot: import('@inkfinite/wasm').DocumentSnapshot;
+			options: import('@inkfinite/wasm').SvgRenderOptions;
+	  };
 type WorkerScope = {
 	onmessage: ((event: MessageEvent<Request>) => void) | null;
 	postMessage(message: unknown): void;
@@ -9,7 +16,10 @@ type WorkerScope = {
 const scope = globalThis as unknown as WorkerScope;
 scope.onmessage = async (event) => {
 	try {
-		const response = await importSvgInWorkerRuntime(new Uint8Array(event.data.source));
+		const response =
+			event.data.type === 'import'
+				? await importSvgInWorkerRuntime(new Uint8Array(event.data.source))
+				: await renderSvgInWorkerRuntime(event.data.snapshot, event.data.options);
 		scope.postMessage({ id: event.data.id, response });
 	} catch (error) {
 		scope.postMessage({
