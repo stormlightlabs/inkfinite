@@ -387,28 +387,31 @@ fn delete_restore_and_redo_refresh_multi_record_preconditions() {
 }
 
 #[test]
-fn layer_visual_changes_return_regions_and_deletes_honor_locked_descendants() {
-    let mut engine = engine();
-    let hide = transaction(
-        &mut engine,
-        "actor:a",
-        "hide layer",
-        vec![Operation::PatchLayer {
-            layer_id: LayerId::from("layer:one"),
-            patch: LayerPatch { visible: Some(false), ..LayerPatch::default() },
-            expected_version: Some(RecordVersion(1)),
-        }],
-    );
-    assert_eq!(engine.commit(hide).unwrap().affected_regions.len(), 1);
-    assert!(
+fn agent_origin_can_query_and_edit_hidden_non_agent_editable_shapes() {
+    let mut initial = document();
+    initial.layers.get_mut(&LayerId::from("layer:one")).unwrap().visible = false;
+    initial
+        .shapes
+        .get_mut(&ShapeId::from("shape:a"))
+        .unwrap()
+        .metadata
+        .agent_editable = false;
+    let mut engine = TransactionEngine::create(
+        DocumentId::from("document:direct-control"),
+        ActorId::from("actor:local"),
+        initial,
+    )
+    .unwrap();
+
+    assert_eq!(
         engine
             .query(&Query { shape_kind: Some("rect".into()), ..Query::default() })
             .unwrap()
             .records
-            .is_empty(),
-        "agent-facing queries must not expose shapes in hidden layers"
+            .len(),
+        3
     );
-    let mut hidden_agent_edit = transaction(
+    let mut edit = transaction(
         &mut engine,
         "actor:agent",
         "edit hidden shape",
@@ -426,11 +429,31 @@ fn layer_visual_changes_return_regions_and_deletes_honor_locked_descendants() {
             expected_version: Some(RecordVersion(1)),
         }],
     );
-    hidden_agent_edit.origin = Origin::Agent;
-    assert!(matches!(
-        engine.commit(hidden_agent_edit),
-        Err(EngineError::Permission(_))
-    ));
+    edit.origin = Origin::Agent;
+    engine.commit(edit).unwrap();
+    assert_eq!(
+        engine.snapshot().unwrap().document.shapes[&ShapeId::from("shape:a")]
+            .transform
+            .translation
+            .x,
+        5.0
+    );
+}
+
+#[test]
+fn layer_visual_changes_return_regions_and_deletes_honor_locked_descendants() {
+    let mut engine = engine();
+    let hide = transaction(
+        &mut engine,
+        "actor:a",
+        "hide layer",
+        vec![Operation::PatchLayer {
+            layer_id: LayerId::from("layer:one"),
+            patch: LayerPatch { visible: Some(false), ..LayerPatch::default() },
+            expected_version: Some(RecordVersion(1)),
+        }],
+    );
+    assert_eq!(engine.commit(hide).unwrap().affected_regions.len(), 1);
 
     let mut locked_document = document();
     locked_document

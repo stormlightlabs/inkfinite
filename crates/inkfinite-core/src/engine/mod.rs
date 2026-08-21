@@ -43,7 +43,7 @@ use diff::{affected_regions, diff_documents};
 use hierarchy::{canonical_heads, warning};
 use history::{HistoryEntry, capture_expected_records, prepare_compensation, refresh_inverse_preconditions};
 use operations::apply_operation;
-use policy::{validate_permissions, validate_transaction_schema};
+use policy::{validate_locks, validate_transaction_schema};
 use query::query_document;
 
 /// Validated transaction result that has not been committed to the CRDT.
@@ -423,7 +423,7 @@ impl TransactionEngine {
         let mut candidate = before.clone();
         let mut inverse = Vec::new();
         for operation in &transaction.operations {
-            validate_permissions(&candidate, operation, &transaction.origin)?;
+            validate_locks(&candidate, operation)?;
             let operation_inverse = apply_operation(&mut candidate, operation)?;
             inverse.splice(0..0, operation_inverse);
         }

@@ -30,15 +30,15 @@ normalized structure where representation matters and rendered output where visu
 - [x] Decide whether `Origin` remains provenance-only
     - Decision: keep `Origin` as provenance-only metadata for history and attribution.
       It must not grant or deny access. Agent authorization moves to MCP.
-- [ ] Separate document invariants and ordinary locks from authorization
-- [ ] Remove `agent_editable` restrictions from direct CLI operations
-- [ ] Remove hidden-from-agent restrictions from direct CLI operations
+- [x] Separate document invariants and ordinary locks from authorization
+- [x] Remove `agent_editable` restrictions from direct CLI operations
+- [x] Remove hidden-from-agent restrictions from direct CLI operations
 
 ### Preserve document correctness
 
-- [ ] Keep causal-head and record-version checks
-- [ ] Keep transaction validation and atomic mutation
-- [ ] Keep ordinary shape and layer locks
+- [x] Keep causal-head and record-version checks
+- [x] Keep transaction validation and atomic mutation
+- [x] Keep ordinary shape and layer locks
 
 ### Simplify CLI and live control
 

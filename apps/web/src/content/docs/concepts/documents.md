@@ -28,9 +28,9 @@ Layers control stacking and visibility. Container shapes can own other shapes, w
 move as one unit. Bindings connect arrows to source and target shapes without making either shape
 a child of the other.
 
-Locks prevent edits to a layer or shape. The `agent_editable` metadata flag creates a separate
-boundary for agent-originated transactions, even when a human can still edit the object in the
-canvas.
+Locks prevent edits to a layer or shape regardless of who created the transaction. The
+`agent_editable` metadata flag is available to permissioned integrations, but the document engine
+and direct CLI do not treat it as a lock.
 
 ## Persistence
 

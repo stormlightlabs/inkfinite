@@ -44,8 +44,8 @@ The current implementation spans these paths:
 | Path                                                   | Responsibility                                                           |
 | ------------------------------------------------------ | ------------------------------------------------------------------------ |
 | `crates/inkfinite-core/src/lib.rs`                     | Defines `Origin`, provenance, and document metadata                      |
-| `crates/inkfinite-core/src/engine/policy.rs`           | Applies ordinary locks and the current origin-specific mutation checks   |
-| `crates/inkfinite-core/src/engine/query.rs`            | Filters shapes in invisible layers independently of transaction origin   |
+| `crates/inkfinite-core/src/engine/policy.rs`           | Applies transaction schema checks and ordinary document locks            |
+| `crates/inkfinite-core/src/engine/query.rs`            | Queries records independently of layer visibility and transaction origin |
 | `crates/inkfinite-core/src/session.rs`                 | Validates live proposals and direct applies                              |
 | `crates/inkfinite-core/src/ipc`                        | Carries live transactions between CLI and desktop sessions               |
 | `crates/inkfinite-cli/src/cli`                         | Constructs agent-originated shape, mutation, and SVG import transactions |
@@ -55,20 +55,18 @@ The current implementation spans these paths:
 Generated document, transaction, and protocol schemas also expose `Origin` and `agent_editable`.
 Regenerate them after changing either serialized type.
 
-## Current origin-sensitive behavior
+## Current behavior
 
-`engine/policy.rs` currently treats `Origin::Agent` specially: it rejects mutations to shapes whose
-`agent_editable` value is false and to shapes contained by invisible layers. Shape and layer locks
-apply regardless of origin.
+The transaction engine does not branch on `Origin`. Direct CLI transactions can query and mutate
+records in invisible layers and records whose `agent_editable` value is false. Shape and layer locks
+still reject edits for every origin, including edits reached through a locked ancestor or a layer
+delete.
 
-`session.rs` also requires agent origin at the live proposal and direct-apply entry points. Proposal
-size, description length, stale-head handling, transaction validation, and atomic commit do not
-depend on origin.
+`session.rs` still requires agent origin at the live proposal and direct-apply entry points. That is
+a property of the current live protocol, not document authorization. Proposal size, description
+length, stale-head handling, transaction validation, and atomic commit do not depend on origin.
 
-The query engine omits shapes in invisible layers for every query. It receives no transaction
-origin, so this is query visibility behavior rather than agent authorization. Keep that distinction
-in mind when changing hidden-layer access.
-
-Changes to origin-sensitive checks must retain origin on committed transactions and preserve all
-origin-independent validation and locks. Caller permissions belong at the integration boundary,
-where they can be evaluated without trusting provenance supplied in the transaction body.
+Committed transactions retain their origin. Causal heads, record versions, schema validation,
+document validation, and atomic commit apply to every caller. Permissioned integrations must check
+caller permissions before passing a transaction to the engine rather than trusting provenance in
+the transaction body.

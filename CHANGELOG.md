@@ -29,6 +29,9 @@
 - Moved canonical browser document state and committed geometry operations to Rust while retaining
   low-latency interaction previews in TypeScript.
 - Unified the document model and SVG pipeline across desktop, web, WASM, and CLI.
+- Made transaction origin provenance-only in the document engine. Direct CLI queries and mutations
+  can access invisible-layer and `agent_editable: false` records while causal checks, validation,
+  atomic commit, and ordinary shape and layer locks continue to apply.
 
 ### Fixed
 

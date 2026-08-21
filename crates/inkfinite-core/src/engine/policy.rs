@@ -1,7 +1,7 @@
 use super::hierarchy::{
     containing_layer, descendant_ids_for_layer, descendant_ids_for_shape, operation_layer_id, operation_shape_ids,
 };
-use super::{Document, EngineError, LayerContentsDisposition, Operation, Origin, TransactionDraft};
+use super::{Document, EngineError, LayerContentsDisposition, Operation, TransactionDraft};
 
 pub fn validate_transaction_schema(transaction: &TransactionDraft) -> Result<(), EngineError> {
     if transaction.id.0.trim().is_empty() {
@@ -19,7 +19,7 @@ pub fn validate_transaction_schema(transaction: &TransactionDraft) -> Result<(),
     Ok(())
 }
 
-pub fn validate_permissions(document: &Document, operation: &Operation, origin: &Origin) -> Result<(), EngineError> {
+pub fn validate_locks(document: &Document, operation: &Operation) -> Result<(), EngineError> {
     let mut shape_ids = operation_shape_ids(operation);
     if let Operation::ReparentShape { parent: crate::ShapeParent::Shape(parent_id), .. } = operation {
         shape_ids.push(parent_id.clone());
@@ -57,17 +57,6 @@ pub fn validate_permissions(document: &Document, operation: &Operation, origin: 
             };
             if shape.metadata.locked {
                 return Err(EngineError::Permission(format!("shape {current} is locked")));
-            }
-            if matches!(origin, Origin::Agent) && !shape.metadata.agent_editable {
-                return Err(EngineError::Permission(format!(
-                    "shape {current} is not agent-editable"
-                )));
-            }
-            if matches!(origin, Origin::Agent) && containing_layer(document, shape).is_some_and(|layer| !layer.visible)
-            {
-                return Err(EngineError::Permission(format!(
-                    "shape {current} is hidden from agents"
-                )));
             }
             current_id = match &shape.parent {
                 crate::ShapeParent::Shape(parent_id) => Some(parent_id.clone()),
@@ -113,7 +102,7 @@ pub fn validate_permissions(document: &Document, operation: &Operation, origin: 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ActorId;
+    use crate::{ActorId, Origin};
     use crate::proto::TransactionId;
 
     #[test]

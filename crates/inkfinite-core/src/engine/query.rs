@@ -34,9 +34,6 @@ pub fn query_document(snapshot: &DocumentSnapshot, query: &Query) -> QueryResult
     }
     for shape in document.shapes.values() {
         let containing_layer = containing_layer(document, shape);
-        if containing_layer.is_some_and(|layer| !layer.visible) {
-            continue;
-        }
         let shape_bounds = world_shape_bounds(document, &shape.id);
         let layer = containing_layer.map(|layer| layer.id.clone());
         let page = layer

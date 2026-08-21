@@ -42,9 +42,9 @@ refresh rather than accepting an outdated result.
 
 ## Permissions
 
-Locks and `agent_editable` metadata are document boundaries. An agent must not work around a locked
-layer, locked shape, or record marked `agent_editable: false` by editing a child or bypassing the
-CLI. Report the boundary and ask the human to make or authorize the change.
+Shape and layer locks apply to every CLI transaction. Do not work around a lock by editing a child
+or bypassing the CLI. The direct CLI does not enforce `agent_editable` or hide records in invisible
+layers; permissioned integrations can use that metadata as part of their own policy.
 
 Raw `app apply` works only in Direct mode. Use `app propose` to force a review regardless of the
 current mode.
