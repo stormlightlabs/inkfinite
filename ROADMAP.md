@@ -15,22 +15,6 @@ save and reopen, edit and export, undo and redo, CRDT merge, and CLI access.
 See [SVG import](apps/web/src/content/docs/internals/svg-import.md) and
 [native path geometry](apps/web/src/content/docs/internals/native-path-geometry.md).
 
-### Editor refinement
-
-Bring the editor interface up to the capabilities of the document model. Improve selection,
-snapping, keyboard and camera behavior, expose layout operations, and add clipboard and image
-workflows that behave like a native drawing application. Frames and bound arrows now use the same
-hierarchy, rendering, and persistence paths across web and desktop.
-
-Selection and movement now support object and grid snapping with alignment and gap guides, angle
-constraints, modifier-aware resize and drawing gestures, Alt-drag duplication, hover feedback,
-transformed handles, edge scrolling, zoom-to-selection, and stored grid preferences. Layout commands, selection and canvas context menus, keyboard shortcuts, the searchable `?` panel,
-clipboard commands, accessibility states, and editor error reporting are now in place. Clipboard
-content formats, native image assets, paste placement, SVG/PNG copy, and document/image drag-and-drop
-imports are also in place. Frames now support titled containment, moving contents, nested selection, zoom,
-and export. Arrows support bound endpoints, straight, curved, and elbow routing, bend controls, labels,
-and binding-aware copy and persistence.
-
 ### Permissioned MCP
 
 Add a local stdio MCP server as the policy-aware interface for model-controlled access. It should

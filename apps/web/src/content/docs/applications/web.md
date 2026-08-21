@@ -7,6 +7,8 @@ order: 5
 ---
 
 The web editor provides the full canvas interface without access to native `.inkfinite` files.
+See [Canvas editor](/docs/applications/editor/) for tools, gestures, clipboard formats, layers, and
+shortcuts.
 
 ## Open the editor
 

@@ -502,19 +502,31 @@
 
 	@media (pointer: coarse) {
 		.status-bar__action,
-		.status-bar__toggle input {
+		.status-bar__toggle {
 			min-height: 2.75rem;
 			min-width: 2.75rem;
 		}
+
+		.status-bar__toggle {
+			justify-content: center;
+		}
+
+		.status-bar__toggle input {
+			width: 1rem;
+			height: 1rem;
+		}
 	}
 
-	@media (max-width: 720px) {
+	@media (max-width: 720px) and (pointer: coarse) {
 		.status-bar {
 			gap: var(--ink-space-3);
 		}
 
+		.status-bar__section:nth-child(2),
+		.status-bar__section:nth-child(3),
 		.status-bar__label,
-		.status-bar__mode {
+		.status-bar__mode,
+		.status-bar__action span:last-child {
 			display: none;
 		}
 
@@ -524,6 +536,11 @@
 
 		.status-bar__toggle-row {
 			gap: var(--ink-space-3);
+		}
+
+		.status-bar__action {
+			min-width: 2.5rem;
+			justify-content: center;
 		}
 	}
 </style>

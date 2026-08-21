@@ -9,3 +9,4 @@ target/
 .vscode
 .agents
 !AGENTS.md
+.svelte-kit/

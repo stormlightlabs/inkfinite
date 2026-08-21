@@ -16,40 +16,6 @@ normalized structure where representation matters and rendered output where visu
 - [ ] Verify opaque fallback content remains visually stable
 - [ ] Add deterministic round-trip fixtures for these workflows
 
-## Editor refinement
-
-### Selection and movement
-
-- [x] Add edge, center, corner, equal-gap, handle, and 15-degree angle snapping with visible guides
-- [x] Apply Shift constraints, Alt/Option duplication, centered resize, and aspect-ratio modifiers
-      consistently across selection and drawing tools
-- [x] Improve selection hover, Direct Select handles, rotated resize cursors, and edge scrolling
-- [x] Add zoom to selection, smoother camera controls, and persistent grid and snap preferences
-
-### Layout and commands
-
-- [x] Add contextual align, distribute, group, order, lock, and `agent_editable` controls
-- [x] Complete the keyboard shortcut scheme and add a searchable `?` shortcut panel
-- [x] Expand context menus for selection, layout, clipboard, and view actions
-- [x] Add accessible labels, keyboard traversal, coarse touch targets, and reduced-motion behavior
-- [x] Report save, import, export, clipboard, and document errors in the editor
-
-### Clipboard, drop, and images
-
-- [x] Copy, cut, select-all, and paste native selections with hierarchy, assets, and bindings intact
-- [x] Paste plain text, Markdown, SVG markup, SVG files, and images into editable canvas objects
-- [x] Add paste in place and paste at cursor
-- [x] Copy selections as SVG and PNG
-- [x] Import `.inkfinite`, SVG, Excalidraw, and image files through drag and drop
-- [x] Add image shapes with embedded assets, aspect-ratio resize, crop, opacity, and replace controls
-- [x] Verify clipboard and image workflows through save/reopen, undo/redo, merge, and export
-
-### Canvas structure
-
-- [x] Add frames with titles, child containment, move-with-contents, zoom, and export behavior
-- [x] Bind arrow endpoints to shapes and preserve bindings through move, group, copy, and merge
-- [x] Add straight, curved, and elbow arrows with bend controls, labels, and automatic routing
-
 ## Permissioned MCP
 
 ### Server and discovery
@@ -123,7 +89,3 @@ normalized structure where representation matters and rendered output where visu
 - [ ] Export SVG as copyable code
 - [ ] Export PNG to clipboard
 - [ ] Move handle on the layer pane
-
----
-
-- [ ] Direct Select could be clearer

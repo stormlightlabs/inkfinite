@@ -584,9 +584,11 @@
 		font: 600 var(--ink-type-xs) / 1 var(--ink-font-body);
 	}
 
-	@media (max-width: 720px) {
+	@media (max-width: 720px) and (pointer: coarse) {
 		.layer-panel {
-			top: 4.75rem;
+			top: auto;
+			bottom: 4.25rem;
+			max-height: min(22rem, calc(100% - 9rem));
 		}
 	}
 

@@ -7,7 +7,8 @@ order: 6
 ---
 
 The desktop editor combines the shared canvas interface with native file handling and authenticated
-local CLI access.
+local CLI access. See [Canvas editor](/docs/applications/editor/) for tools, gestures, clipboard
+formats, layers, and shortcuts.
 
 ## Run locally
 

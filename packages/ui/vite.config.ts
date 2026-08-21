@@ -16,7 +16,7 @@ export default defineConfig({
 				'**/.svelte-kit/**',
 				'**/dist/**',
 				'**/storybook-static/**',
-				'src/lib/editor/editor.stories.fixtures.ts',
+				'src/lib/editor/stories/editor.stories.fixtures.ts',
 				'src/test/**'
 			]
 		},
@@ -31,7 +31,10 @@ export default defineConfig({
 						provider: playwright({ launchOptions: { channel: 'chrome' } }),
 						instances: [{ browser: 'chromium', headless: true }]
 					},
-					include: ['src/**/*.svelte.{test,spec}.{js,ts}', 'src/lib/theme.test.ts'],
+					include: [
+						'src/**/*.svelte.{test,spec}.{js,ts}',
+						'src/lib/__tests__/theme.test.ts'
+					],
 					setupFiles: ['vitest-browser-svelte']
 				}
 			},
@@ -41,7 +44,10 @@ export default defineConfig({
 					name: 'unit',
 					environment: 'node',
 					include: ['src/**/*.{test,spec}.{js,ts}'],
-					exclude: ['src/**/*.svelte.{test,spec}.{js,ts}', 'src/lib/theme.test.ts']
+					exclude: [
+						'src/**/*.svelte.{test,spec}.{js,ts}',
+						'src/lib/__tests__/theme.test.ts'
+					]
 				}
 			}
 		]

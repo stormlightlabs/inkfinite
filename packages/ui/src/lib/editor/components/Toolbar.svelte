@@ -754,6 +754,7 @@
 				class:active={currentTool === tool.id}
 				onclick={() => handleToolClick(tool.id)}
 				aria-label={tool.label}
+				title={tool.label}
 				aria-pressed={currentTool === tool.id}
 				data-tool-id={tool.id}>
 				<span class="toolbar__tool-icon"><Icon name={tool.icon} size={20} /></span>
@@ -1145,8 +1146,8 @@
 		transform: scale(0.96);
 	}
 
-	.toolbar__tool-button:focus {
-		outline: 2px solid var(--ink-accent);
+	.toolbar__tool-button:focus-visible {
+		outline: 3px solid var(--ink-focus);
 		outline-offset: 2px;
 	}
 
@@ -1255,8 +1256,8 @@
 		background: var(--ink-surface-raised);
 	}
 
-	.toolbar__menu-item:focus {
-		outline: 2px solid var(--ink-accent);
+	.toolbar__menu-item:focus-visible {
+		outline: 2px solid var(--ink-focus);
 		outline-offset: -2px;
 	}
 
@@ -1405,10 +1406,37 @@
 		}
 	}
 
-	@media (max-width: 760px) {
+	@media (max-width: 760px) and (pointer: coarse) {
+		.toolbar {
+			width: calc(100vw - 1.5rem);
+			max-width: none;
+			overflow-x: auto;
+			overflow-y: hidden;
+			overscroll-behavior-x: contain;
+			scrollbar-width: none;
+			touch-action: pan-x;
+		}
+
+		.toolbar::-webkit-scrollbar {
+			display: none;
+		}
+
 		.toolbar__brand,
 		.toolbar__divider {
 			display: none;
+		}
+
+		.toolbar__context-panel,
+		.toolbar__pen-context,
+		.toolbar__export-menu {
+			position: fixed;
+			top: 4.75rem;
+			left: 0.75rem;
+			right: 0.75rem;
+			width: auto;
+			max-height: calc(100vh - 9rem);
+			overflow: auto;
+			translate: 0 0;
 		}
 	}
 
