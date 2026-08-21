@@ -20,11 +20,11 @@ normalized structure where representation matters and rendered output where visu
 
 ### Selection and movement
 
-- [ ] Add edge, center, corner, equal-gap, handle, and 15-degree angle snapping with visible guides
-- [ ] Apply Shift constraints, Alt/Option duplication, centered resize, and aspect-ratio modifiers
+- [x] Add edge, center, corner, equal-gap, handle, and 15-degree angle snapping with visible guides
+- [x] Apply Shift constraints, Alt/Option duplication, centered resize, and aspect-ratio modifiers
       consistently across selection and drawing tools
-- [ ] Improve selection hover, Direct Select handles, rotated resize cursors, and edge scrolling
-- [ ] Add zoom to selection, smoother camera controls, and persistent grid and snap preferences
+- [x] Improve selection hover, Direct Select handles, rotated resize cursors, and edge scrolling
+- [x] Add zoom to selection, smoother camera controls, and persistent grid and snap preferences
 
 ### Layout and commands
 

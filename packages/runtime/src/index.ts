@@ -7,13 +7,21 @@ import {
 	reorderShapes,
 	routeAction,
 	ShapeRecord,
+	hitTestPoint,
+	selectionTarget,
 	type PathTopologyEdit,
 	type Store,
 	type Tool
 } from '@inkfinite/core';
 
 /** Grid settings consumed by the editor runtime. */
-export type SnapSettings = { snapEnabled: boolean; gridEnabled: boolean; gridSize: number };
+export type SnapSettings = {
+	snapEnabled: boolean;
+	gridEnabled: boolean;
+	gridSize: number;
+	objectSnapEnabled?: boolean;
+	snapDistance?: number;
+};
 
 /** Tool behavior used for resize, anchor, and Bézier handles. */
 export type SelectionTool = Tool & {
@@ -37,6 +45,8 @@ export type EditorRuntimeOptions = {
 	tools: Map<EditorState['ui']['toolId'], Tool>;
 	selectionTool: SelectionTool;
 	getSnapSettings: () => SnapSettings;
+	/** Canvas viewport used for edge scrolling while a gesture is active. */
+	getViewport?: () => { width: number; height: number };
 	onTransactionDraft: (draft: RuntimeTransactionDraft) => void;
 	/** Opens the board browser from its dedicated Cmd/Ctrl+B shortcut. */
 	onBrowseRequested?: () => void;
@@ -60,6 +70,39 @@ export class EditorRuntime {
 	private panning = false;
 	private lastPanScreen = { x: 0, y: 0 };
 
+	private updateHoveredShape(action: Extract<Action, { type: 'pointer-move' }>): void {
+		if (this.pointerDown || this.panning || this.spaceHeld) return;
+		const state = this.options.store.getState();
+		const hit = hitTestPoint(state, action.world);
+		const hoveredShapeId = hit ? (selectionTarget(state, hit) ?? hit) : undefined;
+		if (hoveredShapeId === state.ui.hoveredShapeId) return;
+		this.options.store.setState((current) => ({ ...current, ui: { ...current.ui, hoveredShapeId } }));
+		this.interactionChanged();
+	}
+
+	private edgeScrollAction(
+		action: Extract<Action, { type: 'pointer-move' }>
+	): Extract<Action, { type: 'pointer-move' }> {
+		const viewport = this.options.getViewport?.();
+		if (!viewport || !this.pointerDown || this.spaceHeld) return action;
+		const margin = 32;
+		const maxSpeed = 18;
+		const edgeDelta = (position: number, size: number) =>
+			position < margin
+				? -Math.min(maxSpeed, margin - position)
+				: position > size - margin
+					? Math.min(maxSpeed, position - (size - margin))
+					: 0;
+		const dx = edgeDelta(action.screen.x, viewport.width);
+		const dy = edgeDelta(action.screen.y, viewport.height);
+		if (dx === 0 && dy === 0) return action;
+		this.options.store.setState((state) => ({ ...state, camera: Camera.pan(state.camera, { x: -dx, y: -dy }) }));
+		return {
+			...action,
+			world: Camera.screenToWorld(this.options.store.getState().camera, action.screen, viewport)
+		};
+	}
+
 	constructor(options: EditorRuntimeOptions) {
 		this.options = options;
 	}
@@ -74,6 +117,7 @@ export class EditorRuntime {
 		const { store, selectionTool } = this.options;
 
 		if (action.type === 'pointer-move' && !this.panning && !this.spaceHeld) {
+			this.updateHoveredShape(action);
 			const activeTool = this.options.tools.get(store.getState().ui.toolId);
 			const handleTool = activeTool && hasHandleHitTesting(activeTool) ? activeTool : selectionTool;
 			this.options.onHandleHover?.(handleTool.getHandleAtPoint(store.getState(), action.world));
@@ -90,6 +134,12 @@ export class EditorRuntime {
 			this.panning = false;
 			this.interactionChanged();
 			return;
+		}
+
+		if (action.type === 'pointer-down' && action.button === 0 && !this.spaceHeld) {
+			store.setState((state) =>
+				state.ui.hoveredShapeId ? { ...state, ui: { ...state.ui, hoveredShapeId: undefined } } : state
+			);
 		}
 
 		if (action.type === 'pointer-down' && (action.button === 1 || (action.button === 0 && this.spaceHeld))) {
@@ -114,7 +164,10 @@ export class EditorRuntime {
 
 		if (this.panning || this.spaceHeld) return;
 
-		const routedAction = snapAction(action, this.options.getSnapSettings());
+		const routedAction = snapAction(
+			action.type === 'pointer-move' ? this.edgeScrollAction(action) : action,
+			this.options.getSnapSettings()
+		);
 		if ('world' in routedAction) this.options.onSnappedWorldChanged?.(routedAction.world);
 
 		if (routedAction.type === 'pointer-down' && routedAction.button === 0) {
@@ -197,7 +250,14 @@ function hasHandleHitTesting(tool: Tool): tool is SelectionTool {
 }
 
 function snapAction(action: Action, snap: SnapSettings): Action {
-	if (!('world' in action) || !snap.snapEnabled || !snap.gridEnabled) return action;
+	if (
+		!('world' in action) ||
+		!snap.snapEnabled ||
+		!snap.gridEnabled ||
+		!Number.isFinite(snap.gridSize) ||
+		snap.gridSize <= 0
+	)
+		return action;
 	const { gridSize } = snap;
 	return {
 		...action,

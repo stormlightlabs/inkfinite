@@ -30,6 +30,8 @@ import {
 	RectTool,
 	SelectTool,
 	shapeBounds,
+	snapPoint,
+	snapTranslation,
 	SnapshotCommand,
 	Store,
 	TextTool
@@ -271,6 +273,10 @@ export function createCanvasController(
 		if (!canvas) {
 			return;
 		}
+		const selected =
+			store.getState().ui.selectionIds.length === 1
+				? store.getState().doc.shapes[store.getState().ui.selectionIds[0]]
+				: undefined;
 		const cursor = computeCursor(
 			textEditor.isEditing || arrowLabelEditor.isEditing || markdownEditor.isEditing,
 			{
@@ -278,7 +284,8 @@ export function createCanvasController(
 				spaceHeld: runtime.getInteractionState().spaceHeld
 			},
 			{ hover: handleState.hover, active: handleState.active },
-			runtime.getInteractionState().pointerDown
+			runtime.getInteractionState().pointerDown,
+			selected?.rot ?? 0
 		);
 		canvas.style.cursor = cursor === 'default' ? '' : cursor;
 	}
@@ -322,21 +329,39 @@ export function createCanvasController(
 
 	const handleMarqueeChange = (bounds: Box2 | null) => void updateMarquee(bounds);
 
-	const selectTool = new SelectTool(handleMarqueeChange, (point) => {
-		const snap = snapStore.get();
-		if (
-			!snap.snapEnabled ||
-			!snap.gridEnabled ||
-			!Number.isFinite(snap.gridSize) ||
-			snap.gridSize <= 0
-		) {
-			return point;
-		}
-		return {
-			x: Math.round(point.x / snap.gridSize) * snap.gridSize,
-			y: Math.round(point.y / snap.gridSize) * snap.gridSize
-		};
-	});
+	const selectTool = new SelectTool(
+		handleMarqueeChange,
+		(point, context) => {
+			const snap = snapStore.get();
+			if (!context) {
+				if (
+					!snap.snapEnabled ||
+					!snap.gridEnabled ||
+					!Number.isFinite(snap.gridSize) ||
+					snap.gridSize <= 0
+				) {
+					return point;
+				}
+				return {
+					x: Math.round(point.x / snap.gridSize) * snap.gridSize,
+					y: Math.round(point.y / snap.gridSize) * snap.gridSize
+				};
+			}
+			return snapTranslation(
+				context.state,
+				context.initialShapes.values(),
+				context.leadPosition,
+				context.delta,
+				snap
+			);
+		},
+		(result) => {
+			pointerState.snappedWorld = result?.point ?? null;
+			pointerState.snapGuides = result?.guides ?? [];
+			renderer?.markDirty();
+		},
+		(point, state, excludedIds) => snapPoint(state, point, excludedIds, snapStore.get())
+	);
 	const directSelectTool = new DirectSelectTool();
 	const rectTool = new RectTool();
 	const ellipseTool = new EllipseTool();
@@ -402,6 +427,7 @@ export function createCanvasController(
 		tools,
 		selectionTool: selectTool,
 		getSnapSettings: () => snapStore.get(),
+		getViewport,
 		onTransactionDraft: ({ name, kind, before, after, topologyEdits }) => {
 			// Tool movement renders `after` as a local preview. We want restore the
 			// committed mirror before executing the command so history and persistence
@@ -776,6 +802,9 @@ export function createCanvasController(
 
 	function handlePointerLeave() {
 		setHandleHover(null);
+		store.setState((state) =>
+			state.ui.hoveredShapeId ? { ...state, ui: { ...state.ui, hoveredShapeId: undefined } } : state
+		);
 	}
 
 	function setCanvasRef(node: HTMLCanvasElement | null) {
@@ -796,7 +825,8 @@ export function createCanvasController(
 			pointerStateProvider: {
 				get: () => ({
 					isPointerDown: runtime.getInteractionState().pointerDown,
-					snappedWorld: pointerState.snappedWorld
+					snappedWorld: pointerState.snappedWorld,
+					snapGuides: pointerState.snapGuides
 				})
 			},
 			handleProvider: { get: () => handleState.getSnapshot() },

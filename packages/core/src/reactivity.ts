@@ -15,6 +15,8 @@ export type UIState = {
 	/** Active destination for newly created shapes on the current page. */
 	activeLayerId?: string | null;
 	selectionIds: string[];
+	/** Shape currently under the pointer; this is editor-only state. */
+	hoveredShapeId?: string;
 	/** Ephemeral path anchors selected by the direct-selection tool. */
 	pathSelection?: PathSelection;
 	toolId: ToolId;
@@ -47,6 +49,7 @@ export const EditorState = {
 				currentPageId: state.ui.currentPageId,
 				activeLayerId: state.ui.activeLayerId,
 				selectionIds: [...state.ui.selectionIds],
+				hoveredShapeId: state.ui.hoveredShapeId,
 				pathSelection: state.ui.pathSelection
 					? {
 							pathId: state.ui.pathSelection.pathId,
@@ -284,13 +287,16 @@ function enforceInvariants(state: EditorState): EditorState {
 	let containerPath = normalizeContainerPath(state, doc, currentPageId);
 	let pathSelection = normalizePathSelection(state.ui.pathSelection, doc, currentPageId);
 	let selectionIds = state.ui.selectionIds;
+	let hoveredShapeId = state.ui.hoveredShapeId;
 	if (currentPageId === null) {
 		containerPath = [];
 		pathSelection = undefined;
 		selectionIds = [];
+		hoveredShapeId = undefined;
 	} else {
 		const currentPage = doc.pages[currentPageId];
 		const validShapeIds = new Set(getInteractiveShapeIds(doc, currentPage));
+		if (!hoveredShapeId || !validShapeIds.has(hoveredShapeId)) hoveredShapeId = undefined;
 
 		selectionIds = selectionIds.filter((id) => {
 			return shapes[id] && validShapeIds.has(id);
@@ -314,7 +320,15 @@ function enforceInvariants(state: EditorState): EditorState {
 	return {
 		...state,
 		doc,
-		ui: { ...state.ui, currentPageId, activeLayerId: nextActiveLayerId, selectionIds, containerPath, pathSelection }
+		ui: {
+			...state.ui,
+			currentPageId,
+			activeLayerId: nextActiveLayerId,
+			selectionIds,
+			hoveredShapeId,
+			containerPath,
+			pathSelection
+		}
 	};
 }
 

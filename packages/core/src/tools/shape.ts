@@ -1,21 +1,22 @@
-import type { Action } from "../actions";
-import { computeNormalizedAnchor, hitTestPoint } from "../geom";
-import { Vec2 } from "../math";
-import { BindingRecord, createId, ShapeRecord } from "../model";
-import type { EditorState, ToolId } from "../reactivity";
-import { canCreateShapeOnActiveLayer, getCurrentPage } from "../reactivity";
-import type { Tool } from "../tools/base";
+import type { Action } from '../actions';
+import { computeNormalizedAnchor, hitTestPoint } from '../geom';
+import { Vec2 } from '../math';
+import { snapAngle } from '../snapping';
+import { BindingRecord, createId, ShapeRecord } from '../model';
+import type { EditorState, ToolId } from '../reactivity';
+import { canCreateShapeOnActiveLayer, getCurrentPage } from '../reactivity';
+import type { Tool } from '../tools/base';
 
 /**
  * Internal state for shape creation tools
  */
 type ShapeCreationToolState = {
-  /** Whether we're currently creating a shape */
-  isCreating: boolean;
-  /** World coordinates where creation started */
-  startWorld: Vec2 | null;
-  /** ID of the shape being created */
-  creatingShapeId: string | null;
+	/** Whether we're currently creating a shape */
+	isCreating: boolean;
+	/** World coordinates where creation started */
+	startWorld: Vec2 | null;
+	/** ID of the shape being created */
+	creatingShapeId: string | null;
 };
 
 /**
@@ -23,6 +24,25 @@ type ShapeCreationToolState = {
  * Shapes smaller than this on either dimension will be deleted
  */
 const MIN_SHAPE_SIZE = 5;
+
+function constrainedRect(
+	start: Vec2,
+	pointer: Vec2,
+	keepAspect: boolean,
+	fromCenter: boolean
+): { x: number; y: number; w: number; h: number } {
+	let dx = pointer.x - start.x;
+	let dy = pointer.y - start.y;
+	if (keepAspect) {
+		const size = Math.max(Math.abs(dx), Math.abs(dy));
+		dx = Math.sign(dx || 1) * size;
+		dy = Math.sign(dy || 1) * size;
+	}
+	if (fromCenter) {
+		return { x: start.x - Math.abs(dx), y: start.y - Math.abs(dy), w: Math.abs(dx) * 2, h: Math.abs(dy) * 2 };
+	}
+	return { x: Math.min(start.x, start.x + dx), y: Math.min(start.y, start.y + dy), w: Math.abs(dx), h: Math.abs(dy) };
+}
 
 /**
  * Rect tool - creates rectangle shapes by dragging
@@ -32,159 +52,158 @@ const MIN_SHAPE_SIZE = 5;
  * - Click-cancel: shapes too small are deleted on pointer up
  */
 export class RectTool implements Tool {
-  readonly id: ToolId = "rect";
-  private toolState: ShapeCreationToolState;
+	readonly id: ToolId = 'rect';
+	private toolState: ShapeCreationToolState;
 
-  constructor() {
-    this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
-  }
+	constructor() {
+		this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
+	}
 
-  onEnter(state: EditorState): EditorState {
-    this.resetToolState();
-    return state;
-  }
+	onEnter(state: EditorState): EditorState {
+		this.resetToolState();
+		return state;
+	}
 
-  onExit(state: EditorState): EditorState {
-    let newState = state;
-    if (this.toolState.creatingShapeId) {
-      newState = this.cancelShapeCreation(state);
-    }
-    this.resetToolState();
-    return newState;
-  }
+	onExit(state: EditorState): EditorState {
+		let newState = state;
+		if (this.toolState.creatingShapeId) {
+			newState = this.cancelShapeCreation(state);
+		}
+		this.resetToolState();
+		return newState;
+	}
 
-  onAction(state: EditorState, action: Action): EditorState {
-    switch (action.type) {
-      case "pointer-down": {
-        return this.handlePointerDown(state, action);
-      }
-      case "pointer-move": {
-        return this.handlePointerMove(state, action);
-      }
-      case "pointer-up": {
-        return this.handlePointerUp(state, action);
-      }
-      case "key-down": {
-        return this.handleKeyDown(state, action);
-      }
-      default: {
-        return state;
-      }
-    }
-  }
+	onAction(state: EditorState, action: Action): EditorState {
+		switch (action.type) {
+			case 'pointer-down': {
+				return this.handlePointerDown(state, action);
+			}
+			case 'pointer-move': {
+				return this.handlePointerMove(state, action);
+			}
+			case 'pointer-up': {
+				return this.handlePointerUp(state, action);
+			}
+			case 'key-down': {
+				return this.handleKeyDown(state, action);
+			}
+			default: {
+				return state;
+			}
+		}
+	}
 
-  private handlePointerDown(state: EditorState, action: Action): EditorState {
-    if (action.type !== "pointer-down") return state;
-    if (!canCreateShapeOnActiveLayer(state)) return state;
+	private handlePointerDown(state: EditorState, action: Action): EditorState {
+		if (action.type !== 'pointer-down') return state;
+		if (!canCreateShapeOnActiveLayer(state)) return state;
 
-    const currentPage = getCurrentPage(state);
-    if (!currentPage) return state;
+		const currentPage = getCurrentPage(state);
+		if (!currentPage) return state;
 
-    const shapeId = createId("shape");
+		const shapeId = createId('shape');
 
-    const shape = ShapeRecord.createRect(currentPage.id, action.world.x, action.world.y, {
-      w: 0,
-      h: 0,
-      fill: "#4a90e2",
-      stroke: "#2e5c8a",
-      radius: 4,
-    }, shapeId);
+		const shape = ShapeRecord.createRect(
+			currentPage.id,
+			action.world.x,
+			action.world.y,
+			{ w: 0, h: 0, fill: '#4a90e2', stroke: '#2e5c8a', radius: 4 },
+			shapeId
+		);
 
-    this.toolState.isCreating = true;
-    this.toolState.startWorld = action.world;
-    this.toolState.creatingShapeId = shapeId;
+		this.toolState.isCreating = true;
+		this.toolState.startWorld = action.world;
+		this.toolState.creatingShapeId = shapeId;
 
-    const newPage = { ...currentPage, shapeIds: [...currentPage.shapeIds, shapeId] };
+		const newPage = { ...currentPage, shapeIds: [...currentPage.shapeIds, shapeId] };
 
-    return {
-      ...state,
-      doc: {
-        ...state.doc,
-        shapes: { ...state.doc.shapes, [shapeId]: shape },
-        pages: { ...state.doc.pages, [currentPage.id]: newPage },
-      },
-      ui: { ...state.ui, selectionIds: [shapeId] },
-    };
-  }
+		return {
+			...state,
+			doc: {
+				...state.doc,
+				shapes: { ...state.doc.shapes, [shapeId]: shape },
+				pages: { ...state.doc.pages, [currentPage.id]: newPage }
+			},
+			ui: { ...state.ui, selectionIds: [shapeId] }
+		};
+	}
 
-  private handlePointerMove(state: EditorState, action: Action): EditorState {
-    if (action.type !== "pointer-move" || !this.toolState.isCreating || !this.toolState.startWorld) return state;
-    if (!this.toolState.creatingShapeId) return state;
+	private handlePointerMove(state: EditorState, action: Action): EditorState {
+		if (action.type !== 'pointer-move' || !this.toolState.isCreating || !this.toolState.startWorld) return state;
+		if (!this.toolState.creatingShapeId) return state;
 
-    const shape = state.doc.shapes[this.toolState.creatingShapeId];
-    if (!shape || shape.type !== "rect") return state;
+		const shape = state.doc.shapes[this.toolState.creatingShapeId];
+		if (!shape || shape.type !== 'rect') return state;
 
-    const delta = Vec2.sub(action.world, this.toolState.startWorld);
-    const w = Math.abs(delta.x);
-    const h = Math.abs(delta.y);
+		const frame = constrainedRect(
+			this.toolState.startWorld,
+			action.world,
+			action.modifiers.shift,
+			action.modifiers.alt
+		);
+		const updatedShape = { ...shape, x: frame.x, y: frame.y, props: { ...shape.props, w: frame.w, h: frame.h } };
 
-    const x = delta.x < 0 ? this.toolState.startWorld.x - w : this.toolState.startWorld.x;
-    const y = delta.y < 0 ? this.toolState.startWorld.y - h : this.toolState.startWorld.y;
+		return {
+			...state,
+			doc: { ...state.doc, shapes: { ...state.doc.shapes, [this.toolState.creatingShapeId]: updatedShape } }
+		};
+	}
 
-    const updatedShape = { ...shape, x, y, props: { ...shape.props, w, h } };
+	private handlePointerUp(state: EditorState, action: Action): EditorState {
+		if (action.type !== 'pointer-up' || !this.toolState.creatingShapeId) return state;
 
-    return {
-      ...state,
-      doc: { ...state.doc, shapes: { ...state.doc.shapes, [this.toolState.creatingShapeId]: updatedShape } },
-    };
-  }
+		const shape = state.doc.shapes[this.toolState.creatingShapeId];
+		if (!shape || shape.type !== 'rect') return state;
 
-  private handlePointerUp(state: EditorState, action: Action): EditorState {
-    if (action.type !== "pointer-up" || !this.toolState.creatingShapeId) return state;
+		let newState = state;
 
-    const shape = state.doc.shapes[this.toolState.creatingShapeId];
-    if (!shape || shape.type !== "rect") return state;
+		const completed = shape.props.w >= MIN_SHAPE_SIZE && shape.props.h >= MIN_SHAPE_SIZE;
+		if (!completed) {
+			newState = this.cancelShapeCreation(state);
+		}
 
-    let newState = state;
+		this.resetToolState();
+		return completed ? { ...newState, ui: { ...newState.ui, toolId: 'select' } } : newState;
+	}
 
-    const completed = shape.props.w >= MIN_SHAPE_SIZE && shape.props.h >= MIN_SHAPE_SIZE;
-    if (!completed) {
-      newState = this.cancelShapeCreation(state);
-    }
+	private handleKeyDown(state: EditorState, action: Action): EditorState {
+		if (action.type !== 'key-down') return state;
 
-    this.resetToolState();
-    return completed ? { ...newState, ui: { ...newState.ui, toolId: "select" } } : newState;
-  }
+		if (action.key === 'Escape' && this.toolState.creatingShapeId) {
+			const newState = this.cancelShapeCreation(state);
+			this.resetToolState();
+			return newState;
+		}
 
-  private handleKeyDown(state: EditorState, action: Action): EditorState {
-    if (action.type !== "key-down") return state;
+		return state;
+	}
 
-    if (action.key === "Escape" && this.toolState.creatingShapeId) {
-      const newState = this.cancelShapeCreation(state);
-      this.resetToolState();
-      return newState;
-    }
+	private cancelShapeCreation(state: EditorState): EditorState {
+		if (!this.toolState.creatingShapeId) return state;
 
-    return state;
-  }
+		const shape = state.doc.shapes[this.toolState.creatingShapeId];
+		if (!shape) return state;
 
-  private cancelShapeCreation(state: EditorState): EditorState {
-    if (!this.toolState.creatingShapeId) return state;
+		const newShapes = { ...state.doc.shapes };
+		delete newShapes[this.toolState.creatingShapeId];
 
-    const shape = state.doc.shapes[this.toolState.creatingShapeId];
-    if (!shape) return state;
+		const currentPage = getCurrentPage(state);
+		if (!currentPage) return state;
 
-    const newShapes = { ...state.doc.shapes };
-    delete newShapes[this.toolState.creatingShapeId];
+		const newPage = {
+			...currentPage,
+			shapeIds: currentPage.shapeIds.filter((id) => id !== this.toolState.creatingShapeId)
+		};
 
-    const currentPage = getCurrentPage(state);
-    if (!currentPage) return state;
+		return {
+			...state,
+			doc: { ...state.doc, shapes: newShapes, pages: { ...state.doc.pages, [currentPage.id]: newPage } },
+			ui: { ...state.ui, selectionIds: [] }
+		};
+	}
 
-    const newPage = {
-      ...currentPage,
-      shapeIds: currentPage.shapeIds.filter((id) => id !== this.toolState.creatingShapeId),
-    };
-
-    return {
-      ...state,
-      doc: { ...state.doc, shapes: newShapes, pages: { ...state.doc.pages, [currentPage.id]: newPage } },
-      ui: { ...state.ui, selectionIds: [] },
-    };
-  }
-
-  private resetToolState(): void {
-    this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
-  }
+	private resetToolState(): void {
+		this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
+	}
 }
 
 /**
@@ -195,158 +214,158 @@ export class RectTool implements Tool {
  * - Click-cancel: shapes too small are deleted on pointer up
  */
 export class EllipseTool implements Tool {
-  readonly id: ToolId = "ellipse";
-  private toolState: ShapeCreationToolState;
+	readonly id: ToolId = 'ellipse';
+	private toolState: ShapeCreationToolState;
 
-  constructor() {
-    this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
-  }
+	constructor() {
+		this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
+	}
 
-  onEnter(state: EditorState): EditorState {
-    this.resetToolState();
-    return state;
-  }
+	onEnter(state: EditorState): EditorState {
+		this.resetToolState();
+		return state;
+	}
 
-  onExit(state: EditorState): EditorState {
-    let newState = state;
-    if (this.toolState.creatingShapeId) {
-      newState = this.cancelShapeCreation(state);
-    }
-    this.resetToolState();
-    return newState;
-  }
+	onExit(state: EditorState): EditorState {
+		let newState = state;
+		if (this.toolState.creatingShapeId) {
+			newState = this.cancelShapeCreation(state);
+		}
+		this.resetToolState();
+		return newState;
+	}
 
-  onAction(state: EditorState, action: Action): EditorState {
-    switch (action.type) {
-      case "pointer-down": {
-        return this.handlePointerDown(state, action);
-      }
-      case "pointer-move": {
-        return this.handlePointerMove(state, action);
-      }
-      case "pointer-up": {
-        return this.handlePointerUp(state, action);
-      }
-      case "key-down": {
-        return this.handleKeyDown(state, action);
-      }
-      default: {
-        return state;
-      }
-    }
-  }
+	onAction(state: EditorState, action: Action): EditorState {
+		switch (action.type) {
+			case 'pointer-down': {
+				return this.handlePointerDown(state, action);
+			}
+			case 'pointer-move': {
+				return this.handlePointerMove(state, action);
+			}
+			case 'pointer-up': {
+				return this.handlePointerUp(state, action);
+			}
+			case 'key-down': {
+				return this.handleKeyDown(state, action);
+			}
+			default: {
+				return state;
+			}
+		}
+	}
 
-  private handlePointerDown(state: EditorState, action: Action): EditorState {
-    if (action.type !== "pointer-down") return state;
-    if (!canCreateShapeOnActiveLayer(state)) return state;
+	private handlePointerDown(state: EditorState, action: Action): EditorState {
+		if (action.type !== 'pointer-down') return state;
+		if (!canCreateShapeOnActiveLayer(state)) return state;
 
-    const currentPage = getCurrentPage(state);
-    if (!currentPage) return state;
+		const currentPage = getCurrentPage(state);
+		if (!currentPage) return state;
 
-    const shapeId = createId("shape");
+		const shapeId = createId('shape');
 
-    const shape = ShapeRecord.createEllipse(currentPage.id, action.world.x, action.world.y, {
-      w: 0,
-      h: 0,
-      fill: "#51cf66",
-      stroke: "#2f9e44",
-    }, shapeId);
+		const shape = ShapeRecord.createEllipse(
+			currentPage.id,
+			action.world.x,
+			action.world.y,
+			{ w: 0, h: 0, fill: '#51cf66', stroke: '#2f9e44' },
+			shapeId
+		);
 
-    this.toolState.isCreating = true;
-    this.toolState.startWorld = action.world;
-    this.toolState.creatingShapeId = shapeId;
+		this.toolState.isCreating = true;
+		this.toolState.startWorld = action.world;
+		this.toolState.creatingShapeId = shapeId;
 
-    const newPage = { ...currentPage, shapeIds: [...currentPage.shapeIds, shapeId] };
+		const newPage = { ...currentPage, shapeIds: [...currentPage.shapeIds, shapeId] };
 
-    return {
-      ...state,
-      doc: {
-        ...state.doc,
-        shapes: { ...state.doc.shapes, [shapeId]: shape },
-        pages: { ...state.doc.pages, [currentPage.id]: newPage },
-      },
-      ui: { ...state.ui, selectionIds: [shapeId] },
-    };
-  }
+		return {
+			...state,
+			doc: {
+				...state.doc,
+				shapes: { ...state.doc.shapes, [shapeId]: shape },
+				pages: { ...state.doc.pages, [currentPage.id]: newPage }
+			},
+			ui: { ...state.ui, selectionIds: [shapeId] }
+		};
+	}
 
-  private handlePointerMove(state: EditorState, action: Action): EditorState {
-    if (action.type !== "pointer-move" || !this.toolState.isCreating || !this.toolState.startWorld) return state;
-    if (!this.toolState.creatingShapeId) return state;
+	private handlePointerMove(state: EditorState, action: Action): EditorState {
+		if (action.type !== 'pointer-move' || !this.toolState.isCreating || !this.toolState.startWorld) return state;
+		if (!this.toolState.creatingShapeId) return state;
 
-    const shape = state.doc.shapes[this.toolState.creatingShapeId];
-    if (!shape || shape.type !== "ellipse") return state;
+		const shape = state.doc.shapes[this.toolState.creatingShapeId];
+		if (!shape || shape.type !== 'ellipse') return state;
 
-    const delta = Vec2.sub(action.world, this.toolState.startWorld);
-    const w = Math.abs(delta.x);
-    const h = Math.abs(delta.y);
+		const frame = constrainedRect(
+			this.toolState.startWorld,
+			action.world,
+			action.modifiers.shift,
+			action.modifiers.alt
+		);
+		const updatedShape = { ...shape, x: frame.x, y: frame.y, props: { ...shape.props, w: frame.w, h: frame.h } };
 
-    const x = delta.x < 0 ? this.toolState.startWorld.x - w : this.toolState.startWorld.x;
-    const y = delta.y < 0 ? this.toolState.startWorld.y - h : this.toolState.startWorld.y;
+		return {
+			...state,
+			doc: { ...state.doc, shapes: { ...state.doc.shapes, [this.toolState.creatingShapeId]: updatedShape } }
+		};
+	}
 
-    const updatedShape = { ...shape, x, y, props: { ...shape.props, w, h } };
+	private handlePointerUp(state: EditorState, action: Action): EditorState {
+		if (action.type !== 'pointer-up' || !this.toolState.creatingShapeId) return state;
 
-    return {
-      ...state,
-      doc: { ...state.doc, shapes: { ...state.doc.shapes, [this.toolState.creatingShapeId]: updatedShape } },
-    };
-  }
+		const shape = state.doc.shapes[this.toolState.creatingShapeId];
+		if (!shape || shape.type !== 'ellipse') return state;
 
-  private handlePointerUp(state: EditorState, action: Action): EditorState {
-    if (action.type !== "pointer-up" || !this.toolState.creatingShapeId) return state;
+		let newState = state;
 
-    const shape = state.doc.shapes[this.toolState.creatingShapeId];
-    if (!shape || shape.type !== "ellipse") return state;
+		const completed = shape.props.w >= MIN_SHAPE_SIZE && shape.props.h >= MIN_SHAPE_SIZE;
+		if (!completed) {
+			newState = this.cancelShapeCreation(state);
+		}
 
-    let newState = state;
+		this.resetToolState();
+		return completed ? { ...newState, ui: { ...newState.ui, toolId: 'select' } } : newState;
+	}
 
-    const completed = shape.props.w >= MIN_SHAPE_SIZE && shape.props.h >= MIN_SHAPE_SIZE;
-    if (!completed) {
-      newState = this.cancelShapeCreation(state);
-    }
+	private handleKeyDown(state: EditorState, action: Action): EditorState {
+		if (action.type !== 'key-down') return state;
 
-    this.resetToolState();
-    return completed ? { ...newState, ui: { ...newState.ui, toolId: "select" } } : newState;
-  }
+		if (action.key === 'Escape' && this.toolState.creatingShapeId) {
+			const newState = this.cancelShapeCreation(state);
+			this.resetToolState();
+			return newState;
+		}
 
-  private handleKeyDown(state: EditorState, action: Action): EditorState {
-    if (action.type !== "key-down") return state;
+		return state;
+	}
 
-    if (action.key === "Escape" && this.toolState.creatingShapeId) {
-      const newState = this.cancelShapeCreation(state);
-      this.resetToolState();
-      return newState;
-    }
+	private cancelShapeCreation(state: EditorState): EditorState {
+		if (!this.toolState.creatingShapeId) return state;
 
-    return state;
-  }
+		const shape = state.doc.shapes[this.toolState.creatingShapeId];
+		if (!shape) return state;
 
-  private cancelShapeCreation(state: EditorState): EditorState {
-    if (!this.toolState.creatingShapeId) return state;
+		const newShapes = { ...state.doc.shapes };
+		delete newShapes[this.toolState.creatingShapeId];
 
-    const shape = state.doc.shapes[this.toolState.creatingShapeId];
-    if (!shape) return state;
+		const currentPage = getCurrentPage(state);
+		if (!currentPage) return state;
 
-    const newShapes = { ...state.doc.shapes };
-    delete newShapes[this.toolState.creatingShapeId];
+		const newPage = {
+			...currentPage,
+			shapeIds: currentPage.shapeIds.filter((id) => id !== this.toolState.creatingShapeId)
+		};
 
-    const currentPage = getCurrentPage(state);
-    if (!currentPage) return state;
+		return {
+			...state,
+			doc: { ...state.doc, shapes: newShapes, pages: { ...state.doc.pages, [currentPage.id]: newPage } },
+			ui: { ...state.ui, selectionIds: [] }
+		};
+	}
 
-    const newPage = {
-      ...currentPage,
-      shapeIds: currentPage.shapeIds.filter((id) => id !== this.toolState.creatingShapeId),
-    };
-
-    return {
-      ...state,
-      doc: { ...state.doc, shapes: newShapes, pages: { ...state.doc.pages, [currentPage.id]: newPage } },
-      ui: { ...state.ui, selectionIds: [] },
-    };
-  }
-
-  private resetToolState(): void {
-    this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
-  }
+	private resetToolState(): void {
+		this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
+	}
 }
 
 /**
@@ -357,153 +376,155 @@ export class EllipseTool implements Tool {
  * - Click-cancel: very short lines are deleted on pointer up
  */
 export class LineTool implements Tool {
-  readonly id: ToolId = "line";
-  private toolState: ShapeCreationToolState;
+	readonly id: ToolId = 'line';
+	private toolState: ShapeCreationToolState;
 
-  constructor() {
-    this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
-  }
+	constructor() {
+		this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
+	}
 
-  onEnter(state: EditorState): EditorState {
-    this.resetToolState();
-    return state;
-  }
+	onEnter(state: EditorState): EditorState {
+		this.resetToolState();
+		return state;
+	}
 
-  onExit(state: EditorState): EditorState {
-    let newState = state;
-    if (this.toolState.creatingShapeId) {
-      newState = this.cancelShapeCreation(state);
-    }
-    this.resetToolState();
-    return newState;
-  }
+	onExit(state: EditorState): EditorState {
+		let newState = state;
+		if (this.toolState.creatingShapeId) {
+			newState = this.cancelShapeCreation(state);
+		}
+		this.resetToolState();
+		return newState;
+	}
 
-  onAction(state: EditorState, action: Action): EditorState {
-    switch (action.type) {
-      case "pointer-down": {
-        return this.handlePointerDown(state, action);
-      }
-      case "pointer-move": {
-        return this.handlePointerMove(state, action);
-      }
-      case "pointer-up": {
-        return this.handlePointerUp(state, action);
-      }
-      case "key-down": {
-        return this.handleKeyDown(state, action);
-      }
-      default: {
-        return state;
-      }
-    }
-  }
+	onAction(state: EditorState, action: Action): EditorState {
+		switch (action.type) {
+			case 'pointer-down': {
+				return this.handlePointerDown(state, action);
+			}
+			case 'pointer-move': {
+				return this.handlePointerMove(state, action);
+			}
+			case 'pointer-up': {
+				return this.handlePointerUp(state, action);
+			}
+			case 'key-down': {
+				return this.handleKeyDown(state, action);
+			}
+			default: {
+				return state;
+			}
+		}
+	}
 
-  private handlePointerDown(state: EditorState, action: Action): EditorState {
-    if (action.type !== "pointer-down") return state;
-    if (!canCreateShapeOnActiveLayer(state)) return state;
+	private handlePointerDown(state: EditorState, action: Action): EditorState {
+		if (action.type !== 'pointer-down') return state;
+		if (!canCreateShapeOnActiveLayer(state)) return state;
 
-    const currentPage = getCurrentPage(state);
-    if (!currentPage) return state;
+		const currentPage = getCurrentPage(state);
+		if (!currentPage) return state;
 
-    const shapeId = createId("shape");
+		const shapeId = createId('shape');
 
-    const shape = ShapeRecord.createLine(currentPage.id, action.world.x, action.world.y, {
-      a: { x: 0, y: 0 },
-      b: { x: 0, y: 0 },
-      stroke: "#495057",
-      width: 2,
-    }, shapeId);
+		const shape = ShapeRecord.createLine(
+			currentPage.id,
+			action.world.x,
+			action.world.y,
+			{ a: { x: 0, y: 0 }, b: { x: 0, y: 0 }, stroke: '#495057', width: 2 },
+			shapeId
+		);
 
-    this.toolState.isCreating = true;
-    this.toolState.startWorld = action.world;
-    this.toolState.creatingShapeId = shapeId;
+		this.toolState.isCreating = true;
+		this.toolState.startWorld = action.world;
+		this.toolState.creatingShapeId = shapeId;
 
-    const newPage = { ...currentPage, shapeIds: [...currentPage.shapeIds, shapeId] };
+		const newPage = { ...currentPage, shapeIds: [...currentPage.shapeIds, shapeId] };
 
-    return {
-      ...state,
-      doc: {
-        ...state.doc,
-        shapes: { ...state.doc.shapes, [shapeId]: shape },
-        pages: { ...state.doc.pages, [currentPage.id]: newPage },
-      },
-      ui: { ...state.ui, selectionIds: [shapeId] },
-    };
-  }
+		return {
+			...state,
+			doc: {
+				...state.doc,
+				shapes: { ...state.doc.shapes, [shapeId]: shape },
+				pages: { ...state.doc.pages, [currentPage.id]: newPage }
+			},
+			ui: { ...state.ui, selectionIds: [shapeId] }
+		};
+	}
 
-  private handlePointerMove(state: EditorState, action: Action): EditorState {
-    if (action.type !== "pointer-move" || !this.toolState.isCreating || !this.toolState.startWorld) return state;
-    if (!this.toolState.creatingShapeId) return state;
+	private handlePointerMove(state: EditorState, action: Action): EditorState {
+		if (action.type !== 'pointer-move' || !this.toolState.isCreating || !this.toolState.startWorld) return state;
+		if (!this.toolState.creatingShapeId) return state;
 
-    const shape = state.doc.shapes[this.toolState.creatingShapeId];
-    if (!shape || shape.type !== "line") return state;
+		const shape = state.doc.shapes[this.toolState.creatingShapeId];
+		if (!shape || shape.type !== 'line') return state;
 
-    const b = Vec2.sub(action.world, this.toolState.startWorld);
-    const updatedShape = { ...shape, props: { ...shape.props, b } };
+		const end = action.modifiers.shift ? snapAngle(this.toolState.startWorld, action.world) : action.world;
+		const b = Vec2.sub(end, this.toolState.startWorld);
+		const updatedShape = { ...shape, props: { ...shape.props, b } };
 
-    return {
-      ...state,
-      doc: { ...state.doc, shapes: { ...state.doc.shapes, [this.toolState.creatingShapeId]: updatedShape } },
-    };
-  }
+		return {
+			...state,
+			doc: { ...state.doc, shapes: { ...state.doc.shapes, [this.toolState.creatingShapeId]: updatedShape } }
+		};
+	}
 
-  private handlePointerUp(state: EditorState, action: Action): EditorState {
-    if (action.type !== "pointer-up" || !this.toolState.creatingShapeId) return state;
+	private handlePointerUp(state: EditorState, action: Action): EditorState {
+		if (action.type !== 'pointer-up' || !this.toolState.creatingShapeId) return state;
 
-    const shape = state.doc.shapes[this.toolState.creatingShapeId];
-    if (!shape || shape.type !== "line") return state;
+		const shape = state.doc.shapes[this.toolState.creatingShapeId];
+		if (!shape || shape.type !== 'line') return state;
 
-    let newState = state;
+		let newState = state;
 
-    const lineLength = Vec2.len(shape.props.b);
-    const completed = lineLength >= MIN_SHAPE_SIZE;
-    if (!completed) {
-      newState = this.cancelShapeCreation(state);
-    }
+		const lineLength = Vec2.len(shape.props.b);
+		const completed = lineLength >= MIN_SHAPE_SIZE;
+		if (!completed) {
+			newState = this.cancelShapeCreation(state);
+		}
 
-    this.resetToolState();
-    return completed ? { ...newState, ui: { ...newState.ui, toolId: "select" } } : newState;
-  }
+		this.resetToolState();
+		return completed ? { ...newState, ui: { ...newState.ui, toolId: 'select' } } : newState;
+	}
 
-  private handleKeyDown(state: EditorState, action: Action): EditorState {
-    if (action.type !== "key-down") return state;
+	private handleKeyDown(state: EditorState, action: Action): EditorState {
+		if (action.type !== 'key-down') return state;
 
-    if (action.key === "Escape" && this.toolState.creatingShapeId) {
-      const newState = this.cancelShapeCreation(state);
-      this.resetToolState();
-      return newState;
-    }
+		if (action.key === 'Escape' && this.toolState.creatingShapeId) {
+			const newState = this.cancelShapeCreation(state);
+			this.resetToolState();
+			return newState;
+		}
 
-    return state;
-  }
+		return state;
+	}
 
-  private cancelShapeCreation(state: EditorState): EditorState {
-    if (!this.toolState.creatingShapeId) return state;
+	private cancelShapeCreation(state: EditorState): EditorState {
+		if (!this.toolState.creatingShapeId) return state;
 
-    const shape = state.doc.shapes[this.toolState.creatingShapeId];
-    if (!shape) return state;
+		const shape = state.doc.shapes[this.toolState.creatingShapeId];
+		if (!shape) return state;
 
-    const newShapes = { ...state.doc.shapes };
-    delete newShapes[this.toolState.creatingShapeId];
+		const newShapes = { ...state.doc.shapes };
+		delete newShapes[this.toolState.creatingShapeId];
 
-    const currentPage = getCurrentPage(state);
-    if (!currentPage) return state;
+		const currentPage = getCurrentPage(state);
+		if (!currentPage) return state;
 
-    const newPage = {
-      ...currentPage,
-      shapeIds: currentPage.shapeIds.filter((id) => id !== this.toolState.creatingShapeId),
-    };
+		const newPage = {
+			...currentPage,
+			shapeIds: currentPage.shapeIds.filter((id) => id !== this.toolState.creatingShapeId)
+		};
 
-    return {
-      ...state,
-      doc: { ...state.doc, shapes: newShapes, pages: { ...state.doc.pages, [currentPage.id]: newPage } },
-      ui: { ...state.ui, selectionIds: [] },
-    };
-  }
+		return {
+			...state,
+			doc: { ...state.doc, shapes: newShapes, pages: { ...state.doc.pages, [currentPage.id]: newPage } },
+			ui: { ...state.ui, selectionIds: [] }
+		};
+	}
 
-  private resetToolState(): void {
-    this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
-  }
+	private resetToolState(): void {
+		this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
+	}
 }
 
 /**
@@ -514,257 +535,275 @@ export class LineTool implements Tool {
  * - Click-cancel: very short arrows are deleted on pointer up
  */
 export class ArrowTool implements Tool {
-  readonly id: ToolId = "arrow";
-  private toolState: ShapeCreationToolState;
+	readonly id: ToolId = 'arrow';
+	private toolState: ShapeCreationToolState;
 
-  constructor() {
-    this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
-  }
+	constructor() {
+		this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
+	}
 
-  onEnter(state: EditorState): EditorState {
-    this.resetToolState();
-    return state;
-  }
+	onEnter(state: EditorState): EditorState {
+		this.resetToolState();
+		return state;
+	}
 
-  onExit(state: EditorState): EditorState {
-    let newState = state;
-    if (this.toolState.creatingShapeId) {
-      newState = this.cancelShapeCreation(state);
-    }
-    this.resetToolState();
-    return newState;
-  }
+	onExit(state: EditorState): EditorState {
+		let newState = state;
+		if (this.toolState.creatingShapeId) {
+			newState = this.cancelShapeCreation(state);
+		}
+		this.resetToolState();
+		return newState;
+	}
 
-  onAction(state: EditorState, action: Action): EditorState {
-    switch (action.type) {
-      case "pointer-down": {
-        return this.handlePointerDown(state, action);
-      }
-      case "pointer-move": {
-        return this.handlePointerMove(state, action);
-      }
-      case "pointer-up": {
-        return this.handlePointerUp(state, action);
-      }
-      case "key-down": {
-        return this.handleKeyDown(state, action);
-      }
-      default: {
-        return state;
-      }
-    }
-  }
+	onAction(state: EditorState, action: Action): EditorState {
+		switch (action.type) {
+			case 'pointer-down': {
+				return this.handlePointerDown(state, action);
+			}
+			case 'pointer-move': {
+				return this.handlePointerMove(state, action);
+			}
+			case 'pointer-up': {
+				return this.handlePointerUp(state, action);
+			}
+			case 'key-down': {
+				return this.handleKeyDown(state, action);
+			}
+			default: {
+				return state;
+			}
+		}
+	}
 
-  private handlePointerDown(state: EditorState, action: Action): EditorState {
-    if (action.type !== "pointer-down") return state;
-    if (!canCreateShapeOnActiveLayer(state)) return state;
+	private handlePointerDown(state: EditorState, action: Action): EditorState {
+		if (action.type !== 'pointer-down') return state;
+		if (!canCreateShapeOnActiveLayer(state)) return state;
 
-    const currentPage = getCurrentPage(state);
-    if (!currentPage) return state;
+		const currentPage = getCurrentPage(state);
+		if (!currentPage) return state;
 
-    const shapeId = createId("shape");
+		const shapeId = createId('shape');
 
-    const shape = ShapeRecord.createArrow(currentPage.id, action.world.x, action.world.y, {
-      points: [{ x: 0, y: 0 }, { x: 0, y: 0 }],
-      start: { kind: "free" },
-      end: { kind: "free" },
-      style: { stroke: "#2563eb", width: 2, headEnd: true },
-      routing: { kind: "straight" },
-    }, shapeId);
+		const shape = ShapeRecord.createArrow(
+			currentPage.id,
+			action.world.x,
+			action.world.y,
+			{
+				points: [
+					{ x: 0, y: 0 },
+					{ x: 0, y: 0 }
+				],
+				start: { kind: 'free' },
+				end: { kind: 'free' },
+				style: { stroke: '#2563eb', width: 2, headEnd: true },
+				routing: { kind: 'straight' }
+			},
+			shapeId
+		);
 
-    this.toolState.isCreating = true;
-    this.toolState.startWorld = action.world;
-    this.toolState.creatingShapeId = shapeId;
+		this.toolState.isCreating = true;
+		this.toolState.startWorld = action.world;
+		this.toolState.creatingShapeId = shapeId;
 
-    const newPage = { ...currentPage, shapeIds: [...currentPage.shapeIds, shapeId] };
+		const newPage = { ...currentPage, shapeIds: [...currentPage.shapeIds, shapeId] };
 
-    return {
-      ...state,
-      doc: {
-        ...state.doc,
-        shapes: { ...state.doc.shapes, [shapeId]: shape },
-        pages: { ...state.doc.pages, [currentPage.id]: newPage },
-      },
-      ui: { ...state.ui, selectionIds: [shapeId] },
-    };
-  }
+		return {
+			...state,
+			doc: {
+				...state.doc,
+				shapes: { ...state.doc.shapes, [shapeId]: shape },
+				pages: { ...state.doc.pages, [currentPage.id]: newPage }
+			},
+			ui: { ...state.ui, selectionIds: [shapeId] }
+		};
+	}
 
-  private handlePointerMove(state: EditorState, action: Action): EditorState {
-    if (action.type !== "pointer-move" || !this.toolState.isCreating || !this.toolState.startWorld) return state;
-    if (!this.toolState.creatingShapeId) return state;
+	private handlePointerMove(state: EditorState, action: Action): EditorState {
+		if (action.type !== 'pointer-move' || !this.toolState.isCreating || !this.toolState.startWorld) return state;
+		if (!this.toolState.creatingShapeId) return state;
 
-    const shape = state.doc.shapes[this.toolState.creatingShapeId];
-    if (!shape || shape.type !== "arrow") return state;
+		const shape = state.doc.shapes[this.toolState.creatingShapeId];
+		if (!shape || shape.type !== 'arrow') return state;
 
-    const b = Vec2.sub(action.world, this.toolState.startWorld);
-    const updatedPoints = [{ x: 0, y: 0 }, b];
-    const updatedShape = { ...shape, props: { ...shape.props, points: updatedPoints } };
+		const end = action.modifiers.shift ? snapAngle(this.toolState.startWorld, action.world) : action.world;
+		const b = Vec2.sub(end, this.toolState.startWorld);
+		const updatedPoints = [{ x: 0, y: 0 }, b];
+		const updatedShape = { ...shape, props: { ...shape.props, points: updatedPoints } };
 
-    let newState = {
-      ...state,
-      doc: { ...state.doc, shapes: { ...state.doc.shapes, [this.toolState.creatingShapeId]: updatedShape } },
-    };
+		let newState = {
+			...state,
+			doc: { ...state.doc, shapes: { ...state.doc.shapes, [this.toolState.creatingShapeId]: updatedShape } }
+		};
 
-    const stateWithoutArrow = {
-      ...newState,
-      doc: {
-        ...newState.doc,
-        shapes: Object.fromEntries(
-          Object.entries(newState.doc.shapes).filter(([id]) => id !== this.toolState.creatingShapeId),
-        ),
-      },
-    };
+		const stateWithoutArrow = {
+			...newState,
+			doc: {
+				...newState.doc,
+				shapes: Object.fromEntries(
+					Object.entries(newState.doc.shapes).filter(([id]) => id !== this.toolState.creatingShapeId)
+				)
+			}
+		};
 
-    const hitShapeId = hitTestPoint(stateWithoutArrow, action.world);
+		const hitShapeId = hitTestPoint(stateWithoutArrow, action.world);
 
-    if (hitShapeId) {
-      newState = {
-        ...newState,
-        ui: {
-          ...newState.ui,
-          bindingPreview: { arrowId: this.toolState.creatingShapeId, targetShapeId: hitShapeId, handle: "end" },
-        },
-      };
-    } else {
-      newState = { ...newState, ui: { ...newState.ui, bindingPreview: undefined } };
-    }
+		if (hitShapeId) {
+			newState = {
+				...newState,
+				ui: {
+					...newState.ui,
+					bindingPreview: {
+						arrowId: this.toolState.creatingShapeId,
+						targetShapeId: hitShapeId,
+						handle: 'end'
+					}
+				}
+			};
+		} else {
+			newState = { ...newState, ui: { ...newState.ui, bindingPreview: undefined } };
+		}
 
-    return newState;
-  }
+		return newState;
+	}
 
-  private handlePointerUp(state: EditorState, action: Action): EditorState {
-    if (action.type !== "pointer-up" || !this.toolState.creatingShapeId) return state;
+	private handlePointerUp(state: EditorState, action: Action): EditorState {
+		if (action.type !== 'pointer-up' || !this.toolState.creatingShapeId) return state;
 
-    const shape = state.doc.shapes[this.toolState.creatingShapeId];
-    if (!shape || shape.type !== "arrow") return state;
+		const shape = state.doc.shapes[this.toolState.creatingShapeId];
+		if (!shape || shape.type !== 'arrow') return state;
 
-    let newState = state;
+		let newState = state;
 
-    const points = shape.props.points;
-    if (!points || points.length < 2) {
-      newState = this.cancelShapeCreation(state);
-      this.resetToolState();
-      return newState;
-    }
+		const points = shape.props.points;
+		if (!points || points.length < 2) {
+			newState = this.cancelShapeCreation(state);
+			this.resetToolState();
+			return newState;
+		}
 
-    const endPoint = points[points.length - 1];
-    const arrowLength = Vec2.len(endPoint);
-    if (arrowLength < MIN_SHAPE_SIZE) {
-      newState = this.cancelShapeCreation(state);
-    } else {
-      newState = this.createBindingsForArrow(state, this.toolState.creatingShapeId);
-    }
+		const endPoint = points[points.length - 1];
+		const arrowLength = Vec2.len(endPoint);
+		if (arrowLength < MIN_SHAPE_SIZE) {
+			newState = this.cancelShapeCreation(state);
+		} else {
+			newState = this.createBindingsForArrow(state, this.toolState.creatingShapeId);
+		}
 
-    if (newState.ui.bindingPreview) {
-      newState = { ...newState, ui: { ...newState.ui, bindingPreview: undefined } };
-    }
+		if (newState.ui.bindingPreview) {
+			newState = { ...newState, ui: { ...newState.ui, bindingPreview: undefined } };
+		}
 
-    this.resetToolState();
-    return arrowLength >= MIN_SHAPE_SIZE ? { ...newState, ui: { ...newState.ui, toolId: "select" } } : newState;
-  }
+		this.resetToolState();
+		return arrowLength >= MIN_SHAPE_SIZE ? { ...newState, ui: { ...newState.ui, toolId: 'select' } } : newState;
+	}
 
-  /**
-   * Create bindings for arrow endpoints that hit other shapes
-   */
-  private createBindingsForArrow(state: EditorState, arrowId: string): EditorState {
-    const arrow = state.doc.shapes[arrowId];
-    if (!arrow || arrow.type !== "arrow") return state;
+	/**
+	 * Create bindings for arrow endpoints that hit other shapes
+	 */
+	private createBindingsForArrow(state: EditorState, arrowId: string): EditorState {
+		const arrow = state.doc.shapes[arrowId];
+		if (!arrow || arrow.type !== 'arrow') return state;
 
-    const points = arrow.props.points;
-    if (!points || points.length < 2) return state;
+		const points = arrow.props.points;
+		if (!points || points.length < 2) return state;
 
-    const startPoint = points[0];
-    const endPoint = points[points.length - 1];
+		const startPoint = points[0];
+		const endPoint = points[points.length - 1];
 
-    const startWorld = { x: arrow.x + startPoint.x, y: arrow.y + startPoint.y };
-    const endWorld = { x: arrow.x + endPoint.x, y: arrow.y + endPoint.y };
+		const startWorld = { x: arrow.x + startPoint.x, y: arrow.y + startPoint.y };
+		const endWorld = { x: arrow.x + endPoint.x, y: arrow.y + endPoint.y };
 
-    const newBindings = { ...state.doc.bindings };
-    let updatedArrow = arrow;
+		const newBindings = { ...state.doc.bindings };
+		let updatedArrow = arrow;
 
-    const stateWithoutArrow = {
-      ...state,
-      doc: {
-        ...state.doc,
-        shapes: Object.fromEntries(Object.entries(state.doc.shapes).filter(([id]) => id !== arrowId)),
-      },
-    };
+		const stateWithoutArrow = {
+			...state,
+			doc: {
+				...state.doc,
+				shapes: Object.fromEntries(Object.entries(state.doc.shapes).filter(([id]) => id !== arrowId))
+			}
+		};
 
-    const startHitId = hitTestPoint(stateWithoutArrow, startWorld);
-    if (startHitId) {
-      const targetShape = state.doc.shapes[startHitId];
-      if (targetShape) {
-        const anchor = computeNormalizedAnchor(startWorld, targetShape);
-        const binding = BindingRecord.create(arrowId, startHitId, "start", {
-          kind: "edge",
-          nx: anchor.nx,
-          ny: anchor.ny,
-        });
-        newBindings[binding.id] = binding;
-        updatedArrow = {
-          ...updatedArrow,
-          props: { ...updatedArrow.props, start: { kind: "bound", bindingId: binding.id } },
-        };
-      }
-    }
+		const startHitId = hitTestPoint(stateWithoutArrow, startWorld);
+		if (startHitId) {
+			const targetShape = state.doc.shapes[startHitId];
+			if (targetShape) {
+				const anchor = computeNormalizedAnchor(startWorld, targetShape);
+				const binding = BindingRecord.create(arrowId, startHitId, 'start', {
+					kind: 'edge',
+					nx: anchor.nx,
+					ny: anchor.ny
+				});
+				newBindings[binding.id] = binding;
+				updatedArrow = {
+					...updatedArrow,
+					props: { ...updatedArrow.props, start: { kind: 'bound', bindingId: binding.id } }
+				};
+			}
+		}
 
-    const endHitId = hitTestPoint(stateWithoutArrow, endWorld);
-    if (endHitId) {
-      const targetShape = state.doc.shapes[endHitId];
-      if (targetShape) {
-        const anchor = computeNormalizedAnchor(endWorld, targetShape);
-        const binding = BindingRecord.create(arrowId, endHitId, "end", { kind: "edge", nx: anchor.nx, ny: anchor.ny });
-        newBindings[binding.id] = binding;
-        updatedArrow = {
-          ...updatedArrow,
-          props: { ...updatedArrow.props, end: { kind: "bound", bindingId: binding.id } },
-        };
-      }
-    }
+		const endHitId = hitTestPoint(stateWithoutArrow, endWorld);
+		if (endHitId) {
+			const targetShape = state.doc.shapes[endHitId];
+			if (targetShape) {
+				const anchor = computeNormalizedAnchor(endWorld, targetShape);
+				const binding = BindingRecord.create(arrowId, endHitId, 'end', {
+					kind: 'edge',
+					nx: anchor.nx,
+					ny: anchor.ny
+				});
+				newBindings[binding.id] = binding;
+				updatedArrow = {
+					...updatedArrow,
+					props: { ...updatedArrow.props, end: { kind: 'bound', bindingId: binding.id } }
+				};
+			}
+		}
 
-    return {
-      ...state,
-      doc: { ...state.doc, bindings: newBindings, shapes: { ...state.doc.shapes, [arrowId]: updatedArrow } },
-    };
-  }
+		return {
+			...state,
+			doc: { ...state.doc, bindings: newBindings, shapes: { ...state.doc.shapes, [arrowId]: updatedArrow } }
+		};
+	}
 
-  private handleKeyDown(state: EditorState, action: Action): EditorState {
-    if (action.type !== "key-down") return state;
+	private handleKeyDown(state: EditorState, action: Action): EditorState {
+		if (action.type !== 'key-down') return state;
 
-    if (action.key === "Escape" && this.toolState.creatingShapeId) {
-      const newState = this.cancelShapeCreation(state);
-      this.resetToolState();
-      return newState;
-    }
+		if (action.key === 'Escape' && this.toolState.creatingShapeId) {
+			const newState = this.cancelShapeCreation(state);
+			this.resetToolState();
+			return newState;
+		}
 
-    return state;
-  }
+		return state;
+	}
 
-  private cancelShapeCreation(state: EditorState): EditorState {
-    if (!this.toolState.creatingShapeId) return state;
+	private cancelShapeCreation(state: EditorState): EditorState {
+		if (!this.toolState.creatingShapeId) return state;
 
-    const shape = state.doc.shapes[this.toolState.creatingShapeId];
-    if (!shape) return state;
+		const shape = state.doc.shapes[this.toolState.creatingShapeId];
+		if (!shape) return state;
 
-    const newShapes = { ...state.doc.shapes };
-    delete newShapes[this.toolState.creatingShapeId];
+		const newShapes = { ...state.doc.shapes };
+		delete newShapes[this.toolState.creatingShapeId];
 
-    const currentPage = getCurrentPage(state);
-    if (!currentPage) return state;
+		const currentPage = getCurrentPage(state);
+		if (!currentPage) return state;
 
-    const newPage = {
-      ...currentPage,
-      shapeIds: currentPage.shapeIds.filter((id) => id !== this.toolState.creatingShapeId),
-    };
+		const newPage = {
+			...currentPage,
+			shapeIds: currentPage.shapeIds.filter((id) => id !== this.toolState.creatingShapeId)
+		};
 
-    return {
-      ...state,
-      doc: { ...state.doc, shapes: newShapes, pages: { ...state.doc.pages, [currentPage.id]: newPage } },
-      ui: { ...state.ui, selectionIds: [] },
-    };
-  }
+		return {
+			...state,
+			doc: { ...state.doc, shapes: newShapes, pages: { ...state.doc.pages, [currentPage.id]: newPage } },
+			ui: { ...state.ui, selectionIds: [] }
+		};
+	}
 
-  private resetToolState(): void {
-    this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
-  }
+	private resetToolState(): void {
+		this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
+	}
 }

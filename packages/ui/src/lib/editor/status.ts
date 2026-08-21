@@ -8,7 +8,13 @@ export type StatusStore = {
 	update(updater: (status: PersistenceStatus) => PersistenceStatus): void;
 };
 
-export type SnapSettings = { snapEnabled: boolean; gridEnabled: boolean; gridSize: number };
+export type SnapSettings = {
+	snapEnabled: boolean;
+	gridEnabled: boolean;
+	gridSize: number;
+	objectSnapEnabled?: boolean;
+	snapDistance?: number;
+};
 
 export type SnapStore = {
 	get(): SnapSettings;
@@ -54,9 +60,34 @@ export function createStatusStore(initial: PersistenceStatus): StatusStore {
  * IMPORTANT: Default gridSize must match DEFAULT_GRID_SIZE renderer
  * to ensure grid lines and snapping positions align correctly
  */
+const SNAP_PREFERENCES_KEY = 'inkfinite:editor-snap-settings';
+
 export function createSnapStore(initial?: Partial<SnapSettings>): SnapStore {
-	const defaults: SnapSettings = { snapEnabled: false, gridEnabled: true, gridSize: 25 };
-	let value: SnapSettings = { ...defaults, ...initial };
+	const defaults: SnapSettings = {
+		snapEnabled: false,
+		gridEnabled: true,
+		gridSize: 25,
+		objectSnapEnabled: true,
+		snapDistance: 8
+	};
+	let saved: Partial<SnapSettings> = {};
+	if (typeof localStorage !== 'undefined') {
+		try {
+			const parsed = JSON.parse(localStorage.getItem(SNAP_PREFERENCES_KEY) ?? '{}');
+			if (parsed && typeof parsed === 'object') saved = parsed;
+		} catch {
+			saved = {};
+		}
+	}
+	let value: SnapSettings = { ...defaults, ...saved, ...initial };
+	const persist = (next: SnapSettings) => {
+		if (typeof localStorage === 'undefined') return;
+		try {
+			localStorage.setItem(SNAP_PREFERENCES_KEY, JSON.stringify(next));
+		} catch {
+			// Preferences are optional when storage is unavailable or full.
+		}
+	};
 	const listeners = new Set<(snap: SnapSettings) => void>();
 
 	return {
@@ -72,12 +103,14 @@ export function createSnapStore(initial?: Partial<SnapSettings>): SnapStore {
 		},
 		update(updater) {
 			value = updater(value);
+			persist(value);
 			for (const listener of listeners) {
 				listener(value);
 			}
 		},
 		set(next) {
 			value = next;
+			persist(value);
 			for (const listener of listeners) {
 				listener(value);
 			}

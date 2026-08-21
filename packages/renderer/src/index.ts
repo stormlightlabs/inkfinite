@@ -13,7 +13,8 @@ import type {
 	StrokeShape,
 	TextShape,
 	Vec2,
-	Viewport
+	Viewport,
+	SnapGuide
 } from '@inkfinite/core';
 import {
 	computeOrthogonalPath,
@@ -49,7 +50,7 @@ export interface Renderer {
 
 export type SnapSettings = { snapEnabled: boolean; gridEnabled: boolean; gridSize: number };
 
-export type PointerVisualState = { isPointerDown: boolean; snappedWorld?: Vec2 | null };
+export type PointerVisualState = { isPointerDown: boolean; snappedWorld?: Vec2 | null; snapGuides?: SnapGuide[] };
 
 export type HandleRenderState = { hover: string | null; active: string | null } | null | undefined;
 
@@ -391,6 +392,32 @@ function drawSnapGuides(
 	const snappedY = pointerState.snappedWorld
 		? pointerState.snappedWorld.y
 		: Math.round(guideWorld.y / gridSize) * gridSize;
+
+	const guides = pointerState.snapGuides ?? [];
+	if (guides.length === 0 && !snapSettings.gridEnabled) return;
+	if (guides.length > 0) {
+		const halfWidth = viewport.width / (2 * camera.zoom);
+		const halfHeight = viewport.height / (2 * camera.zoom);
+		context.save();
+		context.setLineDash([4 / camera.zoom, 4 / camera.zoom]);
+		context.lineWidth = 1 / camera.zoom;
+		context.strokeStyle = 'rgba(236, 72, 153, 0.82)';
+		for (const guide of guides) {
+			const start = guide.start ?? (guide.axis === 'x' ? camera.y - halfHeight : camera.x - halfWidth);
+			const end = guide.end ?? (guide.axis === 'x' ? camera.y + halfHeight : camera.x + halfWidth);
+			context.beginPath();
+			if (guide.axis === 'x') {
+				context.moveTo(guide.position, start);
+				context.lineTo(guide.position, end);
+			} else {
+				context.moveTo(start, guide.position);
+				context.lineTo(end, guide.position);
+			}
+			context.stroke();
+		}
+		context.restore();
+		return;
+	}
 
 	const halfWidth = viewport.width / (2 * camera.zoom);
 	const halfHeight = viewport.height / (2 * camera.zoom);
@@ -1135,6 +1162,16 @@ function drawSelection(
 ) {
 	const selectedIds = new Set(state.ui.selectionIds);
 	const singleSelectionId = state.ui.selectionIds.length === 1 ? state.ui.selectionIds[0] : null;
+	const hovered = state.ui.hoveredShapeId ? state.doc.shapes[state.ui.hoveredShapeId] : undefined;
+	if (hovered && !selectedIds.has(hovered.id)) {
+		const bounds = shapeBounds(hovered);
+		context.save();
+		context.setLineDash([5 / state.camera.zoom, 4 / state.camera.zoom]);
+		context.strokeStyle = 'rgba(37, 99, 235, 0.65)';
+		context.lineWidth = 1.5 / state.camera.zoom;
+		context.strokeRect(bounds.min.x, bounds.min.y, bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y);
+		context.restore();
+	}
 
 	for (const shape of shapes) {
 		if (!selectedIds.has(shape.id)) continue;
@@ -1334,8 +1371,10 @@ function drawPathEditingHandles(
 		context.moveTo(handle.anchor.x, handle.anchor.y);
 		context.lineTo(handle.position.x, handle.position.y);
 		context.stroke();
-		context.fillStyle = handleState?.active === handleId ? '#2563eb' : '#ffffff';
-		context.strokeStyle = '#2563eb';
+		const active = handleState?.active === handleId;
+		const hover = handleState?.hover === handleId;
+		context.fillStyle = active ? '#2563eb' : hover ? '#dbeafe' : '#ffffff';
+		context.strokeStyle = active || hover ? '#1d4ed8' : '#2563eb';
 		context.beginPath();
 		context.arc(handle.position.x, handle.position.y, controlSize, 0, Math.PI * 2);
 		context.fill();
@@ -1348,8 +1387,9 @@ function drawPathEditingHandles(
 		const anchorId = pathAnchorHandleId(anchor);
 		const key = `${anchor.subpathIndex}:${anchor.segmentIndex}`;
 		const selected = selectedAnchors.has(key);
-		context.fillStyle = selected || handleState?.active === anchorId ? '#2563eb' : '#ffffff';
-		context.strokeStyle = '#1d4ed8';
+		const hover = handleState?.hover === anchorId;
+		context.fillStyle = selected || handleState?.active === anchorId ? '#2563eb' : hover ? '#dbeafe' : '#ffffff';
+		context.strokeStyle = hover ? '#1e40af' : '#1d4ed8';
 		context.lineWidth = 1.5 / scale;
 		context.beginPath();
 		context.rect(position.x - anchorSize, position.y - anchorSize, anchorSize * 2, anchorSize * 2);
@@ -1368,26 +1408,27 @@ function getHandlesForShape(state: EditorState, shape: ShapeRecord): HandleVisua
 		shape.type === 'markdown' ||
 		shape.type === 'container'
 	) {
-		const bounds = shapeBounds(shape);
+		const bounds = localShapeBounds(shape);
 		const minX = bounds.min.x;
 		const maxX = bounds.max.x;
 		const minY = bounds.min.y;
 		const maxY = bounds.max.y;
 		const centerX = (minX + maxX) / 2;
 		const centerY = (minY + maxY) / 2;
+		const world = (point: Vec2) => localToWorld(shape, point);
 		handles.push(
-			{ id: 'nw', position: { x: minX, y: minY } },
-			{ id: 'n', position: { x: centerX, y: minY } },
-			{ id: 'ne', position: { x: maxX, y: minY } },
-			{ id: 'e', position: { x: maxX, y: centerY } },
-			{ id: 'se', position: { x: maxX, y: maxY } },
-			{ id: 's', position: { x: centerX, y: maxY } },
-			{ id: 'sw', position: { x: minX, y: maxY } },
-			{ id: 'w', position: { x: minX, y: centerY } },
+			{ id: 'nw', position: world({ x: minX, y: minY }) },
+			{ id: 'n', position: world({ x: centerX, y: minY }) },
+			{ id: 'ne', position: world({ x: maxX, y: minY }) },
+			{ id: 'e', position: world({ x: maxX, y: centerY }) },
+			{ id: 'se', position: world({ x: maxX, y: maxY }) },
+			{ id: 's', position: world({ x: centerX, y: maxY }) },
+			{ id: 'sw', position: world({ x: minX, y: maxY }) },
+			{ id: 'w', position: world({ x: minX, y: centerY }) },
 			{
 				id: 'rotate',
-				position: { x: centerX, y: minY - ROTATE_HANDLE_OFFSET },
-				connectorFrom: { x: centerX, y: minY }
+				position: world({ x: centerX, y: minY - ROTATE_HANDLE_OFFSET }),
+				connectorFrom: world({ x: centerX, y: minY })
 			}
 		);
 		return handles;

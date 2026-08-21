@@ -240,7 +240,13 @@ export class DirectSelectTool implements Tool {
 		const updated =
 			activeHandle.kind === 'control'
 				? moveControl(initialShape, activeHandle.ref, action.world)
-				: moveAnchors(initialShape, pathSelection.anchors, dragStartWorld, action.world);
+				: moveAnchors(
+						initialShape,
+						pathSelection.anchors,
+						dragStartWorld,
+						action.world,
+						action.modifiers.shift
+					);
 		if (!updated) return state;
 		return { ...state, doc: { ...state.doc, shapes: { ...state.doc.shapes, [updated.id]: updated } } };
 	}
@@ -289,9 +295,12 @@ export class DirectSelectTool implements Tool {
 			subpath?.closed && segment.segmentIndex === subpath.segments.length
 				? segment.segmentIndex
 				: segment.segmentIndex + 1;
-		return this.applyTopology(state, path, [operation], [
-			{ subpathIndex: segment.subpathIndex, segmentIndex: anchorIndex }
-		]);
+		return this.applyTopology(
+			state,
+			path,
+			[operation],
+			[{ subpathIndex: segment.subpathIndex, segmentIndex: anchorIndex }]
+		);
 	}
 
 	private deleteSelectedAnchors(state: EditorState): EditorState {
@@ -350,10 +359,12 @@ export class DirectSelectTool implements Tool {
 		const subpathIndices = [...new Set(anchors.map((anchor) => anchor.subpathIndex))];
 		const operations = subpathIndices
 			.filter((subpathIndex) => path.props.subpaths[subpathIndex]?.closed !== closed)
-			.map((subpathIndex): PathTopologyOperation => ({
-				type: closed ? 'close_path' : 'open_path',
-				subpath_index: subpathIndex
-			}));
+			.map(
+				(subpathIndex): PathTopologyOperation => ({
+					type: closed ? 'close_path' : 'open_path',
+					subpath_index: subpathIndex
+				})
+			);
 		return this.applyTopology(state, path, operations, anchors);
 	}
 
@@ -373,7 +384,10 @@ export class DirectSelectTool implements Tool {
 		const [first, second] = endpoints;
 		if (!first || !second) return state;
 		if (first.subpathIndex === second.subpathIndex) {
-			if (first.segmentIndex === 0 && second.segmentIndex === path.props.subpaths[first.subpathIndex]!.segments.length - 1) {
+			if (
+				first.segmentIndex === 0 &&
+				second.segmentIndex === path.props.subpaths[first.subpathIndex]!.segments.length - 1
+			) {
 				return this.applyTopology(
 					state,
 					path,
@@ -489,12 +503,18 @@ function moveAnchors(
 	initial: PathShape,
 	anchors: PathAnchorRef[],
 	startWorld: Vec2,
-	currentWorld: Vec2
+	currentWorld: Vec2,
+	constrainAxis: boolean
 ): PathShape | null {
 	if (anchors.length === 0) return null;
 	const start = worldToLocal(startWorld, initial);
 	const current = worldToLocal(currentWorld, initial);
-	const delta = { x: current.x - start.x, y: current.y - start.y };
+	const rawDelta = { x: current.x - start.x, y: current.y - start.y };
+	const delta = constrainAxis
+		? Math.abs(rawDelta.x) >= Math.abs(rawDelta.y)
+			? { x: rawDelta.x, y: 0 }
+			: { x: 0, y: rawDelta.y }
+		: rawDelta;
 	const selected = new Set(anchors.map(anchorKey));
 	const updated = ShapeRecord.clone(initial) as PathShape;
 

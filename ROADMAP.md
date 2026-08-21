@@ -22,6 +22,12 @@ snapping, keyboard and camera behavior, expose layout operations, and add clipbo
 workflows that behave like a native drawing application. Frames and bound arrows follow once these
 core interactions are consistent across web and desktop.
 
+Selection and movement now support object and grid snapping with alignment and gap guides, angle
+constraints, modifier-aware resize and drawing gestures, Alt-drag duplication, hover feedback,
+transformed handles, edge scrolling, zoom-to-selection, and stored grid preferences. The remaining
+editor refinement work is layout commands, shortcuts, menus, accessibility, clipboard, images,
+frames, and arrow routing.
+
 ### Permissioned MCP
 
 Add a local stdio MCP server as the policy-aware interface for model-controlled access. It should

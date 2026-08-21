@@ -159,6 +159,13 @@
 		const target = event.currentTarget as HTMLInputElement;
 		snap.update((current) => ({ ...current, gridEnabled: target.checked }));
 	}
+
+	function handleGridSizeInput(event: Event) {
+		const target = event.currentTarget as HTMLInputElement;
+		const gridSize = Number(target.value);
+		if (!Number.isFinite(gridSize) || gridSize <= 0) return;
+		snap.update((current) => ({ ...current, gridSize }));
+	}
 </script>
 
 <div class="status-bar" data-agent-occlusion>
@@ -208,6 +215,16 @@
 					checked={snapSnapshot.gridEnabled}
 					onchange={handleGridToggle}
 					aria-label="Enable grid snapping" />
+			</label>
+			<label class="status-bar__grid-size">
+				<span>Grid</span>
+				<input
+					type="number"
+					min="1"
+					step="1"
+					value={snapSnapshot.gridSize}
+					onchange={handleGridSizeInput}
+					aria-label="Grid size" />
 			</label>
 		</div>
 	</div>
@@ -372,8 +389,29 @@
 		opacity: 0.8;
 	}
 
-	.status-bar__toggle:hover input {
+	.status-bar__toggle:hover input,
+	.status-bar__grid-size:hover input {
 		opacity: 1;
+	}
+
+	.status-bar__grid-size {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		font-size: 0.75rem;
+		color: var(--ink-text);
+	}
+
+	.status-bar__grid-size input {
+		width: 3.5rem;
+		padding: 0.125rem 0.25rem;
+		border: 1px solid var(--ink-border);
+		border-radius: var(--ink-radius-wobbly-small);
+		background: var(--ink-canvas);
+		color: var(--ink-text);
+		font: inherit;
+		font-variant-numeric: tabular-nums;
+		opacity: 0.8;
 	}
 
 	.status-bar__toggle input:focus {

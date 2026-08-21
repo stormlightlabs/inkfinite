@@ -18,6 +18,9 @@
 - Native path geometry, rendering, hit testing, compound fills, and shared Rust/TypeScript fixtures.
 - Hierarchical vector editing with nested selection, world-space transforms, reparenting, direct
   anchor and handle editing, and path topology operations.
+- Selection refinement with object, equal-gap, handle, and grid snapping guides, modifier-aware
+  movement and drawing constraints, Alt-drag duplication, hover feedback, transformed handles,
+  edge scrolling, zoom-to-selection, and persisted grid preferences.
 - Excalidraw and Obsidian Canvas import/export, offline peer sync, and a bundled agent skill with
   file, proposal, and stale-head examples.
 

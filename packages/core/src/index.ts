@@ -15,6 +15,7 @@ export * from './persistence/document';
 export * from './persistence/repo';
 export * from './persistence/stats';
 export * from './reactivity';
+export * from './snapping';
 export * as stencils from './stencils';
 export * from './tools';
 export * from './ui/filebrowser';

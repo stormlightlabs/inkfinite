@@ -12,8 +12,9 @@ import {
 	worldToLocal
 } from '../geom';
 import { Box2, clamp, Mat3, type Vec2, Vec2 as Vec2Ops } from '../math';
-import { BindingRecord, ShapeRecord } from '../model';
+import { BindingRecord, createId, ShapeRecord } from '../model';
 import { EditorState, getCurrentPage, getSelectionScopeShapes, selectionTarget, type ToolId } from '../reactivity';
+import { snapAngle, type SnapResult } from '../snapping';
 import type { Tool } from './base';
 
 /**
@@ -50,6 +51,18 @@ type RectHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 
 type HandleKind = RectHandle | 'rotate' | 'line-start' | 'line-end' | `arrow-point-${number}` | 'arrow-label';
 
+/** Context passed to the selection snapper at each movement preview. */
+export type SelectSnapContext = {
+	state: EditorState;
+	selectionIds: string[];
+	initialShapes: ReadonlyMap<string, ShapeRecord>;
+	leadPosition: Vec2;
+	delta: Vec2;
+};
+
+type SelectSnapper = (point: Vec2, context?: SelectSnapContext) => Vec2 | SnapResult;
+type HandleSnapper = (point: Vec2, state: EditorState, excludedIds: string[]) => Vec2 | SnapResult;
+
 const HANDLE_HIT_RADIUS = 10;
 const ROTATE_HANDLE_OFFSET = 40;
 const MIN_RESIZE_SIZE = 5;
@@ -69,7 +82,9 @@ export class SelectTool implements Tool {
 	readonly id: ToolId = 'select';
 	private toolState: SelectToolState;
 	private readonly marqueeListener?: (bounds: Box2 | null) => void;
-	private readonly snapPosition?: (point: Vec2) => Vec2;
+	private readonly snapPosition?: SelectSnapper;
+	private readonly snapGuidesListener?: (result: SnapResult | null) => void;
+	private readonly snapHandle?: HandleSnapper;
 
 	/**
 	 * Creates a selection tool.
@@ -77,9 +92,16 @@ export class SelectTool implements Tool {
 	 * The optional position snapper aligns the lead shape during a drag. Other
 	 * selected shapes keep their original offset from that shape.
 	 */
-	constructor(onMarqueeChange?: (bounds: Box2 | null) => void, snapPosition?: (point: Vec2) => Vec2) {
+	constructor(
+		onMarqueeChange?: (bounds: Box2 | null) => void,
+		snapPosition?: SelectSnapper,
+		onSnapChange?: (result: SnapResult | null) => void,
+		snapHandle?: HandleSnapper
+	) {
 		this.marqueeListener = onMarqueeChange;
 		this.snapPosition = snapPosition;
+		this.snapGuidesListener = onSnapChange;
+		this.snapHandle = snapHandle;
 		this.toolState = {
 			isDragging: false,
 			dragStartWorld: null,
@@ -168,6 +190,20 @@ export class SelectTool implements Tool {
 				return { handle: handle.id, shape };
 			}
 		}
+		// Older documents and integrations calculated the rotate affordance from
+		// the axis-aligned bounds. Accept that point while the visible handle uses
+		// the shape's transformed local bounds.
+		if (
+			shape.type === 'rect' ||
+			shape.type === 'ellipse' ||
+			shape.type === 'text' ||
+			shape.type === 'markdown' ||
+			shape.type === 'container'
+		) {
+			const bounds = shapeBounds(shape);
+			const legacyRotate = { x: (bounds.min.x + bounds.max.x) / 2, y: bounds.min.y - ROTATE_HANDLE_OFFSET };
+			if (Vec2Ops.dist(point, legacyRotate) <= HANDLE_HIT_RADIUS) return { handle: 'rotate', shape };
+		}
 		return null;
 	}
 
@@ -184,10 +220,9 @@ export class SelectTool implements Tool {
 		}
 		this.toolState.isDragging = false;
 		this.toolState.dragStartWorld = point;
-		const bounds = this.toolState.handleStartBounds;
-		this.toolState.rotationCenter = bounds
-			? { x: (bounds.min.x + bounds.max.x) / 2, y: (bounds.min.y + bounds.max.y) / 2 }
-			: null;
+		const localBounds = localShapeBounds(shape);
+		const center = Box2.center(localBounds);
+		this.toolState.rotationCenter = localToWorld(shape, center);
 		this.toolState.rotationStartAngle = this.toolState.rotationCenter
 			? Math.atan2(point.y - this.toolState.rotationCenter.y, point.x - this.toolState.rotationCenter.x)
 			: null;
@@ -220,27 +255,7 @@ export class SelectTool implements Tool {
 				? state.ui.selectionIds
 				: legacyGroupIds;
 		const newSelectionIds = removeSelectedDescendants(state, requestedSelectionIds);
-
-		this.toolState.isDragging = true;
-		this.toolState.dragStartWorld = action.world;
-		this.toolState.initialShapePositions.clear();
-		this.toolState.initialShapes.clear();
-
-		for (const id of newSelectionIds) {
-			const shape = state.doc.shapes[id];
-			if (shape) {
-				this.toolState.initialShapePositions.set(id, { x: shape.x, y: shape.y });
-				this.toolState.initialShapes.set(id, ShapeRecord.clone(shape));
-			}
-		}
-		for (const shape of Object.values(state.doc.shapes)) {
-			if (!newSelectionIds.includes(shape.id) && hasSelectedAncestor(shape, newSelectionIds, state)) {
-				this.toolState.initialShapePositions.set(shape.id, { x: shape.x, y: shape.y });
-				this.toolState.initialShapes.set(shape.id, ShapeRecord.clone(shape));
-			}
-		}
-
-		return {
+		let selectionState: EditorState = {
 			...state,
 			ui: {
 				...state.ui,
@@ -249,6 +264,31 @@ export class SelectTool implements Tool {
 				pathSelection: undefined
 			}
 		};
+		if (action.modifiers.alt && !isShiftHeld && isSelected) {
+			selectionState = duplicateSelectionForDrag(selectionState);
+		}
+		const selectionIds = selectionState.ui.selectionIds;
+
+		this.toolState.isDragging = true;
+		this.toolState.dragStartWorld = action.world;
+		this.toolState.initialShapePositions.clear();
+		this.toolState.initialShapes.clear();
+
+		for (const id of selectionIds) {
+			const shape = selectionState.doc.shapes[id];
+			if (shape) {
+				this.toolState.initialShapePositions.set(id, { x: shape.x, y: shape.y });
+				this.toolState.initialShapes.set(id, ShapeRecord.clone(shape));
+			}
+		}
+		for (const shape of Object.values(selectionState.doc.shapes)) {
+			if (!selectionIds.includes(shape.id) && hasSelectedAncestor(shape, selectionIds, selectionState)) {
+				this.toolState.initialShapePositions.set(shape.id, { x: shape.x, y: shape.y });
+				this.toolState.initialShapes.set(shape.id, ShapeRecord.clone(shape));
+			}
+		}
+
+		return selectionState;
 	}
 
 	/**
@@ -300,23 +340,33 @@ export class SelectTool implements Tool {
 			return state;
 		}
 
+		const snappedPoint =
+			this.toolState.activeHandle === 'rotate'
+				? action.world
+				: this.snapHandlePoint(action.world, state, [shapeId]);
 		let updated: ShapeRecord | null = null;
 		if (this.toolState.activeHandle === 'rotate') {
-			updated = this.rotateShape(state, initialShape, action.world);
+			updated = this.rotateShape(state, initialShape, snappedPoint, action.modifiers.shift);
 		} else if (this.toolState.activeHandle === 'arrow-label') {
-			updated = this.adjustArrowLabel(initialShape, action.world);
+			updated = this.adjustArrowLabel(initialShape, snappedPoint);
 		} else if (
 			this.toolState.activeHandle === 'line-start' ||
 			this.toolState.activeHandle === 'line-end' ||
 			this.toolState.activeHandle.startsWith('arrow-point-')
 		) {
-			updated = this.resizeLineShape(initialShape, action.world, this.toolState.activeHandle);
+			updated = this.resizeLineShape(
+				initialShape,
+				snappedPoint,
+				this.toolState.activeHandle,
+				action.modifiers.shift
+			);
 		} else if (this.toolState.handleStartBounds) {
 			updated = this.resizeRectLikeShape(
 				initialShape,
 				this.toolState.handleStartBounds,
-				action.world,
-				this.toolState.activeHandle
+				snappedPoint,
+				this.toolState.activeHandle,
+				action.modifiers
 			);
 		}
 
@@ -377,11 +427,30 @@ export class SelectTool implements Tool {
 		if (action.type !== 'pointer-move' || !this.toolState.dragStartWorld) return state;
 
 		let delta = Vec2Ops.sub(action.world, this.toolState.dragStartWorld);
+		if (action.modifiers.shift) {
+			delta = constrainAxis(delta);
+		}
 		const leadPosition = this.toolState.initialShapePositions.values().next().value;
 		if (leadPosition && this.snapPosition) {
 			const candidate = Vec2Ops.add(leadPosition, delta);
-			delta = Vec2Ops.sub(this.snapPosition(candidate), leadPosition);
+			const snapped = this.snapPosition(candidate, {
+				state,
+				selectionIds: [...this.toolState.initialShapePositions.keys()],
+				initialShapes: this.toolState.initialShapes,
+				leadPosition,
+				delta
+			});
+			if (isSnapResult(snapped)) {
+				delta = snapped.delta;
+				this.snapGuidesListener?.(snapped);
+			} else {
+				delta = Vec2Ops.sub(snapped, leadPosition);
+				this.snapGuidesListener?.(null);
+			}
+		} else {
+			this.snapGuidesListener?.(null);
 		}
+		if (action.modifiers.shift) delta = constrainAxis(delta);
 
 		const newShapes = { ...state.doc.shapes };
 
@@ -425,7 +494,17 @@ export class SelectTool implements Tool {
 			this.toolState.handleShapeId &&
 			(this.toolState.activeHandle === 'line-start' || this.toolState.activeHandle === 'line-end')
 		) {
-			newState = this.updateArrowBindings(newState, this.toolState.handleShapeId, action.world);
+			const arrow = newState.doc.shapes[this.toolState.handleShapeId];
+			const endpoint =
+				arrow?.type === 'arrow'
+					? localToWorld(
+							arrow,
+							this.toolState.activeHandle === 'line-start'
+								? arrow.props.points[0]
+								: arrow.props.points.at(-1)!
+						)
+					: action.world;
+			newState = this.updateArrowBindings(newState, this.toolState.handleShapeId, endpoint);
 		}
 
 		this.toolState.activeHandle = null;
@@ -441,6 +520,7 @@ export class SelectTool implements Tool {
 		this.toolState.marqueeStart = null;
 		this.toolState.marqueeEnd = null;
 		this.notifyMarqueeChange();
+		this.snapGuidesListener?.(null);
 
 		if (newState.ui.bindingPreview) {
 			newState = { ...newState, ui: { ...newState.ui, bindingPreview: undefined } };
@@ -602,6 +682,20 @@ export class SelectTool implements Tool {
 		return this.toolState.activeHandle;
 	}
 
+	private snapHandlePoint(point: Vec2, state: EditorState, excludedIds: string[]): Vec2 {
+		if (!this.snapHandle) return point;
+		const snapped = this.snapHandle(point, state, excludedIds);
+		if (isSnapResult(snapped)) {
+			this.snapGuidesListener?.({
+				...snapped,
+				guides: snapped.guides.map((guide) => ({ ...guide, kind: guide.kind === 'grid' ? 'grid' : 'handle' }))
+			});
+			return snapped.point;
+		}
+		this.snapGuidesListener?.(null);
+		return snapped;
+	}
+
 	private getHandlePositions(state: EditorState, shape: ShapeRecord): Array<{ id: HandleKind; position: Vec2 }> {
 		const handles: Array<{ id: HandleKind; position: Vec2 }> = [];
 		if (
@@ -611,23 +705,24 @@ export class SelectTool implements Tool {
 			shape.type === 'markdown' ||
 			shape.type === 'container'
 		) {
-			const bounds = shapeBounds(shape);
+			const bounds = localShapeBounds(shape);
 			const minX = bounds.min.x;
 			const maxX = bounds.max.x;
 			const minY = bounds.min.y;
 			const maxY = bounds.max.y;
 			const centerX = (minX + maxX) / 2;
 			const centerY = (minY + maxY) / 2;
+			const world = (point: Vec2) => localToWorld(shape, point);
 			handles.push(
-				{ id: 'nw', position: { x: minX, y: minY } },
-				{ id: 'n', position: { x: centerX, y: minY } },
-				{ id: 'ne', position: { x: maxX, y: minY } },
-				{ id: 'e', position: { x: maxX, y: centerY } },
-				{ id: 'se', position: { x: maxX, y: maxY } },
-				{ id: 's', position: { x: centerX, y: maxY } },
-				{ id: 'sw', position: { x: minX, y: maxY } },
-				{ id: 'w', position: { x: minX, y: centerY } },
-				{ id: 'rotate', position: { x: centerX, y: minY - ROTATE_HANDLE_OFFSET } }
+				{ id: 'nw', position: world({ x: minX, y: minY }) },
+				{ id: 'n', position: world({ x: centerX, y: minY }) },
+				{ id: 'ne', position: world({ x: maxX, y: minY }) },
+				{ id: 'e', position: world({ x: maxX, y: centerY }) },
+				{ id: 'se', position: world({ x: maxX, y: maxY }) },
+				{ id: 's', position: world({ x: centerX, y: maxY }) },
+				{ id: 'sw', position: world({ x: minX, y: maxY }) },
+				{ id: 'w', position: world({ x: minX, y: centerY }) },
+				{ id: 'rotate', position: world({ x: centerX, y: minY - ROTATE_HANDLE_OFFSET }) }
 			);
 		} else if (shape.type === 'line') {
 			const start = localToWorld(shape, shape.props.a);
@@ -674,7 +769,8 @@ export class SelectTool implements Tool {
 		initial: ShapeRecord,
 		_bounds: Box2,
 		pointer: Vec2,
-		handle: HandleKind
+		handle: HandleKind,
+		modifiers: { shift: boolean; alt: boolean }
 	): ShapeRecord | null {
 		if (
 			initial.type !== 'rect' &&
@@ -723,8 +819,42 @@ export class SelectTool implements Tool {
 				break;
 		}
 
-		const width = Math.max(maxX - minX, MIN_RESIZE_SIZE);
-		const height = Math.max(maxY - minY, MIN_RESIZE_SIZE);
+		if (modifiers.alt) {
+			const centerX = dimensions.width / 2;
+			const centerY = dimensions.height / 2;
+			if (handle.includes('w') || handle === 'e') {
+				const radius = Math.max(Math.abs(localPointer.x - centerX), MIN_RESIZE_SIZE / 2);
+				minX = centerX - radius;
+				maxX = centerX + radius;
+			}
+			if (handle.includes('n') || handle === 's') {
+				const radius = Math.max(Math.abs(localPointer.y - centerY), MIN_RESIZE_SIZE / 2);
+				minY = centerY - radius;
+				maxY = centerY + radius;
+			}
+		}
+
+		let width = Math.max(maxX - minX, MIN_RESIZE_SIZE);
+		let height = Math.max(maxY - minY, MIN_RESIZE_SIZE);
+		if (modifiers.shift && handle.length === 2) {
+			const ratio = dimensions.width > 0 && dimensions.height > 0 ? dimensions.width / dimensions.height : 1;
+			if (width / height > ratio) height = width / ratio;
+			else width = height * ratio;
+			if (handle.includes('w')) minX = maxX - width;
+			else if (handle.includes('e')) maxX = minX + width;
+			if (handle.includes('n')) minY = maxY - height;
+			else if (handle.includes('s')) maxY = minY + height;
+			if (modifiers.alt) {
+				const centerX = dimensions.width / 2;
+				const centerY = dimensions.height / 2;
+				minX = centerX - width / 2;
+				maxX = centerX + width / 2;
+				minY = centerY - height / 2;
+				maxY = centerY + height / 2;
+			}
+		}
+		width = Math.max(maxX - minX, MIN_RESIZE_SIZE);
+		height = Math.max(maxY - minY, MIN_RESIZE_SIZE);
 		const matrix = shapeTransform(initial);
 		const translated = [...matrix] as Mat3;
 		translated[6] += matrix[0] * minX + matrix[3] * minY;
@@ -789,7 +919,12 @@ export class SelectTool implements Tool {
 		return { ...initial, props: { ...initial.props, label: { ...initial.props.label, offset: newOffset } } };
 	}
 
-	private resizeLineShape(initial: ShapeRecord, pointer: Vec2, handle: HandleKind): ShapeRecord | null {
+	private resizeLineShape(
+		initial: ShapeRecord,
+		pointer: Vec2,
+		handle: HandleKind,
+		constrainAngle: boolean
+	): ShapeRecord | null {
 		if (initial.type !== 'line' && initial.type !== 'arrow') {
 			return null;
 		}
@@ -819,7 +954,20 @@ export class SelectTool implements Tool {
 			return null;
 		}
 
-		const localPointer = worldToLocal(pointer, initial);
+		let nextPointer = pointer;
+		if (constrainAngle) {
+			const anchor =
+				initial.type === 'line'
+					? localToWorld(initial, handle === 'line-start' ? initial.props.b : initial.props.a)
+					: localToWorld(
+							initial,
+							handle === 'line-start'
+								? initial.props.points[initial.props.points.length - 1]
+								: initial.props.points[0]
+						);
+			nextPointer = snapAngle(anchor, pointer);
+		}
+		const localPointer = worldToLocal(nextPointer, initial);
 		if (initial.type === 'line') {
 			return {
 				...initial,
@@ -836,13 +984,19 @@ export class SelectTool implements Tool {
 		return { ...initial, props: { ...initial.props, points: newPoints } };
 	}
 
-	private rotateShape(state: EditorState, initial: ShapeRecord, pointer: Vec2): ShapeRecord | null {
+	private rotateShape(
+		state: EditorState,
+		initial: ShapeRecord,
+		pointer: Vec2,
+		constrainAngle: boolean
+	): ShapeRecord | null {
 		if (!this.toolState.rotationCenter || this.toolState.rotationStartAngle === null) return null;
 		const currentAngle = Math.atan2(
 			pointer.y - this.toolState.rotationCenter.y,
 			pointer.x - this.toolState.rotationCenter.x
 		);
-		const delta = currentAngle - this.toolState.rotationStartAngle;
+		let delta = currentAngle - this.toolState.rotationStartAngle;
+		if (constrainAngle) delta = Math.round(delta / (Math.PI / 12)) * (Math.PI / 12);
 		const parent = initial.groupId ? state.doc.shapes[initial.groupId] : undefined;
 		const parentTransform = parent ? shapeTransform(parent) : Mat3.identity();
 		const inverseParent = Mat3.invert(parentTransform);
@@ -1024,6 +1178,89 @@ export class SelectTool implements Tool {
 
 		return { ...state, doc: { ...state.doc, bindings: newBindings } };
 	}
+}
+
+function duplicateSelectionForDrag(state: EditorState): EditorState {
+	const selectedIds = removeSelectedDescendants(state, state.ui.selectionIds);
+	const mapping = new Map<string, string>();
+	for (const shape of Object.values(state.doc.shapes)) {
+		if (selectedIds.includes(shape.id) || hasSelectedAncestor(shape, selectedIds, state)) {
+			mapping.set(shape.id, createId('shape'));
+		}
+	}
+	const shapes = { ...state.doc.shapes };
+	const pages = { ...state.doc.pages };
+	const layers = state.doc.layers ? { ...state.doc.layers } : undefined;
+	for (const [oldId, newId] of mapping) {
+		const original = state.doc.shapes[oldId];
+		if (!original) continue;
+		const copy = ShapeRecord.clone(original);
+		const nextGroupId = copy.groupId ? mapping.get(copy.groupId) : undefined;
+		const cloned: ShapeRecord = { ...copy, id: newId, ...(nextGroupId ? { groupId: nextGroupId } : {}) };
+		if (cloned.type === 'arrow') {
+			cloned.props = { ...cloned.props, start: { ...cloned.props.start }, end: { ...cloned.props.end } };
+		}
+		shapes[newId] = cloned;
+		const page = pages[original.pageId];
+		if (page) pages[original.pageId] = { ...page, shapeIds: [...page.shapeIds, newId] };
+		if (layers && original.layerId && layers[original.layerId]) {
+			layers[original.layerId] = {
+				...layers[original.layerId],
+				shapeIds: [...layers[original.layerId].shapeIds, newId]
+			};
+		}
+	}
+
+	const bindings = { ...state.doc.bindings };
+	const bindingMapping = new Map<string, string>();
+	for (const binding of Object.values(state.doc.bindings)) {
+		const fromShapeId = mapping.get(binding.fromShapeId);
+		if (!fromShapeId) continue;
+		const id = createId('binding');
+		bindingMapping.set(binding.id, id);
+		bindings[id] = {
+			...BindingRecord.clone(binding),
+			id,
+			fromShapeId,
+			toShapeId: mapping.get(binding.toShapeId) ?? binding.toShapeId
+		};
+	}
+	for (const [oldId, newId] of mapping) {
+		const shape = shapes[newId];
+		if (shape?.type !== 'arrow') continue;
+		const original = state.doc.shapes[oldId];
+		if (original?.type !== 'arrow') continue;
+		const startBinding = original.props.start.bindingId
+			? bindingMapping.get(original.props.start.bindingId)
+			: undefined;
+		const endBinding = original.props.end.bindingId ? bindingMapping.get(original.props.end.bindingId) : undefined;
+		shapes[newId] = {
+			...shape,
+			props: {
+				...shape.props,
+				start: startBinding ? { kind: 'bound', bindingId: startBinding } : { ...shape.props.start },
+				end: endBinding ? { kind: 'bound', bindingId: endBinding } : { ...shape.props.end }
+			}
+		};
+	}
+
+	return {
+		...state,
+		doc: { ...state.doc, pages, ...(layers ? { layers } : {}), shapes, bindings },
+		ui: {
+			...state.ui,
+			selectionIds: selectedIds.map((id) => mapping.get(id)).filter((id): id is string => Boolean(id))
+		}
+	};
+}
+
+function isSnapResult(value: Vec2 | SnapResult): value is SnapResult {
+	return 'point' in value && 'delta' in value && 'guides' in value;
+}
+
+function constrainAxis(delta: Vec2): Vec2 {
+	if (Math.abs(delta.x) >= Math.abs(delta.y)) return { x: delta.x, y: 0 };
+	return { x: 0, y: delta.y };
 }
 
 function hasSelectedAncestor(shape: ShapeRecord, selectedIds: string[], state: EditorState): boolean {
