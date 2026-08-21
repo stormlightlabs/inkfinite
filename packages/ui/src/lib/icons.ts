@@ -44,7 +44,8 @@ export const ICONS = {
 	sun: 'i-tabler-sun',
 	trash: 'i-bi-trash3',
 	undo: 'i-tabler-arrow-back-up',
-	svg: 'i-tabler-svg'
+	svg: 'i-tabler-svg',
+	'book-open': 'i-ph-book-open-light'
 } as const;
 
 /** A semantic icon name supported by the shared icon component. */

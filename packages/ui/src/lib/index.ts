@@ -4,6 +4,9 @@ export type { ButtonProps, ButtonVariant } from './components/Button.svelte';
 export { default as BrushPopover } from './components/BrushPopover.svelte';
 export type { BrushPopoverProps, BrushSettings } from './components/BrushPopover.svelte';
 
+export { default as ColorPicker } from './components/ColorPicker.svelte';
+export type { ColorPickerProps } from './components/ColorPicker.svelte';
+
 export { default as ContextMenu } from './components/ContextMenu.svelte';
 export type {
 	ContextMenuEntry,

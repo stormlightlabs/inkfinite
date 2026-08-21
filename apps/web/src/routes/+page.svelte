@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import '$lib/docs/docs.css';
 	import { getDocs } from '$lib/docs/content';
+	import '$lib/docs/docs.css';
 	import SiteHeader from '$lib/docs/SiteHeader.svelte';
 	import { Icon } from '$ui';
 
@@ -49,7 +49,6 @@
 		<div class="landing-page">
 			<section class="hero" data-pagefind-ignore>
 				<div class="hero-copy">
-					<p class="eyebrow"><span></span> Documentation</p>
 					<h1>Give your ideas</h1>
 					<h1><em>infinite room.</em></h1>
 					<p class="tagline">
@@ -61,7 +60,8 @@
 							Open the app <Icon name="arrow-right" size={18} />
 						</a>
 						<a class="secondary-action" href={resolve('/docs/getting-started/')}>
-							<Icon name="arrow-right" size={18} /> Quick start
+							Quick start
+							<Icon name="book-open" size={18} />
 						</a>
 					</div>
 				</div>
@@ -161,7 +161,7 @@
 		margin: 0;
 		color: var(--docs-text);
 		font-family: var(--docs-font-heading);
-		font-size: clamp(3.3rem, 7.2vw, 6.7rem);
+		font-size: clamp(3rem, 5vw, 6.5rem);
 		font-weight: 700;
 		letter-spacing: -0.0375em;
 		line-height: 0.92;
@@ -466,7 +466,7 @@
 	}
 
 	.quick-start > div {
-		max-width: 42rem;
+		max-width: 50rem;
 	}
 
 	@media (max-width: 960px) {

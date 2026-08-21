@@ -31,7 +31,7 @@ command-line tools use file locks, atomic replacement, and recovery data to prot
 - Use the [desktop editor](/docs/applications/desktop/) for native files and desktop menus.
 - Use the [command-line interface](/docs/reference/cli/) to inspect, edit, validate, or render a
   document from a script.
-- Use [agent workflows](/docs/reference/agents/) to propose document changes for review.
+- Use [agent workflows](/docs/reference/agents/) to inspect, validate, and apply scripted document changes.
 
 ## Where to go next
 

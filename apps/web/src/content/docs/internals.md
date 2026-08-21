@@ -14,6 +14,26 @@ The boundary between them is intentional: the editor can keep pointer movement a
 local, while completed desktop edits still commit through the same Rust transaction engine used by
 the CLI.
 
+## Implemented foundation
+
+The current system includes:
+
+- an Automerge-backed Rust document engine with validated atomic transactions, history, undo and
+  redo, causal heads, sync, deterministic repair, and native file recovery
+- generated TypeScript contracts, semantic metadata, ordered layers, bindings, built-in shapes, and
+  stencils shared across interfaces
+- deterministic SVG and PNG rendering, static SVG import and export, and native path geometry with
+  hierarchy editing
+- native desktop files, browser WASM sessions, and shared editor, runtime, input, and renderer
+  packages
+- CLI workflows for file and live-session inspection, queries, validation, structured mutations,
+  dry runs, rendering, schemas, and machine-readable output
+
+The linked pages in this section describe these components in detail. Start with [Documents](/docs/concepts/documents/)
+for the record model, [Transactions and sync](/docs/concepts/transactions-and-sync/) for commits and
+merges, [SVG import](/docs/internals/svg-import/) for interchange, and [Native path geometry](/docs/internals/native-path-geometry/)
+for vector editing.
+
 ## Architecture
 
 ```text

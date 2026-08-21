@@ -17,8 +17,9 @@ validation, history, and review tied to the user's request.
 
 Preconditions can require specific document heads or record versions. Inkfinite rejects the whole
 transaction when those expectations are stale, when a selector is ambiguous, or when an operation
-would cross a lock or agent-editability boundary. A rejected transaction does not partially modify
-the canonical file.
+would cross a shape or layer lock. A rejected transaction does not partially modify the canonical
+file. Permissioned integrations can apply caller policy before submitting a valid transaction.
+`agent_editable` is not a document-engine lock.
 
 ## Undo and redo
 

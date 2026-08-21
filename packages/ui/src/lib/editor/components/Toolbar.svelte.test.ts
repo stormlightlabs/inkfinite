@@ -147,7 +147,7 @@ describe('Editor Toolbar', () => {
 		expect(brushBounds.right).toBeCloseTo(penBounds.right, 0);
 	});
 
-	it('changes selected fill and stroke opacity through labeled undoable controls', async () => {
+	it('changes selected colors and opacity through labeled undoable controls', async () => {
 		const page = PageRecord.create('Page', 'page');
 		const shape = ShapeRecord.createRect(
 			page.id,
@@ -172,6 +172,24 @@ describe('Editor Toolbar', () => {
 			store,
 			brushStore: createBrushStore()
 		});
+
+		await screen.getByRole('button', { name: 'Fill color' }).click();
+		await screen
+			.getByRole('group', { name: 'Quick colors' })
+			.getByRole('button', { name: 'blue 3' })
+			.click();
+		const fillShape = store.getState().doc.shapes.shape;
+		if (fillShape.type !== 'rect') throw new Error('Expected a rectangle shape');
+		expect(fillShape.props.fill).toBe('#0089fc');
+
+		await screen.getByRole('button', { name: 'Stroke color' }).click();
+		await screen
+			.getByRole('group', { name: 'Quick colors' })
+			.getByRole('button', { name: 'red 3' })
+			.click();
+		const strokeShape = store.getState().doc.shapes.shape;
+		if (strokeShape.type !== 'rect') throw new Error('Expected a rectangle shape');
+		expect(strokeShape.props.stroke).toBe('#ff4647');
 
 		const fill = screen
 			.getByRole('slider', { name: 'Fill opacity' })

@@ -7,6 +7,10 @@
     - Write TSDoc/rustdoc comments for exported/public and contextually important symbols
       for maintainers
 - Helpers need more than 1 call-site to justify abstraction
+- Prefer the smallest end-to-end path through the shared document model before widening a
+  feature's surface. Verify save/reopen, undo/redo, merge, inspection, and export where they apply.
+- Add shared fixtures and regression coverage with feature work. Optimize from measured bottlenecks
+  rather than speculative architecture.
 - Run the full test suite through the root `pnpm test` command, or run a package's
   Vitest command from that package's directory.
     - Do not invoke a package-local vitest from the repository root Vitest will miss the

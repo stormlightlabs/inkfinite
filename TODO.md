@@ -16,45 +16,11 @@ normalized structure where representation matters and rendered output where visu
 - [ ] Verify opaque fallback content remains visually stable
 - [ ] Add deterministic round-trip fixtures for these workflows
 
-## Direct CLI control
-
-### Remove agent-specific restrictions
-
-- [x] Audit all `Origin::Agent` behavior
-    - CLI and IPC creation paths label transactions as agent-originated.
-      The core engine uses that value to enforce `agent_editable` and hidden-layer mutation rules.
-      Live proposal and apply entry points require it.
-      General queries hide invisible-layer shapes without consulting origin.
-      The [origin and authorization guide](apps/web/src/content/docs/internals/origin-and-authorization.md)
-      records the findings, rationale, and migration boundary.
-- [x] Decide whether `Origin` remains provenance-only
-    - Decision: keep `Origin` as provenance-only metadata for history and attribution.
-      It must not grant or deny access. Agent authorization moves to MCP.
-- [x] Separate document invariants and ordinary locks from authorization
-- [x] Remove `agent_editable` restrictions from direct CLI operations
-- [x] Remove hidden-from-agent restrictions from direct CLI operations
-
-### Preserve document correctness
-
-- [x] Keep causal-head and record-version checks
-- [x] Keep transaction validation and atomic mutation
-- [x] Keep ordinary shape and layer locks
-
-### Simplify CLI and live control
-
-- [x] Remove Review/Direct authorization concepts from general CLI behavior
-- [x] Simplify live apply semantics
-- [x] Remove proposal behavior from the general CLI; reserve review for permissioned MCP
-- [x] Update capabilities, generated protocols, and schemas
-- [x] Update CLI help, documentation, and bundled skill guidance
-- [x] Replace permission-oriented CLI tests with direct-control tests
-- [x] Add regression coverage for unrestricted scripted mutation
-
 ## Permissioned MCP
 
 ### Server and discovery
 
-- [ ] Choose a Rust MCP implementation and add an `inkfinite-mcp` crate or binary
+- [ ] Add `inkfinite-mcp` crate with `rmcp` & its macros
 - [ ] Start with stdio transport and expose Inkfinite capability metadata
 - [ ] Reuse core query and transaction APIs rather than shelling out to the CLI
 - [ ] Discover open sessions and accessible files
@@ -117,3 +83,13 @@ normalized structure where representation matters and rendered output where visu
 - [ ] Add a web manifest, service worker, PWA installation, and stronger offline behavior
 - [ ] Decide crates.io and desktop release packaging; automate release artifacts
 - [ ] Revisit skill organization after SVG and MCP workflows stabilize
+
+### Polish
+
+- [ ] Export SVG as copyable code
+- [ ] Export PNG to clipboard
+- [ ] Move handle on the layer pane
+
+---
+
+- [ ] Direct Select could be clearer

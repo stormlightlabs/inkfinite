@@ -22,7 +22,13 @@
 		SnapshotCommand
 	} from '@inkfinite/core';
 	import { fade } from 'svelte/transition';
-	import { BrushPopover, ContextMenu, Icon, type ContextMenuEntry } from '../../index';
+	import {
+		BrushPopover,
+		ColorPicker,
+		ContextMenu,
+		Icon,
+		type ContextMenuEntry
+	} from '../../index';
 	import { DEFAULT_FILL_COLOR, DEFAULT_STROKE_COLOR, TOOLS } from '../constants';
 	import type { BrushSettings, BrushStore } from '../status';
 	import ArrowPopover from './ArrowPopover.svelte';
@@ -494,16 +500,14 @@
 		store.executeCommand(command);
 	}
 
-	function handleFillChange(event: Event) {
-		const input = event.currentTarget as HTMLInputElement;
-		fillColorValue = input.value;
-		applyFillColor(input.value);
+	function handleFillChange(color: string) {
+		fillColorValue = color;
+		applyFillColor(color);
 	}
 
-	function handleStrokeChange(event: Event) {
-		const input = event.currentTarget as HTMLInputElement;
-		strokeColorValue = input.value;
-		applyStrokeColor(input.value);
+	function handleStrokeChange(color: string) {
+		strokeColorValue = color;
+		applyStrokeColor(color);
 	}
 
 	function applyOpacity(field: 'fillOpacity' | 'strokeOpacity', value: number) {
@@ -646,26 +650,26 @@
 			{#if showColorControls}
 				<div class="toolbar__colors" aria-label="Color controls">
 					{#if getSelectedShapes(editorState).some(shapeSupportsFill)}
-						<label class="toolbar__color-control">
+						<div class="toolbar__color-control">
 							<span>Fill</span>
-							<input
-								type="color"
+							<ColorPicker
+								label="Fill color"
 								value={fillColorValue}
-								onchange={handleFillChange}
 								disabled={fillDisabled}
-								aria-label="Fill color" />
-						</label>
+								align="end"
+								onchange={handleFillChange} />
+						</div>
 					{/if}
 					{#if getSelectedShapes(editorState).some(shapeSupportsStroke)}
-						<label class="toolbar__color-control">
+						<div class="toolbar__color-control">
 							<span>Stroke</span>
-							<input
-								type="color"
+							<ColorPicker
+								label="Stroke color"
 								value={strokeColorValue}
-								onchange={handleStrokeChange}
 								disabled={strokeDisabled}
-								aria-label="Stroke color" />
-						</label>
+								align="end"
+								onchange={handleStrokeChange} />
+						</div>
 					{/if}
 					{#if getSelectedShapes(editorState).some(shapeSupportsFillOpacity)}
 						<label class="toolbar__opacity-control">
