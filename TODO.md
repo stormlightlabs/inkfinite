@@ -46,9 +46,9 @@ normalized structure where representation matters and rendered output where visu
 
 ### Canvas structure
 
-- [ ] Add frames with titles, child containment, move-with-contents, zoom, and export behavior
-- [ ] Bind arrow endpoints to shapes and preserve bindings through move, group, copy, and merge
-- [ ] Add straight, curved, and elbow arrows with bend controls, labels, and automatic routing
+- [x] Add frames with titles, child containment, move-with-contents, zoom, and export behavior
+- [x] Bind arrow endpoints to shapes and preserve bindings through move, group, copy, and merge
+- [x] Add straight, curved, and elbow arrows with bend controls, labels, and automatic routing
 
 ## Permissioned MCP
 

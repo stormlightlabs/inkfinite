@@ -7,7 +7,7 @@ import { SelectTool } from "../src/tools/select";
 
 describe("Arrow binding behavior", () => {
   describe("Issue #2: Moving arrows with select tool", () => {
-    it("should remove bindings when an arrow is moved (dragged)", () => {
+    it("should preserve bindings when an arrow is moved (dragged)", () => {
       let state = EditorState.create();
 
       const page = PageRecord.create("Test Page");
@@ -102,15 +102,15 @@ describe("Arrow binding behavior", () => {
       }, 200);
       state = tool.onAction(state, pointerUp);
 
-      expect(Object.keys(state.doc.bindings).length).toBe(0);
-      expect(state.doc.bindings[bindingStart.id]).toBeUndefined();
-      expect(state.doc.bindings[bindingEnd.id]).toBeUndefined();
+      expect(Object.keys(state.doc.bindings).length).toBe(2);
+      expect(state.doc.bindings[bindingStart.id]).toBeDefined();
+      expect(state.doc.bindings[bindingEnd.id]).toBeDefined();
 
       const updatedArrow = state.doc.shapes[arrow.id];
       expect(updatedArrow.type).toBe("arrow");
       if (updatedArrow.type === "arrow") {
-        expect(updatedArrow.props.start.kind).toBe("free");
-        expect(updatedArrow.props.end.kind).toBe("free");
+        expect(updatedArrow.props.start.kind).toBe("bound");
+        expect(updatedArrow.props.end.kind).toBe("bound");
       }
     });
 

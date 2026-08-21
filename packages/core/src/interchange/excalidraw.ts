@@ -57,7 +57,8 @@ export function importExcalidraw(root: JsonObject, fileName: string): Interchang
 		const angle = optionalFiniteNumber(element.angle, 0, `element ${id}.angle`);
 		const rotationOffset = centerRotationOffset(width, height, angle);
 		const origin = { x: x + rotationOffset.x, y: y + rotationOffset.y };
-		const shapeId = inkId('excalidraw', id);
+		const shapeId =
+			type === 'frame' || type === 'magicframe' ? inkId('excalidraw-group', id) : inkId('excalidraw', id);
 		const stroke = stringOr(element.strokeColor, '#1e1e1e');
 		const background = stringOr(element.backgroundColor, 'transparent');
 		const fill = background === 'transparent' ? '' : background;
@@ -231,8 +232,21 @@ export function importExcalidraw(root: JsonObject, fileName: string): Interchang
 			}
 			case 'frame':
 			case 'magicframe':
-				warnings.add('excalidraw-frame', 'Excalidraw frames were retained only as element groups.');
-				continue;
+				shape = ShapeRecord.createContainer(
+					pageId,
+					origin.x,
+					origin.y,
+					{
+						w: width,
+						h: height,
+						title: stringOr(element.name, 'Frame'),
+						fill: fill || undefined,
+						stroke: stroke || undefined,
+						radius: element.roundness ? Math.min(width, height) * 0.1 : 0
+					},
+					shapeId
+				);
+				break;
 			case 'diamond':
 			case 'iframe':
 				warnings.add(`excalidraw-${type}`, `Excalidraw ${type} elements are not supported and were omitted.`);
@@ -390,6 +404,7 @@ function excalidrawElement(
 	warnings: WarningCollector
 ): JsonObject | null {
 	const groupIds = shape.groupId ? [shape.groupId] : [];
+	const frameId = shape.groupId ?? null;
 	const locked = layerLocked || shape.agentEditable === false;
 	let width = 0;
 	let height = 0;
@@ -511,8 +526,16 @@ function excalidrawElement(
 			specific = { type: 'image', fileId: null, status: 'saved', scale: [1, 1] };
 			break;
 		case 'container':
-			warnings.add('excalidraw-container', 'Containers are represented by their child shapes.');
-			return null;
+			width = shape.props.w ?? 0;
+			height = shape.props.h ?? 0;
+			specific = {
+				type: 'frame',
+				name: shape.props.title ?? 'Frame',
+				backgroundColor: shape.props.fill ?? 'transparent',
+				strokeColor: shape.props.stroke ?? '#2563eb',
+				roundness: shape.props.radius ? { type: 3 } : null
+			};
+			break;
 		case 'stroke': {
 			const points = shape.props.points.map(([x, y]) => ({ x, y }));
 			const normalized = normalizePoints(points, shape.x, shape.y, shape.rot);
@@ -550,7 +573,7 @@ function excalidrawElement(
 		roughness: 0,
 		opacity: Math.round(opacity * 100),
 		groupIds,
-		frameId: null,
+		frameId,
 		roundness: null,
 		seed: stableSeed(shape.id),
 		version: 1,

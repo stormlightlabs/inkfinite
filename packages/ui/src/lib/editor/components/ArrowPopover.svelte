@@ -16,7 +16,7 @@
 		getSelectedShapes(editorState).filter((s): s is ArrowShape => s.type === 'arrow')
 	);
 
-	let routingKind = $derived<'straight' | 'orthogonal' | 'mixed'>(
+	let routingKind = $derived<'straight' | 'curved' | 'orthogonal' | 'mixed'>(
 		(() => {
 			if (selectedArrows.length === 0) return 'straight';
 			const first = selectedArrows[0].props.routing?.kind ?? 'straight';
@@ -71,7 +71,7 @@
 		}
 	}
 
-	function setRouting(kind: 'straight' | 'orthogonal') {
+	function setRouting(kind: 'straight' | 'curved' | 'orthogonal') {
 		const state = store.getState();
 		const arrows = getSelectedShapes(state).filter((s): s is ArrowShape => s.type === 'arrow');
 		if (arrows.length === 0) return;
@@ -160,6 +160,14 @@
 						aria-label="Straight routing"
 						aria-pressed={routingKind === 'straight'}>
 						Straight
+					</button>
+					<button
+						class="arrow-popover__routing-btn"
+						class:arrow-popover__routing-btn--active={routingKind === 'curved'}
+						onclick={() => setRouting('curved')}
+						aria-label="Curved routing"
+						aria-pressed={routingKind === 'curved'}>
+						Curved
 					</button>
 					<button
 						class="arrow-popover__routing-btn"

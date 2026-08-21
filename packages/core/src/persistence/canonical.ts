@@ -726,6 +726,16 @@ function sameAffine(left: Affine, right: Affine): boolean {
 	].every(([a, b]) => Math.abs(a - b) <= 1e-9 * (1 + Math.max(Math.abs(a), Math.abs(b))));
 }
 
+function orderedChildren(shape: ShapeRecord, document: Document): string[] {
+	const layer = shape.layerId ? document.layers?.[shape.layerId] : undefined;
+	const order = layer?.shapeIds ?? document.pages[shape.pageId]?.shapeIds ?? [];
+	const children = order.filter((id) => document.shapes[id]?.groupId === shape.id);
+	if (children.length > 0) return children;
+	return Object.values(document.shapes)
+		.filter((candidate) => candidate.groupId === shape.id)
+		.map((candidate) => candidate.id);
+}
+
 function nativeAsset(asset: import('../model').ImportedAsset): NativeAssetRecord {
 	return {
 		id: asset.id,
@@ -773,9 +783,7 @@ function nativeShape(shape: ShapeRecord, layerId: string, document: Document): N
 		kind: shape.type,
 		parent: shapeParent(shape, document),
 		transform: nativeTransform(shape, document),
-		child_ids: Object.values(document.shapes)
-			.filter((candidate) => candidate.groupId === shape.id)
-			.map((candidate) => candidate.id),
+		child_ids: orderedChildren(shape, document),
 		layout: null,
 		properties: nativePropertiesForShape(shape),
 		metadata,

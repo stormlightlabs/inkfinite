@@ -194,12 +194,32 @@ export function pasteClipboard(
 		if (payload.rootIds.includes(source.id)) pastedIds.push(id);
 	}
 	const bindings = { ...state.doc.bindings };
+	const bindingMapping = new Map<string, string>();
 	for (const binding of payload.bindings) {
 		const fromShapeId = mapping.get(binding.fromShapeId);
 		const toShapeId = mapping.get(binding.toShapeId);
 		if (!fromShapeId || !toShapeId) continue;
 		const id = createId('binding');
+		bindingMapping.set(binding.id, id);
 		bindings[id] = { ...BindingRecord.clone(binding), id, fromShapeId, toShapeId };
+	}
+	for (const source of payload.shapes) {
+		const id = mapping.get(source.id);
+		const pasted = id ? shapes[id] : undefined;
+		if (!id || !pasted || pasted.type !== 'arrow' || source.type !== 'arrow') continue;
+		const endpoint = (handle: 'start' | 'end') => {
+			const sourceBindingId = source.props[handle].bindingId;
+			const pastedBindingId = sourceBindingId
+				? bindingMapping.get(sourceBindingId)
+				: undefined;
+			return pastedBindingId
+				? { kind: 'bound' as const, bindingId: pastedBindingId }
+				: { kind: 'free' as const };
+		};
+		shapes[id] = {
+			...pasted,
+			props: { ...pasted.props, start: endpoint('start'), end: endpoint('end') }
+		};
 	}
 	const assets = { ...(state.doc.assets ?? {}) };
 	for (const asset of payload.assets ?? [])
@@ -209,17 +229,20 @@ export function pasteClipboard(
 	const rootMappedIds = payload.rootIds
 		.map((id) => mapping.get(id))
 		.filter((id): id is string => Boolean(id));
+	const copiedIds = payload.shapes
+		.map((shape) => mapping.get(shape.id))
+		.filter((id): id is string => Boolean(id));
 	if (layers && activeLayerId && layers[activeLayerId]) {
 		layers[activeLayerId] = {
 			...layers[activeLayerId],
-			shapeIds: [...layers[activeLayerId].shapeIds, ...rootMappedIds]
+			shapeIds: [...layers[activeLayerId].shapeIds, ...copiedIds]
 		};
 		pages[pageId] = {
 			...page,
 			shapeIds: page.layerIds?.flatMap((id) => layers[id]?.shapeIds ?? []) ?? page.shapeIds
 		};
 	} else {
-		pages[pageId] = { ...page, shapeIds: [...page.shapeIds, ...rootMappedIds] };
+		pages[pageId] = { ...page, shapeIds: [...page.shapeIds, ...copiedIds] };
 	}
 	return {
 		...state,

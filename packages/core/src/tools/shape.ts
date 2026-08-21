@@ -1,11 +1,56 @@
 import type { Action } from '../actions';
-import { computeNormalizedAnchor, hitTestPoint } from '../geom';
+import { computeNormalizedAnchor, hitTestPoint, shapeBounds } from '../geom';
 import { Vec2 } from '../math';
 import { snapAngle } from '../snapping';
 import { BindingRecord, createId, ShapeRecord } from '../model';
 import type { EditorState, ToolId } from '../reactivity';
 import { canCreateShapeOnActiveLayer, getCurrentPage } from '../reactivity';
 import type { Tool } from '../tools/base';
+
+function adoptFrameContents(state: EditorState, frameId: string): EditorState {
+	const frame = state.doc.shapes[frameId];
+	if (!frame || frame.type !== 'container') return state;
+	const frameBounds = shapeBounds(frame);
+	const candidates = Object.values(state.doc.shapes)
+		.filter((shape) => shape.id !== frameId && shape.pageId === frame.pageId && !shape.groupId && !shape.locked)
+		.filter((shape) => {
+			const bounds = shapeBounds(shape);
+			return (
+				bounds.min.x >= frameBounds.min.x &&
+				bounds.min.y >= frameBounds.min.y &&
+				bounds.max.x <= frameBounds.max.x &&
+				bounds.max.y <= frameBounds.max.y
+			);
+		})
+		.sort((left, right) => pageShapeIndex(state, left.id) - pageShapeIndex(state, right.id));
+	if (candidates.length === 0) return state;
+
+	const shapes = { ...state.doc.shapes };
+	for (const shape of candidates) shapes[shape.id] = { ...shape, groupId: frameId };
+	const childIds = candidates.map((shape) => shape.id);
+	const pages = { ...state.doc.pages };
+	const page = pages[frame.pageId];
+	if (page) pages[frame.pageId] = { ...page, shapeIds: moveFrameBeforeChildren(page.shapeIds, frameId, childIds) };
+	const layers = state.doc.layers ? { ...state.doc.layers } : undefined;
+	if (layers && frame.layerId && layers[frame.layerId]) {
+		const layer = layers[frame.layerId];
+		layers[frame.layerId] = { ...layer, shapeIds: moveFrameBeforeChildren(layer.shapeIds, frameId, childIds) };
+	}
+	return { ...state, doc: { ...state.doc, shapes, pages, ...(layers ? { layers } : {}) } };
+}
+
+function moveFrameBeforeChildren(ids: readonly string[], frameId: string, childIds: readonly string[]): string[] {
+	const children = new Set(childIds);
+	const filtered = ids.filter((id) => id !== frameId && !children.has(id));
+	const firstChild = ids.findIndex((id) => children.has(id));
+	filtered.splice(firstChild < 0 ? filtered.length : Math.min(firstChild, filtered.length), 0, frameId, ...childIds);
+	return filtered;
+}
+
+function pageShapeIndex(state: EditorState, shapeId: string): number {
+	const page = state.doc.pages[state.doc.shapes[shapeId]?.pageId ?? ''];
+	return page?.shapeIds.indexOf(shapeId) ?? Number.MAX_SAFE_INTEGER;
+}
 
 /**
  * Internal state for shape creation tools
@@ -197,6 +242,129 @@ export class RectTool implements Tool {
 		return {
 			...state,
 			doc: { ...state.doc, shapes: newShapes, pages: { ...state.doc.pages, [currentPage.id]: newPage } },
+			ui: { ...state.ui, selectionIds: [] }
+		};
+	}
+
+	private resetToolState(): void {
+		this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
+	}
+}
+
+/**
+ * Frame tool - creates a titled container and adopts shapes completely inside it.
+ */
+export class FrameTool implements Tool {
+	readonly id: ToolId = 'frame';
+	private toolState: ShapeCreationToolState = { isCreating: false, startWorld: null, creatingShapeId: null };
+
+	onEnter(state: EditorState): EditorState {
+		this.resetToolState();
+		return state;
+	}
+
+	onExit(state: EditorState): EditorState {
+		const next = this.toolState.creatingShapeId ? this.cancelShapeCreation(state) : state;
+		this.resetToolState();
+		return next;
+	}
+
+	onAction(state: EditorState, action: Action): EditorState {
+		switch (action.type) {
+			case 'pointer-down':
+				return this.handlePointerDown(state, action);
+			case 'pointer-move':
+				return this.handlePointerMove(state, action);
+			case 'pointer-up':
+				return this.handlePointerUp(state, action);
+			case 'key-down':
+				return this.handleKeyDown(state, action);
+			default:
+				return state;
+		}
+	}
+
+	private handlePointerDown(state: EditorState, action: Extract<Action, { type: 'pointer-down' }>): EditorState {
+		if (!canCreateShapeOnActiveLayer(state)) return state;
+		const page = getCurrentPage(state);
+		if (!page) return state;
+		const id = createId('shape');
+		const shape = ShapeRecord.createContainer(
+			page.id,
+			action.world.x,
+			action.world.y,
+			{ w: 0, h: 0, title: 'Frame', fill: 'rgba(37, 99, 235, 0.05)', stroke: '#2563eb', radius: 8 },
+			id
+		);
+		shape.layerId = state.ui.activeLayerId ?? page.layerIds?.[0];
+		this.toolState = { isCreating: true, startWorld: action.world, creatingShapeId: id };
+		return {
+			...state,
+			doc: {
+				...state.doc,
+				shapes: { ...state.doc.shapes, [id]: shape },
+				pages: { ...state.doc.pages, [page.id]: { ...page, shapeIds: [...page.shapeIds, id] } }
+			},
+			ui: { ...state.ui, selectionIds: [id] }
+		};
+	}
+
+	private handlePointerMove(state: EditorState, action: Extract<Action, { type: 'pointer-move' }>): EditorState {
+		if (!this.toolState.isCreating || !this.toolState.startWorld || !this.toolState.creatingShapeId) return state;
+		const shape = state.doc.shapes[this.toolState.creatingShapeId];
+		if (!shape || shape.type !== 'container') return state;
+		const frame = constrainedRect(
+			this.toolState.startWorld,
+			action.world,
+			action.modifiers.shift,
+			action.modifiers.alt
+		);
+		return {
+			...state,
+			doc: {
+				...state.doc,
+				shapes: {
+					...state.doc.shapes,
+					[shape.id]: { ...shape, x: frame.x, y: frame.y, props: { ...shape.props, w: frame.w, h: frame.h } }
+				}
+			}
+		};
+	}
+
+	private handlePointerUp(state: EditorState, _action: Extract<Action, { type: 'pointer-up' }>): EditorState {
+		if (!this.toolState.creatingShapeId) return state;
+		const shape = state.doc.shapes[this.toolState.creatingShapeId];
+		if (!shape || shape.type !== 'container') return state;
+		const completed = (shape.props.w ?? 0) >= MIN_SHAPE_SIZE && (shape.props.h ?? 0) >= MIN_SHAPE_SIZE;
+		const next = completed ? adoptFrameContents(state, shape.id) : this.cancelShapeCreation(state);
+		this.resetToolState();
+		return completed ? { ...next, ui: { ...next.ui, toolId: 'select' } } : next;
+	}
+
+	private handleKeyDown(state: EditorState, action: Extract<Action, { type: 'key-down' }>): EditorState {
+		if (action.key !== 'Escape' || !this.toolState.creatingShapeId) return state;
+		const next = this.cancelShapeCreation(state);
+		this.resetToolState();
+		return next;
+	}
+
+	private cancelShapeCreation(state: EditorState): EditorState {
+		const id = this.toolState.creatingShapeId;
+		if (!id) return state;
+		const page = getCurrentPage(state);
+		if (!page) return state;
+		const shapes = { ...state.doc.shapes };
+		delete shapes[id];
+		return {
+			...state,
+			doc: {
+				...state.doc,
+				shapes,
+				pages: {
+					...state.doc.pages,
+					[page.id]: { ...page, shapeIds: page.shapeIds.filter((value) => value !== id) }
+				}
+			},
 			ui: { ...state.ui, selectionIds: [] }
 		};
 	}
@@ -711,8 +879,26 @@ export class ArrowTool implements Tool {
 		const startPoint = points[0];
 		const endPoint = points[points.length - 1];
 
-		const startWorld = { x: arrow.x + startPoint.x, y: arrow.y + startPoint.y };
-		const endWorld = { x: arrow.x + endPoint.x, y: arrow.y + endPoint.y };
+		const startWorld = {
+			x: arrow.editorTransform
+				? arrow.editorTransform.e +
+					arrow.editorTransform.a * startPoint.x +
+					arrow.editorTransform.c * startPoint.y
+				: arrow.x + Math.cos(arrow.rot) * startPoint.x - Math.sin(arrow.rot) * startPoint.y,
+			y: arrow.editorTransform
+				? arrow.editorTransform.f +
+					arrow.editorTransform.b * startPoint.x +
+					arrow.editorTransform.d * startPoint.y
+				: arrow.y + Math.sin(arrow.rot) * startPoint.x + Math.cos(arrow.rot) * startPoint.y
+		};
+		const endWorld = {
+			x: arrow.editorTransform
+				? arrow.editorTransform.e + arrow.editorTransform.a * endPoint.x + arrow.editorTransform.c * endPoint.y
+				: arrow.x + Math.cos(arrow.rot) * endPoint.x - Math.sin(arrow.rot) * endPoint.y,
+			y: arrow.editorTransform
+				? arrow.editorTransform.f + arrow.editorTransform.b * endPoint.x + arrow.editorTransform.d * endPoint.y
+				: arrow.y + Math.sin(arrow.rot) * endPoint.x + Math.cos(arrow.rot) * endPoint.y
+		};
 
 		const newBindings = { ...state.doc.bindings };
 		let updatedArrow = arrow;

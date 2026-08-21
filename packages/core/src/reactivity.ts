@@ -6,7 +6,17 @@ import type { Document, LayerRecord, PageRecord, PathSelection, ShapeRecord } fr
 import { Document as DocumentOps, ensureDocumentLayers } from './model';
 import { ReactiveValue } from './reactive-value';
 
-export type ToolId = 'select' | 'direct-select' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'text' | 'pen' | 'markdown';
+export type ToolId =
+	| 'select'
+	| 'direct-select'
+	| 'rect'
+	| 'ellipse'
+	| 'frame'
+	| 'line'
+	| 'arrow'
+	| 'text'
+	| 'pen'
+	| 'markdown';
 
 export type BindingPreview = { arrowId: string; targetShapeId: string; handle: 'start' | 'end' };
 

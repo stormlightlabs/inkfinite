@@ -59,7 +59,7 @@ export function distributeShapes(state: EditorState, shapeIds: readonly string[]
 	return translateSelectedRoots(state, shapes, deltas);
 }
 
-/** Groups selected root shapes in a new container without changing their world positions. */
+/** Groups selected root shapes in a new frame without changing their world positions. */
 export function groupShapes(state: EditorState, shapeIds: readonly string[]): EditorState {
 	const shapes = selectedShapes(state, shapeIds);
 	const roots = removeSelectedDescendants(state, shapes);
@@ -68,6 +68,8 @@ export function groupShapes(state: EditorState, shapeIds: readonly string[]): Ed
 	if (roots.some((shape) => shape.pageId !== pageId)) return state;
 	const page = state.doc.pages[pageId];
 	if (!page) return state;
+	const rootLayerIds = new Set(roots.map((shape) => shape.layerId).filter((id): id is string => Boolean(id)));
+	if (rootLayerIds.size > 1) return state;
 
 	const bounds = combineBounds(roots.map(shapeBounds));
 	if (!bounds) return state;
@@ -78,7 +80,7 @@ export function groupShapes(state: EditorState, shapeIds: readonly string[]): Ed
 		pageId,
 		bounds.min.x,
 		bounds.min.y,
-		{ w: Box2.width(bounds), h: Box2.height(bounds) },
+		{ w: Box2.width(bounds), h: Box2.height(bounds), title: 'Frame' },
 		containerId
 	);
 	const commonParentId = roots.every((shape) => shape.groupId === roots[0].groupId) ? roots[0].groupId : undefined;
@@ -87,16 +89,30 @@ export function groupShapes(state: EditorState, shapeIds: readonly string[]): Ed
 		layerId,
 		...(commonParentId ? { groupId: commonParentId } : {})
 	};
+	const orderedRoots = roots
+		.slice()
+		.sort((left, right) => page.shapeIds.indexOf(left.id) - page.shapeIds.indexOf(right.id));
 	const nextShapes = { ...state.doc.shapes, [containerId]: nextContainer };
-	for (const shape of roots) nextShapes[shape.id] = { ...shape, groupId: containerId };
+	for (const shape of orderedRoots) nextShapes[shape.id] = { ...shape, groupId: containerId };
 
 	const layers = state.doc.layers ? { ...state.doc.layers } : undefined;
 	if (layers && layerId && layers[layerId]) {
-		layers[layerId] = { ...layers[layerId], shapeIds: [...layers[layerId].shapeIds, containerId] };
+		layers[layerId] = {
+			...layers[layerId],
+			shapeIds: insertBeforeFirst(
+				layers[layerId].shapeIds,
+				orderedRoots.map((shape) => shape.id),
+				containerId
+			)
+		};
 	}
 	const nextPage = {
 		...page,
-		shapeIds: [...page.shapeIds, containerId],
+		shapeIds: insertBeforeFirst(
+			page.shapeIds,
+			orderedRoots.map((shape) => shape.id),
+			containerId
+		),
 		...(layers ? { layerIds: [...(page.layerIds ?? [])] } : {})
 	};
 	return {
@@ -111,7 +127,7 @@ export function groupShapes(state: EditorState, shapeIds: readonly string[]): Ed
 	};
 }
 
-/** Ungroups selected containers, or the containers that own selected children. */
+/** Ungroups selected frames, or the frames that own selected children. */
 export function ungroupShapes(state: EditorState, shapeIds: readonly string[]): EditorState {
 	const selected = selectedShapes(state, shapeIds);
 	const groupIds = new Set<string>();
@@ -123,34 +139,46 @@ export function ungroupShapes(state: EditorState, shapeIds: readonly string[]): 
 
 	const shapes = { ...state.doc.shapes };
 	const promotedIds: string[] = [];
+	const replacements = new Map<string, string[]>();
 	for (const groupId of groupIds) {
-		const group = shapes[groupId];
-		const hasContainer = group?.type === 'container';
-		const parentId = group?.groupId;
-		for (const shape of Object.values(shapes)) {
-			if (shape.groupId !== groupId) continue;
+		const group = state.doc.shapes[groupId];
+		if (group?.type !== 'container') continue;
+		const parentId = group.groupId;
+		const children = Object.values(state.doc.shapes)
+			.filter((shape) => shape.groupId === groupId)
+			.sort((left, right) => pageOrder(state, left.id) - pageOrder(state, right.id));
+		const childIds = children.map((shape) => shape.id);
+		replacements.set(groupId, childIds);
+		for (const shape of children) {
 			shapes[shape.id] = { ...shape, ...(parentId ? { groupId: parentId } : { groupId: undefined }) };
 			promotedIds.push(shape.id);
 		}
-		if (hasContainer) delete shapes[groupId];
+		delete shapes[groupId];
 	}
 
-	const deletedContainers = new Set([...groupIds].filter((id) => state.doc.shapes[id]?.type === 'container'));
 	const pages = { ...state.doc.pages };
 	const layers = state.doc.layers ? { ...state.doc.layers } : undefined;
 	for (const [pageId, page] of Object.entries(pages)) {
-		const shapeIds = page.shapeIds.filter((id) => !deletedContainers.has(id));
-		pages[pageId] = shapeIds.length === page.shapeIds.length ? page : { ...page, shapeIds };
+		const shapeIds = replaceGroups(page.shapeIds, replacements);
+		pages[pageId] =
+			shapeIds.length === page.shapeIds.length && shapeIds.every((id, index) => id === page.shapeIds[index])
+				? page
+				: { ...page, shapeIds };
 	}
 	if (layers) {
 		for (const [layerId, layer] of Object.entries(layers)) {
-			const shapeIds = layer.shapeIds.filter((id) => !deletedContainers.has(id));
-			if (shapeIds.length !== layer.shapeIds.length) layers[layerId] = { ...layer, shapeIds };
+			const shapeIds = replaceGroups(layer.shapeIds, replacements);
+			if (
+				shapeIds.length !== layer.shapeIds.length ||
+				shapeIds.some((id, index) => id !== layer.shapeIds[index])
+			) {
+				layers[layerId] = { ...layer, shapeIds };
+			}
 		}
 	}
 	const bindings = { ...state.doc.bindings };
 	for (const [id, binding] of Object.entries(bindings)) {
-		if (deletedContainers.has(binding.fromShapeId) || deletedContainers.has(binding.toShapeId)) delete bindings[id];
+		if (!shapes[binding.fromShapeId] || !shapes[binding.toShapeId]) delete bindings[id];
 	}
 	const selectionIds = promotedIds.filter((id) => shapes[id]);
 	return {
@@ -378,4 +406,33 @@ function combineBounds(bounds: Box2Type[]): Box2Type | null {
 
 function sameIds(left: readonly string[], right: readonly string[]): boolean {
 	return left.length === right.length && left.every((id, index) => id === right[index]);
+}
+
+function insertBeforeFirst(ids: readonly string[], removedIds: readonly string[], insertedId: string): string[] {
+	const removed = new Set(removedIds);
+	const firstIndex = ids.findIndex((id) => removed.has(id));
+	const result = ids.filter((id) => !removed.has(id));
+	result.splice(firstIndex < 0 ? result.length : Math.min(firstIndex, result.length), 0, insertedId, ...removedIds);
+	return result;
+}
+
+function replaceGroups(ids: readonly string[], replacements: ReadonlyMap<string, string[]>): string[] {
+	const result: string[] = [];
+	const alreadyAdded = new Set<string>();
+	for (const id of ids) {
+		const replacement = replacements.get(id);
+		const values = replacement ? replacement : [id];
+		for (const value of values) {
+			if (alreadyAdded.has(value)) continue;
+			alreadyAdded.add(value);
+			result.push(value);
+		}
+	}
+	return result;
+}
+
+function pageOrder(state: EditorState, shapeId: string): number {
+	const page = state.doc.pages[state.doc.shapes[shapeId]?.pageId ?? ''];
+	const index = page?.shapeIds.indexOf(shapeId) ?? -1;
+	return index < 0 ? Number.MAX_SAFE_INTEGER : index;
 }

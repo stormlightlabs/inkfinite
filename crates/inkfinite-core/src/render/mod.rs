@@ -144,10 +144,17 @@ impl Renderer<'_> {
         let matrix = parent_matrix.then(Affine::from_transform(shape.transform));
         let local_bounds = shape_local_bounds(shape)?;
         let world_bounds = matrix.transform_bounds(local_bounds);
-        let intersects_region = self
-            .options
-            .region
-            .is_none_or(|region| intersects(&region, &world_bounds));
+        let bound_arrow = shape.kind.as_str() == crate::ARROW_KIND
+            && self
+                .document
+                .bindings
+                .values()
+                .any(|binding| binding.source_shape_id == shape.id);
+        let intersects_region = bound_arrow
+            || self
+                .options
+                .region
+                .is_none_or(|region| intersects(&region, &world_bounds));
         let render_self = (self.options.selection.is_empty() || selected) && intersects_region;
 
         let mut inner = String::new();
@@ -198,12 +205,24 @@ impl Renderer<'_> {
             }
             Some(BuiltinShapeKind::Container) => {
                 let props: ContainerProps = properties(shape)?;
-                if props.width > 0.0 || props.height > 0.0 || props.fill.is_some() || props.stroke.is_some() {
+                if props.width > 0.0
+                    || props.height > 0.0
+                    || props.fill.is_some()
+                    || props.stroke.is_some()
+                    || props.title.is_some()
+                {
                     writeln!(
                         output,
                         "      <rect transform=\"{transform}\" width=\"{}\" height=\"{}\" rx=\"{}\" fill=\"{}\" fill-opacity=\"{fill_opacity}\" stroke=\"{}\" stroke-opacity=\"{stroke_opacity}\" stroke-width=\"2\"/>",
                         number(props.width), number(props.height), number(props.radius.min(props.width / 2.0).min(props.height / 2.0).max(0.0)),
                         paint(props.fill.as_deref()), paint(props.stroke.as_deref())
+                    ).expect("writing to a String cannot fail");
+                }
+                if let Some(title) = props.title.filter(|title| !title.is_empty()) {
+                    writeln!(
+                        output,
+                        "      <text transform=\"{transform}\" x=\"8\" y=\"18\" font-family=\"sans-serif\" font-size=\"14\" font-weight=\"600\" fill=\"#1f2937\">{}</text>",
+                        escape_xml(&title)
                     ).expect("writing to a String cannot fail");
                 }
             }
@@ -332,26 +351,31 @@ impl Renderer<'_> {
                 points[last] = local;
             }
         }
-        if props
-            .routing
-            .as_ref()
-            .is_some_and(|routing| routing.kind == "orthogonal")
-        {
+        let routing_kind = props.routing.as_ref().map_or("straight", |routing| {
+            if routing.automatic { "orthogonal" } else { routing.kind.as_str() }
+        });
+        if routing_kind == "orthogonal" {
             points = orthogonal(points[0], points[points.len() - 1]);
+        } else if routing_kind == "curved" {
+            points = curved(points.as_slice());
         }
-        let path = points
-            .iter()
-            .enumerate()
-            .map(|(index, point)| {
-                format!(
-                    "{} {} {}",
-                    if index == 0 { "M" } else { "L" },
-                    number(point.x),
-                    number(point.y)
-                )
-            })
-            .collect::<Vec<_>>()
-            .join(" ");
+        let path = if routing_kind == "curved" {
+            curved_path_data(&points)
+        } else {
+            points
+                .iter()
+                .enumerate()
+                .map(|(index, point)| {
+                    format!(
+                        "{} {} {}",
+                        if index == 0 { "M" } else { "L" },
+                        number(point.x),
+                        number(point.y)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
         let dash = props
             .style
             .dash
@@ -511,6 +535,8 @@ struct ContainerProps {
     #[serde(default, alias = "h")]
     height: f64,
     #[serde(default)]
+    title: Option<String>,
+    #[serde(default)]
     fill: Option<String>,
     #[serde(default)]
     stroke: Option<String>,
@@ -539,6 +565,8 @@ struct ArrowStyle {
 #[derive(Deserialize)]
 struct ArrowRouting {
     kind: String,
+    #[serde(default)]
+    automatic: bool,
 }
 
 #[derive(Deserialize)]
@@ -899,6 +927,88 @@ fn orthogonal(start: Vec2, end: Vec2) -> Vec<Vec2> {
     }
     let middle = start.x + (end.x - start.x) / 2.0;
     vec![start, Vec2 { x: middle, y: start.y }, Vec2 { x: middle, y: end.y }, end]
+}
+
+fn curved(points: &[Vec2]) -> Vec<Vec2> {
+    if points.len() < 3 {
+        return points.to_vec();
+    }
+    let samples = 12;
+    let midpoint = |left: Vec2, right: Vec2| Vec2 { x: (left.x + right.x) / 2.0, y: (left.y + right.y) / 2.0 };
+    let mut output = vec![points[0]];
+    let mut start = points[0];
+    for index in 1..points.len() - 1 {
+        let control = points[index];
+        let end = midpoint(control, points[index + 1]);
+        for step in 1..=samples {
+            output.push(quadratic_point(
+                start,
+                control,
+                end,
+                f64::from(step) / f64::from(samples),
+            ));
+        }
+        start = end;
+    }
+    let control = points[points.len() - 2];
+    let end = points[points.len() - 1];
+    for step in 1..=samples {
+        output.push(quadratic_point(
+            start,
+            control,
+            end,
+            f64::from(step) / f64::from(samples),
+        ));
+    }
+    output
+}
+
+fn quadratic_point(start: Vec2, control: Vec2, end: Vec2, t: f64) -> Vec2 {
+    let inverse = 1.0 - t;
+    Vec2 {
+        x: inverse * inverse * start.x + 2.0 * inverse * t * control.x + t * t * end.x,
+        y: inverse * inverse * start.y + 2.0 * inverse * t * control.y + t * t * end.y,
+    }
+}
+
+fn curved_path_data(points: &[Vec2]) -> String {
+    if points.len() < 3 {
+        return points
+            .iter()
+            .enumerate()
+            .map(|(index, point)| {
+                format!(
+                    "{} {} {}",
+                    if index == 0 { "M" } else { "L" },
+                    number(point.x),
+                    number(point.y)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+    }
+    let midpoint = |left: Vec2, right: Vec2| Vec2 { x: (left.x + right.x) / 2.0, y: (left.y + right.y) / 2.0 };
+    let mut path = format!("M {} {}", number(points[0].x), number(points[0].y));
+    for index in 1..points.len() - 1 {
+        let end = midpoint(points[index], points[index + 1]);
+        path.push_str(&format!(
+            " Q {} {} {} {}",
+            number(points[index].x),
+            number(points[index].y),
+            number(end.x),
+            number(end.y)
+        ));
+    }
+    let last = points[points.len() - 1];
+    let control = points[points.len() - 2];
+    path.push_str(&format!(
+        " Q {} {} {} {}",
+        number(control.x),
+        number(control.y),
+        number(last.x),
+        number(last.y)
+    ));
+    path
 }
 
 fn arrow_head(output: &mut String, transform: &str, from: Vec2, at: Vec2, style: &ArrowStyle, opacity: &str) {

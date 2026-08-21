@@ -50,6 +50,7 @@ export const TOOLS: Array<{ id: ToolId; label: string; icon: IconName }> = [
 	{ id: 'direct-select', label: 'Direct Select', icon: 'direct-select' },
 	{ id: 'rect', label: 'Rectangle', icon: 'rectangle' },
 	{ id: 'ellipse', label: 'Ellipse', icon: 'ellipse' },
+	{ id: 'frame', label: 'Frame', icon: 'rectangle' },
 	{ id: 'line', label: 'Line', icon: 'line' },
 	{ id: 'arrow', label: 'Arrow', icon: 'arrow-right' },
 	{ id: 'text', label: 'Text', icon: 'text' },

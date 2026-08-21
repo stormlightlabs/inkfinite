@@ -487,10 +487,6 @@ export class SelectTool implements Tool {
 			newState = this.completeMarqueeSelection(state);
 		}
 
-		if (this.toolState.isDragging && !this.toolState.activeHandle) {
-			newState = this.removeBindingsForMovedArrows(newState);
-		}
-
 		if (
 			this.toolState.handleShapeId &&
 			(this.toolState.activeHandle === 'line-start' || this.toolState.activeHandle === 'line-end')
@@ -1098,59 +1094,6 @@ export class SelectTool implements Tool {
 		}
 
 		return null;
-	}
-
-	/**
-	 * Remove bindings for arrows that were moved with the select tool
-	 *
-	 * When an arrow is moved (not just its endpoints), its bindings should be removed
-	 * to prevent the endpoints from snapping back to the old binding positions.
-	 */
-	private removeBindingsForMovedArrows(state: EditorState): EditorState {
-		const movedArrowIds = state.ui.selectionIds.filter((shapeId) => {
-			const shape = state.doc.shapes[shapeId];
-			return shape?.type === 'arrow';
-		});
-
-		if (movedArrowIds.length === 0) {
-			return state;
-		}
-
-		const newBindings = { ...state.doc.bindings };
-		const newShapes = { ...state.doc.shapes };
-		let bindingsRemoved = false;
-
-		for (const arrowId of movedArrowIds) {
-			const arrow = newShapes[arrowId];
-			if (!arrow || arrow.type !== 'arrow') continue;
-
-			for (const [bindingId, binding] of Object.entries(newBindings)) {
-				if (binding.fromShapeId === arrowId) {
-					delete newBindings[bindingId];
-					bindingsRemoved = true;
-
-					console.log('[Arrow Movement Fix] Removing binding', {
-						arrowId,
-						bindingId,
-						handle: binding.handle,
-						targetShapeId: binding.toShapeId
-					});
-				}
-			}
-
-			if (bindingsRemoved) {
-				newShapes[arrowId] = {
-					...arrow,
-					props: { ...arrow.props, start: { kind: 'free' }, end: { kind: 'free' } }
-				};
-			}
-		}
-
-		if (!bindingsRemoved) {
-			return state;
-		}
-
-		return { ...state, doc: { ...state.doc, shapes: newShapes, bindings: newBindings } };
 	}
 
 	/**

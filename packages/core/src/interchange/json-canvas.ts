@@ -33,7 +33,15 @@ export function importJsonCanvas(root: JsonObject, fileName: string): Interchang
 	const edges = optionalArray(root.edges, 'edges');
 	const { snapshot, pageId, layerId } = blankSnapshot(fileName);
 	const nodeShapes = new Map<string, Shape>();
-	const groupNodes: Array<{ id: string; x: number; y: number; width: number; height: number }> = [];
+	const groupNodes: Array<{
+		id: string;
+		x: number;
+		y: number;
+		width: number;
+		height: number;
+		label?: string;
+		color?: string;
+	}> = [];
 	const sourceIds = new Set<string>();
 
 	for (const [index, value] of nodes.entries()) {
@@ -49,12 +57,20 @@ export function importJsonCanvas(root: JsonObject, fileName: string): Interchang
 		const width = positiveNumber(node.width, `nodes[${index}].width`);
 		const height = positiveNumber(node.height, `nodes[${index}].height`);
 		if (type === 'group') {
-			groupNodes.push({ id, x, y, width, height });
+			groupNodes.push({
+				id,
+				x,
+				y,
+				width,
+				height,
+				...(typeof node.label === 'string' ? { label: node.label } : {}),
+				...(typeof node.color === 'string' ? { color: canvasColor(node.color) } : {})
+			});
 			if (typeof node.label === 'string' && node.label.trim()) {
-				warnings.add('json-canvas-group-label', 'Group labels are not editable in Inkfinite and were omitted.');
+				warnings.add('json-canvas-group-label', 'Group labels were imported as frame titles.');
 			}
 			if (node.background !== undefined) {
-				warnings.add('json-canvas-group-background', 'Group backgrounds are not supported and were omitted.');
+				warnings.add('json-canvas-group-background', 'Group backgrounds were imported as frame fills.');
 			}
 			continue;
 		}
@@ -104,7 +120,27 @@ export function importJsonCanvas(root: JsonObject, fileName: string): Interchang
 		nodeShapes.set(id, shape);
 	}
 
+	for (const group of groupNodes) {
+		const frame = ShapeRecord.createContainer(
+			pageId,
+			group.x,
+			group.y,
+			{ w: group.width, h: group.height, title: group.label || 'Frame', fill: group.color },
+			inkId('json-canvas-group', group.id)
+		);
+		frame.layerId = layerId;
+		nodeShapes.set(group.id, frame);
+		addShape(snapshot.doc, pageId, layerId, frame);
+	}
+	const frameIds = groupNodes.map((group) => inkId('json-canvas-group', group.id));
+	snapshot.doc.pages[pageId].shapeIds = [
+		...frameIds,
+		...snapshot.doc.pages[pageId].shapeIds.filter((id) => !frameIds.includes(id))
+	];
+	snapshot.doc.layers![layerId].shapeIds = [...snapshot.doc.pages[pageId].shapeIds];
+
 	for (const shape of nodeShapes.values()) {
+		if (shape.type === 'container') continue;
 		const bounds = shapeBounds(shape);
 		const containing = groupNodes
 			.filter(

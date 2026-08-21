@@ -518,7 +518,10 @@ export function pointNearLine(p: Vec2, shape: LineShape | ArrowShape, tolerance 
 		if (!shape.props.points || shape.props.points.length < 2) {
 			return false;
 		}
-		points = shape.props.points;
+		points = arrowPath(
+			shape.props.points,
+			shape.props.routing?.automatic ? 'orthogonal' : (shape.props.routing?.kind ?? 'straight')
+		);
 	}
 
 	const localP = worldToLocal(p, shape);
@@ -713,9 +716,31 @@ export function hitTestPoint(state: EditorState, worldPoint: Vec2, tolerance = 5
 				}
 				break;
 			}
-			case 'line':
+			case 'line': {
+				if (pointNearLine(worldPoint, shape, tolerance)) return shape.id;
+				break;
+			}
 			case 'arrow': {
-				if (pointNearLine(worldPoint, shape, tolerance)) {
+				const resolved = resolveArrowEndpoints(state, shape.id);
+				const points = resolved
+					? arrowPath(
+							[
+								worldToLocal(resolved.a, shape),
+								...shape.props.points.slice(1, -1),
+								worldToLocal(resolved.b, shape)
+							],
+							shape.props.routing?.automatic ? 'orthogonal' : (shape.props.routing?.kind ?? 'straight')
+						)
+					: arrowPath(
+							shape.props.points,
+							shape.props.routing?.automatic ? 'orthogonal' : (shape.props.routing?.kind ?? 'straight')
+						);
+				const localPoint = worldToLocal(worldPoint, shape);
+				if (
+					points.some(
+						(point, index) => index > 0 && pointNearSegment(localPoint, points[index - 1], point, tolerance)
+					)
+				) {
 					return shape.id;
 				}
 				break;
@@ -872,34 +897,60 @@ export function resolveArrowEndpoints(state: EditorState, arrowId: string): { a:
 }
 
 /**
- * Compute orthogonal (Manhattan-style) routing between two points
+ * Compute orthogonal (Manhattan-style) routing between two points.
  *
- * Creates a path with 2-4 segments that connects start to end using only horizontal and vertical lines.
- * The path avoids overlapping segments and creates clean right angles.
- *
- * @param start - Starting point
- * @param end - Ending point
- * @returns Array of points forming the orthogonal path (includes start and end)
+ * The midpoint route gives bound arrows a deterministic path while leaving
+ * stored bend points available for manual editing.
  */
 export function computeOrthogonalPath(start: Vec2, end: Vec2): Vec2[] {
 	const dx = end.x - start.x;
 	const dy = end.y - start.y;
 
-	if (Math.abs(dx) < 0.1 && Math.abs(dy) < 0.1) {
-		return [start, end];
-	}
-
-	if (Math.abs(dx) < 0.1) {
-		return [start, end];
-	}
-
-	if (Math.abs(dy) < 0.1) {
-		return [start, end];
-	}
+	if (Math.abs(dx) < 0.1 || Math.abs(dy) < 0.1) return [start, end];
 
 	const midX = start.x + dx / 2;
-
 	return [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
+}
+
+/** Return a sampled quadratic path through arrow bend points. */
+export function computeCurvedPath(points: readonly Vec2[], samplesPerCurve = 12): Vec2[] {
+	if (points.length < 3) return points.map((point) => ({ ...point }));
+	const samples = Math.max(2, Math.floor(samplesPerCurve));
+	const output: Vec2[] = [{ ...points[0] }];
+	const midpoint = (left: Vec2, right: Vec2): Vec2 => ({ x: (left.x + right.x) / 2, y: (left.y + right.y) / 2 });
+	let start = points[0];
+	for (let index = 1; index < points.length - 1; index += 1) {
+		const control = points[index];
+		const end = midpoint(control, points[index + 1]);
+		for (let step = 1; step <= samples; step += 1) {
+			const t = step / samples;
+			const inverse = 1 - t;
+			output.push({
+				x: inverse * inverse * start.x + 2 * inverse * t * control.x + t * t * end.x,
+				y: inverse * inverse * start.y + 2 * inverse * t * control.y + t * t * end.y
+			});
+		}
+		start = end;
+	}
+	const control = points.at(-2)!;
+	const end = points.at(-1)!;
+	for (let step = 1; step <= samples; step += 1) {
+		const t = step / samples;
+		const inverse = 1 - t;
+		output.push({
+			x: inverse * inverse * start.x + 2 * inverse * t * control.x + t * t * end.x,
+			y: inverse * inverse * start.y + 2 * inverse * t * control.y + t * t * end.y
+		});
+	}
+	return output;
+}
+
+/** Resolve the local polyline used to draw an arrow. */
+export function arrowPath(points: readonly Vec2[], routing: 'straight' | 'curved' | 'orthogonal' = 'straight'): Vec2[] {
+	if (points.length < 2) return points.map((point) => ({ ...point }));
+	if (routing === 'orthogonal') return computeOrthogonalPath(points[0], points.at(-1)!);
+	if (routing === 'curved') return computeCurvedPath(points);
+	return points.map((point) => ({ ...point }));
 }
 
 /**

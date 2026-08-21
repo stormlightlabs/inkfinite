@@ -1,7 +1,15 @@
-import { shapeBounds } from "./geom";
+import {
+  arrowPath,
+  computePolylineLength,
+  getPointAtDistance,
+  localToWorld,
+  resolveArrowEndpoints,
+  shapeBounds,
+  worldToLocal,
+} from "./geom";
 import type { Box2 } from "./math";
 import { Box2 as Box2Ops } from "./math";
-import type { ArrowShape, EllipseShape, LineShape, MarkdownShape, PathShape, RectShape, ShapeRecord, TextShape } from "./model";
+import type { ArrowShape, ContainerShape, EllipseShape, LineShape, MarkdownShape, PathShape, RectShape, ShapeRecord, TextShape } from "./model";
 import type { EditorState } from "./reactivity";
 import { getSelectedShapes, getShapesOnCurrentPage } from "./reactivity";
 
@@ -59,7 +67,7 @@ export async function exportSelectionToPNG(
     return null;
   }
 
-  const bounds = combineBounds(shapes.map((s) => shapeBounds(s)));
+  const bounds = combineBounds(shapes.map((shape) => exportBounds(state, shape)));
   if (!bounds) {
     return null;
   }
@@ -109,13 +117,13 @@ export async function exportSelectionToPNG(
  * @returns SVG string
  */
 export function exportToSVG(state: EditorState, options: ExportOptions = {}): string {
-  const shapes = options.selectedOnly ? getSelectedShapes(state) : getShapesOnCurrentPage(state);
+  const shapes = options.selectedOnly ? getExportSelection(state) : getShapesOnCurrentPage(state);
 
   if (shapes.length === 0) {
     return "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\"></svg>";
   }
 
-  const bounds = combineBounds(shapes.map((s) => shapeBounds(s)));
+  const bounds = combineBounds(shapes.map((shape) => exportBounds(state, shape)));
   if (!bounds) {
     return "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\"></svg>";
   }
@@ -164,6 +172,9 @@ function shapeToSVG(shape: ShapeRecord, state: EditorState): string | null {
     }
     case "arrow": {
       return arrowToSVG(shape, transform, state);
+    }
+    case "container": {
+      return containerToSVG(shape, transform);
     }
     case "text": {
       return textToSVG(shape, transform);
@@ -219,40 +230,63 @@ function lineToSVG(shape: LineShape, transform: string): string {
   }" stroke-width="${width}"/>`;
 }
 
-function arrowToSVG(shape: ArrowShape, transform: string, _state: EditorState): string {
-  const points = shape.props.points;
-  if (!points || points.length < 2) {
-    return `<g transform="${transform}"></g>`;
+function arrowToSVG(shape: ArrowShape, transform: string, state: EditorState): string {
+  const resolved = resolveArrowEndpoints(state, shape.id);
+  if (!resolved || shape.props.points.length < 2) return "";
+  const endpoints = [worldToLocal(resolved.a, shape), ...shape.props.points.slice(1, -1), worldToLocal(resolved.b, shape)];
+  const routing = shape.props.routing?.automatic ? "orthogonal" : shape.props.routing?.kind ?? "straight";
+  const points = arrowPath(endpoints, routing);
+  const stroke = escapeXML(shape.props.style.stroke);
+  const width = svgNumber(shape.props.style.width);
+  const last = points.at(-1)!;
+  const previous = points.at(-2)!;
+  const angle = Math.atan2(last.y - previous.y, last.x - previous.x);
+  const head = (at: { x: number; y: number }, direction: number) => {
+    const length = 15;
+    const spread = Math.PI / 6;
+    const left = { x: at.x - length * Math.cos(direction - spread), y: at.y - length * Math.sin(direction - spread) };
+    const right = { x: at.x - length * Math.cos(direction + spread), y: at.y - length * Math.sin(direction + spread) };
+    return `<path d="M ${svgNumber(at.x)} ${svgNumber(at.y)} L ${svgNumber(left.x)} ${svgNumber(left.y)} M ${svgNumber(at.x)} ${svgNumber(at.y)} L ${svgNumber(right.x)} ${svgNumber(right.y)}" fill="none" stroke="${stroke}" stroke-width="${width}"/>`;
+  };
+  const pathData = routing === "curved"
+    ? curvedPathData(endpoints)
+    : points.map((point, index) => `${index === 0 ? "M" : "L"} ${svgNumber(point.x)} ${svgNumber(point.y)}`).join(" ");
+  const elements = routing === "straight"
+    ? points.slice(1).map((point, index) => `<line x1="${svgNumber(points[index].x)}" y1="${svgNumber(points[index].y)}" x2="${svgNumber(point.x)}" y2="${svgNumber(point.y)}" fill="none" stroke="${stroke}" stroke-width="${width}"/>`)
+    : [`<path d="${pathData}" fill="none" stroke="${stroke}" stroke-width="${width}"/>`];
+  if (shape.props.style.headEnd !== false) elements.push(head(last, angle));
+  if (shape.props.style.headStart) elements.push(head(points[0], angle + Math.PI));
+  const label = shape.props.label;
+  if (label?.text) {
+    const length = computePolylineLength(points);
+    const distance = label.align === "start" ? label.offset : label.align === "end" ? length - label.offset : length / 2 + label.offset;
+    const at = getPointAtDistance(points, Math.max(0, Math.min(length, distance)));
+    elements.push(`<text x="${svgNumber(at.x)}" y="${svgNumber(at.y - 7)}" text-anchor="middle" font-family="sans-serif" font-size="14" fill="${stroke}">${escapeXML(label.text)}</text>`);
   }
+  return `<g transform="${transform}">${elements.join("")}</g>`;
+}
 
-  const startPoint = points[0];
-  const endPoint = points[points.length - 1];
-  const strokeColor = shape.props.style.stroke;
-  const strokeWidth = shape.props.style.width;
+function curvedPathData(points: Array<{ x: number; y: number }>): string {
+  if (points.length < 3) return points.map((point, index) => `${index === 0 ? "M" : "L"} ${svgNumber(point.x)} ${svgNumber(point.y)}`).join(" ");
+  const midpoint = (left: { x: number; y: number }, right: { x: number; y: number }) => ({
+    x: (left.x + right.x) / 2,
+    y: (left.y + right.y) / 2,
+  });
+  let path = `M ${svgNumber(points[0].x)} ${svgNumber(points[0].y)}`;
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const end = midpoint(points[index], points[index + 1]);
+    path += ` Q ${svgNumber(points[index].x)} ${svgNumber(points[index].y)} ${svgNumber(end.x)} ${svgNumber(end.y)}`;
+  }
+  const control = points[points.length - 2];
+  const end = points[points.length - 1];
+  return `${path} Q ${svgNumber(control.x)} ${svgNumber(control.y)} ${svgNumber(end.x)} ${svgNumber(end.y)}`;
+}
 
-  const angle = Math.atan2(endPoint.y - startPoint.y, endPoint.x - startPoint.x);
-  const arrowLength = 15;
-  const arrowAngle = Math.PI / 6;
-
-  const arrowPoint1 = {
-    x: endPoint.x - arrowLength * Math.cos(angle - arrowAngle),
-    y: endPoint.y - arrowLength * Math.sin(angle - arrowAngle),
-  };
-
-  const arrowPoint2 = {
-    x: endPoint.x - arrowLength * Math.cos(angle + arrowAngle),
-    y: endPoint.y - arrowLength * Math.sin(angle + arrowAngle),
-  };
-
-  const strokeAttribute = `stroke="${escapeXML(strokeColor)}" stroke-width="${strokeWidth}"`;
-
-  return [
-    `<g transform="${transform}">`,
-    `  <line x1="${startPoint.x}" y1="${startPoint.y}" x2="${endPoint.x}" y2="${endPoint.y}" ${strokeAttribute}/>`,
-    `  <line x1="${endPoint.x}" y1="${endPoint.y}" x2="${arrowPoint1.x}" y2="${arrowPoint1.y}" ${strokeAttribute}/>`,
-    `  <line x1="${endPoint.x}" y1="${endPoint.y}" x2="${arrowPoint2.x}" y2="${arrowPoint2.y}" ${strokeAttribute}/>`,
-    `</g>`,
-  ].join("\n");
+function containerToSVG(shape: ContainerShape, transform: string): string {
+  const { w = 0, h = 0, title, fill, stroke, radius = 0 } = shape.props;
+  const elements = [`<rect transform="${transform}" width="${svgNumber(w)}" height="${svgNumber(h)}" rx="${svgNumber(Math.min(radius, w / 2, h / 2))}" fill="${escapeXML(fill ?? "none")}" stroke="${escapeXML(stroke ?? "none")}"/>`];
+  if (title) elements.push(`<text transform="${transform}" x="8" y="18" font-family="sans-serif" font-size="14" font-weight="600" fill="#1f2937">${escapeXML(title)}</text>`);
+  return elements.join("");
 }
 
 function textToSVG(shape: TextShape, transform: string): string {
@@ -329,6 +363,29 @@ function encodeBase64(bytes: number[]): string {
 function escapeXML(string_: string): string {
   return string_.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\"", "&quot;")
     .replaceAll("'", "&apos;");
+}
+
+function exportBounds(state: EditorState, shape: ShapeRecord): Box2 {
+  if (shape.type !== "arrow") return shapeBounds(shape);
+  const resolved = resolveArrowEndpoints(state, shape.id);
+  if (!resolved || shape.props.points.length < 2) return shapeBounds(shape);
+  const endpoints = [worldToLocal(resolved.a, shape), ...shape.props.points.slice(1, -1), worldToLocal(resolved.b, shape)];
+  const routing = shape.props.routing?.automatic ? "orthogonal" : shape.props.routing?.kind ?? "straight";
+  return Box2Ops.fromPoints(arrowPath(endpoints, routing).map((point) => localToWorld(shape, point)));
+}
+
+function getExportSelection(state: EditorState): ShapeRecord[] {
+  const selected = new Set(state.ui.selectionIds);
+  return getShapesOnCurrentPage(state).filter((shape) => selected.has(shape.id) || hasSelectedAncestor(shape, selected, state));
+}
+
+function hasSelectedAncestor(shape: ShapeRecord, selected: ReadonlySet<string>, state: EditorState): boolean {
+  let parentId = shape.groupId;
+  while (parentId) {
+    if (selected.has(parentId)) return true;
+    parentId = state.doc.shapes[parentId]?.groupId;
+  }
+  return false;
 }
 
 /**

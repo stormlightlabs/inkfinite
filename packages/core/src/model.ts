@@ -129,7 +129,13 @@ export type ArrowStyle = { stroke: string; width: number; headStart?: boolean; h
 /**
  * Arrow routing configuration
  */
-export type ArrowRouting = { kind: 'straight' | 'orthogonal'; cornerRadius?: number };
+export type ArrowRouting = {
+	kind: 'straight' | 'curved' | 'orthogonal';
+	/** Radius used by orthogonal corners when the renderer supports it. */
+	cornerRadius?: number;
+	/** Let the renderer choose a route around other shapes. */
+	automatic?: boolean;
+};
 
 /**
  * Arrow label configuration
@@ -160,8 +166,15 @@ export type ImageProps = {
 	crop?: { top: number; right: number; bottom: number; left: number };
 };
 
-/** Native container dimensions used for hierarchy selection and overlays. */
-export type ContainerProps = { w?: number; h?: number };
+/** Native frame dimensions and title used for hierarchy selection and overlays. */
+export type ContainerProps = {
+	w?: number;
+	h?: number;
+	title?: string;
+	fill?: string;
+	stroke?: string;
+	radius?: number;
+};
 
 /**
  * Markdown block properties

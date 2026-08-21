@@ -17,6 +17,7 @@ import {
 	CursorStore,
 	diffDoc,
 	EllipseTool,
+	FrameTool,
 	getInteractiveShapesOnCurrentPage,
 	hitTestPoint,
 	selectionTarget,
@@ -385,6 +386,7 @@ export function createCanvasController(
 	const directSelectTool = new DirectSelectTool();
 	const rectTool = new RectTool();
 	const ellipseTool = new EllipseTool();
+	const frameTool = new FrameTool();
 	const lineTool = new LineTool();
 	const arrowTool = new ArrowTool();
 	const textTool = new TextTool();
@@ -403,6 +405,7 @@ export function createCanvasController(
 		directSelectTool,
 		rectTool,
 		ellipseTool,
+		frameTool,
 		lineTool,
 		arrowTool,
 		textTool,

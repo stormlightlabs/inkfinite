@@ -21,6 +21,9 @@
 - Selection refinement with object, equal-gap, handle, and grid snapping guides, modifier-aware
   movement and drawing constraints, Alt-drag duplication, hover feedback, transformed handles,
   edge scrolling, zoom-to-selection, and persisted grid preferences.
+- Titled frames with child containment, move-with-contents behavior, nested selection, frame export,
+  binding-aware arrows, curved and elbow routing, bend controls, labels, automatic endpoint updates,
+  and binding-preserving copy and persistence.
 - Excalidraw and Obsidian Canvas import/export, offline peer sync, and a bundled agent skill with
   file, proposal, and stale-head examples.
 

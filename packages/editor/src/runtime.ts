@@ -1,5 +1,6 @@
 import {
 	type Action,
+	BindingRecord,
 	Camera,
 	type CommandKind,
 	createId,
@@ -394,28 +395,97 @@ function arrowDelta(key: string, step: number): { x: number; y: number } | null 
 }
 
 function duplicateSelection(state: EditorState): EditorState | null {
+	const selectedIds = new Set(state.ui.selectionIds);
+	const roots = state.ui.selectionIds.filter((id) => !hasSelectedAncestor(state, id, selectedIds));
+	if (roots.length === 0) return null;
+	const included = Object.values(state.doc.shapes).filter(
+		(shape) => roots.includes(shape.id) || roots.some((root) => hasAncestor(shape, root, state))
+	);
+	const mapping = new Map(included.map((shape) => [shape.id, createId('shape')]));
 	const shapes = { ...state.doc.shapes };
-	const pages = { ...state.doc.pages };
-	const selectionIds: string[] = [];
-	for (const id of state.ui.selectionIds) {
-		const shape = shapes[id];
-		if (!shape) continue;
-		const copy = ShapeRecord.clone(shape);
-		const newId = createId('shape');
-		shapes[newId] = { ...copy, id: newId, x: copy.x + 12, y: copy.y + 12 };
-		const page = pages[shape.pageId];
-		if (!page) continue;
-		pages[shape.pageId] = { ...page, shapeIds: [...page.shapeIds, newId] };
-		selectionIds.push(newId);
+	for (const source of included) {
+		const copy = ShapeRecord.clone(source);
+		const id = mapping.get(source.id)!;
+		const parentId = source.groupId ? mapping.get(source.groupId) : undefined;
+		shapes[id] = {
+			...copy,
+			id,
+			x: copy.x + 12,
+			y: copy.y + 12,
+			editorTransform: copy.editorTransform
+				? { ...copy.editorTransform, e: copy.editorTransform.e + 12, f: copy.editorTransform.f + 12 }
+				: undefined,
+			...(parentId ? { groupId: parentId } : { groupId: undefined })
+		};
 	}
-	return selectionIds.length === 0
-		? null
-		: { ...state, doc: { ...state.doc, shapes, pages }, ui: { ...state.ui, selectionIds } };
+	const pages = { ...state.doc.pages };
+	const layers = state.doc.layers ? { ...state.doc.layers } : undefined;
+	const copiedIds = included.map((shape) => mapping.get(shape.id)!);
+	const rootCopies = roots.map((id) => mapping.get(id)).filter((id): id is string => Boolean(id));
+	for (const page of Object.values(pages)) {
+		const added = copiedIds.filter((id) => shapes[id]?.pageId === page.id);
+		if (added.length > 0) pages[page.id] = { ...page, shapeIds: [...page.shapeIds, ...added] };
+	}
+	if (layers) {
+		for (const layer of Object.values(layers)) {
+			const added = copiedIds.filter((id) => shapes[id]?.layerId === layer.id);
+			if (added.length > 0) layers[layer.id] = { ...layer, shapeIds: [...layer.shapeIds, ...added] };
+		}
+	}
+	const bindings = { ...state.doc.bindings };
+	for (const binding of Object.values(state.doc.bindings)) {
+		const fromShapeId = mapping.get(binding.fromShapeId);
+		if (!fromShapeId) continue;
+		const id = createId('binding');
+		const toShapeId = mapping.get(binding.toShapeId) ?? binding.toShapeId;
+		bindings[id] = { ...BindingRecord.clone(binding), id, fromShapeId, toShapeId };
+	}
+	for (const source of included) {
+		const id = mapping.get(source.id);
+		const copy = id ? shapes[id] : undefined;
+		if (!id || !copy || copy.type !== 'arrow' || source.type !== 'arrow') continue;
+		const copiedBindings = Object.values(bindings).filter((binding) => binding.fromShapeId === id);
+		const handleBinding = (handle: 'start' | 'end') => {
+			const originalBindingId = source.props[handle].bindingId;
+			const original = originalBindingId ? state.doc.bindings[originalBindingId] : undefined;
+			const copied = copiedBindings.find(
+				(binding) =>
+					original &&
+					binding.toShapeId === (mapping.get(original.toShapeId) ?? original.toShapeId) &&
+					binding.handle === handle
+			);
+			return copied ? { kind: 'bound' as const, bindingId: copied.id } : { kind: 'free' as const };
+		};
+		shapes[id] = { ...copy, props: { ...copy.props, start: handleBinding('start'), end: handleBinding('end') } };
+	}
+	return {
+		...state,
+		doc: { ...state.doc, pages, shapes, bindings, ...(layers ? { layers } : {}) },
+		ui: { ...state.ui, selectionIds: rootCopies }
+	};
 }
 
 function reorderSelection(state: EditorState, direction: 'forward' | 'backward'): EditorState | null {
 	const next = reorderShapes(state, state.ui.selectionIds, direction);
 	return next === state ? null : next;
+}
+
+function hasSelectedAncestor(state: EditorState, id: string, selected: ReadonlySet<string>): boolean {
+	let parentId = state.doc.shapes[id]?.groupId;
+	while (parentId) {
+		if (selected.has(parentId)) return true;
+		parentId = state.doc.shapes[parentId]?.groupId;
+	}
+	return false;
+}
+
+function hasAncestor(shape: import('@inkfinite/core').ShapeRecord, ancestorId: string, state: EditorState): boolean {
+	let parentId = shape.groupId;
+	while (parentId) {
+		if (parentId === ancestorId) return true;
+		parentId = state.doc.shapes[parentId]?.groupId;
+	}
+	return false;
 }
 
 function describeAction(action: Action, kind: CommandKind): string {

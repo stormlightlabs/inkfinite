@@ -17,7 +17,7 @@ import type {
 	SnapGuide
 } from '@inkfinite/core';
 import {
-	computeOrthogonalPath,
+	arrowPath,
 	computePolylineLength,
 	getPointAtDistance,
 	getLayersOnCurrentPage,
@@ -556,10 +556,10 @@ function drawShape(
 			drawPath(context, shape);
 			break;
 		}
-		case 'container':
-			// Containers provide hierarchy and selection bounds; their children
-			// are rendered in the surrounding depth-first traversal.
+		case 'container': {
+			drawContainer(context, shape);
 			break;
+		}
 	}
 
 	context.restore();
@@ -689,6 +689,52 @@ function drawLine(context: CanvasRenderingContext2D, shape: LineShape) {
 	context.stroke();
 }
 
+function drawContainer(context: CanvasRenderingContext2D, shape: Extract<ShapeRecord, { type: 'container' }>) {
+	const { w = 0, h = 0, title, fill, stroke, radius = 0 } = shape.props;
+	const shapeAlpha = context.globalAlpha;
+	context.beginPath();
+	if (radius > 0) {
+		const r = Math.min(radius, w / 2, h / 2);
+		context.moveTo(r, 0);
+		context.lineTo(w - r, 0);
+		context.arcTo(w, 0, w, r, r);
+		context.lineTo(w, h - r);
+		context.arcTo(w, h, w - r, h, r);
+		context.lineTo(r, h);
+		context.arcTo(0, h, 0, h - r, r);
+		context.lineTo(0, r);
+		context.arcTo(0, 0, r, 0, r);
+		context.closePath();
+	} else {
+		context.rect(0, 0, w, h);
+	}
+	if (fill) {
+		context.globalAlpha = shapeAlpha * (shape.fillOpacity ?? 1);
+		context.fillStyle = fill;
+		context.fill();
+	}
+	if (stroke) {
+		context.globalAlpha = shapeAlpha * (shape.strokeOpacity ?? 1);
+		context.strokeStyle = stroke;
+		context.lineWidth = 1.5;
+		context.stroke();
+	}
+	if (title) {
+		context.globalAlpha = shapeAlpha * (shape.fillOpacity ?? 1);
+		context.fillStyle = '#1f2937';
+		context.font = '600 14px sans-serif';
+		context.textBaseline = 'top';
+		context.fillText(title, 8, 6);
+		context.globalAlpha = shapeAlpha * (shape.strokeOpacity ?? 1);
+		context.strokeStyle = stroke ?? 'rgba(37, 99, 235, 0.45)';
+		context.lineWidth = 1;
+		context.beginPath();
+		context.moveTo(0, 26);
+		context.lineTo(w, 26);
+		context.stroke();
+	}
+}
+
 /**
  * Draw an arrow shape
  */
@@ -702,17 +748,11 @@ function drawArrow(context: CanvasRenderingContext2D, state: EditorState, shape:
 	const a = worldToLocal(resolved.a, shape);
 	const b = worldToLocal(resolved.b, shape);
 
-	let points: Vec2[];
-
-	if (shape.props.routing?.kind === 'orthogonal') {
-		points = computeOrthogonalPath(a, b);
-	} else {
-		points = shape.props.points.map((p: Vec2, index: number) => {
-			if (index === 0) return a;
-			if (index === shape.props.points.length - 1) return b;
-			return p;
-		});
-	}
+	const endpoints = [a, ...shape.props.points.slice(1, -1), b];
+	const points = arrowPath(
+		endpoints,
+		shape.props.routing?.automatic ? 'orthogonal' : (shape.props.routing?.kind ?? 'straight')
+	);
 
 	context.beginPath();
 	context.moveTo(points[0].x, points[0].y);
