@@ -50,7 +50,7 @@
 		</nav>
 
 		<div class="header-actions">
-			<div class="desktop-search"><DocsSearch /></div>
+			<div class="desktop-search"><DocsSearch id="desktop-search" /></div>
 			<DocsThemeToggle />
 			<details class="mobile-menu">
 				<summary aria-label="Open documentation menu">
@@ -58,7 +58,7 @@
 					<span>Menu</span>
 				</summary>
 				<div class="mobile-menu-panel">
-					<DocsSearch />
+					<DocsSearch id="mobile-search" />
 					<nav aria-label="Mobile navigation">
 						{#each primaryLinks as link (link.slug)}
 							<a class:active={isCurrent(link.slug)} href={resolve(link.href)}
@@ -89,7 +89,7 @@
 		position: sticky;
 		top: 0;
 		z-index: 10;
-		border-bottom: 1px solid var(--docs-border);
+		border-bottom: 0.25px dotted var(--docs-border);
 		background: var(--docs-header-surface);
 		backdrop-filter: blur(12px);
 	}
@@ -128,6 +128,7 @@
 		align-items: center;
 		gap: 1.35rem;
 		margin-right: auto;
+		font-family: var(--docs-font-heading);
 	}
 
 	.primary-nav a,

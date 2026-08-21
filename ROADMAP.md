@@ -15,6 +15,13 @@ save and reopen, edit and export, undo and redo, CRDT merge, and CLI access.
 See [SVG import](apps/web/src/content/docs/internals/svg-import.md) and
 [native path geometry](apps/web/src/content/docs/internals/native-path-geometry.md).
 
+### Editor refinement
+
+Bring the editor interface up to the capabilities of the document model. Improve selection,
+snapping, keyboard and camera behavior, expose layout operations, and add clipboard and image
+workflows that behave like a native drawing application. Frames and bound arrows follow once these
+core interactions are consistent across web and desktop.
+
 ### Permissioned MCP
 
 Add a local stdio MCP server as the policy-aware interface for model-controlled access. It should

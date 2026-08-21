@@ -4,6 +4,7 @@ export const ICONS = {
 	arrow: 'i-tabler-arrow-up-right',
 	'arrow-down': 'i-tabler-arrow-down',
 	'arrow-right': 'i-tabler-arrow-right',
+	'arrow-left': 'i-tabler-arrow-left',
 	'arrow-up': 'i-tabler-arrow-up',
 	check: 'i-bi-check-lg',
 	'chevron-left': 'i-tabler-chevron-left',

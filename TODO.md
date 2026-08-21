@@ -16,6 +16,40 @@ normalized structure where representation matters and rendered output where visu
 - [ ] Verify opaque fallback content remains visually stable
 - [ ] Add deterministic round-trip fixtures for these workflows
 
+## Editor refinement
+
+### Selection and movement
+
+- [ ] Add edge, center, corner, equal-gap, handle, and 15-degree angle snapping with visible guides
+- [ ] Apply Shift constraints, Alt/Option duplication, centered resize, and aspect-ratio modifiers
+      consistently across selection and drawing tools
+- [ ] Improve selection hover, Direct Select handles, rotated resize cursors, and edge scrolling
+- [ ] Add zoom to selection, smoother camera controls, and persistent grid and snap preferences
+
+### Layout and commands
+
+- [ ] Add contextual align, distribute, group, order, lock, and `agent_editable` controls
+- [ ] Complete the keyboard shortcut scheme and add a searchable `?` shortcut panel
+- [ ] Expand context menus for selection, layout, clipboard, and view actions
+- [ ] Add accessible labels, keyboard traversal, coarse touch targets, and reduced-motion behavior
+- [ ] Report save, import, export, clipboard, and document errors in the editor
+
+### Clipboard, drop, and images
+
+- [ ] Copy, cut, and paste native selections with hierarchy, assets, and bindings intact
+- [ ] Paste plain text, Markdown, SVG markup, SVG files, and images into editable canvas objects
+- [ ] Add paste in place and paste at cursor
+- [ ] Copy selections as SVG and PNG
+- [ ] Import `.inkfinite`, SVG, Excalidraw, and image files through drag and drop
+- [ ] Add image shapes with embedded assets, aspect-ratio resize, crop, opacity, and replace controls
+- [ ] Verify clipboard and image workflows through save/reopen, undo/redo, merge, and export
+
+### Canvas structure
+
+- [ ] Add frames with titles, child containment, move-with-contents, zoom, and export behavior
+- [ ] Bind arrow endpoints to shapes and preserve bindings through move, group, copy, and merge
+- [ ] Add straight, curved, and elbow arrows with bend controls, labels, and automatic routing
+
 ## Permissioned MCP
 
 ### Server and discovery
