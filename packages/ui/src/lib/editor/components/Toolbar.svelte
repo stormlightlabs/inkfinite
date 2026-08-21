@@ -40,6 +40,8 @@
 		canvas?: HTMLCanvasElement;
 		brushStore: BrushStore;
 		onStencilsClick?: () => void;
+		/** Whether to expose the desktop-only agent editability control. */
+		showAgentControl?: boolean;
 		onImportEditable?: () => void;
 		onImportSvg?: () => void;
 		onImportSvgMarkup?: () => void;
@@ -55,6 +57,7 @@
 		canvas,
 		brushStore,
 		onStencilsClick,
+		showAgentControl = false,
 		onImportEditable,
 		onImportSvg,
 		onImportSvgMarkup,
@@ -706,14 +709,16 @@
 			{#if hasArrowSelection}
 				<ArrowPopover {store} />
 			{/if}
-			<label class="toolbar__agent-control" title="Allow agents to edit the selection">
-				<input
-					type="checkbox"
-					checked={agentEditableValue}
-					onchange={handleAgentEditableChange}
-					aria-label="Agent editable" />
-				<span>Agents</span>
-			</label>
+			{#if showAgentControl}
+				<label class="toolbar__agent-control" title="Allow agents to edit the selection">
+					<input
+						type="checkbox"
+						checked={agentEditableValue}
+						onchange={handleAgentEditableChange}
+						aria-label="Agent editable" />
+					<span>Agents</span>
+				</label>
+			{/if}
 		</div>
 	{/if}
 

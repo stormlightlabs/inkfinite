@@ -5,6 +5,28 @@ import { render } from 'vitest-browser-svelte';
 import { createBrushStore } from '../status';
 import Toolbar from './Toolbar.svelte';
 
+function createSelectedRectStore() {
+	const page = PageRecord.create('Page', 'page');
+	const shape = ShapeRecord.createRect(
+		page.id,
+		0,
+		0,
+		{ w: 20, h: 20, fill: '#fff', stroke: '#000', radius: 0 },
+		'shape'
+	);
+	const store = new Store();
+	store.setState((state) => ({
+		...state,
+		doc: {
+			pages: { [page.id]: { ...page, shapeIds: [shape.id] } },
+			shapes: { [shape.id]: shape },
+			bindings: {}
+		},
+		ui: { ...state.ui, currentPageId: page.id, selectionIds: [shape.id] }
+	}));
+	return store;
+}
+
 describe('Editor Toolbar', () => {
 	it('selects tools through accessible controls', async () => {
 		const onToolChange = vi.fn();
@@ -207,30 +229,28 @@ describe('Editor Toolbar', () => {
 		expect(store.canUndo()).toBe(true);
 	});
 
+	it('hides the agent edit control when it is not enabled', async () => {
+		const screen = render(Toolbar, {
+			currentTool: 'select',
+			onToolChange: vi.fn(),
+			store: createSelectedRectStore(),
+			brushStore: createBrushStore(),
+			showAgentControl: false
+		});
+
+		await expect
+			.element(screen.getByRole('checkbox', { name: 'Agent editable' }))
+			.not.toBeInTheDocument();
+	});
+
 	it('changes whether agents may edit selected shapes', async () => {
-		const page = PageRecord.create('Page', 'page');
-		const shape = ShapeRecord.createRect(
-			page.id,
-			0,
-			0,
-			{ w: 20, h: 20, fill: '#fff', stroke: '#000', radius: 0 },
-			'shape'
-		);
-		const store = new Store();
-		store.setState((state) => ({
-			...state,
-			doc: {
-				pages: { [page.id]: { ...page, shapeIds: [shape.id] } },
-				shapes: { [shape.id]: shape },
-				bindings: {}
-			},
-			ui: { ...state.ui, currentPageId: page.id, selectionIds: [shape.id] }
-		}));
+		const store = createSelectedRectStore();
 		const screen = render(Toolbar, {
 			currentTool: 'select',
 			onToolChange: vi.fn(),
 			store,
-			brushStore: createBrushStore()
+			brushStore: createBrushStore(),
+			showAgentControl: true
 		});
 
 		const control = screen.getByRole('checkbox', { name: 'Agent editable' });

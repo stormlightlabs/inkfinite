@@ -221,6 +221,7 @@
 		currentTool={c.tools.currentToolId}
 		onToolChange={c.tools.handleChange}
 		onStencilsClick={handleStencilsClick}
+		showAgentControl={platformKind === 'desktop'}
 		store={c.store}
 		canvas={canvasEl ?? undefined}
 		brushStore={c.brushStore}

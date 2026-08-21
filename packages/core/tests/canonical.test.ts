@@ -30,7 +30,8 @@ describe('toCanonicalDocumentSnapshot', () => {
 			kind: 'rect',
 			parent: { kind: 'layer', id: 'layer:page:one:default' },
 			transform: { translation: { x: 10, y: 20 }, rotation: 0 },
-			properties: { w: 40, h: 20, fill: 'red' }
+			properties: { w: 40, h: 20, fill: 'red' },
+			metadata: { agent_editable: true }
 		});
 	});
 

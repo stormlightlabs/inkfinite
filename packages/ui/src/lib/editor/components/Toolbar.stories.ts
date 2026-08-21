@@ -22,4 +22,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Web: Story = {};
+export const Web: Story = { args: { showAgentControl: false } };
+
+export const Desktop: Story = { args: { showAgentControl: true } };
