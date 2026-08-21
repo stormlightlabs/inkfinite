@@ -6,6 +6,7 @@ export * from './geom';
 export * from './history';
 export * from './interchange';
 export * from './layers';
+export * from './layout';
 export * from './math';
 export * from './model';
 export * from './path-topology';

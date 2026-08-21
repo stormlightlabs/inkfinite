@@ -435,9 +435,11 @@ export class InputAdapter {
 			return true;
 		}
 
-		if (Modifiers.isPrimaryModifier(modifiers) && (key === 'b' || key === 'B')) {
-			return true;
+		if (Modifiers.isPrimaryModifier(modifiers)) {
+			if ('abgldcxvzy'.includes(key.toLowerCase()) || key === '[' || key === ']') return true;
 		}
+
+		if (key === '?' || (key === '/' && e.shiftKey)) return true;
 
 		return false;
 	}

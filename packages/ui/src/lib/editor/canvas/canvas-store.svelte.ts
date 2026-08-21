@@ -34,7 +34,8 @@ import {
 	snapTranslation,
 	SnapshotCommand,
 	Store,
-	TextTool
+	TextTool,
+	validateDoc
 } from '@inkfinite/core';
 import type {
 	Box2,
@@ -64,7 +65,14 @@ import { PointerState } from './store/pointer-state.svelte';
 
 type Stencil = stencils.Stencil;
 
-export type CanvasControllerBindings = { setHistoryViewerOpen(value: boolean): void };
+export type CanvasControllerBindings = {
+	setHistoryViewerOpen(value: boolean): void;
+	setShortcutsOpen(value: boolean): void;
+	reportError(error: unknown, title?: string): void;
+	onCopyRequested?: () => void;
+	onCutRequested?: () => void;
+	onPasteRequested?: () => void;
+};
 
 export type CanvasController = ReturnType<typeof createCanvasController>;
 
@@ -296,6 +304,17 @@ export function createCanvasController(
 	}
 
 	function applyLoadedDoc(doc: LoadedDoc, fitDrawing = false, syncCanonical = true) {
+		const validation = validateDoc({
+			pages: doc.pages,
+			layers: doc.layers,
+			shapes: doc.shapes,
+			bindings: doc.bindings,
+			...(doc.assets ? { assets: doc.assets } : {})
+		});
+		if (!validation.ok) {
+			bindings.reportError(new Error(validation.errors.join('; ')), 'Document error');
+			return;
+		}
 		const firstPageId = doc.order.pageIds[0] ?? Object.keys(doc.pages)[0] ?? null;
 		store.setState((state) => ({
 			...state,
@@ -411,7 +430,8 @@ export function createCanvasController(
 			setActiveBoardId(boardId);
 			applyLoadedDoc(doc, true);
 		},
-		() => sink?.flush() ?? Promise.resolve()
+		() => sink?.flush() ?? Promise.resolve(),
+		(error, title) => bindings.reportError(error, title)
 	);
 	const fileBrowser = new FileBrowserController(
 		() => repo,
@@ -420,7 +440,8 @@ export function createCanvasController(
 			applyLoadedDoc(doc, true);
 		},
 		() => platformSession?.inspectBoard,
-		() => sink?.flush() ?? Promise.resolve()
+		() => sink?.flush() ?? Promise.resolve(),
+		(error, title) => bindings.reportError(error, title)
 	);
 	const runtime = new EditorRuntime({
 		store,
@@ -437,6 +458,12 @@ export function createCanvasController(
 			syncHandleState();
 		},
 		onBrowseRequested: () => fileBrowser.handleOpen(),
+		onShortcutsRequested: () => bindings.setShortcutsOpen(true),
+		onUndoRequested: () => store.undo(),
+		onRedoRequested: () => store.redo(),
+		onCopyRequested: bindings.onCopyRequested,
+		onCutRequested: bindings.onCutRequested,
+		onPasteRequested: bindings.onPasteRequested,
 		onHandleHover: setHandleHover,
 		onInteractionChanged: syncHandleState,
 		onSnappedWorldChanged: (world) => {
@@ -867,84 +894,90 @@ export function createCanvasController(
 	});
 
 	onMount(async () => {
-		platformSession = await platformAdapter.connect();
-		repo = platformSession.repo;
-		sink = platformSession.sink;
-		persistenceStatusStore = platformSession.status;
-		desktopRepo = platformSession.desktop ?? null;
-		if (desktopRepo) {
-			proposal = desktopRepo.getProposal();
-			unsubscribeProposal = desktopRepo.subscribeProposal((update) => {
-				proposal = update.proposal;
-				proposalMessage = update.message ?? null;
-			});
-			unsubscribeLiveDocument = desktopRepo.subscribeLiveDocument(applyLoadedDoc);
-			unsubscribeAgentUi = desktopRepo.subscribeAgentUi((control) => {
-				if (control.camera) camera.cancelFit();
-				store.setState((state) => ({
-					...state,
-					camera: control.camera ?? state.camera,
-					ui: {
-						...state.ui,
-						currentPageId: control.page_id ?? state.ui.currentPageId,
-						activeLayerId: control.active_layer_id ?? state.ui.activeLayerId,
-						selectionIds: control.selection_ids ?? state.ui.selectionIds
-					}
-				}));
-				renderer?.markDirty();
-			});
-			unsubscribeAgentContext = store.subscribe(scheduleAgentContext);
-			scheduleAgentContext();
-		}
-		unsubscribeFileMenu =
-			platformSession.subscribeFileMenu?.((action) => {
-				switch (action) {
-					case 'new':
-						void desktop.handleNew();
-						break;
-					case 'open':
-						void desktop.handleOpen();
-						break;
-					case 'save-as':
-						void desktop.handleSaveAs(() => (sink ? sink.flush() : Promise.resolve()));
-						break;
-					case 'import':
-						void importEditableCanvas();
-						break;
-					case 'import-svg':
-						void importSvg();
-						break;
-					case 'export-excalidraw':
-						void exportEditableCanvas('excalidraw');
-						break;
-					case 'export-json-canvas':
-						void exportEditableCanvas('json-canvas');
-						break;
-				}
-			}) ?? null;
-
-		if (platform === 'desktop') {
+		try {
+			platformSession = await platformAdapter.connect();
+			repo = platformSession.repo;
+			sink = platformSession.sink;
+			persistenceStatusStore = platformSession.status;
+			desktopRepo = platformSession.desktop ?? null;
 			if (desktopRepo) {
-				await desktop.openDraft();
+				proposal = desktopRepo.getProposal();
+				unsubscribeProposal = desktopRepo.subscribeProposal((update) => {
+					proposal = update.proposal;
+					proposalMessage = update.message ?? null;
+				});
+				unsubscribeLiveDocument = desktopRepo.subscribeLiveDocument(applyLoadedDoc);
+				unsubscribeAgentUi = desktopRepo.subscribeAgentUi((control) => {
+					if (control.camera) camera.cancelFit();
+					store.setState((state) => ({
+						...state,
+						camera: control.camera ?? state.camera,
+						ui: {
+							...state.ui,
+							currentPageId: control.page_id ?? state.ui.currentPageId,
+							activeLayerId: control.active_layer_id ?? state.ui.activeLayerId,
+							selectionIds: control.selection_ids ?? state.ui.selectionIds
+						}
+					}));
+					renderer?.markDirty();
+				});
+				unsubscribeAgentContext = store.subscribe(scheduleAgentContext);
+				scheduleAgentContext();
 			}
-		} else {
-			const boards = await repo.listBoards();
-			let boardId: string;
+			unsubscribeFileMenu =
+				platformSession.subscribeFileMenu?.((action) => {
+					switch (action) {
+						case 'new':
+							void desktop.handleNew();
+							break;
+						case 'open':
+							void desktop.handleOpen();
+							break;
+						case 'save-as':
+							void desktop.handleSaveAs(() =>
+								sink ? sink.flush() : Promise.resolve()
+							);
+							break;
+						case 'import':
+							void importEditableCanvas();
+							break;
+						case 'import-svg':
+							void importSvg();
+							break;
+						case 'export-excalidraw':
+							void exportEditableCanvas('excalidraw');
+							break;
+						case 'export-json-canvas':
+							void exportEditableCanvas('json-canvas');
+							break;
+					}
+				}) ?? null;
 
-			if (boards.length > 0) {
-				boardId = boards[0].id;
+			if (platform === 'desktop') {
+				if (desktopRepo) {
+					await desktop.openDraft();
+				}
 			} else {
-				boardId = await repo.createBoard('Untitled Board');
+				const boards = await repo.listBoards();
+				let boardId: string;
+
+				if (boards.length > 0) {
+					boardId = boards[0].id;
+				} else {
+					boardId = await repo.createBoard('Untitled Board');
+				}
+
+				const doc = await repo.loadDoc(boardId);
+				setActiveBoardId(boardId);
+				applyLoadedDoc(doc);
+
+				removeBeforeUnload = () => {
+					window.removeEventListener('beforeunload', handleBeforeUnload);
+				};
+				window.addEventListener('beforeunload', handleBeforeUnload);
 			}
-
-			const doc = await repo.loadDoc(boardId);
-			setActiveBoardId(boardId);
-			applyLoadedDoc(doc);
-
-			removeBeforeUnload = () => {
-				window.removeEventListener('beforeunload', handleBeforeUnload);
-			};
-			window.addEventListener('beforeunload', handleBeforeUnload);
+		} catch (error) {
+			bindings.reportError(error, 'Open document failed');
 		}
 	});
 

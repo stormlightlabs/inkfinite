@@ -42,6 +42,23 @@
 		if (closeOnEscape && event.key === 'Escape') {
 			event.preventDefault();
 			handleClose();
+			return;
+		}
+		if (event.key !== 'Tab' || !dialogElement) return;
+		const focusable = Array.from(
+			dialogElement.querySelectorAll<HTMLElement>(
+				'button:not(:disabled), [href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])'
+			)
+		);
+		if (focusable.length === 0) return;
+		const first = focusable[0];
+		const last = focusable.at(-1);
+		if (event.shiftKey && document.activeElement === first) {
+			event.preventDefault();
+			last?.focus();
+		} else if (!event.shiftKey && document.activeElement === last) {
+			event.preventDefault();
+			first?.focus();
 		}
 	}
 
@@ -125,6 +142,13 @@
 		to {
 			transform: translateY(0);
 			opacity: 1;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.dialog__backdrop,
+		.dialog__content {
+			animation: none;
 		}
 	}
 </style>

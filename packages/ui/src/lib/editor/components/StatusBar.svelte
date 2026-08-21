@@ -24,6 +24,7 @@
 		platform?: EditorPlatform;
 		draft?: boolean;
 		onOpenBrowser?: () => void;
+		onShortcutsClick?: () => void;
 		onHistoryClick?: () => void;
 	};
 
@@ -36,6 +37,7 @@
 		platform = 'web',
 		draft = false,
 		onOpenBrowser,
+		onShortcutsClick,
 		onHistoryClick
 	}: Props = $props();
 
@@ -233,7 +235,9 @@
 		<span class="status-bar__label">Save</span>
 		<span
 			class="status-bar__value"
-			class:status-bar__value--error={statusVm.persistence.state === 'error'}>
+			class:status-bar__value--error={statusVm.persistence.state === 'error'}
+			role={statusVm.persistence.state === 'error' ? 'alert' : undefined}
+			title={statusVm.persistence.errorMsg ?? undefined}>
 			{formatPersistenceSummary()}
 		</span>
 	</div>
@@ -255,6 +259,16 @@
 				title="Boards (Cmd/Ctrl+B)">
 				<Icon name="folder" size={15} />
 				<span>Boards</span>
+			</button>
+		{/if}
+		{#if onShortcutsClick}
+			<button
+				class="status-bar__action"
+				onclick={onShortcutsClick}
+				aria-label="Keyboard shortcuts"
+				title="Keyboard shortcuts (?)">
+				<span aria-hidden="true">?</span>
+				<span>Shortcuts</span>
 			</button>
 		{/if}
 		<button
@@ -483,6 +497,14 @@
 		.status-bar__actions {
 			justify-content: flex-start;
 			margin-left: auto;
+		}
+	}
+
+	@media (pointer: coarse) {
+		.status-bar__action,
+		.status-bar__toggle input {
+			min-height: 2.75rem;
+			min-width: 2.75rem;
 		}
 	}
 

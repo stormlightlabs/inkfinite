@@ -29,6 +29,11 @@
 		Icon,
 		type ContextMenuEntry
 	} from '../../index';
+	import {
+		executeSelectionCommand,
+		SELECTION_COMMAND_LABELS,
+		type SelectionCommand
+	} from '../commands';
 	import { DEFAULT_FILL_COLOR, DEFAULT_STROKE_COLOR, TOOLS } from '../constants';
 	import type { BrushSettings, BrushStore } from '../status';
 	import ArrowPopover from './ArrowPopover.svelte';
@@ -73,6 +78,9 @@
 	let importMenuOpen = $state(false);
 	let importMenuPoint = $state({ x: 0, y: 0 });
 	let importButtonEl = $state<HTMLButtonElement | null>(null);
+	let layoutMenuOpen = $state(false);
+	let layoutMenuPoint = $state({ x: 0, y: 0 });
+	let layoutButtonEl = $state<HTMLButtonElement | null>(null);
 	let fillColorValue = $state(DEFAULT_FILL_COLOR);
 	let strokeColorValue = $state(DEFAULT_STROKE_COLOR);
 	let fillOpacityValue = $state(1);
@@ -147,8 +155,16 @@
 				shapeSupportsStrokeOpacity(s)
 		)
 	);
+	let selectedShapes = $derived(getSelectedShapes(editorState));
+	let selectionCount = $derived(selectedShapes.length);
+	let hasGroupedSelection = $derived(
+		selectedShapes.some((shape) => Boolean(shape.groupId) || shape.type === 'container')
+	);
+	let allSelectedLocked = $derived(
+		selectionCount > 0 && selectedShapes.every((shape) => shape.locked)
+	);
 	let showContextControls = $derived(
-		currentTool !== 'pen' && (getSelectedShapes(editorState).length > 0 || hasArrowSelection)
+		currentTool !== 'pen' && (selectionCount > 0 || hasArrowSelection)
 	);
 
 	let position = $state({ x: 12, y: 12 });
@@ -227,6 +243,122 @@
 
 	function handleToolClick(toolId: ToolId) {
 		onToolChange(toolId);
+	}
+
+	function toggleLayoutMenu() {
+		if (!layoutButtonEl) return;
+		if (layoutMenuOpen) {
+			layoutMenuOpen = false;
+			return;
+		}
+		const bounds = layoutButtonEl.getBoundingClientRect();
+		layoutMenuPoint = { x: bounds.left, y: bounds.bottom + 8 };
+		layoutMenuOpen = true;
+	}
+
+	function getLayoutMenuItems(): ContextMenuEntry[] {
+		const items: ContextMenuEntry[] = [];
+		const enoughForAlignment = selectionCount >= 2;
+		const enoughForDistribution = selectionCount >= 3;
+		if (enoughForAlignment) {
+			items.push(
+				...(
+					[
+						'align-left',
+						'align-center',
+						'align-right',
+						'align-top',
+						'align-middle',
+						'align-bottom'
+					] as SelectionCommand[]
+				).map((id) => ({
+					id,
+					label: SELECTION_COMMAND_LABELS[id],
+					icon: 'select' as const,
+					disabled: !enoughForAlignment
+				}))
+			);
+			items.push({ type: 'separator' });
+		}
+		items.push(
+			{
+				id: 'distribute-horizontal',
+				label: SELECTION_COMMAND_LABELS['distribute-horizontal'],
+				icon: 'arrow-right',
+				disabled: !enoughForDistribution
+			},
+			{
+				id: 'distribute-vertical',
+				label: SELECTION_COMMAND_LABELS['distribute-vertical'],
+				icon: 'arrow-down',
+				disabled: !enoughForDistribution
+			},
+			{ type: 'separator' },
+			{
+				id: 'group',
+				label: SELECTION_COMMAND_LABELS.group,
+				icon: 'layers',
+				disabled: selectionCount < 2
+			},
+			{
+				id: 'ungroup',
+				label: SELECTION_COMMAND_LABELS.ungroup,
+				icon: 'layers',
+				disabled: !hasGroupedSelection
+			},
+			{ type: 'separator' },
+			{
+				id: 'forward',
+				label: SELECTION_COMMAND_LABELS.forward,
+				icon: 'arrow-up',
+				shortcut: '⌘/Ctrl ]'
+			},
+			{
+				id: 'backward',
+				label: SELECTION_COMMAND_LABELS.backward,
+				icon: 'arrow-down',
+				shortcut: '⌘/Ctrl ['
+			},
+			{
+				id: 'front',
+				label: SELECTION_COMMAND_LABELS.front,
+				icon: 'arrow-up',
+				shortcut: '⇧⌘/Ctrl ]'
+			},
+			{
+				id: 'back',
+				label: SELECTION_COMMAND_LABELS.back,
+				icon: 'arrow-down',
+				shortcut: '⇧⌘/Ctrl ['
+			},
+			{ type: 'separator' },
+			{
+				id: allSelectedLocked ? 'unlock' : 'lock',
+				label: allSelectedLocked
+					? SELECTION_COMMAND_LABELS.unlock
+					: SELECTION_COMMAND_LABELS.lock,
+				icon: allSelectedLocked ? 'lock-open' : 'lock',
+				shortcut: '⇧⌘/Ctrl L'
+			},
+			{ type: 'separator' },
+			{
+				id: 'agent-editable',
+				label: SELECTION_COMMAND_LABELS['agent-editable'],
+				icon: 'terminal'
+			},
+			{
+				id: 'agent-readonly',
+				label: SELECTION_COMMAND_LABELS['agent-readonly'],
+				icon: 'lock-open'
+			}
+		);
+		return items;
+	}
+
+	function handleLayoutMenuAction(id: string) {
+		if (id in SELECTION_COMMAND_LABELS) {
+			executeSelectionCommand(store, id as SelectionCommand);
+		}
 	}
 
 	async function exportPNGViewport() {
@@ -417,6 +549,7 @@
 		const before = EditorState.clone(state);
 		const newShapes = { ...state.doc.shapes };
 		for (const shape of targets) {
+			// FIXME: make this a switch..case
 			if (shape.type === 'text') {
 				const updated: TextShape = { ...shape, props: { ...shape.props, color } };
 				newShapes[shape.id] = updated;
@@ -722,6 +855,28 @@
 		</div>
 	{/if}
 
+	{#if showContextControls}
+		<button
+			class="toolbar__layout-button"
+			bind:this={layoutButtonEl}
+			onpointerdown={(event) => event.stopPropagation()}
+			onclick={toggleLayoutMenu}
+			aria-label="Layout and selection commands"
+			aria-haspopup="menu"
+			aria-expanded={layoutMenuOpen}>
+			Layout
+		</button>
+		<ContextMenu
+			items={getLayoutMenuItems()}
+			label="Layout and selection commands"
+			open={layoutMenuOpen}
+			returnFocus={layoutButtonEl}
+			x={layoutMenuPoint.x}
+			y={layoutMenuPoint.y}
+			onOpenChange={(value) => (layoutMenuOpen = value)}
+			onSelect={handleLayoutMenuAction} />
+	{/if}
+
 	<div class="toolbar__divider"></div>
 
 	<button
@@ -982,6 +1137,7 @@
 	}
 
 	.toolbar__tool-button:active,
+	.toolbar__layout-button:active,
 	.toolbar__import-button:active,
 	.toolbar__export-button:active {
 		transform: scale(0.96);
@@ -1025,6 +1181,7 @@
 		position: relative;
 	}
 
+	.toolbar__layout-button,
 	.toolbar__import-button,
 	.toolbar__export-button {
 		border: 1px solid var(--ink-border);
@@ -1040,10 +1197,18 @@
 		transition-duration: 0.2s;
 	}
 
+	.toolbar__layout-button:hover,
 	.toolbar__import-button:hover,
 	.toolbar__export-button:hover {
 		background: var(--ink-surface-hover);
 		border-color: var(--ink-text-muted);
+	}
+
+	.toolbar__layout-button:focus-visible,
+	.toolbar__import-button:focus-visible,
+	.toolbar__export-button:focus-visible {
+		outline: 2px solid var(--ink-focus);
+		outline-offset: 2px;
 	}
 
 	.toolbar__import-button:disabled,
@@ -1229,6 +1394,7 @@
 			gap: var(--ink-space-1);
 		}
 
+		.toolbar__layout-button,
 		.toolbar__import-button,
 		.toolbar__export-button {
 			height: 42px;
@@ -1241,6 +1407,16 @@
 		.toolbar__brand,
 		.toolbar__divider {
 			display: none;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.toolbar,
+		.toolbar__tool-button,
+		.toolbar__layout-button,
+		.toolbar__import-button,
+		.toolbar__export-button {
+			transition: none;
 		}
 	}
 </style>

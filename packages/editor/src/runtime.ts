@@ -4,8 +4,14 @@ import {
 	type CommandKind,
 	createId,
 	EditorState,
+	getSelectionScopeShapes,
+	groupShapes,
 	reorderShapes,
+	reorderShapesToEdge,
 	routeAction,
+	setShapesLocked,
+	translateShapes,
+	ungroupShapes,
 	ShapeRecord,
 	hitTestPoint,
 	selectionTarget,
@@ -50,6 +56,15 @@ export type EditorRuntimeOptions = {
 	onTransactionDraft: (draft: RuntimeTransactionDraft) => void;
 	/** Opens the board browser from its dedicated Cmd/Ctrl+B shortcut. */
 	onBrowseRequested?: () => void;
+	/** Opens the searchable keyboard shortcut panel. */
+	onShortcutsRequested?: () => void;
+	/** Handles undo and redo before the active tool sees the key event. */
+	onUndoRequested?: () => void;
+	onRedoRequested?: () => void;
+	/** Clipboard actions are supplied by the host because browser permissions vary. */
+	onCopyRequested?: () => void;
+	onCutRequested?: () => void;
+	onPasteRequested?: () => void;
 	onHandleHover?: (handle: string | null) => void;
 	onInteractionChanged?: () => void;
 	onSnappedWorldChanged?: (world: { x: number; y: number }) => void;
@@ -178,7 +193,15 @@ export class EditorRuntime {
 		}
 
 		const before = store.getState();
-		const shortcut = applyKeyboardShortcut(before, routedAction, this.options.onBrowseRequested);
+		const shortcut = applyKeyboardShortcut(before, routedAction, {
+			onBrowseRequested: this.options.onBrowseRequested,
+			onShortcutsRequested: this.options.onShortcutsRequested,
+			onUndoRequested: this.options.onUndoRequested,
+			onRedoRequested: this.options.onRedoRequested,
+			onCopyRequested: this.options.onCopyRequested,
+			onCutRequested: this.options.onCutRequested,
+			onPasteRequested: this.options.onPasteRequested
+		});
 		const after = shortcut ?? routeAction(before, routedAction, this.options.tools);
 
 		if (!statesEqual(before, after)) {
@@ -271,13 +294,52 @@ function snapAction(action: Action, snap: SnapSettings): Action {
 function applyKeyboardShortcut(
 	state: EditorState,
 	action: Action,
-	onBrowseRequested: (() => void) | undefined
+	handlers: {
+		onBrowseRequested?: () => void;
+		onShortcutsRequested?: () => void;
+		onUndoRequested?: () => void;
+		onRedoRequested?: () => void;
+		onCopyRequested?: () => void;
+		onCutRequested?: () => void;
+		onPasteRequested?: () => void;
+	}
 ): EditorState | null {
 	if (action.type !== 'key-down') return null;
 	const primary = action.modifiers.meta || action.modifiers.ctrl;
-	if (primary && (action.key === 'b' || action.key === 'B')) {
-		onBrowseRequested?.();
+	if (action.key === '?' || (action.key === '/' && action.modifiers.shift)) {
+		handlers.onShortcutsRequested?.();
 		return null;
+	}
+	if (primary && ['z', 'Z'].includes(action.key)) {
+		if (action.modifiers.shift) handlers.onRedoRequested?.();
+		else handlers.onUndoRequested?.();
+		return null;
+	}
+	if (primary && ['y', 'Y'].includes(action.key)) {
+		handlers.onRedoRequested?.();
+		return null;
+	}
+	if (primary && ['b', 'B'].includes(action.key)) {
+		handlers.onBrowseRequested?.();
+		return null;
+	}
+	if (primary && ['c', 'C'].includes(action.key)) {
+		handlers.onCopyRequested?.();
+		return null;
+	}
+	if (primary && ['x', 'X'].includes(action.key)) {
+		handlers.onCutRequested?.();
+		return null;
+	}
+	if (primary && ['v', 'V'].includes(action.key)) {
+		handlers.onPasteRequested?.();
+		return null;
+	}
+	if (primary && ['a', 'A'].includes(action.key)) {
+		const selectionIds = getSelectionScopeShapes(state).map((shape) => shape.id);
+		return selectionIds.length === 0 || selectionIds.every((id) => state.ui.selectionIds.includes(id))
+			? null
+			: { ...state, ui: { ...state.ui, selectionIds } };
 	}
 	if (state.ui.selectionIds.length === 0) return null;
 
@@ -285,33 +347,35 @@ function applyKeyboardShortcut(
 		const step = action.modifiers.shift ? 10 : 1;
 		const delta = arrowDelta(action.key, step);
 		if (delta) {
-			const shapes = { ...state.doc.shapes };
-			let changed = false;
-			for (const id of state.ui.selectionIds) {
-				const shape = shapes[id];
-				if (!shape) continue;
-				shapes[id] = shape.editorTransform
-					? {
-							...shape,
-							x: shape.x + delta.x,
-							y: shape.y + delta.y,
-							editorTransform: {
-								...shape.editorTransform,
-								e: shape.editorTransform.e + delta.x,
-								f: shape.editorTransform.f + delta.y
-							}
-						}
-					: { ...shape, x: shape.x + delta.x, y: shape.y + delta.y };
-				changed = true;
-			}
-			if (changed) return { ...state, doc: { ...state.doc, shapes } };
+			const next = translateShapes(state, state.ui.selectionIds, delta);
+			return next === state ? null : next;
 		}
 	}
 	if (primary && ['d', 'D'].includes(action.key)) return duplicateSelection(state);
-	if (primary && action.key === ']') return reorderSelection(state, 'forward');
-	if (primary && action.key === '[') return reorderSelection(state, 'backward');
-	if (primary && action.modifiers.shift && ['g', 'G'].includes(action.key)) return ungroupSelection(state);
+	if (primary && ['g', 'G'].includes(action.key)) {
+		return action.modifiers.shift
+			? nullableState(ungroupShapes(state, state.ui.selectionIds), state)
+			: nullableState(groupShapes(state, state.ui.selectionIds), state);
+	}
+	if (primary && action.modifiers.shift && ['l', 'L'].includes(action.key)) {
+		const locked = state.ui.selectionIds.every((id) => state.doc.shapes[id]?.locked);
+		return nullableState(setShapesLocked(state, state.ui.selectionIds, !locked), state);
+	}
+	if (primary && action.key === ']') {
+		return action.modifiers.shift
+			? nullableState(reorderShapesToEdge(state, state.ui.selectionIds, 'front'), state)
+			: reorderSelection(state, 'forward');
+	}
+	if (primary && action.key === '[') {
+		return action.modifiers.shift
+			? nullableState(reorderShapesToEdge(state, state.ui.selectionIds, 'back'), state)
+			: reorderSelection(state, 'backward');
+	}
 	return null;
+}
+
+function nullableState(next: EditorState, previous: EditorState): EditorState | null {
+	return next === previous ? null : next;
 }
 
 function arrowDelta(key: string, step: number): { x: number; y: number } | null {
@@ -354,31 +418,15 @@ function reorderSelection(state: EditorState, direction: 'forward' | 'backward')
 	return next === state ? null : next;
 }
 
-function ungroupSelection(state: EditorState): EditorState | null {
-	const groups = new Set(
-		state.ui.selectionIds.map((id) => state.doc.shapes[id]?.groupId).filter((id): id is string => Boolean(id))
-	);
-	if (groups.size === 0) return null;
-	const shapes = { ...state.doc.shapes };
-	let changed = false;
-	for (const [id, shape] of Object.entries(shapes)) {
-		if (shape.groupId && groups.has(shape.groupId)) {
-			const copy = { ...shape };
-			delete copy.groupId;
-			shapes[id] = copy;
-			changed = true;
-		}
-	}
-	return changed ? { ...state, doc: { ...state.doc, shapes } } : null;
-}
-
 function describeAction(action: Action, kind: CommandKind): string {
 	if (action.type === 'key-down') {
 		if (action.key.startsWith('Arrow')) return 'Nudge';
 		const primary = action.modifiers.meta || action.modifiers.ctrl;
 		if (primary && ['d', 'D'].includes(action.key)) return 'Duplicate';
-		if (primary && action.key === ']') return 'Bring Forward';
-		if (primary && action.key === '[') return 'Send Backward';
+		if (primary && action.key === ']') return action.modifiers.shift ? 'Bring to Front' : 'Bring Forward';
+		if (primary && action.key === '[') return action.modifiers.shift ? 'Send to Back' : 'Send Backward';
+		if (primary && ['g', 'G'].includes(action.key)) return action.modifiers.shift ? 'Ungroup' : 'Group';
+		if (primary && action.modifiers.shift && ['l', 'L'].includes(action.key)) return 'Toggle Lock';
 	}
 	if (action.type === 'pointer-up') return 'Pointer up';
 	return kind === 'doc' ? 'Edit' : kind === 'camera' ? 'Camera change' : 'UI change';

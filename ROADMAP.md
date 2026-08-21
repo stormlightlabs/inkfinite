@@ -24,9 +24,10 @@ core interactions are consistent across web and desktop.
 
 Selection and movement now support object and grid snapping with alignment and gap guides, angle
 constraints, modifier-aware resize and drawing gestures, Alt-drag duplication, hover feedback,
-transformed handles, edge scrolling, zoom-to-selection, and stored grid preferences. The remaining
-editor refinement work is layout commands, shortcuts, menus, accessibility, clipboard, images,
-frames, and arrow routing.
+transformed handles, edge scrolling, zoom-to-selection, and stored grid preferences. Layout commands,
+selection and canvas context menus, keyboard shortcuts, the searchable `?` panel, clipboard
+commands, accessibility states, and editor error reporting are now in place. Remaining editor
+refinement work is clipboard content formats, images, frames, and arrow routing.
 
 ### Permissioned MCP
 

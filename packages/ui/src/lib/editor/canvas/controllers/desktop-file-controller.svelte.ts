@@ -13,8 +13,13 @@ export class DesktopFileController {
 		private getRepo: () => PersistentDocRepo | null,
 		private getDesktopRepo: () => DesktopDocumentRepo | null,
 		private onLoadDoc: (boardId: string, doc: LoadedDoc) => void,
-		private prepareToSwitch: () => Promise<void>
+		private prepareToSwitch: () => Promise<void>,
+		private onError?: (error: unknown, title?: string) => void
 	) {}
+
+	private report(error: unknown, title: string) {
+		this.onError?.(error, title);
+	}
 
 	get repo(): DesktopDocumentRepo | null {
 		return this.getDesktopRepo();
@@ -23,10 +28,14 @@ export class DesktopFileController {
 	openDraft = async () => {
 		const desktopRepo = this.getDesktopRepo();
 		if (!desktopRepo) return;
-		const opened = await desktopRepo.openDraft();
-		this.isDraft = true;
-		this.onLoadDoc(opened.boardId, opened.doc);
-		await this.refreshBoards();
+		try {
+			const opened = await desktopRepo.openDraft();
+			this.isDraft = true;
+			this.onLoadDoc(opened.boardId, opened.doc);
+			await this.refreshBoards();
+		} catch (error) {
+			this.report(error, 'Open document failed');
+		}
 	};
 
 	refreshBoards = async (): Promise<BoardMeta[]> => {
@@ -41,6 +50,7 @@ export class DesktopFileController {
 			return boards;
 		} catch (error) {
 			console.error('Failed to list boards', error);
+			this.report(error, 'Document error');
 			this.boards = [];
 			return [];
 		}
@@ -62,6 +72,7 @@ export class DesktopFileController {
 				return;
 			}
 			console.error('Failed to open board', error);
+			this.report(error, 'Open document failed');
 		}
 	};
 
@@ -82,6 +93,7 @@ export class DesktopFileController {
 				return;
 			}
 			console.error('Failed to create board', error);
+			this.report(error, 'Create document failed');
 		}
 	};
 
@@ -100,6 +112,7 @@ export class DesktopFileController {
 				return;
 			}
 			console.error('Failed to save board', error);
+			this.report(error, 'Save document failed');
 		}
 	};
 
@@ -122,6 +135,7 @@ export class DesktopFileController {
 			await this.refreshBoards();
 		} catch (error) {
 			console.error('Failed to load board', error);
+			this.report(error, 'Load document failed');
 		}
 	};
 }

@@ -195,7 +195,7 @@
 	.ink-context-menu__item {
 		display: grid;
 		grid-template-columns: 1.25rem minmax(0, 1fr) auto;
-		min-height: 2.5rem;
+		min-height: 2.75rem;
 		align-items: center;
 		gap: var(--ink-space-2);
 		padding: 0 var(--ink-space-2);
@@ -266,9 +266,15 @@
 		background: color-mix(in srgb, var(--ink-border) 60%, transparent);
 	}
 
+	@media (pointer: coarse) {
+		.ink-context-menu__item {
+			min-height: 3rem;
+		}
+	}
+
 	@media (prefers-reduced-motion: reduce) {
 		.ink-context-menu__item {
-			transition-duration: 0.01ms;
+			transition: none;
 		}
 	}
 </style>

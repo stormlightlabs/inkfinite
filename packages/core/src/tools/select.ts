@@ -607,12 +607,16 @@ export class SelectTool implements Tool {
 	 */
 	private deleteSelectedShapes(state: EditorState): EditorState {
 		const shapesToDelete = new Set(state.ui.selectionIds);
+		for (const shape of Object.values(state.doc.shapes)) {
+			if (hasSelectedAncestor(shape, state.ui.selectionIds, state)) shapesToDelete.add(shape.id);
+		}
 
 		if (shapesToDelete.size === 0) return state;
 
 		const newShapes = { ...state.doc.shapes };
 		const newBindings = { ...state.doc.bindings };
 		const newPages = { ...state.doc.pages };
+		const newLayers = state.doc.layers ? { ...state.doc.layers } : undefined;
 
 		for (const shapeId of shapesToDelete) {
 			delete newShapes[shapeId];
@@ -630,10 +634,24 @@ export class SelectTool implements Tool {
 				newPages[pageId] = { ...page, shapeIds: filteredShapeIds };
 			}
 		}
+		if (newLayers) {
+			for (const [layerId, layer] of Object.entries(newLayers)) {
+				const filteredShapeIds = layer.shapeIds.filter((id) => !shapesToDelete.has(id));
+				if (filteredShapeIds.length !== layer.shapeIds.length) {
+					newLayers[layerId] = { ...layer, shapeIds: filteredShapeIds };
+				}
+			}
+		}
 
 		return {
 			...state,
-			doc: { ...state.doc, shapes: newShapes, bindings: newBindings, pages: newPages },
+			doc: {
+				...state.doc,
+				shapes: newShapes,
+				bindings: newBindings,
+				pages: newPages,
+				...(newLayers ? { layers: newLayers } : {})
+			},
 			ui: { ...state.ui, selectionIds: [] }
 		};
 	}

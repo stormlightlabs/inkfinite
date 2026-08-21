@@ -28,15 +28,15 @@ normalized structure where representation matters and rendered output where visu
 
 ### Layout and commands
 
-- [ ] Add contextual align, distribute, group, order, lock, and `agent_editable` controls
-- [ ] Complete the keyboard shortcut scheme and add a searchable `?` shortcut panel
-- [ ] Expand context menus for selection, layout, clipboard, and view actions
-- [ ] Add accessible labels, keyboard traversal, coarse touch targets, and reduced-motion behavior
-- [ ] Report save, import, export, clipboard, and document errors in the editor
+- [x] Add contextual align, distribute, group, order, lock, and `agent_editable` controls
+- [x] Complete the keyboard shortcut scheme and add a searchable `?` shortcut panel
+- [x] Expand context menus for selection, layout, clipboard, and view actions
+- [x] Add accessible labels, keyboard traversal, coarse touch targets, and reduced-motion behavior
+- [x] Report save, import, export, clipboard, and document errors in the editor
 
 ### Clipboard, drop, and images
 
-- [ ] Copy, cut, and paste native selections with hierarchy, assets, and bindings intact
+- [ ] Copy, cut, select-all, and paste native selections with hierarchy, assets, and bindings intact
 - [ ] Paste plain text, Markdown, SVG markup, SVG files, and images into editable canvas objects
 - [ ] Add paste in place and paste at cursor
 - [ ] Copy selections as SVG and PNG

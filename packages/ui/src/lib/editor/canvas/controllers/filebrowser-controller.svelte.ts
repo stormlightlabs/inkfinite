@@ -16,7 +16,8 @@ export class FileBrowserController {
 		private getInspector?: () =>
 			| ((boardId: string) => Promise<BoardInspectorData>)
 			| undefined,
-		private prepareToSwitch?: () => Promise<void>
+		private prepareToSwitch?: () => Promise<void>,
+		private onError?: (error: unknown, title?: string) => void
 	) {}
 
 	handleOpen = () => {
@@ -47,6 +48,7 @@ export class FileBrowserController {
 			}
 		} catch (error) {
 			console.error('Failed to list boards', error);
+			this.onError?.(error, 'Document error');
 		}
 	};
 
@@ -59,13 +61,19 @@ export class FileBrowserController {
 	private createBrowserRepo(repo: PersistentDocRepo): PersistentDocRepo {
 		const onLoadDoc = this.onLoadDoc;
 		const prepareToSwitch = this.prepareToSwitch;
+		const onError = this.onError;
 		return {
 			...repo,
 			async openBoard(boardId) {
-				await prepareToSwitch?.();
-				await repo.openBoard(boardId);
-				const doc = await repo.loadDoc(boardId);
-				onLoadDoc?.(boardId, doc);
+				try {
+					await prepareToSwitch?.();
+					await repo.openBoard(boardId);
+					const doc = await repo.loadDoc(boardId);
+					onLoadDoc?.(boardId, doc);
+				} catch (error) {
+					onError?.(error, 'Load document failed');
+					throw error;
+				}
 			}
 		};
 	}
