@@ -1,17 +1,11 @@
 //! Commands for inspecting and focusing a running desktop app.
 
-use std::time::{Duration, Instant};
-
 use inkfinite_core::ipc::{self, AppRequest, AppResponse, IpcError, UiControl};
-use inkfinite_core::proto::{ProposalId, Query, RecordId, SessionId};
-use inkfinite_core::session::{ProposalReviewState, ProposalStatus};
+use inkfinite_core::proto::{Query, RecordId, SessionId};
 use inkfinite_core::{LayerId, PageId, ShapeId};
 
 use super::apply::read_transaction;
-use super::args::{
-    AppApplyArgs, AppCommand, AppInspectArgs, AppProposalCommand, AppProposalWaitArgs, AppProposeArgs, AppQueryArgs,
-    AppRenderArgs, AppUiArgs,
-};
+use super::args::{AppApplyArgs, AppCommand, AppInspectArgs, AppQueryArgs, AppRenderArgs, AppUiArgs};
 use super::render::render_output_bytes;
 use super::support::{map_output_error, portable_path, write_heads, write_json};
 use super::{CliError, EXIT_CONFLICT, EXIT_INPUT, EXIT_INVALID, Result, Write, anyhow, fs, json};
@@ -23,8 +17,6 @@ pub fn run_app_command(command: AppCommand, json_output: bool, stdout: &mut dyn 
         AppCommand::Context(args) => context(args, json_output, stdout),
         AppCommand::Inspect(args) => inspect(args, json_output, stdout),
         AppCommand::Query(args) => query(args, json_output, stdout),
-        AppCommand::Propose(args) => propose(args, json_output, stdout),
-        AppCommand::Proposal(command) => proposal(command, json_output, stdout),
         AppCommand::Render(args) => render(args, json_output, stdout),
         AppCommand::Ui(args) => control_ui(args, json_output, stdout),
         AppCommand::Apply(args) => apply(args, json_output, stdout),
@@ -47,7 +39,6 @@ fn context(args: AppInspectArgs, json_output: bool, stdout: &mut dyn Write) -> R
         context.page_id.as_ref().map_or("none", PageId::as_str)
     )
     .map_err(map_output_error)?;
-    writeln!(stdout, "Agent access: {:?}", context.agent_access).map_err(map_output_error)?;
     writeln!(
         stdout,
         "Active layer: {}",
@@ -68,33 +59,6 @@ fn context(args: AppInspectArgs, json_output: bool, stdout: &mut dyn Write) -> R
     }
     writeln!(stdout, "Occluded regions: {}", context.occluded_regions.len()).map_err(map_output_error)?;
     write_heads(stdout, &context.heads)
-}
-
-fn proposal(command: AppProposalCommand, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
-    match command {
-        AppProposalCommand::Status(args) => {
-            let status = fetch_proposal_status(args.session_id, args.proposal_id)?;
-            write_proposal_status(&status, json_output, stdout)
-        }
-        AppProposalCommand::Wait(args) => wait_for_proposal(&args, json_output, stdout),
-        AppProposalCommand::Renew(args) => renew_proposal(args, json_output, stdout),
-    }
-}
-
-fn renew_proposal(args: super::args::AppProposalStatusArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
-    let response = send(AppRequest::RenewProposal {
-        session_id: args.session_id.map(SessionId),
-        proposal_id: ProposalId(args.proposal_id),
-    })?;
-    let AppResponse::RenewedProposal(proposal) = response else {
-        return unexpected_response("proposal renew");
-    };
-    if json_output {
-        write_json(stdout, &proposal)
-    } else {
-        writeln!(stdout, "Renewed: {}", proposal.id.0).map_err(map_output_error)?;
-        writeln!(stdout, "Expires: {}", proposal.expires_at.0).map_err(map_output_error)
-    }
 }
 
 fn render(args: AppRenderArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
@@ -179,54 +143,6 @@ fn control_ui(args: AppUiArgs, json_output: bool, stdout: &mut dyn Write) -> Res
     }
 }
 
-fn fetch_proposal_status(session_id: Option<String>, proposal_id: String) -> Result<ProposalStatus> {
-    let response = send(AppRequest::ProposalStatus {
-        session_id: session_id.map(SessionId),
-        proposal_id: ProposalId(proposal_id),
-    })?;
-    let AppResponse::ProposalStatus(status) = response else {
-        return Err(CliError::new(
-            EXIT_INVALID,
-            anyhow!("desktop app returned an unexpected response for proposal status"),
-        ));
-    };
-    Ok(status)
-}
-
-fn wait_for_proposal(args: &AppProposalWaitArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
-    let deadline = Instant::now() + Duration::from_secs(args.timeout_seconds);
-    loop {
-        let status = fetch_proposal_status(args.session_id.clone(), args.proposal_id.clone())?;
-        if matches!(
-            status.state,
-            ProposalReviewState::Accepted
-                | ProposalReviewState::PartiallyAccepted
-                | ProposalReviewState::Rejected
-                | ProposalReviewState::Expired
-        ) {
-            return write_proposal_status(&status, json_output, stdout);
-        }
-        if Instant::now() >= deadline {
-            return Err(
-                CliError::new(EXIT_CONFLICT, anyhow!("proposal {} is still pending", args.proposal_id))
-                    .with_code("proposal_wait_timeout")
-                    .retryable("Continue waiting or ask the user to review the proposal in Inkfinite Desktop."),
-            );
-        }
-        std::thread::sleep(Duration::from_millis(250));
-    }
-}
-
-fn write_proposal_status(status: &ProposalStatus, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
-    if json_output {
-        return write_json(stdout, status);
-    }
-    writeln!(stdout, "Proposal: {}", status.proposal_id.0).map_err(map_output_error)?;
-    writeln!(stdout, "State: {:?}", status.state).map_err(map_output_error)?;
-    writeln!(stdout, "Affected: {}", status.affected_ids.len()).map_err(map_output_error)?;
-    write_heads(stdout, &status.heads)
-}
-
 fn status(json_output: bool, stdout: &mut dyn Write) -> Result<()> {
     let response = send(AppRequest::Status)?;
     let AppResponse::Status(statuses) = response else {
@@ -240,11 +156,10 @@ fn status(json_output: bool, stdout: &mut dyn Write) -> Result<()> {
     for status in statuses {
         writeln!(
             stdout,
-            "session\t{}\t{}\t{}\t{:?}",
+            "session\t{}\t{}\t{}",
             status.session_id.0,
             status.path.0,
-            if status.dirty { "dirty" } else { "saved" },
-            status.agent_access
+            if status.dirty { "dirty" } else { "saved" }
         )
         .map_err(map_output_error)?;
         write_heads(stdout, &status.snapshot.heads)?;
@@ -330,56 +245,16 @@ fn focus(json_output: bool, stdout: &mut dyn Write) -> Result<()> {
     }
 }
 
-fn propose(args: AppProposeArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
-    let transaction = read_transaction(&args.transaction)?;
-    propose_transaction(transaction, args.session_id.map(SessionId), json_output, stdout)
-}
-
-/// Submits a prepared transaction to the desktop review surface.
-pub fn propose_transaction(
-    transaction: inkfinite_core::proto::TransactionDraft, session_id: Option<SessionId>, json_output: bool,
-    stdout: &mut dyn Write,
-) -> Result<()> {
-    let response = send(AppRequest::Propose { session_id, transaction })?;
-    let AppResponse::Proposal(proposal) = response else {
-        return unexpected_response("propose");
-    };
-    if json_output {
-        return write_json(stdout, &proposal);
-    }
-    writeln!(stdout, "Proposal: {}", proposal.id.0).map_err(map_output_error)?;
-    write_heads(stdout, &proposal.transaction.base_heads)?;
-    writeln!(stdout, "Created: {}", proposal.preview.created.len()).map_err(map_output_error)?;
-    writeln!(stdout, "Changed: {}", proposal.preview.changed.len()).map_err(map_output_error)?;
-    writeln!(stdout, "Deleted: {}", proposal.preview.deleted.len()).map_err(map_output_error)?;
-    writeln!(stdout, "Affected regions: {}", proposal.affected_regions.len()).map_err(map_output_error)
-}
-
-/// Submits a structured edit using the desktop session's current agent access mode.
+/// Submits and applies a structured edit to the desktop session.
 pub fn mutate_transaction(
     transaction: inkfinite_core::proto::TransactionDraft, session_id: Option<SessionId>, json_output: bool,
     stdout: &mut dyn Write,
 ) -> Result<()> {
-    let response = send(AppRequest::Mutate { session_id, transaction })?;
-    match response {
-        AppResponse::Proposal(proposal) => {
-            if json_output {
-                write_json(stdout, &json!({ "outcome": "proposed", "proposal": proposal }))
-            } else {
-                writeln!(stdout, "Agent access: review").map_err(map_output_error)?;
-                writeln!(stdout, "Proposal: {}", proposal.id.0).map_err(map_output_error)
-            }
-        }
-        AppResponse::Committed(commit) => {
-            if json_output {
-                write_json(stdout, &json!({ "outcome": "committed", "commit": commit }))
-            } else {
-                writeln!(stdout, "Agent access: direct").map_err(map_output_error)?;
-                write_commit(&commit, false, stdout)
-            }
-        }
-        _ => unexpected_response("mutate"),
-    }
+    let response = send(AppRequest::Apply { session_id, transaction })?;
+    let AppResponse::Committed(commit) = response else {
+        return unexpected_response("apply");
+    };
+    write_commit(&commit, json_output, stdout)
 }
 
 fn apply(args: AppApplyArgs, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
@@ -445,12 +320,9 @@ fn send(request: AppRequest) -> Result<AppResponse> {
     let response = runtime.block_on(ipc::send(request)).map_err(map_ipc_error)?;
     response.result.map_err(|error| {
         let exit_code = match error.code.as_str() {
-            "proposal_stale"
-            | "proposal_conflict"
-            | "stale_heads"
-            | "direct_apply_disabled"
-            | "actor_mismatch"
-            | "document_engine_error" => EXIT_CONFLICT,
+            "proposal_stale" | "proposal_conflict" | "stale_heads" | "actor_mismatch" | "document_engine_error" => {
+                EXIT_CONFLICT
+            }
             _ => EXIT_INVALID,
         };
         let retryable = matches!(
@@ -459,21 +331,14 @@ fn send(request: AppRequest) -> Result<AppResponse> {
                 | "stale_heads"
                 | "precondition_failed"
                 | "session_selection_required"
-                | "direct_apply_disabled"
                 | "desktop_unavailable"
         );
-        let direct_apply_disabled = error.code == "direct_apply_disabled";
         let mut diagnostic = CliError::new(exit_code, anyhow!(error.message)).with_code(error.code);
         if let Some(details) = error.details {
             diagnostic = diagnostic.with_details(details);
         }
         if retryable {
-            let suggestion = if direct_apply_disabled {
-                "Switch Agent access to Apply directly in Inkfinite Desktop, or use app propose for review."
-            } else {
-                "Refresh desktop status and current heads before retrying."
-            };
-            diagnostic = diagnostic.retryable(suggestion);
+            diagnostic = diagnostic.retryable("Refresh desktop status and current heads before retrying.");
         }
         diagnostic
     })

@@ -348,10 +348,8 @@
 		<ProposalReview
 			proposal={liveProposal}
 			message={proposalMessage}
-			agentAccess={c.agentAccess()}
 			onAccept={c.acceptProposal}
-			onReject={c.rejectProposal}
-			onAgentAccessChange={c.setAgentAccess} />
+			onReject={c.rejectProposal} />
 	{/if}
 	<HistoryViewer store={c.store} bind:open={historyViewerOpen} onClose={c.history.handleClose} />
 	<Dialog

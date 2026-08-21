@@ -19,11 +19,6 @@ import type {
 export type SessionId = string;
 
 /**
- * How authenticated agents may change one open desktop document.
- */
-export type AgentAccessMode = 'review' | 'direct';
-
-/**
  * Transport-independent request accepted by desktop commands, IPC, or CLI adapters.
  */
 export type Request =

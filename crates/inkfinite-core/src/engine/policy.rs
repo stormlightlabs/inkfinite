@@ -102,8 +102,8 @@ pub fn validate_locks(document: &Document, operation: &Operation) -> Result<(), 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ActorId, Origin};
     use crate::proto::TransactionId;
+    use crate::{ActorId, Origin};
 
     #[test]
     fn an_empty_transaction_is_rejected_by_schema_policy() {

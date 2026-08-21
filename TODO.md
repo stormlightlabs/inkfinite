@@ -42,13 +42,13 @@ normalized structure where representation matters and rendered output where visu
 
 ### Simplify CLI and live control
 
-- [ ] Remove Review/Direct authorization concepts from general CLI behavior
-- [ ] Simplify live apply semantics
-- [ ] Keep proposal behavior only where independently useful
-- [ ] Update capabilities, generated protocols, and schemas
-- [ ] Update CLI help, documentation, and bundled skill guidance
-- [ ] Replace permission-oriented CLI tests with direct-control tests
-- [ ] Add regression coverage for unrestricted scripted mutation
+- [x] Remove Review/Direct authorization concepts from general CLI behavior
+- [x] Simplify live apply semantics
+- [x] Remove proposal behavior from the general CLI; reserve review for permissioned MCP
+- [x] Update capabilities, generated protocols, and schemas
+- [x] Update CLI help, documentation, and bundled skill guidance
+- [x] Replace permission-oriented CLI tests with direct-control tests
+- [x] Add regression coverage for unrestricted scripted mutation
 
 ## Permissioned MCP
 

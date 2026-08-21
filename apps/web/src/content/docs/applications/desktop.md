@@ -35,16 +35,12 @@ live CLI workflow instead.
 
 ## Local CLI access
 
-The desktop app exposes authenticated IPC to the local `inkfinite` CLI. Read-only commands can list
-sessions, report the active page, selection, viewport, and agent access mode, inspect the open
-document, query records, or focus the window.
+The desktop app exposes authenticated IPC to the local `inkfinite` CLI. Commands can list sessions,
+report editor context, inspect and query the open document, apply validated transactions, control
+the view, or focus the window.
 
-Each document starts with **Agent access** set to **Review changes**. Structured live commands then
-open a ghost preview. Only the desktop UI can accept or reject it, while the CLI can poll the
-outcome.
-
-Switch **Agent access** to **Apply directly** when you want an agent to work independently. Validated
-live edits then commit without repeated prompts. The setting belongs to the open document session,
-resets when it closes, and cannot be enabled through the CLI. Discovery and authentication remain
-local to the current user account. See [Agent workflows](/docs/reference/agents/) for both modes and
+Structured live mutations commit immediately after causal-head, record-version, validation, and
+lock checks. Reviewed model access belongs to the permissioned MCP interface. CLI discovery and
+authentication remain local to the current user account. See
+[Agent workflows](/docs/reference/agents/) and
 [Command-line interface](/docs/reference/cli/) for commands.

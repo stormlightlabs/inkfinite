@@ -112,7 +112,6 @@ export interface DesktopDocumentRepo extends PersistentDocRepo {
 	pickWorkspaceDir(): Promise<string | null>;
 	closeSession(): Promise<void>;
 	getProposal(): LiveProposal | null;
-	getAgentAccess(): 'review' | 'direct';
 	subscribeProposal(listener: (update: ProposalUpdate) => void): () => void;
 	/** Receives document snapshots committed by the live CLI or trusted sync peers. */
 	subscribeLiveDocument(
@@ -125,9 +124,7 @@ export interface DesktopDocumentRepo extends PersistentDocRepo {
 		operationPositions?: number[]
 	): Promise<import('@inkfinite/core').LoadedDoc>;
 	rejectProposal(proposalId: string): Promise<void>;
-	setAgentAccess(
-		agentAccess: 'review' | 'direct'
-	): Promise<{ agent_access: 'review' | 'direct' }>;
+
 	/** Publishes the current page, selection, and visible world-space rectangle. */
 	updateAgentContext(context: AgentEditorContext): Promise<void>;
 }

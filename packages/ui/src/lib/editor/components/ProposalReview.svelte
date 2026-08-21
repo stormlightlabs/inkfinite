@@ -4,24 +4,18 @@
 	let {
 		proposal,
 		message,
-		agentAccess,
 		onAccept,
-		onReject,
-		onAgentAccessChange
+		onReject
 	}: {
 		proposal: LiveProposal | null;
 		message: string | null;
-		agentAccess: 'review' | 'direct';
 		onAccept: (operationPositions?: number[]) => Promise<void>;
 		onReject: () => Promise<void>;
-		onAgentAccessChange: (mode: 'review' | 'direct') => Promise<void>;
 	} = $props();
 
 	let selected = $state<number[]>([]);
 	let busy = $state(false);
 	let error = $state<string | null>(null);
-	let accessBusy = $state(false);
-	let accessError = $state<string | null>(null);
 
 	$effect(() => {
 		proposal?.id;
@@ -63,22 +57,6 @@
 		}
 	}
 
-	async function changeAgentAccess(event: Event) {
-		const select = event.currentTarget as HTMLSelectElement;
-		const mode = select.value as 'review' | 'direct';
-		accessBusy = true;
-		accessError = null;
-		try {
-			await onAgentAccessChange(mode);
-		} catch (cause) {
-			select.value = agentAccess;
-			accessError =
-				cause instanceof Error ? cause.message : 'Agent access could not be changed.';
-		} finally {
-			accessBusy = false;
-		}
-	}
-
 	function operationLabel(position: number): string {
 		return proposal?.operation_previews?.[position]?.label ?? `Operation ${position + 1}`;
 	}
@@ -89,24 +67,6 @@
 		return bounds.map((box) => `${box.x},${box.y} ${box.width}×${box.height}`).join(' → ');
 	}
 </script>
-
-<aside class="agent-access" data-mode={agentAccess} aria-label="Agent access" data-agent-occlusion>
-	<label for="agent-access-mode">Agent access</label>
-	<select
-		id="agent-access-mode"
-		value={agentAccess}
-		disabled={accessBusy}
-		onchange={changeAgentAccess}>
-		<option value="review">Review changes</option>
-		<option value="direct">Apply directly</option>
-	</select>
-	<small>
-		{agentAccess === 'direct'
-			? 'Agents can edit this document until you close it or switch back.'
-			: 'Agent edits appear as proposals before they change the document.'}
-	</small>
-	{#if accessError}<p class="access-error" role="alert">{accessError}</p>{/if}
-</aside>
 
 {#if proposal}
 	<aside class="proposal-panel" aria-label="Agent review" data-agent-occlusion>
@@ -182,7 +142,7 @@
 	.proposal-panel,
 	.proposal-message {
 		position: absolute;
-		top: 7.25rem;
+		top: 1rem;
 		right: 1rem;
 		z-index: 4;
 		width: min(24rem, calc(100% - 2rem));
@@ -194,57 +154,6 @@
 			0 1rem 2.5rem color-mix(in srgb, #000 22%, transparent),
 			0 0 0 1px color-mix(in srgb, var(--ink-accent) 24%, transparent);
 		-webkit-font-smoothing: antialiased;
-	}
-
-	.agent-access {
-		position: absolute;
-		top: 1rem;
-		right: 1rem;
-		z-index: 4;
-		display: grid;
-		grid-template-columns: auto auto;
-		gap: 0.35rem 0.75rem;
-		align-items: center;
-		width: min(24rem, calc(100% - 2rem));
-		box-sizing: border-box;
-		padding: 0.75rem 0.9rem;
-		border: 1px solid color-mix(in srgb, var(--ink-text) 22%, transparent);
-		border-radius: 0.9rem;
-		background: color-mix(in srgb, var(--ink-canvas) 96%, var(--ink-accent) 4%);
-		color: var(--ink-text);
-		box-shadow: 0 0.4rem 1.2rem color-mix(in srgb, #000 24%, transparent);
-	}
-
-	.agent-access[data-mode='direct'] {
-		border-color: color-mix(in srgb, #d4a96a 72%, transparent);
-	}
-
-	.agent-access label {
-		font-weight: 700;
-	}
-
-	.agent-access select {
-		min-width: 9.5rem;
-		padding: 0.4rem 0.55rem;
-		border: 1px solid color-mix(in srgb, var(--ink-text) 28%, transparent);
-		border-radius: 0.55rem;
-		color: var(--ink-text);
-		background: var(--ink-canvas);
-	}
-
-	.agent-access small,
-	.access-error {
-		grid-column: 1 / -1;
-		margin: 0;
-		line-height: 1.35;
-	}
-
-	.agent-access small {
-		color: color-mix(in srgb, var(--ink-text) 66%, transparent);
-	}
-
-	.access-error {
-		color: #e98282;
 	}
 
 	.proposal-panel {
@@ -427,16 +336,5 @@
 	button.quiet {
 		background: transparent;
 		color: color-mix(in srgb, var(--ink-text) 68%, transparent);
-	}
-
-	@media (max-width: 120rem) {
-		.agent-access {
-			top: 7.25rem;
-		}
-
-		.proposal-panel,
-		.proposal-message {
-			top: 14rem;
-		}
 	}
 </style>

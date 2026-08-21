@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use inkfinite_core::editor::EditorPatch;
 use inkfinite_core::proto::{
-    AgentAccessMode, DocumentPath, Proposal, ProposalId, ProtocolError, Query, QueryResult, SessionId, TransactionDraft,
+    DocumentPath, Proposal, ProposalId, ProtocolError, Query, QueryResult, SessionId, TransactionDraft,
 };
 use inkfinite_core::session::{
     EditorContextUpdate, SessionCommit, SessionError, SessionOpened, SessionSaved, SessionService, SessionStatus,
@@ -283,16 +283,6 @@ pub fn accept_proposal(
 pub fn reject_proposal(state: State<'_, DesktopState>, session_id: String, proposal_id: ProposalId) -> Result<()> {
     lock_service(&state)?
         .reject_proposal(&SessionId(session_id), &proposal_id)
-        .map_err(to_protocol_error)
-}
-
-/// Changes how authenticated agents may edit this desktop session.
-#[tauri::command]
-pub fn set_agent_access(
-    state: State<'_, DesktopState>, session_id: String, agent_access: AgentAccessMode,
-) -> Result<SessionStatus> {
-    lock_service(&state)?
-        .set_agent_access(&SessionId(session_id), agent_access)
         .map_err(to_protocol_error)
 }
 

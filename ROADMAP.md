@@ -19,17 +19,6 @@ export, undo and redo, CRDT merge, CLI access, and visual stability of fallback 
 See [SVG import](apps/web/src/content/docs/internals/svg-import.md) and
 [native path geometry](apps/web/src/content/docs/internals/native-path-geometry.md).
 
-### Direct CLI control
-
-Make the CLI a fully capable document interface rather than an authorization boundary. Humans,
-scripts, and agents should receive the same mutation capability. Every edit still passes causal
-head and record-version checks, transaction and document validation, atomic commit, and ordinary
-shape and layer locks.
-
-`Origin` should remain provenance for history and attribution. It must not grant or deny access.
-The audit and migration boundary are documented in
-[Origin and authorization](apps/web/src/content/docs/internals/origin-and-authorization.md).
-
 ### Permissioned MCP
 
 Add a local stdio MCP server as the policy-aware interface for model-controlled access. It should
@@ -51,7 +40,8 @@ benchmark identifies the cost they address.
 
 Inkfinite now has an Automerge-backed Rust document engine, generated TypeScript contracts,
 deterministic SVG rendering, native desktop files, browser WASM sessions, shared editor/runtime
-packages, CLI file and live workflows, SVG import/export, and native hierarchical path editing.
+packages, unrestricted CLI file and live workflows, SVG import/export, and native hierarchical path
+editing.
 The changelog gives the release-level summary; the docs site owns implementation and usage detail.
 
 ## Engineering principles

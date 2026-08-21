@@ -80,7 +80,6 @@ export function createCanvasController(
 	let desktopRepo: DesktopDocumentRepo | null = null;
 	let proposal = $state<LiveProposal | null>(null);
 	let proposalMessage = $state<string | null>(null);
-	let agentAccess = $state<'review' | 'direct'>('review');
 	let unsubscribeProposal: (() => void) | null = null;
 	let unsubscribeLiveDocument: (() => void) | null = null;
 	let unsubscribeAgentUi: (() => void) | null = null;
@@ -205,7 +204,6 @@ export function createCanvasController(
 		agentContextTimer = setTimeout(() => {
 			agentContextTimer = null;
 			if (!desktopRepo) return;
-			agentAccess = desktopRepo.getAgentAccess();
 			const state = store.getState();
 			const viewport = getViewport();
 			const width = viewport.width / state.camera.zoom;
@@ -843,7 +841,6 @@ export function createCanvasController(
 		persistenceStatusStore = platformSession.status;
 		desktopRepo = platformSession.desktop ?? null;
 		if (desktopRepo) {
-			agentAccess = desktopRepo.getAgentAccess();
 			proposal = desktopRepo.getProposal();
 			unsubscribeProposal = desktopRepo.subscribeProposal((update) => {
 				proposal = update.proposal;
@@ -998,12 +995,7 @@ export function createCanvasController(
 			if (!desktopRepo || !proposal) return Promise.reject(new Error('No proposal is open'));
 			return desktopRepo.rejectProposal(proposal.id);
 		},
-		agentAccess: () => agentAccess,
-		setAgentAccess: async (mode: 'review' | 'direct') => {
-			if (!desktopRepo) return Promise.reject(new Error('No desktop session is open'));
-			const status = await desktopRepo.setAgentAccess(mode);
-			agentAccess = status.agent_access;
-		},
+
 		insertStencil,
 		commitLayerState,
 		importEditableCanvas,

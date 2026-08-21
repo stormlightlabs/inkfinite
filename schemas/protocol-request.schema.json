@@ -2024,7 +2024,7 @@
       "type": "object"
     },
     {
-      "description": "Apply a transaction directly when the desktop session allows it.",
+      "description": "Validate and apply a transaction to an open session.",
       "properties": {
         "session_id": {
           "$ref": "#/$defs/SessionId",

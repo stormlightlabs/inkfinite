@@ -155,9 +155,9 @@ The CLI calls the same Rust core for closed-file operations. For open desktop do
 authenticated local IPC protocol exposed by the Tauri process rather than racing the desktop file
 writer.
 
-The current implementation also carries agent access and proposal policy through the Rust protocol
-and transaction policy. See [Command-line interface](/docs/reference/cli/) and
-[Agent workflows](/docs/reference/agents/) for the supported commands and review flow.
+The Rust protocol supports direct live commits and optional proposals. See
+[Command-line interface](/docs/reference/cli/) and [Agent workflows](/docs/reference/agents/) for
+the supported commands and review flow.
 
 ## Files and generated contracts
 

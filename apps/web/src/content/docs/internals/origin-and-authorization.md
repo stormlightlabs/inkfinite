@@ -46,7 +46,7 @@ The current implementation spans these paths:
 | `crates/inkfinite-core/src/lib.rs`                     | Defines `Origin`, provenance, and document metadata                      |
 | `crates/inkfinite-core/src/engine/policy.rs`           | Applies transaction schema checks and ordinary document locks            |
 | `crates/inkfinite-core/src/engine/query.rs`            | Queries records independently of layer visibility and transaction origin |
-| `crates/inkfinite-core/src/session.rs`                 | Validates live proposals and direct applies                              |
+| `crates/inkfinite-core/src/session.rs`                 | Validates live proposals and applies                                     |
 | `crates/inkfinite-core/src/ipc`                        | Carries live transactions between CLI and desktop sessions               |
 | `crates/inkfinite-cli/src/cli`                         | Constructs agent-originated shape, mutation, and SVG import transactions |
 | `packages/core/src/persistence/canonical.ts`           | Maps `agent_editable` between native records and editor state            |
@@ -62,9 +62,10 @@ records in invisible layers and records whose `agent_editable` value is false. S
 still reject edits for every origin, including edits reached through a locked ancestor or a layer
 delete.
 
-`session.rs` still requires agent origin at the live proposal and direct-apply entry points. That is
-a property of the current live protocol, not document authorization. Proposal size, description
-length, stale-head handling, transaction validation, and atomic commit do not depend on origin.
+`session.rs` requires agent origin at live proposal and apply entry points as a protocol-shape
+check, not as authorization. Proposal size, description length, stale-head handling, transaction
+validation, and atomic commit do not depend on origin. Live applies do not require a desktop access
+mode.
 
 Committed transactions retain their origin. Causal heads, record versions, schema validation,
 document validation, and atomic commit apply to every caller. Permissioned integrations must check

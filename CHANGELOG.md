@@ -10,8 +10,7 @@
   bindings, built-in shapes and stencils, and deterministic SVG/PNG rendering.
 - CLI support for file and live-session inspection, queries, validation, structured mutations,
   dry runs, rendering, schemas, and machine-readable output.
-- Authenticated desktop IPC with reviewed proposals, ghost previews, partial acceptance, and
-  session-scoped direct apply.
+- Authenticated desktop IPC with direct live mutation and editor control.
 - Rust-owned desktop sessions and browser WASM sessions covering create, open, mutate, persist,
   reopen, undo/redo, projection, reconciliation, SVG import, and SVG rendering.
 - Static SVG import and export with native primitives and paths, nested transforms, inherited
@@ -29,9 +28,11 @@
 - Moved canonical browser document state and committed geometry operations to Rust while retaining
   low-latency interaction previews in TypeScript.
 - Unified the document model and SVG pipeline across desktop, web, WASM, and CLI.
-- Made transaction origin provenance-only in the document engine. Direct CLI queries and mutations
-  can access invisible-layer and `agent_editable: false` records while causal checks, validation,
+- Made transaction origin provenance-only in the document engine. CLI queries and mutations can
+  access invisible-layer and `agent_editable: false` records while causal checks, validation,
   atomic commit, and ordinary shape and layer locks continue to apply.
+- Removed Review/Direct session authorization and proposal commands from the general CLI.
+  Structured live mutations and `app apply` now commit after validation.
 
 ### Fixed
 

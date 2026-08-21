@@ -85,7 +85,6 @@ describe('Tauri desktop session command boundary', () => {
 						session_id: 'session:1',
 						path: currentPath,
 						actor_id: 'actor:desktop',
-						agent_access: 'review',
 						snapshot: document,
 						dirty: false,
 						lock_held: true,
@@ -110,7 +109,6 @@ describe('Tauri desktop session command boundary', () => {
 						session_id: 'session:1',
 						path: currentPath,
 						actor_id: 'actor:desktop',
-						agent_access: 'review',
 						snapshot: document,
 						dirty: false,
 						lock_held: true,
@@ -121,22 +119,7 @@ describe('Tauri desktop session command boundary', () => {
 					}
 				} satisfies SessionSaved;
 			}
-			if (command === 'set_agent_access') {
-				expect(args).toEqual({ sessionId: 'session:1', agentAccess: 'direct' });
-				return {
-					session_id: 'session:1',
-					path: currentPath,
-					actor_id: 'actor:desktop',
-					agent_access: 'direct',
-					snapshot: document,
-					dirty: false,
-					lock_held: true,
-					recovery_available: false,
-					can_undo: false,
-					can_redo: false,
-					sync: { status: 'disabled' }
-				};
-			}
+
 			throw new Error(`Unexpected command: ${command}`);
 		});
 
@@ -144,11 +127,9 @@ describe('Tauri desktop session command boundary', () => {
 		await repo.createBoard('Untitled');
 		files.setSavePath('/tmp/Renamed.inkfinite');
 		await repo.saveAs();
-		await repo.setAgentAccess('direct');
 
 		expect(tauri.invoke).toHaveBeenCalledWith('create_document', expect.any(Object));
 		expect(tauri.invoke).toHaveBeenCalledWith('save_as', expect.any(Object));
-		expect(repo.getAgentAccess()).toBe('direct');
 	});
 
 	it('turns structured Tauri failures into readable errors', async () => {
@@ -173,7 +154,6 @@ describe('Tauri desktop session command boundary', () => {
 			session_id: 'session:1',
 			path: '/tmp/Untitled.inkfinite',
 			actor_id: 'actor:desktop',
-			agent_access: 'direct',
 			snapshot: document,
 			dirty: false,
 			lock_held: true,
@@ -232,7 +212,6 @@ describe('Tauri desktop session command boundary', () => {
 						session_id: 'session:1',
 						path: '/tmp/Untitled.inkfinite',
 						actor_id: 'actor:desktop',
-						agent_access: 'review',
 						snapshot: document,
 						dirty: false,
 						lock_held: true,

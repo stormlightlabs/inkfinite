@@ -53,12 +53,7 @@ pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(
             "stderr_only": true
         },
         "live_mode": {
-            "commands": ["status", "context", "inspect", "query", "focus", "propose", "proposal status", "proposal wait", "proposal renew", "render", "ui", "apply"],
-            "proposal_review": true,
-            "proposal_decisions": "desktop_ui_only",
-            "agent_access_modes": ["review", "direct"],
-            "agent_access_is_session_scoped": true,
-            "agent_access_is_desktop_controlled": true,
+            "commands": ["status", "context", "inspect", "query", "focus", "render", "ui", "apply"],
             "transport": "authenticated_local_socket",
             "tcp_or_http": false
         },
@@ -69,7 +64,7 @@ pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(
             "layout": ["align", "distribute"],
             "shape": ["create", "patch", "delete", "kinds", "describe"],
             "semantic_placement": ["inside", "below", "right-of", "align-left", "align-center", "align-right", "align-top", "align-middle", "align-bottom"],
-            "structured_targets": ["file", "app_current_access_mode"]
+            "structured_targets": ["file", "app"]
         },
         "path_format": "forward_slashes",
         "protocol": { "id": PROTOCOL_ID, "version": PROTOCOL_VERSION },
@@ -96,7 +91,7 @@ pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(
     .map_err(map_output_error)?;
     writeln!(
         stdout,
-        "Live mode: app status, app context, app inspect, app query, app focus, app propose, app proposal status/wait/renew, app render, app ui, app apply"
+        "Live mode: app status, app context, app inspect, app query, app focus, app render, app ui, app apply"
     )
     .map_err(map_output_error)?;
     writeln!(stdout, "Global options: --json, --non-interactive").map_err(map_output_error)?;

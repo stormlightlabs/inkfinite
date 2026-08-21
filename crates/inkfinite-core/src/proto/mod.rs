@@ -15,7 +15,7 @@ use ts_rs::TS;
 pub const PROTOCOL_ID: &str = "inkfinite.protocol";
 
 /// Current transport-independent protocol version.
-pub const PROTOCOL_VERSION: u32 = 4;
+pub const PROTOCOL_VERSION: u32 = 6;
 
 /// Stable identifier for a transaction.
 #[derive(Clone, Debug, Eq, Hash, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS)]
@@ -31,17 +31,6 @@ pub struct SessionId(pub String);
 #[derive(Clone, Debug, Eq, Hash, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS)]
 #[serde(transparent)]
 pub struct ProposalId(pub String);
-
-/// How authenticated agents may change one open desktop document.
-#[derive(Clone, Copy, Debug, Default, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
-#[serde(rename_all = "snake_case")]
-pub enum AgentAccessMode {
-    /// Show every agent change as a proposal that requires desktop review.
-    #[default]
-    Review,
-    /// Apply validated agent changes immediately for this desktop session.
-    Direct,
-}
 
 /// Cross-platform serialized document path used at file-service boundaries.
 #[derive(Clone, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
@@ -533,7 +522,7 @@ pub enum Request {
         /// Transaction to preview.
         transaction: TransactionDraft,
     },
-    /// Apply a transaction directly when the desktop session allows it.
+    /// Validate and apply a transaction to an open session.
     Apply {
         /// Open session to change.
         session_id: SessionId,

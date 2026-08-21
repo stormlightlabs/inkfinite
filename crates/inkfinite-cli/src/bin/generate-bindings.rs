@@ -265,7 +265,6 @@ fn protocol_bindings() -> String {
         "import type { CommitResult, DocumentPath, Proposal, ProposalId, Query, QueryResult, SaveResult, TransactionDraft } from \"./transaction.js\";\n\n",
     );
     append_declaration::<SessionId>(&mut output, &config);
-    append_declaration::<AgentAccessMode>(&mut output, &config);
     append_clean_declaration::<Request>(&mut output, &config);
     append_clean_declaration::<Response>(&mut output, &config);
     append_clean_declaration::<ProtocolError>(&mut output, &config);

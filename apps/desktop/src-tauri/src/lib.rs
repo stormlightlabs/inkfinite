@@ -34,7 +34,6 @@ pub fn run() {
             session::propose,
             session::accept_proposal,
             session::reject_proposal,
-            session::set_agent_access,
             session::undo,
             session::redo,
             session::save,

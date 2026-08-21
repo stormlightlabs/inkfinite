@@ -329,15 +329,9 @@ fn schemas_and_capabilities_match_checked_in_contracts() {
         "authenticated_local_socket"
     );
     assert_eq!(capabilities_json["live_mode"]["tcp_or_http"], false);
-    assert_eq!(capabilities_json["live_mode"]["proposal_decisions"], "desktop_ui_only");
     assert_eq!(
-        capabilities_json["live_mode"]["agent_access_modes"],
-        json!(["review", "direct"])
-    );
-    assert_eq!(capabilities_json["live_mode"]["agent_access_is_session_scoped"], true);
-    assert_eq!(
-        capabilities_json["live_mode"]["agent_access_is_desktop_controlled"],
-        true
+        capabilities_json["mutation_commands"]["structured_targets"],
+        json!(["file", "app"])
     );
     assert_eq!(
         capabilities_json["query_options"],
@@ -842,10 +836,6 @@ fn live_commands_read_shared_records_from_the_authenticated_local_server() {
                     }),
                     AppRequest::Focus => AppResponse::Focused,
                     AppRequest::Context { .. }
-                    | AppRequest::Propose { .. }
-                    | AppRequest::Mutate { .. }
-                    | AppRequest::ProposalStatus { .. }
-                    | AppRequest::RenewProposal { .. }
                     | AppRequest::Render { .. }
                     | AppRequest::Ui { .. }
                     | AppRequest::Apply { .. } => {
@@ -894,7 +884,7 @@ fn live_commands_read_shared_records_from_the_authenticated_local_server() {
 #[cfg(unix)]
 #[test]
 #[allow(clippy::too_many_lines)]
-fn live_structured_edits_follow_desktop_agent_access_mode() {
+fn live_structured_edits_apply_without_permission_mode() {
     use std::os::unix::fs::FileTypeExt;
     use std::os::unix::net::{UnixListener, UnixStream};
     use std::sync::mpsc;
@@ -965,23 +955,12 @@ fn live_structured_edits_follow_desktop_agent_access_mode() {
         runtime.block_on(async move {
             let listener = tokio::net::UnixListener::from_std(listener).unwrap();
             let mut guard = RequestGuard::new(server_token);
-            for _ in 0..11 {
+            for _ in 0..10 {
                 let (mut stream, _) = listener.accept().await.unwrap();
                 let request = ipc::read_frame::<RequestEnvelope>(&mut stream).await.unwrap();
                 guard.validate(&request).unwrap();
                 let request_id = request.request_id;
-                let enable_direct_after_response = matches!(&request.request, AppRequest::Inspect { .. });
                 let result: Result<AppResponse, ProtocolError> = ipc::dispatch(&mut service, request.request);
-                if let Ok(AppResponse::Proposal(proposal)) = &result {
-                    service
-                        .accept_proposal(&session_id, &proposal.id, None)
-                        .expect("desktop review fixture should accept the proposal");
-                }
-                if enable_direct_after_response {
-                    service
-                        .set_agent_access(&session_id, inkfinite_core::proto::AgentAccessMode::Direct)
-                        .expect("desktop fixture should enable direct access");
-                }
                 ipc::write_frame(&mut stream, &ResponseEnvelope { request_id, result })
                     .await
                     .unwrap();
@@ -994,7 +973,7 @@ fn live_structured_edits_follow_desktop_agent_access_mode() {
         });
     });
 
-    let proposed = run([
+    let committed_shape = run([
         "shape",
         "create",
         "--app",
@@ -1008,37 +987,22 @@ fn live_structured_edits_follow_desktop_agent_access_mode() {
         "architecture.service",
         "--json",
     ]);
-    assert_success(&proposed);
-    let proposed_json = parse_stdout(&proposed);
-    assert_eq!(proposed_json["outcome"], "proposed");
-    assert_eq!(proposed_json["proposal"]["id"], "proposal:1");
+    assert_success(&committed_shape);
+    let committed_shape_json = parse_stdout(&committed_shape);
+    assert_eq!(committed_shape_json["status"]["dirty"], true);
     assert_eq!(
-        proposed_json["proposal"]["preview"]["created"]
+        committed_shape_json["commit"]["patch"]["created"]
             .as_array()
             .unwrap()
             .len(),
         1
     );
 
-    let proposal_status = run([
-        "app",
-        "proposal",
-        "status",
-        "--session-id",
-        "session:1",
-        "--proposal-id",
-        "proposal:1",
-        "--json",
-    ]);
-    assert_success(&proposal_status);
-    assert_eq!(parse_stdout(&proposal_status)["state"], "accepted");
-
     let context = run(["app", "context", "--session-id", "session:1", "--json"]);
     assert_success(&context);
     let context_json = parse_stdout(&context);
     assert_eq!(context_json["page_id"], page_id.as_str());
     assert_eq!(context_json["active_layer_id"], layer_id.as_str());
-    assert_eq!(context_json["agent_access"], "review");
     assert_eq!(context_json["viewport"]["width"], 100.0);
 
     let rendered = run([
@@ -1073,7 +1037,7 @@ fn live_structured_edits_follow_desktop_agent_access_mode() {
     let accepted = run(["app", "inspect", "--session-id", "session:1", "--json"]);
     assert_success(&accepted);
 
-    let direct_shape = run([
+    let second_shape = run([
         "shape",
         "create",
         "--app",
@@ -1087,10 +1051,8 @@ fn live_structured_edits_follow_desktop_agent_access_mode() {
         "architecture.database",
         "--json",
     ]);
-    assert_success(&direct_shape);
-    let direct_shape_json = parse_stdout(&direct_shape);
-    assert_eq!(direct_shape_json["outcome"], "committed");
-    assert_eq!(direct_shape_json["commit"]["status"]["agent_access"], "direct");
+    assert_success(&second_shape);
+    assert_eq!(parse_stdout(&second_shape)["status"]["dirty"], true);
 
     let direct_state = run(["app", "inspect", "--session-id", "session:1", "--json"]);
     assert_success(&direct_state);

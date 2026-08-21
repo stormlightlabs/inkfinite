@@ -19,12 +19,8 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use crate::DocumentSnapshot;
 use crate::engine::EngineError;
 use crate::file::FileError;
-use crate::proto::{
-    AgentAccessMode, Bounds, CameraState, PROTOCOL_ID, PROTOCOL_VERSION, Proposal, Query, QueryResult, SessionId,
-};
-use crate::session::{
-    LiveSvgPreview, ProposalStatus, SessionCommit, SessionContext, SessionError, SessionService, SessionStatus,
-};
+use crate::proto::{Bounds, CameraState, PROTOCOL_ID, PROTOCOL_VERSION, Query, QueryResult, SessionId};
+use crate::session::{LiveSvgPreview, SessionCommit, SessionContext, SessionError, SessionService, SessionStatus};
 use crate::{LayerId, PageId, ShapeId};
 
 pub use crate::engine::{CommitResult, TransactionDraft};
@@ -94,34 +90,6 @@ pub enum AppRequest {
         /// Shared semantic and hierarchy filters.
         query: Query,
     },
-    /// Validate and store an agent transaction for desktop review.
-    Propose {
-        /// Session to propose against, or the only open session when omitted.
-        session_id: Option<SessionId>,
-        /// Agent transaction to validate and preview.
-        transaction: TransactionDraft,
-    },
-    /// Submit an agent transaction using the desktop session's current access mode.
-    Mutate {
-        /// Session to change, or the only open session when omitted.
-        session_id: Option<SessionId>,
-        /// Agent transaction to propose or apply directly.
-        transaction: TransactionDraft,
-    },
-    /// Read a proposal outcome without changing its review state.
-    ProposalStatus {
-        /// Session owning the proposal, or the only open session when omitted.
-        session_id: Option<SessionId>,
-        /// Proposal whose review state should be returned.
-        proposal_id: crate::proto::ProposalId,
-    },
-    /// Revalidate a pending or recently expired proposal and renew its review window.
-    RenewProposal {
-        /// Session owning the proposal, or the only open session when omitted.
-        session_id: Option<SessionId>,
-        /// Proposal to renew.
-        proposal_id: crate::proto::ProposalId,
-    },
     /// Render the current live document and an optional proposed result.
     Render {
         /// Session to render, or the only open session when omitted.
@@ -140,7 +108,7 @@ pub enum AppRequest {
         /// Typed editor state change.
         control: UiControl,
     },
-    /// Apply an agent transaction when direct access is enabled.
+    /// Validate and apply a transaction to an open desktop session.
     Apply {
         /// Session to change, or the only open session when omitted.
         session_id: Option<SessionId>,
@@ -179,12 +147,6 @@ pub enum AppResponse {
     Snapshot(DocumentSnapshot),
     /// Shared deterministic query result.
     QueryResult(QueryResult),
-    /// A transaction was validated and stored for review.
-    Proposal(Proposal),
-    /// Current or retained proposal review state.
-    ProposalStatus(ProposalStatus),
-    /// A proposal was revalidated and returned to review.
-    RenewedProposal(Proposal),
     /// Current and proposed deterministic SVG projections.
     Rendered(Box<LiveSvgPreview>),
     /// A directly authorized transaction was committed.
@@ -486,53 +448,6 @@ pub fn dispatch(service: &mut SessionService, request: AppRequest) -> Result<App
                 .map(AppResponse::QueryResult)
                 .map_err(|error| session_protocol_error(&error))
         }
-        AppRequest::Propose { session_id, transaction } => {
-            let session_id = service
-                .resolve_session_id(session_id.as_ref())
-                .map_err(|error| session_protocol_error(&error))?;
-            match service.propose(&session_id, transaction) {
-                Ok(proposal) => Ok(AppResponse::Proposal(proposal)),
-                Err(error) => Err(session_protocol_error_with_heads(service, &session_id, &error)),
-            }
-        }
-        AppRequest::Mutate { session_id, transaction } => {
-            let session_id = service
-                .resolve_session_id(session_id.as_ref())
-                .map_err(|error| session_protocol_error(&error))?;
-            let agent_access = service
-                .status(&session_id)
-                .map_err(|error| session_protocol_error(&error))?
-                .agent_access;
-            if agent_access == AgentAccessMode::Direct {
-                match service.apply_direct(&session_id, transaction) {
-                    Ok(commit) => Ok(AppResponse::Committed(Box::new(commit))),
-                    Err(error) => Err(session_protocol_error_with_heads(service, &session_id, &error)),
-                }
-            } else {
-                match service.propose(&session_id, transaction) {
-                    Ok(proposal) => Ok(AppResponse::Proposal(proposal)),
-                    Err(error) => Err(session_protocol_error_with_heads(service, &session_id, &error)),
-                }
-            }
-        }
-        AppRequest::ProposalStatus { session_id, proposal_id } => {
-            let session_id = service
-                .resolve_session_id(session_id.as_ref())
-                .map_err(|error| session_protocol_error(&error))?;
-            service
-                .proposal_status(&session_id, &proposal_id)
-                .map(AppResponse::ProposalStatus)
-                .map_err(|error| session_protocol_error(&error))
-        }
-        AppRequest::RenewProposal { session_id, proposal_id } => {
-            let session_id = service
-                .resolve_session_id(session_id.as_ref())
-                .map_err(|error| session_protocol_error(&error))?;
-            service
-                .renew_proposal(&session_id, &proposal_id)
-                .map(AppResponse::RenewedProposal)
-                .map_err(|error| session_protocol_error_with_heads(service, &session_id, &error))
-        }
         AppRequest::Render { session_id, transaction, page_id, region } => {
             let session_id = service
                 .resolve_session_id(session_id.as_ref())
@@ -559,7 +474,7 @@ pub fn dispatch(service: &mut SessionService, request: AppRequest) -> Result<App
             let session_id = service
                 .resolve_session_id(session_id.as_ref())
                 .map_err(|error| session_protocol_error(&error))?;
-            match service.apply_direct(&session_id, transaction) {
+            match service.apply(&session_id, transaction) {
                 Ok(commit) => Ok(AppResponse::Committed(Box::new(commit))),
                 Err(error) => Err(session_protocol_error_with_heads(service, &session_id, &error)),
             }
@@ -680,7 +595,6 @@ pub fn session_protocol_error(error: &SessionError) -> ProtocolError {
         SessionError::ProposalStale { .. } => "proposal_stale",
         SessionError::ProposalConflict { .. } => "proposal_conflict",
         SessionError::InvalidProposalSelection(_) => "invalid_proposal_selection",
-        SessionError::DirectApplyDisabled => "direct_apply_disabled",
         SessionError::AlreadyOpen { .. } => "document_already_open",
         SessionError::File(file_error) => match file_error {
             FileError::Locked { .. } => "document_locked",

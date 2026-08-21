@@ -241,7 +241,7 @@ pub struct MutationOptions {
     #[arg(long, value_name = "FILE")]
     pub transaction_out: Option<PathBuf>,
 
-    /// Submit this edit to the running desktop app using its Review or Direct access mode.
+    /// Apply this edit to the running desktop app.
     #[arg(long)]
     pub app: bool,
 
@@ -564,21 +564,11 @@ pub enum AppCommand {
     inkfinite app query --session-id session:1 --kind rect
 ")]
     Query(AppQueryArgs),
-    /// Validate and send an agent transaction to the desktop for review.
-    #[command(after_help = "Examples:
-
-    inkfinite app propose --transaction transaction.json --json
-    cat transaction.json | inkfinite app propose --transaction - --json
-")]
-    Propose(AppProposeArgs),
-    /// Observe a proposal without accepting or rejecting it.
-    #[command(subcommand)]
-    Proposal(AppProposalCommand),
     /// Render the current live document and an optional proposed result without applying it.
     Render(AppRenderArgs),
     /// Change the desktop page, active layer, selection, or camera.
     Ui(AppUiArgs),
-    /// Apply an agent transaction when Direct access is enabled in the desktop UI.
+    /// Validate and apply a transaction to the running desktop app.
     #[command(after_help = "Example:
 
     inkfinite app apply --transaction transaction.json --json
@@ -590,16 +580,6 @@ pub enum AppCommand {
     inkfinite app focus
 ")]
     Focus,
-}
-
-#[derive(Debug, Subcommand)]
-pub enum AppProposalCommand {
-    /// Return the current review state once.
-    Status(AppProposalStatusArgs),
-    /// Wait until desktop review accepts, rejects, or expires the proposal.
-    Wait(AppProposalWaitArgs),
-    /// Revalidate the proposal and start a fresh review window.
-    Renew(AppProposalStatusArgs),
 }
 
 #[derive(Debug, Args)]
@@ -644,29 +624,6 @@ pub struct AppUiArgs {
     /// Control this session, or the only open session when omitted.
     #[arg(long, value_name = "SESSION_ID")]
     pub session_id: Option<String>,
-}
-
-#[derive(Debug, Args)]
-pub struct AppProposalStatusArgs {
-    /// Proposal whose review state should be read.
-    #[arg(long, value_name = "PROPOSAL_ID")]
-    pub proposal_id: String,
-    /// Read from this session, or the only open session when omitted.
-    #[arg(long, value_name = "SESSION_ID")]
-    pub session_id: Option<String>,
-}
-
-#[derive(Debug, Args)]
-pub struct AppProposalWaitArgs {
-    /// Proposal whose final review state should be awaited.
-    #[arg(long, value_name = "PROPOSAL_ID")]
-    pub proposal_id: String,
-    /// Wait in this session, or the only open session when omitted.
-    #[arg(long, value_name = "SESSION_ID")]
-    pub session_id: Option<String>,
-    /// Maximum number of seconds to wait.
-    #[arg(long, default_value_t = 300, value_parser = clap::value_parser!(u64).range(1..))]
-    pub timeout_seconds: u64,
 }
 
 fn parse_camera(value: &str) -> std::result::Result<CameraState, String> {
@@ -730,16 +687,6 @@ pub struct AppQueryArgs {
     /// Return at most this many matches after deterministic sorting.
     #[arg(long, value_parser = clap::value_parser!(u32).range(1..))]
     pub limit: Option<u32>,
-}
-
-#[derive(Debug, Args)]
-pub struct AppProposeArgs {
-    /// Transaction JSON file, or - to read standard input.
-    #[arg(long, value_name = "TRANSACTION")]
-    pub transaction: PathBuf,
-    /// Propose against this session, or the only open session when omitted.
-    #[arg(long, value_name = "SESSION_ID")]
-    pub session_id: Option<String>,
 }
 
 #[derive(Debug, Args)]

@@ -6,7 +6,7 @@ group: Reference
 order: 9
 ---
 
-Use Inkfinite's command-line tools to inspect documents and make either reviewed or direct changes.
+Use Inkfinite's command-line tools to inspect, validate, and change documents.
 
 ## Workflow
 
@@ -22,23 +22,11 @@ For a saved file, follow the same sequence for every change:
 Prefer semantic roles, names, and tags over coordinates when they identify one record. If a selector
 matches multiple shapes, narrow it with an exact ID. Do not guess which one the human meant.
 
-## Proposals
+## Live documents
 
 For a document open in the desktop app, add `--app` to a structured `shape`, `connect`, or `layout`
-command instead of changing its file. The command follows the document's **Agent access** setting.
-
-In **Review changes** mode, the app shows created, changed, and deleted records as a ghost preview.
-The user accepts all or selected operations, or rejects the proposal. The agent can observe the
-result with `app proposal status` or wait with `app proposal wait`; it cannot make the review
-decision through IPC.
-
-In **Apply directly** mode, validated `--app` edits commit immediately. This mode is useful when a
-human has asked an agent to work independently. It lasts only for the open document and returns to
-Review the next time the document opens. Only the desktop UI can change the mode.
-
-Partial acceptance creates a transaction from the approved operations and validates it again. A
-stale proposal may need a refreshed preview after another edit changes the document. Review the
-refresh rather than accepting an outdated result.
+command instead of changing its file. Validated live edits commit immediately. Use the permissioned
+MCP interface when model-controlled changes require authorization or review.
 
 ## Permissions
 
@@ -46,8 +34,7 @@ Shape and layer locks apply to every CLI transaction. Do not work around a lock 
 or bypassing the CLI. The direct CLI does not enforce `agent_editable` or hide records in invisible
 layers; permissioned integrations can use that metadata as part of their own policy.
 
-Raw `app apply` works only in Direct mode. Use `app propose` to force a review regardless of the
-current mode.
+Raw `app apply` validates and commits a prepared transaction.
 
 ## Conflicts
 
@@ -58,18 +45,7 @@ files, copy an older document over the current file, or silently drop intervenin
 Record-version preconditions protect individual objects in the same way. A failed version check
 means the object changed after the agent inspected it.
 
-## Skills
+## Skill
 
-The repository includes an installable agent skill at `.skills/inkfinite`. It documents the
-safe workflow and includes runnable examples for file edits, proposal review, and stale-head
-recovery.
-
-After building the CLI, verify the examples from the repository root:
-
-```sh
-INKFINITE_CLI="$PWD/target/debug/inkfinite" \
-  bash skills/inkfinite/scripts/verify-examples.sh
-```
-
-The fixture server used by those examples tests the protocol. It does not replace a real desktop
-session and cannot enable Direct access.
+The repository includes an installable agent skill at `skills/inkfinite`. It documents the safe
+CLI workflow and points agents to the CLI's generated help and schemas for current commands.

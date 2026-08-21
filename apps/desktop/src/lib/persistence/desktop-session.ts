@@ -36,7 +36,6 @@ export type SessionStatus = {
 	session_id: string;
 	path: string;
 	actor_id: string;
-	agent_access: 'review' | 'direct';
 	snapshot: DocumentSnapshot;
 	/** Rust-owned projection used to materialize the editor mirror. */
 	editor_projection?: EditorProjection;
@@ -147,7 +146,6 @@ export interface SessionApi {
 		operation_positions?: number[];
 	}): Promise<SessionCommit>;
 	rejectProposal(args: { session_id: string; proposal_id: string }): Promise<void>;
-	setAgentAccess(args: { session_id: string; agent_access: 'review' | 'direct' }): Promise<SessionStatus>;
 	undo(args: { session_id: string; actor_id: string }): Promise<SessionCommit>;
 	redo(args: { session_id: string; actor_id: string }): Promise<SessionCommit>;
 	save(args: { session_id: string; expected_heads: ChangeHash[] }): Promise<SessionSaved>;
@@ -213,11 +211,6 @@ function createSessionApi(): SessionApi {
 			}),
 		rejectProposal: (args) =>
 			invokeSession<void>('reject_proposal', { sessionId: args.session_id, proposalId: args.proposal_id }),
-		setAgentAccess: (args) =>
-			invokeSession<SessionStatus>('set_agent_access', {
-				sessionId: args.session_id,
-				agentAccess: args.agent_access
-			}),
 		undo: (args) => invokeSession<SessionCommit>('undo', { sessionId: args.session_id, actorId: args.actor_id }),
 		redo: (args) => invokeSession<SessionCommit>('redo', { sessionId: args.session_id, actorId: args.actor_id }),
 		save: (args) =>
@@ -290,14 +283,12 @@ export type DesktopSessionRepo = PersistentDocRepo & {
 	query(query: Query): Promise<QueryResult>;
 	validate(): Promise<SessionStatus>;
 	getSessionStatus(): SessionStatus | null;
-	getAgentAccess(): 'review' | 'direct';
 	getProposal(): Proposal | null;
 	subscribeProposal(listener: (update: ProposalUpdate) => void): () => void;
 	subscribeLiveDocument(listener: (doc: LoadedDoc) => void): () => void;
 	subscribeAgentUi(listener: (control: AgentUiControl) => void): () => void;
 	acceptProposal(proposalId: string, operationPositions?: number[]): Promise<LoadedDoc>;
 	rejectProposal(proposalId: string): Promise<void>;
-	setAgentAccess(agentAccess: 'review' | 'direct'): Promise<SessionStatus>;
 	/** Publishes editor-only context for read-only agent queries. */
 	updateAgentContext(context: {
 		pageId: string | null;
@@ -792,12 +783,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		notifyProposal({ proposal: null });
 	}
 
-	async function setAgentAccess(agentAccess: 'review' | 'direct'): Promise<SessionStatus> {
-		if (!currentStatus) throw new Error('No board loaded');
-		const status = await api.setAgentAccess({ session_id: currentStatus.session_id, agent_access: agentAccess });
-		updateStatus(status);
-		return status;
-	}
+
 
 	async function updateAgentContext(context: {
 		pageId: string | null;
@@ -870,14 +856,12 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		query,
 		validate,
 		getSessionStatus: () => currentStatus,
-		getAgentAccess: () => currentStatus?.agent_access ?? 'review',
 		getProposal,
 		subscribeProposal,
 		subscribeLiveDocument,
 		subscribeAgentUi,
 		acceptProposal,
 		rejectProposal,
-		setAgentAccess,
 		updateAgentContext,
 		syncConnect,
 		syncDisconnect,

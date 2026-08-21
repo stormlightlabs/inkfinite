@@ -20,9 +20,8 @@ use crate::engine::geometry::world_shape_bounds;
 use crate::engine::{EngineError, SyncApplyResult, validate_document};
 use crate::file::{DocumentFile, FileError};
 use crate::proto::{
-    AgentAccessMode, Bounds, CameraState, CommitResult, DocumentPath, Operation, Proposal, ProposalId,
-    ProposalOperationPreview, Query, QueryResult, RecordId, SaveResult, SessionId, TransactionDraft, TransactionId,
-    Warning,
+    Bounds, CameraState, CommitResult, DocumentPath, Operation, Proposal, ProposalId, ProposalOperationPreview, Query,
+    QueryResult, RecordId, SaveResult, SessionId, TransactionDraft, TransactionId, Warning,
 };
 use crate::render::{SvgRenderError, SvgRenderOptions, render_svg};
 use crate::svg_import::import_svg;
@@ -68,8 +67,6 @@ pub struct SessionStatus {
     pub path: DocumentPath,
     /// Actor used for local commits and history operations.
     pub actor_id: ActorId,
-    /// Agent mutation policy chosen in the desktop UI for this session.
-    pub agent_access: AgentAccessMode,
     /// Current materialized CRDT snapshot.
     pub snapshot: DocumentSnapshot,
     /// Rust-owned flat editor projection of the current snapshot.
@@ -163,8 +160,6 @@ pub struct SessionContext {
     pub path: DocumentPath,
     /// Actor used to build proposals for this session.
     pub actor_id: ActorId,
-    /// Agent mutation policy currently selected in the desktop UI.
-    pub agent_access: AgentAccessMode,
     /// Current causal heads.
     pub heads: Vec<ChangeHash>,
     /// Page currently visible in the editor.
@@ -312,9 +307,6 @@ pub enum SessionError {
     /// A partial acceptance selected no valid operations.
     #[error("invalid proposal operation selection: {0}")]
     InvalidProposalSelection(String),
-    /// Direct agent changes are disabled for this desktop session.
-    #[error("direct agent changes are disabled; switch Agent access to Direct in the desktop app")]
-    DirectApplyDisabled,
     /// Two commands attempted to open the same path through one service.
     #[error("document is already open in session {session_id:?}: {path:?}")]
     AlreadyOpen {
@@ -347,7 +339,6 @@ struct DocumentSession {
     camera: Option<CameraState>,
     occluded_regions: Vec<Bounds>,
     context_updated_at: Timestamp,
-    agent_access: AgentAccessMode,
 }
 
 #[derive(Clone)]
@@ -437,7 +428,6 @@ impl SessionService {
             session_id: session_id.clone(),
             path: DocumentPath(session.file.path().to_string_lossy().into_owned()),
             actor_id: session.file.actor_id().clone(),
-            agent_access: session.agent_access,
             heads: snapshot.heads,
             page_id: session.page_id.clone(),
             active_layer_id: session.active_layer_id.clone(),
@@ -864,38 +854,15 @@ impl SessionService {
         Ok(refreshed)
     }
 
-    /// Changes the agent mutation policy for this desktop session.
+    /// Validates and applies one live transaction.
     ///
     /// # Errors
     ///
-    /// Returns a session lookup or snapshot error.
-    pub fn set_agent_access(
-        &mut self, session_id: &SessionId, agent_access: AgentAccessMode,
-    ) -> Result<SessionStatus, SessionError> {
-        let session = self.session_mut(session_id)?;
-        let previous = session.agent_access;
-        session.agent_access = agent_access;
-        match session.status(session_id) {
-            Ok(status) => Ok(status),
-            Err(error) => {
-                session.agent_access = previous;
-                Err(error)
-            }
-        }
-    }
-
-    /// Applies one agent transaction when direct access is enabled.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed access, validation, permission, or persistence error.
-    pub fn apply_direct(
+    /// Returns a typed validation, lock, or persistence error.
+    pub fn apply(
         &mut self, session_id: &SessionId, transaction: TransactionDraft,
     ) -> Result<SessionCommit, SessionError> {
         let session = self.session_mut(session_id)?;
-        if session.agent_access != AgentAccessMode::Direct {
-            return Err(SessionError::DirectApplyDisabled);
-        }
         ensure_actor(session.file.actor_id(), &transaction.actor_id)?;
         validate_live_transaction(&transaction)?;
         let commit = session.file.commit(transaction)?;
@@ -1147,7 +1114,6 @@ impl SessionService {
             camera: None,
             occluded_regions: Vec::new(),
             context_updated_at: timestamp_now(),
-            agent_access: AgentAccessMode::Review,
         };
         let status = session.status(&session_id)?;
         self.sessions.insert(session_id.clone(), session);
@@ -1209,7 +1175,6 @@ impl DocumentSession {
             session_id: session_id.clone(),
             path: DocumentPath(self.file.path().to_string_lossy().into_owned()),
             actor_id: self.file.actor_id().clone(),
-            agent_access: self.agent_access,
             editor_projection: project_editor(&snapshot),
             snapshot,
             dirty,
@@ -1815,35 +1780,31 @@ mod tests {
     }
 
     #[test]
-    fn direct_apply_requires_session_access_and_remains_enabled() {
+    fn live_apply_commits_valid_agent_transactions() {
         let root = test_directory();
-        let path = root.join("apply-authorized.inkfinite");
+        let path = root.join("live-apply.inkfinite");
         let actor = ActorId::from("actor:proposal");
         let mut service = SessionService::new();
         let opened = service
-            .create(
-                &path,
-                DocumentId::from("document:apply-authorized"),
-                actor.clone(),
-                None,
-            )
+            .create(&path, DocumentId::from("document:live-apply"), actor.clone(), None)
             .expect("create session");
         let snapshot = opened.status.snapshot.clone();
-        let transaction = agent_rename(&snapshot, actor, "Authorized edit");
-        assert_eq!(opened.status.agent_access, AgentAccessMode::Review);
-        assert!(matches!(
-            service.apply_direct(&opened.session_id, transaction.clone()),
-            Err(SessionError::DirectApplyDisabled)
-        ));
-        service
-            .set_agent_access(&opened.session_id, AgentAccessMode::Direct)
-            .expect("enable direct access");
-        service
-            .apply_direct(&opened.session_id, transaction)
-            .expect("apply direct transaction");
+        let transaction = agent_rename(&snapshot, actor, "Scripted edit");
+
+        let committed = service
+            .apply(&opened.session_id, transaction)
+            .expect("apply live transaction");
         assert_eq!(
-            service.status(&opened.session_id).expect("session status").agent_access,
-            AgentAccessMode::Direct
+            committed
+                .status
+                .snapshot
+                .document
+                .pages
+                .values()
+                .next()
+                .expect("page")
+                .name,
+            "Scripted edit"
         );
 
         service.close(&opened.session_id).expect("close session");

@@ -77,7 +77,7 @@ discover shape contracts.
 
 With the desktop app running, use `app status`, `app context`, `app inspect`, and `app query` for
 read-only access. Context reports the active page, selection, viewport, actor, and current heads.
-Add `--app` to a structured mutation to use the open document's **Agent access** setting:
+Add `--app` to apply a structured mutation to the open document:
 
 ```sh
 inkfinite app status --json
@@ -85,19 +85,12 @@ inkfinite app context --json
 inkfinite app query --role architecture.service --detail --limit 20 --json
 inkfinite shape patch --app --role architecture.service \
   --patch '@service-patch.json' --json
-inkfinite app propose --transaction transaction.json --json
-inkfinite app proposal wait --proposal-id proposal:1 --json
+inkfinite app apply --transaction transaction.json --json
 ```
 
-Each document starts in **Review changes** mode, where the command opens a ghost preview. The user
-accepts all or selected operations, or rejects the proposal, in the desktop UI. The CLI can observe
-that decision with `app proposal status` or `app proposal wait`, but it cannot make the decision.
-
-For a solo agent session, the user can switch **Agent access** to **Apply directly**. The same
-structured command then commits immediately. The setting lasts only while that document is open,
-and the CLI cannot enable it. `app propose` always requests review, even in Direct mode.
-
-`app apply` sends a prepared transaction directly and works only while **Apply directly** is enabled.
+Structured `--app` mutations and `app apply` validate and commit immediately. They enforce current
+heads, record versions, transaction validation, and document locks. Reviewed, permissioned model
+access belongs to the MCP interface rather than the general CLI.
 
 ## Rendering
 

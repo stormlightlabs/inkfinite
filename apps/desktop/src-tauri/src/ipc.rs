@@ -13,7 +13,7 @@ use serde_json::json;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::oneshot;
 
-/// Tauri event carrying a newly created or refreshed live proposal.
+/// Tauri event carrying a newly created or refreshed proposal.
 pub const PROPOSAL_EVENT: &str = "inkfinite-proposal";
 /// Tauri event clearing the currently reviewed proposal.
 pub const PROPOSAL_CLEARED_EVENT: &str = "inkfinite-proposal-cleared";
@@ -233,10 +233,6 @@ fn dispatch_request(
         AppRequest::Context { session_id }
         | AppRequest::Inspect { session_id }
         | AppRequest::Query { session_id, .. }
-        | AppRequest::Propose { session_id, .. }
-        | AppRequest::Mutate { session_id, .. }
-        | AppRequest::ProposalStatus { session_id, .. }
-        | AppRequest::RenewProposal { session_id, .. }
         | AppRequest::Render { session_id, .. }
         | AppRequest::Ui { session_id, .. }
         | AppRequest::Apply { session_id, .. } => session_id.clone(),
@@ -248,13 +244,7 @@ fn dispatch_request(
             "the desktop session service lock is poisoned",
         )
     })?;
-    let mut response = match dispatch(&mut service, request) {
-        Ok(response) => response,
-        Err(error) => {
-            emit_refreshed_proposal(app, &error)?;
-            return Err(error);
-        }
-    };
+    let mut response = dispatch(&mut service, request)?;
     if let AppResponse::Committed(commit) = &mut response {
         let saved = service
             .save(&commit.status.session_id, &commit.status.snapshot.heads)
@@ -284,17 +274,6 @@ fn dispatch_request(
         }
     }
     match &response {
-        AppResponse::Proposal(proposal) | AppResponse::RenewedProposal(proposal) => app
-            .emit(
-                PROPOSAL_EVENT,
-                json!({ "session_id": requested_session, "proposal": proposal }),
-            )
-            .map_err(|error| {
-                protocol_error(
-                    "proposal_notification_failed",
-                    format!("could not notify the desktop frontend: {error}"),
-                )
-            })?,
         AppResponse::Committed(commit) => app
             .emit(
                 COMMIT_EVENT,
@@ -310,40 +289,12 @@ fn dispatch_request(
         | AppResponse::Context(_)
         | AppResponse::Snapshot(_)
         | AppResponse::QueryResult(_)
-        | AppResponse::ProposalStatus(_)
         | AppResponse::Rendered(_)
         | AppResponse::Focused
         | AppResponse::UiControlled => {}
     }
     Ok(response)
 }
-
-fn emit_refreshed_proposal(app: &AppHandle, error: &ProtocolError) -> Result<(), ProtocolError> {
-    match error.code.as_str() {
-        "proposal_stale" => {
-            let Some(proposal) = error.details.as_ref() else {
-                return Ok(());
-            };
-            app.emit(PROPOSAL_EVENT, json!({ "proposal": proposal }))
-                .map_err(|emit_error| {
-                    protocol_error(
-                        "proposal_notification_failed",
-                        format!("could not notify the desktop frontend: {emit_error}"),
-                    )
-                })
-        }
-        "proposal_conflict" => app
-            .emit(PROPOSAL_CLEARED_EVENT, json!({ "message": error.message }))
-            .map_err(|emit_error| {
-                protocol_error(
-                    "proposal_notification_failed",
-                    format!("could not notify the desktop frontend: {emit_error}"),
-                )
-            }),
-        _ => Ok(()),
-    }
-}
-
 fn protocol_error(code: &str, message: impl Into<String>) -> ProtocolError {
     ProtocolError { code: code.into(), message: message.into(), details: None }
 }
