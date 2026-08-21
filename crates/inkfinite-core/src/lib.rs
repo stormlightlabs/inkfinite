@@ -7,6 +7,7 @@ pub mod editor;
 pub mod engine;
 pub mod file;
 pub mod ipc;
+pub mod path;
 pub mod proto;
 pub mod render;
 pub mod session;
@@ -491,6 +492,17 @@ pub enum PathFillRule {
     EvenOdd,
 }
 
+/// Whether the two cubic handles at an anchor move together.
+#[derive(Clone, Copy, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(rename_all = "snake_case")]
+pub enum PathHandleMode {
+    /// The incoming and outgoing handles can move independently.
+    Broken,
+    /// The incoming and outgoing handles stay opposite one another.
+    Joined,
+}
+
 /// One normalized drawing command in a path subpath.
 #[derive(Clone, Copy, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 #[serde(tag = "type")]
@@ -539,6 +551,9 @@ pub struct PathSubpath {
     pub segments: Vec<PathSegment>,
     /// Whether the final point connects back to the subpath's move point.
     pub closed: bool,
+    /// Optional per-anchor handle modes. Missing entries use broken handles.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handle_modes: Option<Vec<PathHandleMode>>,
 }
 
 /// Normalized geometry for a native path shape.
@@ -576,6 +591,16 @@ pub enum PathGeometryError {
         /// Invalid segment index.
         segment: usize,
     },
+    /// The optional handle-mode list does not match the segment list.
+    #[error("path subpath {subpath} has {actual} handle modes for {expected} segments")]
+    HandleModeCount {
+        /// Invalid subpath index.
+        subpath: usize,
+        /// Number of segments that need modes.
+        expected: usize,
+        /// Number of modes supplied by the document.
+        actual: usize,
+    },
     /// A point in a path command is not finite.
     #[error("path subpath {subpath} segment {segment} has a non-finite {component} coordinate")]
     NonFiniteCoordinate {
@@ -610,6 +635,15 @@ pub fn validate_path_geometry(geometry: &PathGeometry) -> Result<(), PathGeometr
         };
         if !matches!(first, PathSegment::Move { .. }) {
             return Err(PathGeometryError::MissingMove { subpath: subpath_index });
+        }
+        if let Some(handle_modes) = &subpath.handle_modes
+            && handle_modes.len() != subpath.segments.len()
+        {
+            return Err(PathGeometryError::HandleModeCount {
+                subpath: subpath_index,
+                expected: subpath.segments.len(),
+                actual: handle_modes.len(),
+            });
         }
         for (segment_index, segment) in subpath.segments.iter().enumerate() {
             if segment_index > 0 && matches!(segment, PathSegment::Move { .. }) {
@@ -1114,6 +1148,7 @@ mod tests {
                     },
                 ],
                 closed: true,
+                handle_modes: None,
             }],
             fill_rule: PathFillRule::EvenOdd,
         };

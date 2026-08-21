@@ -20,7 +20,13 @@ import type {
 	Transform
 } from '@inkfinite/bindings/model';
 import type { BoardExport, DocOrder, LoadedDoc } from './document';
-import { ensureDocumentLayers, type Document, type LayerRecord, type ShapeRecord } from '../model';
+import {
+	ensureDocumentLayers,
+	type Document,
+	type LayerRecord,
+	type PathTopologyEdit,
+	type ShapeRecord
+} from '../model';
 
 const FORMAT_ID = 'inkfinite.document';
 const FORMAT_VERSION = 2;
@@ -304,8 +310,9 @@ export function fromCanonicalDocumentSnapshot(snapshot: NativeDocumentSnapshot):
 export function createEditorReconciliationRequest(
 	before: Document,
 	after: Document,
-	options: Omit<EditorReconciliationRequest, 'patches'>
+	options: Omit<EditorReconciliationRequest, 'patches'> & { topologyEdits?: PathTopologyEdit[] }
 ): EditorReconciliationRequest {
+	const { topologyEdits = [], ...requestOptions } = options;
 	const previous = ensureDocumentLayers(before);
 	const next = ensureDocumentLayers(after);
 	const patches: EditorPatch[] = [];
@@ -313,6 +320,7 @@ export function createEditorReconciliationRequest(
 	const nextShapes = next.shapes;
 	const deletedPages = new Set(Object.keys(previous.pages).filter((id) => !next.pages[id]));
 	const deletedLayerDestinations = deletedLayerMoves(previous, next);
+	const topologyShapeIds = new Set(topologyEdits.map((edit) => edit.shapeId));
 
 	for (const page of Object.values(next.pages)) {
 		if (!previous.pages[page.id]) {
@@ -338,6 +346,11 @@ export function createEditorReconciliationRequest(
 			patches.push({ type: 'delete_shape', shape_id: shapeId });
 		}
 	}
+	for (const edit of topologyEdits) {
+		if (previousShapes[edit.shapeId] && nextShapes[edit.shapeId]) {
+			patches.push({ type: 'path_topology', shape_id: edit.shapeId, operations: edit.operations });
+		}
+	}
 	for (const shape of Object.values(nextShapes)) {
 		const old = previousShapes[shape.id];
 		if (!old) {
@@ -357,7 +370,14 @@ export function createEditorReconciliationRequest(
 			});
 			continue;
 		}
-		const patch = shapePatch(old, shape, previous, next, deletedLayerDestinations.has(old.layerId ?? ''));
+		const patch = shapePatch(
+			old,
+			shape,
+			previous,
+			next,
+			deletedLayerDestinations.has(old.layerId ?? ''),
+			topologyShapeIds.has(shape.id)
+		);
 		if (patch) patches.push(patch);
 	}
 
@@ -414,7 +434,7 @@ export function createEditorReconciliationRequest(
 			patches.push({ type: 'create_binding', binding: nativeBinding(binding) });
 		}
 	}
-	return { ...options, patches };
+	return { ...requestOptions, patches };
 }
 
 type Affine = EditorTransform;
@@ -550,7 +570,8 @@ function shapePatch(
 	after: ShapeRecord,
 	beforeDocument: Document,
 	afterDocument: Document,
-	skipDeletedLayerParent: boolean
+	skipDeletedLayerParent: boolean,
+	skipProperties: boolean
 ): Extract<EditorPatch, { type: 'shape' }> | null {
 	const parentBefore = shapeParent(before, beforeDocument);
 	const parentAfter = shapeParent(after, afterDocument);
@@ -571,7 +592,7 @@ function shapePatch(
 			transformChanged = !sameAffine(beforeLocal, afterLocal);
 		}
 	}
-	const propertiesChanged = JSON.stringify(before.props) !== JSON.stringify(after.props);
+	const propertiesChanged = !skipProperties && JSON.stringify(before.props) !== JSON.stringify(after.props);
 	const styleChanged = JSON.stringify(shapeStyle(before)) !== JSON.stringify(shapeStyle(after));
 	const orderChanged = skipDeletedLayerParent
 		? false

@@ -7,6 +7,7 @@ import {
 	reorderShapes,
 	routeAction,
 	ShapeRecord,
+	type PathTopologyEdit,
 	type Store,
 	type Tool
 } from '@inkfinite/core';
@@ -27,6 +28,7 @@ export type RuntimeTransactionDraft = {
 	before: EditorState;
 	after: EditorState;
 	action: Action;
+	topologyEdits?: PathTopologyEdit[];
 };
 
 /** Dependencies supplied by a UI adapter. */
@@ -160,7 +162,17 @@ export class EditorRuntime {
 	}
 
 	private emitDraft(before: EditorState, after: EditorState, action: Action): void {
-		this.commit(before, after, describeAction(action, commandKind(before, after)), action);
+		const activeTool = this.options.tools.get(before.ui.toolId);
+		const topologyEdits = activeTool?.getPendingTopologyEdits?.();
+		this.options.onTransactionDraft({
+			name: describeAction(action, commandKind(before, after)),
+			kind: commandKind(before, after),
+			before: EditorState.clone(before),
+			after: EditorState.clone(after),
+			action,
+			...(topologyEdits && topologyEdits.length > 0 ? { topologyEdits } : {})
+		});
+		activeTool?.clearPendingTopologyEdits?.();
 	}
 
 	private interactionChanged(): void {

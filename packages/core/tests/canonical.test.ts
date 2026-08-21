@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEditorReconciliationRequest, toCanonicalDocumentSnapshot } from '../src/persistence/canonical';
-import { LayerRecord, PageRecord, ShapeRecord, type Document } from '../src/model';
+import { LayerRecord, PageRecord, ShapeRecord, type Document, type PathProps } from '../src/model';
 
 describe('toCanonicalDocumentSnapshot', () => {
 	it('projects browser shapes into the canonical renderer input', () => {
@@ -60,6 +60,62 @@ describe('toCanonicalDocumentSnapshot', () => {
 			type: 'shape',
 			shape_id: 'shape:rect',
 			transform: { e: 30, f: 45 }
+		});
+	});
+
+	it('routes topology edits as canonical path patches', () => {
+		const page = PageRecord.create('Page 1', 'page:one');
+		const props: PathProps = {
+			subpaths: [
+				{
+					segments: [
+						{ type: 'move', to: { x: 0, y: 0 } },
+						{ type: 'line', to: { x: 40, y: 0 } },
+						{ type: 'line', to: { x: 40, y: 40 } }
+					],
+					closed: false
+				}
+			],
+			fill_rule: 'nonzero',
+			fill: '#fff'
+		};
+		const path = ShapeRecord.createPath(page.id, 0, 0, props, 'shape:path');
+		page.shapeIds.push(path.id);
+		const before: Document = { pages: { [page.id]: page }, shapes: { [path.id]: path }, bindings: {} };
+		const after: Document = {
+			...before,
+			shapes: {
+				[path.id]: {
+					...path,
+					props: {
+						...path.props,
+						subpaths: [
+							{
+								...path.props.subpaths[0],
+								segments: [...path.props.subpaths[0].segments, { type: 'line', to: { x: 0, y: 40 } }]
+							}
+						]
+					}
+				}
+			}
+		};
+
+		const request = createEditorReconciliationRequest(before, after, {
+			actor_id: 'browser',
+			origin: 'human',
+			transaction_id: 'transaction:topology',
+			description: 'Add path anchor',
+			timestamp: 1,
+			topologyEdits: [
+				{ shapeId: path.id, operations: [{ type: 'add_anchor', subpath_index: 0, segment_index: 1, t: 0.5 }] }
+			]
+		});
+
+		expect(request.patches).toHaveLength(1);
+		expect(request.patches[0]).toMatchObject({
+			type: 'path_topology',
+			shape_id: path.id,
+			operations: [{ type: 'add_anchor', segment_index: 1 }]
 		});
 	});
 

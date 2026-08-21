@@ -46,8 +46,13 @@
   world-space-preserving reparent operations with locked-ancestor selection rules.
 - Direct path selection with subpath and anchor selection, anchor and subpath movement, and
   quadratic and cubic Bézier control-handle rendering and editing.
+- Native path topology editing with anchor insertion and deletion, line and curve conversion,
+  cubic handle break/join operations, open and close operations, compatible endpoint joining,
+  semantic Rust reconciliation, and responsive previews.
 - Direct path-edit previews update bounds and hit regions, commit one transaction per
   completed gesture, and record each gesture as one undo step with interaction coverage.
+- Shared path-topology fixtures and Rust, TypeScript, reconciliation, and commit-boundary tests
+  cover compound fill rules, endpoint orientation, malformed geometry, and invalid operations.
 
 #### SVG Interop
 

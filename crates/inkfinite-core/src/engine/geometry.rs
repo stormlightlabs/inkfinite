@@ -471,6 +471,7 @@ mod tests {
                     },
                 ],
                 closed: false,
+                handle_modes: None,
             }],
             fill_rule: crate::PathFillRule::NonZero,
         };
@@ -491,6 +492,7 @@ mod tests {
                     PathSegment::Line { to: Vec2 { x: 30.0, y: 20.0 } },
                 ],
                 closed: true,
+                handle_modes: None,
             }],
             fill_rule: crate::PathFillRule::EvenOdd,
         };

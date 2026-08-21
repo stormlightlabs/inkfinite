@@ -1,5 +1,5 @@
 import type { Camera } from "./camera";
-import type { ShapeRecord } from "./model";
+import type { PathTopologyEdit, ShapeRecord } from "./model";
 import type { EditorState } from "./reactivity";
 
 export type CommandKind = "doc" | "ui" | "camera";
@@ -22,6 +22,8 @@ export type HistoryAppliedEvent = {
 export interface Command {
   /** Display name for this command (shown in history UI) */
   readonly name: string;
+  /** Canonical path operations associated with this command, when present. */
+  readonly topologyEdits?: PathTopologyEdit[];
   /** Command category, used for persistence decisions */
   readonly kind: CommandKind;
 
@@ -46,12 +48,23 @@ export interface Command {
 export class SnapshotCommand implements Command {
   readonly name: string;
   readonly kind: CommandKind;
+  readonly topologyEdits?: PathTopologyEdit[];
   private readonly before: EditorState;
   private readonly after: EditorState;
 
-  constructor(name: string, kind: CommandKind, before: EditorState, after: EditorState) {
+  constructor(
+    name: string,
+    kind: CommandKind,
+    before: EditorState,
+    after: EditorState,
+    topologyEdits?: PathTopologyEdit[],
+  ) {
     this.name = name;
     this.kind = kind;
+    this.topologyEdits = topologyEdits?.map((edit) => ({
+      shapeId: edit.shapeId,
+      operations: edit.operations.map((operation) => ({ ...operation })),
+    }));
     this.before = deepCloneState(before);
     this.after = deepCloneState(after);
   }

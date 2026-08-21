@@ -94,6 +94,13 @@ round trip during pointer movement, but it does not define committed geometry. S
 compare preview results with the canonical Rust operation for curve splitting, topology changes,
 and nested transforms.
 
+Direct selection uses Alt-click on a rendered segment to add an anchor. Delete removes selected
+anchors; Q and C convert their incoming segments to quadratic and cubic curves, L converts them
+to lines, O opens selected subpaths, Z closes them, and B breaks selected cubic handles. J joins
+two selected endpoints from separate open subpaths, or joins cubic handles for another selection.
+These commands remain editor interactions; the resulting topology operations are committed through
+the Rust reconciliation API.
+
 A completed gesture submits one operation in one transaction through the Rust document session. Rust
 applies the operation, validates the resulting path and hierarchy, computes committed bounds and
 invalidated regions, and returns the updated editor projection. One completed gesture therefore

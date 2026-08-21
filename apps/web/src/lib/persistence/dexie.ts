@@ -215,7 +215,8 @@ export function createDexieSession(
 					origin: 'human',
 					transaction_id: `transaction:browser:${++transactionNumber}`,
 					description: change.description,
-					timestamp: Date.now()
+					timestamp: Date.now(),
+					topologyEdits: change.topologyEdits
 				});
 				if (request.patches.length === 0) return;
 				state = await worker.applyEditorPatches(request);

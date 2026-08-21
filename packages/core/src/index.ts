@@ -8,6 +8,7 @@ export * from './interchange';
 export * from './layers';
 export * from './math';
 export * from './model';
+export * from './path-topology';
 export * from './persistence/desktop';
 export * from './persistence/canonical';
 export * from './persistence/document';

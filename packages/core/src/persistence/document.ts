@@ -7,7 +7,8 @@ import {
 	PageRecord as PageOps,
 	type ShapeRecord,
 	ShapeRecord as ShapeOps,
-	type ImportedAsset
+	type ImportedAsset,
+	type PathTopologyEdit
 } from '../model';
 import type { EditorProjection } from '@inkfinite/bindings/editor';
 import type { DocumentSnapshot as NativeDocumentSnapshot } from '@inkfinite/bindings/model';
@@ -27,6 +28,8 @@ export type DocPatch = {
 	upserts?: { pages?: PageRecord[]; shapes?: ShapeRecord[]; bindings?: BindingRecord[] };
 	deletes?: { pageIds?: string[]; shapeIds?: string[]; bindingIds?: string[] };
 	order?: Partial<DocOrder>;
+	/** Canonical path operations associated with this document change. */
+	topologyEdits?: PathTopologyEdit[];
 };
 
 /** A complete document loaded from persistence. */
@@ -57,6 +60,7 @@ export type EditorDocumentChange = {
 	after: Document;
 	op: 'do' | 'undo' | 'redo';
 	description: string;
+	topologyEdits?: PathTopologyEdit[];
 };
 
 /** Receives editor changes and controls when they reach persistence. */

@@ -514,6 +514,12 @@ function shapeOrderFromPageRows(rows: PageRow[]): Record<string, string[]> {
 
 function clonePatch(patch: DocPatch): DocPatch {
 	const cloned: DocPatch = {};
+	if (patch.topologyEdits) {
+		cloned.topologyEdits = patch.topologyEdits.map((edit) => ({
+			shapeId: edit.shapeId,
+			operations: edit.operations.map((operation) => ({ ...operation }))
+		}));
+	}
 
 	if (patch.upserts) {
 		cloned.upserts = {};
@@ -598,8 +604,9 @@ function isPatchEmpty(patch: DocPatch): boolean {
 		Boolean(patch.order?.pageIds?.length) ||
 		Boolean(patch.order?.shapeOrder && Object.keys(patch.order.shapeOrder).length > 0) ||
 		Boolean(patch.order?.layers && Object.keys(patch.order.layers).length > 0);
+	const hasTopology = Boolean(patch.topologyEdits?.length);
 
-	return !(hasUpserts || hasDeletes || hasOrder);
+	return !(hasUpserts || hasDeletes || hasOrder || hasTopology);
 }
 
 /**

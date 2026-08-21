@@ -495,6 +495,7 @@ fn reconciliation_failure(error: &EditorReconciliationError) -> EditorReconcilia
         EditorReconciliationError::UnknownBinding(_) => "unknown_binding",
         EditorReconciliationError::SingularParent { .. } => "singular_parent",
         EditorReconciliationError::UnsupportedShear { .. } => "unsupported_shear",
+        EditorReconciliationError::PathTopology { .. } => "path_topology",
     };
     EditorReconciliationFailure { code: code.into(), message: error.to_string() }
 }

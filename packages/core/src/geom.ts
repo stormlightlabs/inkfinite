@@ -10,6 +10,8 @@ import type {
 	PathAnchorRef,
 	PathControlRef,
 	PathGeometry,
+	PathSegment,
+	PathSegmentRef,
 	PathShape,
 	RectShape,
 	ShapeRecord,
@@ -207,6 +209,52 @@ export function hitTestPathControl(shape: PathShape, point: Vec2, tolerance = 10
 	return closest;
 }
 
+/** Find the rendered path segment and curve parameter closest to a world point. */
+export function hitTestPathSegment(shape: PathShape, point: Vec2, tolerance = 10): PathSegmentRef | null {
+	let closest: PathSegmentRef | null = null;
+	let closestDistance = tolerance;
+	for (const [subpathIndex, subpath] of shape.props.subpaths.entries()) {
+		const first = subpath.segments[0];
+		if (!first || first.type !== 'move') continue;
+		let current = first.to;
+		for (const [segmentIndex, segment] of subpath.segments.slice(1).entries()) {
+			const actualSegmentIndex = segmentIndex + 1;
+			const sampleCount = segment.type === 'line' ? 1 : segment.type === 'quadratic' ? 32 : 48;
+			for (let sample = 1; sample <= sampleCount; sample += 1) {
+				const fromT = (sample - 1) / sampleCount;
+				const toT = sample / sampleCount;
+				const from = localToWorld(shape, samplePathSegment(current, segment, fromT));
+				const to = localToWorld(shape, samplePathSegment(current, segment, toT));
+				const distance = distanceToSegment(point, from, to);
+				if (distance <= closestDistance) {
+					closestDistance = distance;
+					const segmentT = parameterOnSegment(point, from, to);
+					closest = {
+						subpathIndex,
+						segmentIndex: actualSegmentIndex,
+						t: Math.min(1, Math.max(0, fromT + (toT - fromT) * segmentT))
+					};
+				}
+			}
+			current = segment.to;
+		}
+		if (subpath.closed) {
+			const from = localToWorld(shape, current);
+			const to = localToWorld(shape, first.to);
+			const distance = distanceToSegment(point, from, to);
+			if (distance <= closestDistance) {
+				closestDistance = distance;
+				closest = {
+					subpathIndex,
+					segmentIndex: subpath.segments.length,
+					t: parameterOnSegment(point, from, to)
+				};
+			}
+		}
+	}
+	return closest;
+}
+
 /** Find a subpath whose rendered geometry is close to a world point. */
 export function hitTestPathSubpath(shape: PathShape, point: Vec2, tolerance = 10): number | null {
 	let closestSubpath: number | null = null;
@@ -266,8 +314,26 @@ function distanceToSegment(point: Vec2, from: Vec2, to: Vec2): number {
 	const segment = Vec2Ops.sub(to, from);
 	const lengthSq = Vec2Ops.lenSq(segment);
 	if (lengthSq === 0) return Vec2Ops.dist(point, from);
-	const t = Math.max(0, Math.min(1, Vec2Ops.dot(Vec2Ops.sub(point, from), segment) / lengthSq));
+	const t = parameterOnSegment(point, from, to);
 	return Vec2Ops.dist(point, Vec2Ops.add(from, Vec2Ops.mulScalar(segment, t)));
+}
+
+function parameterOnSegment(point: Vec2, from: Vec2, to: Vec2): number {
+	const segment = Vec2Ops.sub(to, from);
+	const lengthSq = Vec2Ops.lenSq(segment);
+	if (lengthSq === 0) return 0;
+	return Math.max(0, Math.min(1, Vec2Ops.dot(Vec2Ops.sub(point, from), segment) / lengthSq));
+}
+
+function samplePathSegment(start: Vec2, segment: PathSegment, t: number): Vec2 {
+	if (segment.type === 'line') return lerp(start, segment.to, t);
+	if (segment.type === 'quadratic') return quadraticPoint(start, segment.control, segment.to, t);
+	if (segment.type === 'cubic') return cubicPoint(start, segment.control_1, segment.control_2, segment.to, t);
+	return segment.to;
+}
+
+function lerp(start: Vec2, end: Vec2, t: number): Vec2 {
+	return { x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t };
 }
 
 function quadraticExtremum(start: number, control: number, end: number): number | null {

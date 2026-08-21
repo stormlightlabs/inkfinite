@@ -1,7 +1,12 @@
-import type { EditorTransform as GeneratedEditorTransform } from '@inkfinite/bindings/editor';
+import type {
+	EditorTransform as GeneratedEditorTransform,
+	PathCurveKind,
+	PathTopologyOperation
+} from '@inkfinite/bindings/editor';
 import type {
 	PathFillRule as NativePathFillRule,
 	PathGeometry as NativePathGeometry,
+	PathHandleMode as NativePathHandleMode,
 	PathSegment as NativePathSegment,
 	PathSubpath as NativePathSubpath
 } from '@inkfinite/bindings/model';
@@ -81,6 +86,12 @@ export type PathFillRule = NativePathFillRule;
 /** A normalized native path segment. */
 export type PathSegment = NativePathSegment;
 
+/** Whether cubic handles at an anchor move together. */
+export type PathHandleMode = NativePathHandleMode;
+
+/** Canonical curve type used by topology operations. */
+export type { PathCurveKind, PathTopologyOperation };
+
 /** One native path subpath. */
 export type PathSubpath = NativePathSubpath;
 
@@ -90,11 +101,17 @@ export type PathGeometry = NativePathGeometry;
 /** Ephemeral reference to one path anchor, identified by its segment destination. */
 export type PathAnchorRef = { subpathIndex: number; segmentIndex: number };
 
+/** Ephemeral reference to a rendered path segment and its curve parameter. */
+export type PathSegmentRef = PathAnchorRef & { t: number };
+
 /** Ephemeral selection state used by the direct-selection tool. */
 export type PathSelection = { pathId: string; anchors: PathAnchorRef[] };
 
 /** A path control handle exposed by the direct-selection tool. */
 export type PathControlRef = PathAnchorRef & { control: 'quadratic' | 'control_1' | 'control_2' };
+
+/** Topology operations staged for one path commit. */
+export type PathTopologyEdit = { shapeId: string; operations: PathTopologyOperation[] };
 
 /** Native path painting properties stored alongside its geometry. */
 export type PathProps = PathGeometry & { fill?: string; stroke?: string; stroke_width?: number };
@@ -338,6 +355,7 @@ export const ShapeRecord = {
 					...shape.props,
 					subpaths: shape.props.subpaths.map((subpath) => ({
 						...subpath,
+						handle_modes: subpath.handle_modes ? [...subpath.handle_modes] : subpath.handle_modes,
 						segments: subpath.segments.map((segment) => ({
 							...segment,
 							to: { ...segment.to },

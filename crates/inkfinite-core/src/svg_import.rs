@@ -595,7 +595,10 @@ impl ImportParser {
         }
         let mut segments = vec![NativePathSegment::Move { to: points[0] }];
         segments.extend(points.iter().skip(1).copied().map(|to| NativePathSegment::Line { to }));
-        let geometry = PathGeometry { subpaths: vec![PathSubpath { segments, closed }], fill_rule: style.fill_rule };
+        let geometry = PathGeometry {
+            subpaths: vec![PathSubpath { segments, closed, handle_modes: None }],
+            fill_rule: style.fill_rule,
+        };
         self.path_shape(node, style, &geometry, self.transform(node)?)
     }
 
@@ -1239,7 +1242,11 @@ fn normalize_path(value: &str, fill_rule: PathFillRule) -> Result<PathGeometry, 
             PathSegment::MoveTo { abs, x, y } => {
                 current = point(abs, x, y, current);
                 start = current;
-                subpaths.push(PathSubpath { segments: vec![NativePathSegment::Move { to: current }], closed: false });
+                subpaths.push(PathSubpath {
+                    segments: vec![NativePathSegment::Move { to: current }],
+                    closed: false,
+                    handle_modes: None,
+                });
                 previous_cubic_control = None;
                 previous_quadratic_control = None;
                 previous = PreviousSegment::Other;
@@ -1374,7 +1381,11 @@ fn reflect(control: Vec2, around: Vec2) -> Vec2 {
 
 fn ensure_open_subpath(subpaths: &mut Vec<PathSubpath>, current: Vec2) {
     if subpaths.last().is_none_or(|subpath| subpath.closed) {
-        subpaths.push(PathSubpath { segments: vec![NativePathSegment::Move { to: current }], closed: false });
+        subpaths.push(PathSubpath {
+            segments: vec![NativePathSegment::Move { to: current }],
+            closed: false,
+            handle_modes: None,
+        });
     }
 }
 

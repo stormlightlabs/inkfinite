@@ -2,13 +2,22 @@ import type { Action } from '../actions';
 import {
 	hitTestPathAnchor,
 	hitTestPathControl,
+	hitTestPathSegment,
 	hitTestPathSubpath,
 	hitTestPoint,
 	pathAnchorRefs,
 	worldToLocal
 } from '../geom';
 import type { Vec2 } from '../math';
-import { ShapeRecord, type PathAnchorRef, type PathControlRef, type PathShape } from '../model';
+import { applyPathTopologyOperations } from '../path-topology';
+import {
+	ShapeRecord,
+	type PathAnchorRef,
+	type PathControlRef,
+	type PathShape,
+	type PathTopologyEdit,
+	type PathTopologyOperation
+} from '../model';
 import { EditorState, getSelectionScopeShapes, selectionTarget, type ToolId } from '../reactivity';
 import type { Tool } from './base';
 
@@ -42,9 +51,11 @@ export function pathControlHandleId(control: PathControlRef): string {
 export class DirectSelectTool implements Tool {
 	readonly id: ToolId = 'direct-select';
 	private toolState: DirectToolState = this.createToolState();
+	private pendingTopologyEdits: PathTopologyEdit[] = [];
 
 	onEnter(state: EditorState): EditorState {
 		this.resetToolState();
+		this.pendingTopologyEdits = [];
 		const selected = state.ui.selectionIds.length === 1 ? state.doc.shapes[state.ui.selectionIds[0]] : undefined;
 		if (selected?.type !== 'path') return { ...state, ui: { ...state.ui, pathSelection: undefined } };
 		return {
@@ -61,6 +72,7 @@ export class DirectSelectTool implements Tool {
 
 	onExit(state: EditorState): EditorState {
 		this.resetToolState();
+		this.pendingTopologyEdits = [];
 		return state;
 	}
 
@@ -71,8 +83,30 @@ export class DirectSelectTool implements Tool {
 			this.resetToolState();
 			return state;
 		}
-		if (action.type === 'key-down' && action.key === 'Escape') return this.handleEscape(state);
+		if (action.type === 'key-down') {
+			if (action.key === 'Escape') return this.handleEscape(state);
+			if (action.modifiers.ctrl || action.modifiers.meta || action.modifiers.alt) return state;
+			if (action.key === 'Delete' || action.key === 'Backspace') return this.deleteSelectedAnchors(state);
+			if (action.key === 'q' || action.key === 'Q') return this.convertSelectedSegments(state, 'quadratic');
+			if (action.key === 'c' || action.key === 'C') return this.convertSelectedSegments(state, 'cubic');
+			if (action.key === 'l' || action.key === 'L') return this.convertSelectedSegmentsToLines(state);
+			if (action.key === 'o' || action.key === 'O') return this.setSelectedPathsClosed(state, false);
+			if (action.key === 'z' || action.key === 'Z') return this.setSelectedPathsClosed(state, true);
+			if (action.key === 'b' || action.key === 'B') return this.applyHandleOperation(state, 'break_handles');
+			if (action.key === 'j' || action.key === 'J') return this.joinSelectedEndpoints(state);
+		}
 		return state;
+	}
+
+	getPendingTopologyEdits(): PathTopologyEdit[] {
+		return this.pendingTopologyEdits.map((edit) => ({
+			shapeId: edit.shapeId,
+			operations: edit.operations.map((operation) => ({ ...operation }))
+		}));
+	}
+
+	clearPendingTopologyEdits(): void {
+		this.pendingTopologyEdits = [];
 	}
 
 	/** Return the handle under a point for hover and cursor feedback. */
@@ -116,6 +150,13 @@ export class DirectSelectTool implements Tool {
 				return nextState;
 			}
 
+			if (action.modifiers.alt) {
+				const segment = hitTestPathSegment(selectedPath, action.world, HANDLE_HIT_RADIUS);
+				if (segment) {
+					return this.addAnchor(state, selectedPath, segment);
+				}
+			}
+
 			const subpathIndex = hitTestPathSubpath(selectedPath, action.world, HANDLE_HIT_RADIUS);
 			if (subpathIndex !== null) {
 				const subpathAnchors = pathAnchorRefs(selectedPath).filter(
@@ -154,6 +195,10 @@ export class DirectSelectTool implements Tool {
 		}
 		const target = targetId ? state.doc.shapes[targetId] : undefined;
 		if (target?.type === 'path') {
+			if (action.modifiers.alt) {
+				const segment = hitTestPathSegment(target, action.world, HANDLE_HIT_RADIUS);
+				if (segment) return this.addAnchor(state, target, segment);
+			}
 			const control = hitTestPathControl(target, action.world, HANDLE_HIT_RADIUS);
 			if (control) {
 				const nextState = this.setPathSelection(state, target, []);
@@ -226,6 +271,169 @@ export class DirectSelectTool implements Tool {
 				pathSelection: { pathId: path.id, anchors: uniqueAnchors(anchors) }
 			}
 		};
+	}
+
+	private addAnchor(
+		state: EditorState,
+		path: PathShape,
+		segment: { subpathIndex: number; segmentIndex: number; t: number }
+	): EditorState {
+		const operation: PathTopologyOperation = {
+			type: 'add_anchor',
+			subpath_index: segment.subpathIndex,
+			segment_index: segment.segmentIndex,
+			t: segment.t
+		};
+		const subpath = path.props.subpaths[segment.subpathIndex];
+		const anchorIndex =
+			subpath?.closed && segment.segmentIndex === subpath.segments.length
+				? segment.segmentIndex
+				: segment.segmentIndex + 1;
+		return this.applyTopology(state, path, [operation], [
+			{ subpathIndex: segment.subpathIndex, segmentIndex: anchorIndex }
+		]);
+	}
+
+	private deleteSelectedAnchors(state: EditorState): EditorState {
+		const path = this.getSelectedPath(state);
+		const anchors = state.ui.pathSelection?.anchors ?? [];
+		if (!path || anchors.length === 0) return state;
+		const operations = [...anchors]
+			.sort((left, right) => right.subpathIndex - left.subpathIndex || right.segmentIndex - left.segmentIndex)
+			.map(
+				(anchor): PathTopologyOperation => ({
+					type: 'delete_anchor',
+					subpath_index: anchor.subpathIndex,
+					segment_index: anchor.segmentIndex
+				})
+			);
+		return this.applyTopology(state, path, operations, []);
+	}
+
+	private convertSelectedSegments(state: EditorState, curve: 'quadratic' | 'cubic'): EditorState {
+		const path = this.getSelectedPath(state);
+		const anchors = state.ui.pathSelection?.anchors ?? [];
+		if (!path) return state;
+		const operations = anchors
+			.filter((anchor) => anchor.segmentIndex > 0)
+			.map(
+				(anchor): PathTopologyOperation => ({
+					type: 'convert_to_curve',
+					subpath_index: anchor.subpathIndex,
+					segment_index: anchor.segmentIndex,
+					curve
+				})
+			);
+		return this.applyTopology(state, path, operations, anchors);
+	}
+
+	private convertSelectedSegmentsToLines(state: EditorState): EditorState {
+		const path = this.getSelectedPath(state);
+		const anchors = state.ui.pathSelection?.anchors ?? [];
+		if (!path) return state;
+		const operations = anchors
+			.filter((anchor) => anchor.segmentIndex > 0)
+			.map(
+				(anchor): PathTopologyOperation => ({
+					type: 'convert_to_line',
+					subpath_index: anchor.subpathIndex,
+					segment_index: anchor.segmentIndex
+				})
+			);
+		return this.applyTopology(state, path, operations, anchors);
+	}
+
+	private setSelectedPathsClosed(state: EditorState, closed: boolean): EditorState {
+		const path = this.getSelectedPath(state);
+		const anchors = state.ui.pathSelection?.anchors ?? [];
+		if (!path) return state;
+		const subpathIndices = [...new Set(anchors.map((anchor) => anchor.subpathIndex))];
+		const operations = subpathIndices
+			.filter((subpathIndex) => path.props.subpaths[subpathIndex]?.closed !== closed)
+			.map((subpathIndex): PathTopologyOperation => ({
+				type: closed ? 'close_path' : 'open_path',
+				subpath_index: subpathIndex
+			}));
+		return this.applyTopology(state, path, operations, anchors);
+	}
+
+	private joinSelectedEndpoints(state: EditorState): EditorState {
+		const path = this.getSelectedPath(state);
+		const anchors = state.ui.pathSelection?.anchors ?? [];
+		if (!path) return state;
+		const endpoints = anchors.filter((anchor) => {
+			const subpath = path.props.subpaths[anchor.subpathIndex];
+			return Boolean(
+				subpath &&
+				!subpath.closed &&
+				(anchor.segmentIndex === 0 || anchor.segmentIndex === subpath.segments.length - 1)
+			);
+		});
+		if (endpoints.length !== 2) return this.applyHandleOperation(state, 'join_handles');
+		const [first, second] = endpoints;
+		if (!first || !second) return state;
+		if (first.subpathIndex === second.subpathIndex) {
+			if (first.segmentIndex === 0 && second.segmentIndex === path.props.subpaths[first.subpathIndex]!.segments.length - 1) {
+				return this.applyTopology(
+					state,
+					path,
+					[{ type: 'close_path', subpath_index: first.subpathIndex }],
+					[...anchors]
+				);
+			}
+			return state;
+		}
+		const operation: PathTopologyOperation = {
+			type: 'join_endpoints',
+			first_subpath_index: first.subpathIndex,
+			first_at_start: first.segmentIndex === 0,
+			second_subpath_index: second.subpathIndex,
+			second_at_start: second.segmentIndex === 0
+		};
+		const updated = applyPathTopologyOperations(path, [operation]);
+		if (!updated) return state;
+		const mergedSubpathIndex = Math.min(first.subpathIndex, second.subpathIndex);
+		const mergedSubpath = updated.props.subpaths[mergedSubpathIndex];
+		const nextAnchors = mergedSubpath
+			? [
+					{ subpathIndex: mergedSubpathIndex, segmentIndex: 0 },
+					{ subpathIndex: mergedSubpathIndex, segmentIndex: mergedSubpath.segments.length - 1 }
+				]
+			: [];
+		return this.applyTopology(state, path, [operation], nextAnchors);
+	}
+
+	private applyHandleOperation(state: EditorState, type: 'break_handles' | 'join_handles'): EditorState {
+		const path = this.getSelectedPath(state);
+		const anchors = state.ui.pathSelection?.anchors ?? [];
+		if (!path) return state;
+		const operations = anchors.map(
+			(anchor): PathTopologyOperation => ({
+				type,
+				subpath_index: anchor.subpathIndex,
+				segment_index: anchor.segmentIndex
+			})
+		);
+		return this.applyTopology(state, path, operations, anchors);
+	}
+
+	private applyTopology(
+		state: EditorState,
+		path: PathShape,
+		operations: PathTopologyOperation[],
+		anchors: PathAnchorRef[]
+	): EditorState {
+		if (operations.length === 0) return state;
+		const updated = applyPathTopologyOperations(path, operations);
+		if (!updated || JSON.stringify(updated.props) === JSON.stringify(path.props)) return state;
+		const pending = this.pendingTopologyEdits.find((edit) => edit.shapeId === path.id);
+		if (pending) pending.operations.push(...operations);
+		else this.pendingTopologyEdits.push({ shapeId: path.id, operations: [...operations] });
+		return this.setPathSelection(
+			{ ...state, doc: { ...state.doc, shapes: { ...state.doc.shapes, [path.id]: updated } } },
+			updated,
+			anchors
+		);
 	}
 
 	private beginDrag(
@@ -320,6 +528,24 @@ function moveControl(initial: PathShape, control: PathControlRef, point: Vec2): 
 	else if (control.control === 'control_1' && segment.type === 'cubic') segment.control_1 = position;
 	else if (control.control === 'control_2' && segment.type === 'cubic') segment.control_2 = position;
 	else return null;
+
+	if (segment.type === 'cubic') {
+		const anchorIndex = control.control === 'control_1' ? control.segmentIndex - 1 : control.segmentIndex;
+		const subpath = updated.props.subpaths[control.subpathIndex];
+		if (subpath?.handle_modes?.[anchorIndex] === 'joined') {
+			const anchor = subpath.segments[anchorIndex]?.to;
+			const opposite =
+				control.control === 'control_1'
+					? subpath.segments[control.segmentIndex - 1]
+					: subpath.segments[control.segmentIndex + 1];
+			if (anchor && opposite?.type === 'cubic') {
+				const oppositeControl = control.control === 'control_1' ? 'control_2' : 'control_1';
+				const mirrored = { x: anchor.x * 2 - position.x, y: anchor.y * 2 - position.y };
+				if (oppositeControl === 'control_1') opposite.control_1 = mirrored;
+				else opposite.control_2 = mirrored;
+			}
+		}
+	}
 	return updated;
 }
 

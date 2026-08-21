@@ -69,6 +69,14 @@ export function validatePathGeometry(value: unknown): value is PathGeometry {
 			subpath.segments.length === 0
 		)
 			return false;
+		if (
+			subpath.handle_modes !== undefined &&
+			subpath.handle_modes !== null &&
+			(!Array.isArray(subpath.handle_modes) ||
+				subpath.handle_modes.length !== subpath.segments.length ||
+				!subpath.handle_modes.every((mode) => mode === 'broken' || mode === 'joined'))
+		)
+			return false;
 		const first = subpath.segments[0];
 		if (!isRecord(first) || first.type !== 'move') return false;
 		return subpath.segments.every(
@@ -217,7 +225,14 @@ export function pathBounds(geometry: PathGeometry): Bounds {
 
 export function validateShapeProperties(kind: string, properties: Record<string, JsonValue>): boolean {
 	if (!(BUILTIN_SHAPE_KINDS as readonly string[]).includes(kind)) return false;
-	if (kind === 'path' && !validatePathGeometry({ subpaths: properties.subpaths, fill_rule: properties.fill_rule }))
+	if (
+		kind === 'path' &&
+		!validatePathGeometry({
+			subpaths: properties.subpaths,
+			fill_rule: properties.fill_rule,
+			handle_modes: properties.handle_modes
+		})
+	)
 		return false;
 	if (kind === 'stroke' && !validateStrokeProperties(properties)) return false;
 	return ['width', 'height'].every((name) => {

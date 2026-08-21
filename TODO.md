@@ -119,22 +119,22 @@ document lifecycle, including SVG import and rendering.
 
 #### Segment editing
 
-- [ ] Route committed topology operations through canonical Rust geometry APIs
-- [ ] Add anchors to path segments
-- [ ] Delete anchors
-- [ ] Convert straight segments to curves
-- [ ] Convert curves to straight segments
-- [ ] Break Bezier handles
-- [ ] Join Bezier handles
+- [x] Route committed topology operations through canonical Rust geometry APIs
+- [x] Add anchors to path segments
+- [x] Delete anchors
+- [x] Convert straight segments to curves
+- [x] Convert curves to straight segments
+- [x] Break Bezier handles
+- [x] Join Bezier handles
 
 #### Open paths, compound paths, and tests
 
-- [ ] Open closed paths
-- [ ] Close open paths
-- [ ] Join compatible endpoints
-- [ ] Preserve compound-path fill behavior during topology changes
-- [ ] Reject invalid durable path topology
-- [ ] Add topology-edit fixtures and tests
+- [x] Open closed paths
+- [x] Close open paths
+- [x] Join compatible endpoints
+- [x] Preserve compound-path fill behavior during topology changes
+- [x] Reject invalid durable path topology
+- [x] Add topology-edit fixtures and tests
 
 ## Direct CLI Control
 

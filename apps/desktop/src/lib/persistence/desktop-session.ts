@@ -609,7 +609,8 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 			origin: 'human',
 			transaction_id: createId('transaction'),
 			description: 'Update desktop document',
-			timestamp: Date.now()
+			timestamp: Date.now(),
+			topologyEdits: patch.topologyEdits
 		});
 		if (request.patches.length === 0) return;
 		const committed = await api.reconcileEditorPatches({

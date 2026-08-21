@@ -172,6 +172,38 @@ fn geometry_is_normalized_and_bounded_at_the_commit_boundary() {
 }
 
 #[test]
+fn invalid_path_topology_is_rejected_before_commit() {
+    let mut engine = engine();
+    let before = engine.snapshot().expect("initial snapshot");
+    let path_id = ShapeId::from("shape:invalid-path");
+    let mut invalid = shape(path_id.as_str(), 120.0);
+    invalid.kind = ShapeKind::from(crate::PATH_KIND);
+    invalid.properties = ShapeProperties::from([
+        (
+            "subpaths".into(),
+            json!([{
+                "segments": [
+                    { "type": "move", "to": { "x": 0.0, "y": 0.0 } },
+                    { "type": "line", "to": { "x": 10.0, "y": 0.0 } },
+                    { "type": "move", "to": { "x": 20.0, "y": 0.0 } }
+                ],
+                "closed": false
+            }]),
+        ),
+        ("fill_rule".into(), json!("nonzero")),
+    ]);
+    let draft = transaction(
+        &mut engine,
+        "actor:local",
+        "invalid path",
+        vec![Operation::CreateShape { shape: invalid, anchor: SiblingAnchor::Last }],
+    );
+    let result = engine.commit(draft);
+    assert!(matches!(result, Err(EngineError::Schema(_))));
+    assert_eq!(engine.snapshot().expect("snapshot after rejection").heads, before.heads);
+}
+
+#[test]
 fn transaction_is_atomic_and_returns_inverse_patch_heads_and_regions() {
     let mut engine = engine();
     let initial = engine.snapshot().unwrap();

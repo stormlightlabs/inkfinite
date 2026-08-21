@@ -1,0 +1,120 @@
+{
+  "_do_not_edit": true,
+  "_generated_by": "Inkfinite path topology fixture",
+  "format": "inkfinite.path-topology-fixture",
+  "cases": [
+    {
+      "name": "open-and-close-compound-subpaths",
+      "geometry": {
+        "fill_rule": "evenodd",
+        "subpaths": [
+          {
+            "closed": false,
+            "segments": [
+              { "type": "move", "to": { "x": 0.0, "y": 0.0 } },
+              { "type": "line", "to": { "x": 10.0, "y": 0.0 } }
+            ]
+          },
+          {
+            "closed": true,
+            "segments": [
+              { "type": "move", "to": { "x": 20.0, "y": 20.0 } },
+              { "type": "line", "to": { "x": 30.0, "y": 20.0 } }
+            ]
+          }
+        ]
+      },
+      "operations": [
+        { "type": "close_path", "subpath_index": 0 },
+        { "type": "open_path", "subpath_index": 1 }
+      ],
+      "expected": {
+        "fill_rule": "evenodd",
+        "subpaths": [
+          {
+            "closed": true,
+            "segments": [
+              { "type": "move", "to": { "x": 0.0, "y": 0.0 } },
+              { "type": "line", "to": { "x": 10.0, "y": 0.0 } }
+            ]
+          },
+          {
+            "closed": false,
+            "segments": [
+              { "type": "move", "to": { "x": 20.0, "y": 20.0 } },
+              { "type": "line", "to": { "x": 30.0, "y": 20.0 } }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "join-open-compound-endpoints",
+      "geometry": {
+        "fill_rule": "evenodd",
+        "subpaths": [
+          {
+            "closed": false,
+            "handle_modes": ["broken", "joined"],
+            "segments": [
+              { "type": "move", "to": { "x": 0.0, "y": 0.0 } },
+              {
+                "type": "cubic",
+                "control_1": { "x": 3.0, "y": 0.0 },
+                "control_2": { "x": 7.0, "y": 0.0 },
+                "to": { "x": 10.0, "y": 0.0 }
+              }
+            ]
+          },
+          {
+            "closed": false,
+            "handle_modes": ["joined", "broken"],
+            "segments": [
+              { "type": "move", "to": { "x": 20.0, "y": 0.0 } },
+              {
+                "type": "cubic",
+                "control_1": { "x": 23.0, "y": 0.0 },
+                "control_2": { "x": 27.0, "y": 0.0 },
+                "to": { "x": 30.0, "y": 0.0 }
+              }
+            ]
+          }
+        ]
+      },
+      "operations": [
+        {
+          "type": "join_endpoints",
+          "first_subpath_index": 0,
+          "first_at_start": false,
+          "second_subpath_index": 1,
+          "second_at_start": true
+        }
+      ],
+      "expected": {
+        "fill_rule": "evenodd",
+        "subpaths": [
+          {
+            "closed": false,
+            "handle_modes": ["broken", "joined", "joined", "broken"],
+            "segments": [
+              { "type": "move", "to": { "x": 0.0, "y": 0.0 } },
+              {
+                "type": "cubic",
+                "control_1": { "x": 3.0, "y": 0.0 },
+                "control_2": { "x": 7.0, "y": 0.0 },
+                "to": { "x": 10.0, "y": 0.0 }
+              },
+              { "type": "line", "to": { "x": 20.0, "y": 0.0 } },
+              {
+                "type": "cubic",
+                "control_1": { "x": 23.0, "y": 0.0 },
+                "control_2": { "x": 27.0, "y": 0.0 },
+                "to": { "x": 30.0, "y": 0.0 }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

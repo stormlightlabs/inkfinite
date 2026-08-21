@@ -104,6 +104,11 @@ export type Vec2 = {
 export type PathFillRule = 'nonzero' | 'evenodd';
 
 /**
+ * Whether the two cubic handles at an anchor move together.
+ */
+export type PathHandleMode = 'broken' | 'joined';
+
+/**
  * One normalized drawing command in a path subpath.
  */
 export type PathSegment =
@@ -161,6 +166,10 @@ export type PathSubpath = {
 	 * Whether the final point connects back to the subpath's move point.
 	 */
 	closed: boolean;
+	/**
+	 * Optional per-anchor handle modes. Missing entries use broken handles.
+	 */
+	handle_modes?: Array<PathHandleMode> | null;
 };
 
 /**

@@ -290,6 +290,123 @@ export type EditorProjection = {
 };
 
 /**
+ * Curve kind used when converting a straight path segment.
+ */
+export type PathCurveKind = 'quadratic' | 'cubic';
+
+/**
+ * One deterministic edit to normalized path topology.
+ */
+export type PathTopologyOperation =
+	| {
+			type: 'add_anchor';
+			/**
+			 * Subpath containing the segment.
+			 */
+			subpath_index: number;
+			/**
+			 * Segment whose destination anchor is split.
+			 */
+			segment_index: number;
+			/**
+			 * Curve parameter at which the new anchor is inserted.
+			 */
+			t: number;
+	  }
+	| {
+			type: 'delete_anchor';
+			/**
+			 * Subpath containing the anchor.
+			 */
+			subpath_index: number;
+			/**
+			 * Segment whose destination anchor is removed.
+			 */
+			segment_index: number;
+	  }
+	| {
+			type: 'convert_to_curve';
+			/**
+			 * Subpath containing the segment.
+			 */
+			subpath_index: number;
+			/**
+			 * Segment to convert.
+			 */
+			segment_index: number;
+			/**
+			 * Curve representation to create.
+			 */
+			curve: PathCurveKind;
+	  }
+	| {
+			type: 'convert_to_line';
+			/**
+			 * Subpath containing the segment.
+			 */
+			subpath_index: number;
+			/**
+			 * Segment to convert.
+			 */
+			segment_index: number;
+	  }
+	| {
+			type: 'open_path';
+			/**
+			 * Subpath to open.
+			 */
+			subpath_index: number;
+	  }
+	| {
+			type: 'close_path';
+			/**
+			 * Subpath to close.
+			 */
+			subpath_index: number;
+	  }
+	| {
+			type: 'join_endpoints';
+			/**
+			 * First subpath containing an endpoint.
+			 */
+			first_subpath_index: number;
+			/**
+			 * Whether the first endpoint is the move-point endpoint.
+			 */
+			first_at_start: boolean;
+			/**
+			 * Second subpath containing an endpoint.
+			 */
+			second_subpath_index: number;
+			/**
+			 * Whether the second endpoint is the move-point endpoint.
+			 */
+			second_at_start: boolean;
+	  }
+	| {
+			type: 'break_handles';
+			/**
+			 * Subpath containing the anchor.
+			 */
+			subpath_index: number;
+			/**
+			 * Anchor segment index whose handles are changed.
+			 */
+			segment_index: number;
+	  }
+	| {
+			type: 'join_handles';
+			/**
+			 * Subpath containing the anchor.
+			 */
+			subpath_index: number;
+			/**
+			 * Anchor segment index whose handles are changed.
+			 */
+			segment_index: number;
+	  };
+
+/**
  * Semantic editor changes that can be reconciled into native operations.
  *
  * Shape transforms are world-space transforms from [`EditorShape::transform`].
@@ -326,6 +443,17 @@ export type EditorPatch =
 			 * Replacement sibling placement.
 			 */
 			anchor: SiblingAnchor<ShapeId> | null;
+	  }
+	| {
+			type: 'path_topology';
+			/**
+			 * Path shape to edit.
+			 */
+			shape_id: ShapeId;
+			/**
+			 * Ordered operations applied to the path in one transaction.
+			 */
+			operations: Array<PathTopologyOperation>;
 	  }
 	| {
 			type: 'create_page';

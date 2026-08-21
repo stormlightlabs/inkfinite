@@ -14,6 +14,7 @@ use thiserror::Error;
 use ts_rs::TS;
 
 use crate::engine::geometry::{Affine, decompose_transform, parent_world_transform, world_transform};
+use crate::path::{PathTopologyOperation, apply_path_topology_operations};
 use crate::proto::{
     LayerContentsDisposition, LayerPatch, Operation, ShapePatch as NativeShapePatch, TransactionDraft, TransactionId,
 };
@@ -218,6 +219,13 @@ pub enum EditorPatch {
         /// Replacement sibling placement.
         anchor: Option<SiblingAnchor<ShapeId>>,
     },
+    /// Apply canonical topology operations to one native path.
+    PathTopology {
+        /// Path shape to edit.
+        shape_id: ShapeId,
+        /// Ordered operations applied to the path in one transaction.
+        operations: Vec<PathTopologyOperation>,
+    },
     /// Create a page and its later layer records.
     CreatePage {
         /// New page record.
@@ -339,6 +347,14 @@ pub enum EditorReconciliationError {
     UnsupportedShear {
         /// Shape whose transform could not be decomposed.
         shape_id: ShapeId,
+    },
+    /// A path topology operation was invalid for the selected shape.
+    #[error("path topology operation for shape {shape_id} failed: {message}")]
+    PathTopology {
+        /// Shape whose geometry was targeted.
+        shape_id: ShapeId,
+        /// Canonical geometry error.
+        message: String,
     },
 }
 
@@ -526,6 +542,9 @@ pub fn reconcile_editor_patches(
                     &mut operations,
                 )?;
             }
+            EditorPatch::PathTopology { shape_id, operations: topology } => {
+                reconcile_path_topology(document, shape_id, &topology, &mut operations)?;
+            }
             EditorPatch::CreateShape { shape, parent, transform, anchor } => {
                 let local_transform = local_transform(document, &shape.id, &parent, transform, &created_layers)?;
                 let metadata = shape.metadata.unwrap_or_else(|| default_metadata.clone());
@@ -601,6 +620,53 @@ pub fn reconcile_editor_patches(
         operations,
         timestamp: request.timestamp,
     })
+}
+
+fn reconcile_path_topology(
+    document: &Document, shape_id: ShapeId, topology: &[PathTopologyOperation], operations: &mut Vec<Operation>,
+) -> Result<(), EditorReconciliationError> {
+    let shape = document
+        .shapes
+        .get(&shape_id)
+        .ok_or_else(|| EditorReconciliationError::UnknownShape(shape_id.clone()))?;
+    if shape.kind.as_str() != crate::PATH_KIND {
+        return Err(EditorReconciliationError::PathTopology {
+            shape_id,
+            message: "topology operations require a path shape".into(),
+        });
+    }
+    if topology.is_empty() {
+        return Ok(());
+    }
+    let mut geometry = crate::path_geometry_from_properties(&shape.properties).map_err(|error| {
+        EditorReconciliationError::PathTopology { shape_id: shape.id.clone(), message: error.to_string() }
+    })?;
+    apply_path_topology_operations(&mut geometry, topology).map_err(|error| {
+        EditorReconciliationError::PathTopology { shape_id: shape.id.clone(), message: error.to_string() }
+    })?;
+    let mut properties = shape.properties.clone();
+    properties.insert(
+        "subpaths".into(),
+        serde_json::to_value(geometry.subpaths).map_err(|error| EditorReconciliationError::PathTopology {
+            shape_id: shape.id.clone(),
+            message: error.to_string(),
+        })?,
+    );
+    properties.insert(
+        "fill_rule".into(),
+        serde_json::to_value(geometry.fill_rule).map_err(|error| EditorReconciliationError::PathTopology {
+            shape_id: shape.id.clone(),
+            message: error.to_string(),
+        })?,
+    );
+    if properties != shape.properties {
+        operations.push(Operation::PatchShape {
+            shape_id: shape.id.clone(),
+            patch: NativeShapePatch { properties: Some(properties), ..NativeShapePatch::default() },
+            expected_version: Some(shape.version),
+        });
+    }
+    Ok(())
 }
 
 struct ReconcileShapeOptions<'a> {
@@ -914,6 +980,47 @@ mod tests {
             .point(Vec2 { x: moved.e, y: moved.f });
         assert!((local.translation.x - expected.x).abs() < 1e-9);
         assert!((local.translation.y - expected.y).abs() < 1e-9);
+    }
+
+    #[test]
+    fn reconciliation_routes_path_topology_through_canonical_geometry() {
+        let mut snapshot = nested_snapshot();
+        let path_id = ShapeId::from("shape:child");
+        let path = snapshot.document.shapes.get_mut(&path_id).unwrap();
+        path.kind = ShapeKind::from(crate::PATH_KIND);
+        path.properties = BTreeMap::from([
+            (
+                "subpaths".into(),
+                serde_json::json!([{
+                    "segments": [
+                        { "type": "move", "to": { "x": 0.0, "y": 0.0 } },
+                        { "type": "line", "to": { "x": 40.0, "y": 0.0 } },
+                        { "type": "line", "to": { "x": 40.0, "y": 40.0 } }
+                    ],
+                    "closed": false
+                }]),
+            ),
+            ("fill_rule".into(), serde_json::json!("nonzero")),
+        ]);
+
+        let transaction = reconcile_editor_patches(
+            &snapshot,
+            request(vec![EditorPatch::PathTopology {
+                shape_id: path_id.clone(),
+                operations: vec![PathTopologyOperation::AddAnchor { subpath_index: 0, segment_index: 1, t: 0.5 }],
+            }]),
+        )
+        .expect("path topology should reconcile");
+
+        assert_eq!(transaction.operations.len(), 1);
+        let Operation::PatchShape { shape_id, patch, .. } = &transaction.operations[0] else {
+            panic!("expected a path property patch")
+        };
+        assert_eq!(shape_id, &path_id);
+        let properties = patch.properties.as_ref().expect("topology should replace properties");
+        let segments = properties["subpaths"][0]["segments"].as_array().expect("segments");
+        assert_eq!(segments.len(), 4);
+        assert_eq!(segments[1]["to"], serde_json::json!({ "x": 20.0, "y": 0.0 }));
     }
 
     #[test]

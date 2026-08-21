@@ -1,4 +1,5 @@
 import type { Action } from "../actions";
+import type { PathTopologyEdit } from "../model";
 import type { EditorState, ToolId } from "../reactivity";
 
 /**
@@ -35,6 +36,12 @@ export interface Tool {
    * @returns Updated editor state
    */
   onExit(state: EditorState): EditorState;
+
+  /** Returns topology operations staged by the current gesture, if any. */
+  getPendingTopologyEdits?(): PathTopologyEdit[];
+
+  /** Clears topology metadata after the runtime hands a draft to persistence. */
+  clearPendingTopologyEdits?(): void;
 }
 
 /**

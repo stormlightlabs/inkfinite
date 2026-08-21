@@ -140,18 +140,23 @@ export function createCanvasController(
 				if (!activeBoardId || event.kind !== 'doc' || !sink) {
 					return;
 				}
+				const topologyEdits = event.op === 'do' ? event.command.topologyEdits : undefined;
 				if (sink.enqueueEditorChange) {
 					sink.enqueueEditorChange({
 						boardId: activeBoardId,
 						before: event.beforeState.doc,
 						after: event.afterState.doc,
 						op: event.op,
-						description: event.command.name
+						description: event.command.name,
+						topologyEdits
 					});
 					return;
 				}
 				const patch = diffDoc(event.beforeState.doc, event.afterState.doc);
-				sink.enqueueDocPatch(activeBoardId, patch);
+				sink.enqueueDocPatch(
+					activeBoardId,
+					topologyEdits ? { ...patch, topologyEdits } : patch
+				);
 			}
 		}
 	);
@@ -399,12 +404,12 @@ export function createCanvasController(
 		tools,
 		selectionTool: selectTool,
 		getSnapSettings: () => snapStore.get(),
-		onTransactionDraft: ({ name, kind, before, after }) => {
+		onTransactionDraft: ({ name, kind, before, after, topologyEdits }) => {
 			// Tool movement renders `after` as a local preview. We want restore the
 			// committed mirror before executing the command so history and persistence
 			// receive the real before/after pair exactly once.
 			store.setState(() => before);
-			store.executeCommand(new SnapshotCommand(name, kind, before, after));
+			store.executeCommand(new SnapshotCommand(name, kind, before, after, topologyEdits));
 			syncHandleState();
 		},
 		onBrowseRequested: () => fileBrowser.handleOpen(),

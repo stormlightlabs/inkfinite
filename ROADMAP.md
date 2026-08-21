@@ -72,12 +72,16 @@ and dragging. Path-edit previews recompute bounds and hit regions from the
 preview document. Each completed geometry gesture produces one history entry,
 with interaction coverage for preview, commit, and undo behavior.
 
-The next direct path-editing slice covers:
+The segment-editing slice is implemented. Direct selection can split and delete
+anchors, convert lines and curves, and break or join cubic handles. Committed
+requests carry semantic topology operations to Rust, while the editor mirrors
+the same operations for responsive previews.
 
-- add and remove anchors
-- open and close paths
-- join compatible endpoints
-- convert straight segments to curves and curves to straight segments
+The open/close and endpoint-joining slice is implemented. Direct selection can open or close
+selected subpaths and join two selected endpoints from separate open subpaths. Joining reverses
+subpaths when needed, inserts a connecting line when endpoints differ, preserves cubic controls
+and handle modes, and retains the path's compound fill rule. Rust rejects malformed input before
+applying topology operations; shared Rust and TypeScript fixtures cover these edits.
 
 Path anchors, handles, and subpath selections are ephemeral editor state.
 They are geometry owned by a path shape rather than independent durable
