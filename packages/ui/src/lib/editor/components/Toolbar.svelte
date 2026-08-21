@@ -702,12 +702,13 @@
 			{#if hasArrowSelection}
 				<ArrowPopover {store} />
 			{/if}
-			<label class="toolbar__agent-control">
+			<label class="toolbar__agent-control" title="Allow agents to edit the selection">
 				<input
 					type="checkbox"
 					checked={agentEditableValue}
-					onchange={handleAgentEditableChange} />
-				<span>Agent editable</span>
+					onchange={handleAgentEditableChange}
+					aria-label="Agent editable" />
+				<span>Agents</span>
 			</label>
 		</div>
 	{/if}
@@ -898,17 +899,28 @@
 	.toolbar__agent-control {
 		display: inline-flex;
 		align-items: center;
-		gap: var(--ink-space-2);
-		min-height: 2.5rem;
-		padding: 0 var(--ink-space-2);
-		color: var(--ink-text);
-		font: 600 var(--ink-type-xs) / 1 var(--ink-font-body);
+		gap: var(--ink-space-1);
+		min-height: 2rem;
+		padding: 0 var(--ink-space-1);
+		color: var(--ink-text-muted);
+		font: 500 var(--ink-type-xs) / 1 var(--ink-font-body);
 		white-space: nowrap;
+		cursor: pointer;
+	}
+
+	.toolbar__agent-control:hover {
+		color: var(--ink-text);
+	}
+
+	.toolbar__agent-control:focus-within {
+		border-radius: var(--ink-radius-wobbly-small);
+		outline: 2px solid var(--ink-accent);
+		outline-offset: 1px;
 	}
 
 	.toolbar__agent-control input {
-		width: 1rem;
-		height: 1rem;
+		width: 0.875rem;
+		height: 0.875rem;
 		margin: 0;
 		accent-color: var(--ink-accent);
 	}

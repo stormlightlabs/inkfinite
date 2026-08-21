@@ -4,95 +4,36 @@
 
 ### Added
 
-- Automerge-backed CRDT transaction engine: validates, commits, and returns
-  patches, heads, inverse metadata, affected IDs, and warnings in one atomic
-  operation.
-- Rust document model with pages, layers, shapes, bindings, semantic metadata,
-  and stable IDs.
-- Typed schema generation and TypeScript bindings from Rust records.
-- Deterministic headless SVG rendering for all built-in shapes, layers,
-  bindings, transforms, opacity, text, and Markdown.
-- File-mode CLI commands: `new`, `inspect`, `query`, `validate`, `shape`,
-  `connect`, `layout`, `apply`, `render`, `schema`, `capabilities`.
-- Global `--json` and `--non-interactive` CLI options with `--dry-run` for
-  mutations and stable exit codes.
-- Authenticated local IPC between the desktop app and CLI using versioned
-  Unix-domain sockets or Windows named pipes.
-- Live agent proposal workflow with ghost preview, partial acceptance, and
-  explicit-apply Direct mode.
-- Offline Automerge sync between trusted peers through a transport-neutral
-  envelope and per-peer checkpoints.
-- Bundled agent skill with worked examples covering file edits, proposal
-  review, and stale-head recovery.
-- Excalidraw and Obsidian Canvas (JSON Canvas) import and export.
-- Ordered layers with visibility, locking, active-layer state, opacity, and a
-  curated built-in stencil set.
-- Shape fill and stroke opacity controls.
-- 10,000-shape rendering and hit-testing budget met on reference hardware.
-- Atomic file writes with advisory lock, recovery data, and interrupted-write
-  recovery.
-- Tauri desktop document sessions owned by Rust: create, open, snapshot,
-  commit, undo, redo, save, query, and validate.
-- WASM (Rust-owned) editor projection and reconciliation bindings that handle composed
-  ancestor transforms, semantic editor patches, and minimal parent-relative native transactions.
-- Stateful browser WASM document sessions that open, validate, mutate, undo, redo, and save
-  canonical Automerge bytes through one worker.
-- Canonical geometry commits that validate and normalize native paths and freehand strokes in Rust,
-  compute committed stroke bounds, and exercise shared Rust/TypeScript geometry fixtures.
-- Browser smoke coverage for the compiled WASM document engine and real worker across create,
-  mutate, save, reopen, projection, undo, redo, SVG import, and SVG rendering.
-- Hierarchical vector object editing with selectable imported containers, nested selection scopes,
-  full affine hit testing, world-space child transforms for move, resize, and rotation, and
-  world-space-preserving reparent operations with locked-ancestor selection rules.
-- Direct path selection with subpath and anchor selection, anchor and subpath movement, and
-  quadratic and cubic Bézier control-handle rendering and editing.
-- Native path topology editing with anchor insertion and deletion, line and curve conversion,
-  cubic handle break/join operations, open and close operations, compatible endpoint joining,
-  semantic Rust reconciliation, and responsive previews.
-- Direct path-edit previews update bounds and hit regions, commit one transaction per
-  completed gesture, and record each gesture as one undo step with interaction coverage.
-- Shared path-topology fixtures and Rust, TypeScript, reconciliation, and commit-boundary tests
-  cover compound fill rules, endpoint orientation, malformed geometry, and invalid operations.
-
-#### SVG Interop
-
-- Native path shape representation with normalized move, line, quadratic, and
-  cubic subpaths, closed-path flags, compound fill rules, and generated bindings.
-- Static SVG import parsing with native primitive and path mapping, nested
-  transforms, inherited paint and opacity, text flattening, embedded raster
-  asset extraction, retained source assets, and typed warnings for unsupported
-  content and active SVG features.
-- Native path bounds with Bézier extrema, Canvas rendering, fill and stroke hit
-  testing, parent-relative transforms, deterministic SVG output, and shared
-  valid/invalid geometry fixtures.
-- SVG imports committed as one validated transaction from the desktop file menu,
-  browser file and drop entry points, and the CLI.
-- Browser SVG imports use the Rust document session through a lazy WASM facade
-  and reusable worker.
-- Browser SVG exports project the current board into the canonical snapshot,
-  render it through the Rust SVG renderer in the shared worker, and preserve warnings.
+- Automerge-backed Rust document engine with validated atomic transactions, history, undo/redo,
+  causal heads, sync, deterministic repair, and native file recovery.
+- Shared document model, generated TypeScript contracts, semantic metadata, ordered layers,
+  bindings, built-in shapes and stencils, and deterministic SVG/PNG rendering.
+- CLI support for file and live-session inspection, queries, validation, structured mutations,
+  dry runs, rendering, schemas, and machine-readable output.
+- Authenticated desktop IPC with reviewed proposals, ghost previews, partial acceptance, and
+  session-scoped direct apply.
+- Rust-owned desktop sessions and browser WASM sessions covering create, open, mutate, persist,
+  reopen, undo/redo, projection, reconciliation, SVG import, and SVG rendering.
+- Static SVG import and export with native primitives and paths, nested transforms, inherited
+  paint, retained source assets, and opaque fallback content for unsupported visuals.
+- Native path geometry, rendering, hit testing, compound fills, and shared Rust/TypeScript fixtures.
+- Hierarchical vector editing with nested selection, world-space transforms, reparenting, direct
+  anchor and handle editing, and path topology operations.
+- Excalidraw and Obsidian Canvas import/export, offline peer sync, and a bundled agent skill with
+  file, proposal, and stale-head examples.
 
 ### Changed
 
-- Editor runtime extracted to framework-neutral `@inkfinite/runtime` and
-  `@inkfinite/input-dom`; both web and desktop compose the shared
-  `@inkfinite/ui/editor` through platform-specific adapters.
-- Cursor mapping reimplemented with current-bound coordinate mapping, reactive
-  viewport invalidation, and pointer-capture cleanup across resize, scrolling,
-  and device-pixel-ratio changes.
-- Document model collapsed to a single native model, removing the
-  predecessor/current split.
-- Desktop editor updates now use the shared TypeScript patch builder and Rust
-  reconciliation for page, layer, and shape changes
-- Browser canonical state now caches the Rust editor projection with Automerge
-  bytes. WASM request and response payloads are generated from Rust.
-- The shared browser worker and client are named for their document-engine role,
-  and root test verification builds the WASM package before running tests.
+- Consolidated the editor into shared UI, runtime, DOM input, renderer, and core packages used by
+  desktop and web.
+- Moved canonical browser document state and committed geometry operations to Rust while retaining
+  low-latency interaction previews in TypeScript.
+- Unified the document model and SVG pipeline across desktop, web, WASM, and CLI.
 
 ### Fixed
 
-- Concurrent merge deterministic repairs: missing parents move to a recovery
-  layer, broken bindings are removed, duplicate child references collapse, and
-  pages without layers gain a default.
-- Invalid documents rejected before any canonical file is changed.
-- Recovery data preserved on interrupted writes.
+- Rejected malformed documents and transactions before canonical state changes.
+- Repaired merge damage deterministically, including missing parents, duplicate child references,
+  broken bindings, and pages without layers.
+- Corrected cursor mapping, nested-transform hit testing, path preview bounds, pointer capture, and
+  persistence recovery behavior.
