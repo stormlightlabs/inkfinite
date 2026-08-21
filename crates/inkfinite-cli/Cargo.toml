@@ -17,6 +17,7 @@ path = "src/bin/generate-bindings.rs"
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
+clap_complete.workspace = true
 inkfinite-core.workspace = true
 resvg.workspace = true
 schemars.workspace = true

@@ -36,7 +36,7 @@ pub fn print_schema(kind: SchemaKind, stdout: &mut dyn Write) -> Result<(), CliE
 
 pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(), CliError> {
     let capabilities = json!({
-        "commands": ["new", "inspect", "query", "app", "validate", "apply", "import", "shape", "connect", "layout", "render", "schema", "capabilities"],
+        "commands": ["new", "inspect", "query", "app", "validate", "apply", "import", "shape", "connect", "layout", "render", "schema", "completions", "capabilities"],
         "exit_codes": {
             "conflict": EXIT_CONFLICT,
             "input": EXIT_INPUT,
@@ -72,6 +72,7 @@ pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(
         "query_options": ["detail", "limit"],
         "render_filters": ["page", "layer", "shape", "role", "region"],
         "schemas": ["document", "transaction", "protocol", "protocol-request", "protocol-response", "protocol-error"],
+        "completions": { "shells": ["bash", "fish", "zsh"], "alias": "comp" },
         "shape_kinds": builtin_shape_kinds()
     });
     if json_output {
@@ -86,7 +87,7 @@ pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(
     .map_err(map_output_error)?;
     writeln!(
         stdout,
-        "Commands: new, inspect, query, app, validate, apply, import, shape, connect, layout, render, schema, capabilities"
+        "Commands: new, inspect, query, app, validate, apply, import, shape, connect, layout, render, schema, completions, capabilities"
     )
     .map_err(map_output_error)?;
     writeln!(

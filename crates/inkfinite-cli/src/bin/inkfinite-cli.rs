@@ -3,9 +3,7 @@
 use std::io;
 
 use clap::Parser;
-
-#[path = "../cli/mod.rs"]
-mod cli;
+use inkfinite_cli::cli;
 
 fn main() {
     let arguments = std::env::args_os().collect::<Vec<_>>();

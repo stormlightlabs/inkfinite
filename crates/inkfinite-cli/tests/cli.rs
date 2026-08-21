@@ -62,6 +62,24 @@ fn help_makes_common_tasks_and_support_paths_discoverable() {
 }
 
 #[test]
+fn completion_command_accepts_long_name_and_alias() {
+    let bash = run(["completions", "bash"]);
+    assert_success(&bash);
+    assert!(String::from_utf8_lossy(&bash.stdout).contains("inkfinite"));
+
+    let fish = run(["comp", "fish"]);
+    assert_success(&fish);
+    assert!(String::from_utf8_lossy(&fish.stdout).contains("inkfinite"));
+
+    let zsh = run(["completions", "zsh"]);
+    assert_success(&zsh);
+    assert!(String::from_utf8_lossy(&zsh.stdout).contains("inkfinite"));
+
+    let invalid = run(["completions", "powershell"]);
+    assert_eq!(invalid.status.code(), Some(2));
+}
+
+#[test]
 fn closed_file_workflow_has_stable_human_and_json_output() {
     let temporary = TestDirectory::new("workflow");
     let document_path = temporary.path.join("System Map.inkfinite");

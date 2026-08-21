@@ -50,9 +50,15 @@ pnpm tauri dev
 To build the CLI used by scripts and live desktop sessions:
 
 ```sh
-cargo build -p inkfinite-cli --bin inkfinite  # you can optionally cargo install
-./target/debug/inkfinite --help               # just inkfinite if cargo installed
+cargo build -p inkfinite-cli --bin inkfinite
+./target/debug/inkfinite --help
+
+# Build an installable release tree with the binary, man page, and completions.
+cargo xtask dist
 ```
+
+See the [CLI documentation](apps/web/src/content/docs/reference/cli.md) for
+installation paths and shell completion setup.
 
 ## Documentation
 

@@ -24,6 +24,7 @@ commands are:
 | `import svg`                 | Import static SVG content into native shapes                  |
 | `render`                     | Write an SVG or PNG of a document or filtered view            |
 | `app`                        | Inspect or work with a running desktop session                |
+| `completions`                | Print a Bash, Fish, or Zsh completion script                  |
 | `schema`, `capabilities`     | Print machine-readable contracts for integrations             |
 
 During development, build the binary with:
@@ -31,6 +32,56 @@ During development, build the binary with:
 ```sh
 cargo build -p inkfinite-cli --bin inkfinite
 ```
+
+## Build and install the CLI
+
+The workspace includes an `xtask` helper for building the CLI and generating its
+man page and shell completions:
+
+```sh
+cargo xtask man
+cargo xtask completions
+cargo xtask dist
+```
+
+The first two commands write to `target/man/inkfinite.1` and
+`target/completions/`. `cargo xtask dist` builds the release binary and writes a
+source-built distribution under `target/dist/`:
+
+```text
+target/dist/bin/inkfinite
+target/dist/share/man/man1/inkfinite.1
+target/dist/share/bash-completion/completions/inkfinite
+target/dist/share/fish/vendor_completions.d/inkfinite.fish
+target/dist/share/zsh/site-functions/_inkfinite
+```
+
+On a Unix system, install those files with:
+
+```sh
+sudo mkdir -p /usr/local/bin /usr/local/share/man/man1 \
+  /usr/local/share/bash-completion/completions \
+  /usr/local/share/fish/vendor_completions.d \
+  /usr/local/share/zsh/site-functions
+
+sudo install -m 755 target/dist/bin/inkfinite /usr/local/bin/inkfinite
+
+sudo install -m 644 target/dist/share/man/man1/inkfinite.1 \
+  /usr/local/share/man/man1/inkfinite.1
+
+sudo install -m 644 target/dist/share/bash-completion/completions/inkfinite \
+  /usr/local/share/bash-completion/completions/inkfinite
+
+sudo install -m 644 target/dist/share/fish/vendor_completions.d/inkfinite.fish \
+  /usr/local/share/fish/vendor_completions.d/inkfinite.fish
+
+sudo install -m 644 target/dist/share/zsh/site-functions/_inkfinite \
+  /usr/local/share/zsh/site-functions/_inkfinite
+```
+
+Use `inkfinite completions bash`, `inkfinite completions fish`, or
+`inkfinite completions zsh` to print one script directly. `comp` is an alias for
+`completions`.
 
 ## File mode
 

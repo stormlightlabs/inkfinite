@@ -105,6 +105,7 @@ impl CliError {
 mod app;
 mod apply;
 mod args;
+mod completion;
 mod connect;
 mod contract;
 mod document;
@@ -122,7 +123,7 @@ use args::{
 };
 use support::parse_bounds;
 
-pub use args::{Cli, Command};
+pub use args::{Cli, Command, CompletionShell};
 
 pub fn run(command: Command, json_output: bool, stdout: &mut dyn Write) -> Result<()> {
     match command {
@@ -138,6 +139,7 @@ pub fn run(command: Command, json_output: bool, stdout: &mut dyn Write) -> Resul
         Command::Layout(command) => layout::run_layout_command(command, json_output, stdout),
         Command::Render(args) => render::render_document(args, json_output, stdout),
         Command::Schema(args) => contract::print_schema(args.kind, stdout),
+        Command::Completions(args) => completion::print_completions(args.shell, stdout),
         Command::Capabilities => contract::print_capabilities(json_output, stdout),
     }
 }

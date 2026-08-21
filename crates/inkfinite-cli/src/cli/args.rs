@@ -108,6 +108,16 @@ pub enum Command {
     inkfinite schema protocol
 ")]
     Schema(SchemaArgs),
+    /// Print a shell completion script.
+    #[command(
+        visible_alias = "comp",
+        after_help = "Examples:
+
+    inkfinite completions bash > inkfinite.bash
+    inkfinite comp zsh > _inkfinite
+"
+    )]
+    Completions(CompletionsArgs),
     /// Report the stable file-mode command contract.
     #[command(after_help = "Examples:
 
@@ -714,4 +724,22 @@ pub struct SchemaArgs {
     /// Contract to print.
     #[arg(value_enum, value_name = "KIND")]
     pub kind: SchemaKind,
+}
+
+#[derive(Debug, Args)]
+pub struct CompletionsArgs {
+    /// Shell to generate completions for.
+    #[arg(value_enum, value_name = "SHELL")]
+    pub shell: CompletionShell,
+}
+
+/// Shells supported by the completion command and source distribution.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+pub enum CompletionShell {
+    /// Bourne Again Shell.
+    Bash,
+    /// Friendly Interactive Shell.
+    Fish,
+    /// Z Shell.
+    Zsh,
 }
