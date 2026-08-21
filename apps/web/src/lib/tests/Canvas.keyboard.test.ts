@@ -85,7 +85,7 @@ vi.mock('$editor/status', () => ({
 	})
 }));
 
-vi.mock('@inkfinite/renderer', () => {
+vi.mock('@inkfinite/editor/renderer', () => {
 	return {
 		createRenderer: vi.fn((_canvas, store) => {
 			coreMocks.storeInstances.push(store);

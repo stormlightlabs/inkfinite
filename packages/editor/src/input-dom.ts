@@ -6,7 +6,7 @@ import {
 	PointerButtons,
 	type Vec2,
 	type Viewport
-} from '@inkfinite/runtime';
+} from './runtime.js';
 
 /**
  * Pointer state tracked by the input adapter

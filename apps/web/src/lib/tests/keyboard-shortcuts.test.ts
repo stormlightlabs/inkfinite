@@ -1,5 +1,5 @@
 import { Action, EditorState, Store, type Tool } from '@inkfinite/core';
-import { EditorRuntime, type SelectionTool } from '@inkfinite/runtime';
+import { EditorRuntime, type SelectionTool } from '@inkfinite/editor/runtime';
 import { describe, expect, it, vi } from 'vitest';
 
 class IdleSelectionTool implements Tool {

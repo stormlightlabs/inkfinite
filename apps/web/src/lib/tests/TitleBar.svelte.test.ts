@@ -3,7 +3,7 @@ import { type ComponentProps } from 'svelte';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, render } from 'vitest-browser-svelte';
 import Toolbar from '$editor/components/Toolbar.svelte';
-import { createStoreWithRect } from './Toolbar.colors.test';
+import { createStoreWithRect } from './toolbar-fixtures';
 
 const renderToolbar = (overrides: Partial<ComponentProps<typeof Toolbar>> = {}) => {
 	const brushStore = createBrushStore();

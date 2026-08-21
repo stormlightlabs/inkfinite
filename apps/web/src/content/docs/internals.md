@@ -40,9 +40,11 @@ for vector editing.
 Browser app ───────┐
                    ├── @inkfinite/ui
 Desktop frontend ──┘        │
-                            ├── @inkfinite/runtime ── @inkfinite/core
-                            ├── @inkfinite/input-dom
-                            └── @inkfinite/renderer ── Canvas 2D
+                            └── @inkfinite/editor ── @inkfinite/core
+                                      │
+                                      ├── DOM input
+                                      ├── interaction runtime
+                                      └── Canvas 2D renderer
 
 Desktop frontend
       │ generated contracts + Tauri commands
@@ -95,18 +97,18 @@ The [testing guide](/docs/internals/testing/) documents shared fixtures and focu
 
 ## Edit flow
 
-`@inkfinite/runtime` is a framework-neutral interaction state machine. It routes normalized actions
-through camera and tool state, applies gesture previews to the editor store, and emits a transaction
-draft when an interaction reaches a commit boundary such as pointer-up or an explicit editor commit.
+`@inkfinite/editor/runtime` is a framework-neutral interaction state machine. It routes normalized
+actions through camera and tool state, applies gesture previews to the editor store, and emits a
+transaction draft when an interaction reaches a commit point such as pointer-up or an editor commit.
 
 A desktop document edit follows this path:
 
 ```text
 DOM input
    ↓
-@inkfinite/input-dom
+@inkfinite/editor/input-dom
    ↓
-@inkfinite/runtime
+@inkfinite/editor/runtime
    ↓
 editor-state preview
    ↓ completed gesture
@@ -142,9 +144,7 @@ Causal heads and record versions are used for optimistic concurrency. See
 | `apps/desktop/src-tauri` | Tauri command surface and native application integration around `inkfinite-core`                                          |
 | `packages/bindings`      | Generated TypeScript contracts derived from Rust; do not edit these by hand                                               |
 | `packages/core`          | Editor-facing model, geometry, actions, tools, stencils, interchange, and browser-side utilities                          |
-| `packages/runtime`       | Framework-neutral interaction state machine and transaction-draft boundaries                                              |
-| `packages/input-dom`     | Normalizes browser pointer, keyboard, wheel, and viewport input for the runtime                                           |
-| `packages/renderer`      | Canvas 2D scene rendering, selection overlays, viewport culling, and layout caches                                        |
+| `packages/editor`        | DOM input normalization, interaction state, transaction drafts, and Canvas 2D rendering                                   |
 | `packages/ui`            | Shared Svelte editor, panels, controls, themes, and UI components                                                         |
 | `apps/web`               | Browser composition root, documentation site, and IndexedDB-backed editor persistence                                     |
 | `apps/desktop`           | Desktop composition root and TypeScript adapter for Tauri-owned native document sessions                                  |
@@ -154,11 +154,11 @@ workspace contains the shared packages plus the web and desktop application root
 
 ## Rendering
 
-Interactive rendering is Canvas 2D. `@inkfinite/renderer` subscribes to the editor store, marks the
-canvas dirty when state changes, and draws on the next animation frame. It maps the camera into world
-coordinates, culls shapes outside an expanded viewport, and keeps bounded caches for text and
-Markdown layout. Selection handles, binding previews, and snapping guides are rendered from
-editor-only state and are not durable document records.
+Interactive rendering is Canvas 2D. `@inkfinite/editor/renderer` subscribes to the editor store,
+marks the canvas dirty when state changes, and draws on the next animation frame. It maps the camera
+into world coordinates, culls shapes outside an expanded viewport, and keeps fixed-size caches for
+text and Markdown layout. Selection handles, binding previews, and snapping guides are rendered from
+editor-only state and are not native document records.
 
 Headless rendering is separate. `inkfinite-core` renders the durable document directly to
 deterministic SVG for CLI output, fixtures, and inspection. This keeps headless output independent

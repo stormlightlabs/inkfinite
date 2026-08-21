@@ -1,0 +1,41 @@
+{
+	"name": "@inkfinite/editor",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./input-dom": {
+			"types": "./dist/input-dom.d.ts",
+			"default": "./dist/input-dom.js"
+		},
+		"./renderer": {
+			"types": "./dist/renderer.d.ts",
+			"default": "./dist/renderer.js"
+		},
+		"./runtime": {
+			"types": "./dist/runtime.d.ts",
+			"default": "./dist/runtime.js"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"format": "prettier --write src tests",
+		"format:check": "prettier --check src tests",
+		"lint": "pnpm run format:check",
+		"test": "vitest run",
+		"typecheck": "tsc -p tsconfig.json --noEmit"
+	},
+	"dependencies": {
+		"@inkfinite/core": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/jsdom": "^27.0.0",
+		"jsdom": "^27.3.0",
+		"prettier": "^3.7.4",
+		"typescript": "^5.9.3",
+		"vitest": "^4.0.16"
+	}
+}

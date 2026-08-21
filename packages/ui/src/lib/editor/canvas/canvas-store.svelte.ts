@@ -47,8 +47,8 @@ import type {
 	Viewport
 } from '@inkfinite/core';
 import { stencils } from '@inkfinite/core';
-import { Action, EditorRuntime } from '@inkfinite/runtime';
-import { createRenderer, type Renderer } from '@inkfinite/renderer';
+import { Action, EditorRuntime } from '@inkfinite/editor/runtime';
+import { createRenderer, type Renderer } from '@inkfinite/editor/renderer';
 import { onDestroy, onMount } from 'svelte';
 import { computeCursor } from './canvas-helpers';
 import { ArrowLabelEditorController } from './controllers/arrowlabel-controller.svelte';
@@ -803,7 +803,9 @@ export function createCanvasController(
 	function handlePointerLeave() {
 		setHandleHover(null);
 		store.setState((state) =>
-			state.ui.hoveredShapeId ? { ...state, ui: { ...state.ui, hoveredShapeId: undefined } } : state
+			state.ui.hoveredShapeId
+				? { ...state, ui: { ...state.ui, hoveredShapeId: undefined } }
+				: state
 		);
 	}
 

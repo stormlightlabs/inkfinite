@@ -13,7 +13,7 @@ import {
 	EditorRuntime,
 	type RuntimeTransactionDraft,
 	type SelectionTool
-} from '@inkfinite/runtime';
+} from '@inkfinite/editor/runtime';
 import { describe, expect, it } from 'vitest';
 
 const modifiers = { ctrl: false, shift: false, alt: false, meta: false };

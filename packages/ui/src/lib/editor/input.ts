@@ -1,2 +1,2 @@
-/** @deprecated Import DOM input normalization from `@inkfinite/input-dom`. */
-export * from '@inkfinite/input-dom';
+/** @deprecated Import DOM input normalization from `@inkfinite/editor/input-dom`. */
+export * from '@inkfinite/editor/input-dom';

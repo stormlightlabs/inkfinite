@@ -1,10 +1,10 @@
-import { BehaviorSubject, type Subscription } from 'rxjs';
 import type { Camera } from './camera';
 import { Camera as CameraOps } from './camera';
 import { History } from './history';
 import type { Command, HistoryAppliedEvent, HistoryEntry, HistoryOperation, HistoryState } from './history';
 import type { Document, LayerRecord, PageRecord, PathSelection, ShapeRecord } from './model';
 import { Document as DocumentOps, ensureDocumentLayers } from './model';
+import { ReactiveValue } from './reactive-value';
 
 export type ToolId = 'select' | 'direct-select' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'text' | 'pen' | 'markdown';
 
@@ -73,19 +73,19 @@ export type StoreOptions = { onHistoryEvent?: (event: HistoryAppliedEvent) => vo
  * Reactive store for editor state
  *
  * Features:
- * - Observable state using RxJS BehaviorSubject
+ * - Observable state snapshots
  * - Immutable state updates
  * - Invariant enforcement (repairs invalid state)
  * - Subscription management
  * - Undo/redo history support
  */
 export class Store {
-	private readonly state$: BehaviorSubject<EditorState>;
+	private readonly state: ReactiveValue<EditorState>;
 	private history: HistoryState;
 	private readonly historyListener?: (event: HistoryAppliedEvent) => void;
 
 	constructor(initialState?: EditorState, options?: StoreOptions) {
-		this.state$ = new BehaviorSubject(enforceInvariants(initialState ?? EditorState.create()));
+		this.state = new ReactiveValue(enforceInvariants(initialState ?? EditorState.create()));
 		this.history = History.create();
 		this.historyListener = options?.onHistoryEvent;
 	}
@@ -94,7 +94,7 @@ export class Store {
 	 * Get the current state snapshot
 	 */
 	getState(): EditorState {
-		return this.state$.value;
+		return this.state.value;
 	}
 
 	/**
@@ -108,10 +108,10 @@ export class Store {
 	 * @param updater - Function that transforms current state to new state
 	 */
 	setState(updater: StateUpdater): void {
-		const currentState = this.state$.value;
+		const currentState = this.state.value;
 		const newState = updater(currentState);
 		const repairedState = enforceInvariants(newState);
-		this.state$.next(repairedState);
+		this.state.set(repairedState);
 	}
 
 	/**
@@ -122,11 +122,11 @@ export class Store {
 	 * @param command - Command to execute
 	 */
 	executeCommand(command: Command): void {
-		const currentState = this.state$.value;
+		const currentState = this.state.value;
 		const [newHistory, newState] = History.execute(this.history, currentState, command);
 		this.history = newHistory;
 		const repairedState = enforceInvariants(newState);
-		this.state$.next(repairedState);
+		this.state.set(repairedState);
 		const entry = this.history.undoStack.at(-1);
 		if (entry) {
 			this.emitHistoryEvent('do', entry, currentState, repairedState);
@@ -139,7 +139,7 @@ export class Store {
 	 * @returns True if undo was successful, false if nothing to undo
 	 */
 	undo(): boolean {
-		const currentState = this.state$.value;
+		const currentState = this.state.value;
 		const entry = this.history.undoStack.at(-1);
 		const result = History.undo(this.history, currentState);
 
@@ -150,7 +150,7 @@ export class Store {
 		const [newHistory, newState] = result;
 		this.history = newHistory;
 		const repairedState = enforceInvariants(newState);
-		this.state$.next(repairedState);
+		this.state.set(repairedState);
 		if (entry) {
 			this.emitHistoryEvent('undo', entry, currentState, repairedState);
 		}
@@ -163,7 +163,7 @@ export class Store {
 	 * @returns True if redo was successful, false if nothing to redo
 	 */
 	redo(): boolean {
-		const currentState = this.state$.value;
+		const currentState = this.state.value;
 		const entry = this.history.redoStack.at(-1);
 		const result = History.redo(this.history, currentState);
 
@@ -174,7 +174,7 @@ export class Store {
 		const [newHistory, newState] = result;
 		this.history = newHistory;
 		const repairedState = enforceInvariants(newState);
-		this.state$.next(repairedState);
+		this.state.set(repairedState);
 		if (entry) {
 			this.emitHistoryEvent('redo', entry, currentState, repairedState);
 		}
@@ -219,15 +219,7 @@ export class Store {
 	 * @returns Unsubscribe function
 	 */
 	subscribe(listener: StateListener): () => void {
-		const subscription: Subscription = this.state$.subscribe(listener);
-		return () => subscription.unsubscribe();
-	}
-
-	/**
-	 * Get the underlying RxJS observable
-	 */
-	getObservable() {
-		return this.state$.asObservable();
+		return this.state.subscribe(listener);
 	}
 
 	private emitHistoryEvent(

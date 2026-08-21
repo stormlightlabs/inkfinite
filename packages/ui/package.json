@@ -47,9 +47,7 @@
 		"@fontsource-variable/ibm-plex-sans": "^5.2.8",
 		"@fontsource-variable/playpen-sans": "^5.2.9",
 		"@inkfinite/core": "workspace:*",
-		"@inkfinite/input-dom": "workspace:*",
-		"@inkfinite/renderer": "workspace:*",
-		"@inkfinite/runtime": "workspace:*",
+		"@inkfinite/editor": "workspace:*",
 		"culori": "^4.0.2"
 	},
 	"devDependencies": {

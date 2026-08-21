@@ -1,6 +1,6 @@
 import { PageRecord, ShapeRecord, Store } from '@inkfinite/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createRenderer } from '../src';
+import { createRenderer } from '../src/renderer';
 
 describe('Renderer', () => {
 	let canvas: HTMLCanvasElement;
