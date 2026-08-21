@@ -272,7 +272,9 @@ export type DesktopSessionRepo = PersistentDocRepo & {
 	openDraft(): Promise<{ boardId: string; doc: LoadedDoc }>;
 	isDraft(): boolean;
 	getCurrentFile(): FileHandle | null;
+	openPath(path: string): Promise<{ boardId: string; doc: LoadedDoc }>;
 	importSvg(): Promise<SvgImportResult | null>;
+	importSvgPath(path: string): Promise<SvgImportResult | null>;
 	openFromDialog(prepareToOpen?: () => Promise<void>): Promise<{ boardId: string; doc: LoadedDoc }>;
 	saveAs(prepareToSave?: () => Promise<void>): Promise<{ boardId: string; doc: LoadedDoc }>;
 	getWorkspaceDir(): Promise<string | null>;
@@ -417,7 +419,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 			updatedAt: Date.now()
 		};
 		currentDoc = status.editor_projection
-			? loadedDocFromProjection(status.editor_projection)
+			? loadedDocFromProjection(status.editor_projection, status.snapshot)
 			: loadedDocFromSnapshot(status.snapshot);
 		if (!isDraft) {
 			boardFiles.set(currentBoard.id, currentFile);
@@ -430,7 +432,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		currentStatus = status;
 		currentFile = { path: status.path, name: fileName(status.path) };
 		currentDoc = status.editor_projection
-			? loadedDocFromProjection(status.editor_projection)
+			? loadedDocFromProjection(status.editor_projection, status.snapshot)
 			: loadedDocFromSnapshot(status.snapshot);
 		if (currentBoard && !currentIsDraft) {
 			currentBoard = { ...currentBoard, updatedAt: Date.now() };
@@ -533,11 +535,11 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		return opened.status.snapshot.document_id;
 	}
 
-	async function importSvg(): Promise<SvgImportResult | null> {
+	async function importSvg(path?: string): Promise<SvgImportResult | null> {
 		if (!currentStatus || !currentDoc) throw new Error('No board loaded');
-		const path = await fileOps.showSvgDialog();
-		if (!path) return null;
-		const result = await api.importSvg({ session_id: currentStatus.session_id, path });
+		const selectedPath = path ?? (await fileOps.showSvgDialog());
+		if (!selectedPath) return null;
+		const result = await api.importSvg({ session_id: currentStatus.session_id, path: selectedPath });
 		updateStatus(result.session.status);
 		await saveCurrentSession();
 		if (!currentDoc) throw new Error('SVG import did not return a document');
@@ -625,7 +627,13 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		if (!currentBoard) throw new Error('No board loaded');
 		return {
 			board: currentBoard,
-			doc: { pages: doc.pages, shapes: doc.shapes, bindings: doc.bindings },
+			doc: {
+				pages: doc.pages,
+				shapes: doc.shapes,
+				bindings: doc.bindings,
+				...(doc.layers ? { layers: doc.layers } : {}),
+				...(doc.assets ? { assets: doc.assets } : {})
+			},
 			order: doc.order
 		};
 	}
@@ -650,7 +658,8 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 			upserts: {
 				pages: Object.values(imported.pages),
 				shapes: Object.values(imported.shapes),
-				bindings: Object.values(imported.bindings)
+				bindings: Object.values(imported.bindings),
+				assets: Object.values(imported.assets ?? {})
 			},
 			order: imported.order
 		});
@@ -783,8 +792,6 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		notifyProposal({ proposal: null });
 	}
 
-
-
 	async function updateAgentContext(context: {
 		pageId: string | null;
 		activeLayerId: string | null;
@@ -845,7 +852,13 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		exportBoard,
 		importBoard,
 		getCurrentFile: () => (currentIsDraft ? null : currentFile),
+		openPath: async (path: string) => {
+			const doc = await openPath(path);
+			if (!currentBoard) throw new Error('Failed to open document');
+			return { boardId: currentBoard.id, doc };
+		},
 		importSvg,
+		importSvgPath: (path: string) => importSvg(path),
 		openFromDialog,
 		saveAs,
 		getWorkspaceDir: () => fileOps.getWorkspaceDir(),
@@ -941,7 +954,7 @@ async function listDocumentEntries(fileOps: DesktopFileOps, directory: string) {
 	});
 }
 
-function loadedDocFromProjection(projection: EditorProjection): LoadedDoc {
+function loadedDocFromProjection(projection: EditorProjection, snapshot?: DocumentSnapshot): LoadedDoc {
 	const pages: Record<string, EditorPageRecord> = {};
 	const layers: Record<string, EditorLayerRecord> = {};
 	const shapes: Record<string, EditorShapeRecord> = {};
@@ -995,11 +1008,30 @@ function loadedDocFromProjection(projection: EditorProjection): LoadedDoc {
 					: { kind: 'edge', nx: binding.anchor.x, ny: binding.anchor.y }
 		};
 	}
+	const assets = Object.fromEntries(
+		Object.values(snapshot?.document.assets ?? {}).flatMap((asset) =>
+			asset.source.kind === 'embedded'
+				? [
+						[
+							asset.id,
+							{
+								id: asset.id,
+								name: asset.name,
+								mediaType: asset.media_type,
+								digest: asset.digest,
+								bytes: [...asset.source.bytes]
+							}
+						]
+					]
+				: []
+		)
+	);
 	return {
 		pages,
 		layers,
 		shapes,
 		bindings,
+		...(Object.keys(assets).length > 0 ? { assets } : {}),
 		order: {
 			pageIds: [...projection.order.page_ids],
 			shapeOrder: Object.fromEntries(
@@ -1066,7 +1098,32 @@ function loadedDocFromSnapshot(snapshot: DocumentSnapshot): LoadedDoc {
 		};
 	}
 
-	return { pages, layers, shapes, bindings, order: { pageIds: [...snapshot.document.page_ids], shapeOrder, layers } };
+	const assets = Object.fromEntries(
+		Object.values(snapshot.document.assets).flatMap((asset) =>
+			asset.source.kind === 'embedded'
+				? [
+						[
+							asset.id,
+							{
+								id: asset.id,
+								name: asset.name,
+								mediaType: asset.media_type,
+								digest: asset.digest,
+								bytes: [...asset.source.bytes]
+							}
+						]
+					]
+				: []
+		)
+	);
+	return {
+		pages,
+		layers,
+		shapes,
+		bindings,
+		...(Object.keys(assets).length > 0 ? { assets } : {}),
+		order: { pageIds: [...snapshot.document.page_ids], shapeOrder, layers }
+	};
 }
 
 function flattenShape(
@@ -1173,6 +1230,9 @@ function applyPatch(doc: LoadedDoc, patch: DocPatch): LoadedDoc {
 	for (const id of patch.deletes?.pageIds ?? []) delete next.pages[id];
 	for (const id of patch.deletes?.shapeIds ?? []) delete next.shapes[id];
 	for (const id of patch.deletes?.bindingIds ?? []) delete next.bindings[id];
+	for (const id of patch.deletes?.assetIds ?? []) {
+		if (next.assets) delete next.assets[id];
+	}
 	for (const page of patch.upserts?.pages ?? []) {
 		const previous = next.pages[page.id];
 		next.pages[page.id] = previous
@@ -1185,6 +1245,10 @@ function applyPatch(doc: LoadedDoc, patch: DocPatch): LoadedDoc {
 	}
 	for (const shape of patch.upserts?.shapes ?? []) next.shapes[shape.id] = shape;
 	for (const binding of patch.upserts?.bindings ?? []) next.bindings[binding.id] = binding;
+	if (patch.upserts?.assets?.length) {
+		next.assets ??= {};
+		for (const asset of patch.upserts.assets) next.assets[asset.id] = { ...asset, bytes: [...asset.bytes] };
+	}
 	if (patch.order?.pageIds) next.order.pageIds = [...patch.order.pageIds];
 	if (patch.order?.shapeOrder)
 		next.order.shapeOrder = { ...(next.order.shapeOrder ?? {}), ...structuredClone(patch.order.shapeOrder) };
@@ -1218,6 +1282,7 @@ function rebaseImportedDocument(snapshot: BoardExport, destination: LoadedDoc): 
 			([, binding]) => shapes[binding.fromShapeId] && shapes[binding.toShapeId]
 		)
 	);
+	const assets = snapshot.doc.assets ? structuredClone(snapshot.doc.assets) : undefined;
 	const layer: EditorLayerRecord = {
 		...(destination.layers?.[destinationLayerId] ?? {
 			id: destinationLayerId,
@@ -1240,6 +1305,7 @@ function rebaseImportedDocument(snapshot: BoardExport, destination: LoadedDoc): 
 		layers: { [destinationLayerId]: layer },
 		shapes,
 		bindings,
+		...(assets ? { assets } : {}),
 		order: {
 			pageIds: [destinationPageId],
 			shapeOrder: { [destinationPageId]: [...layer.shapeIds] },

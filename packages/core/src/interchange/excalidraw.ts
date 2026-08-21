@@ -33,6 +33,7 @@ export function importExcalidraw(root: JsonObject, fileName: string): Interchang
 	const imported = new Map<string, Shape>();
 	const sourceById = new Map<string, JsonObject>();
 	const pendingLabels = new Map<string, string>();
+	const files = isObject(root.files) ? root.files : {};
 
 	for (const [index, value] of elements.entries()) {
 		const element = object(value, `elements[${index}]`);
@@ -140,6 +141,27 @@ export function importExcalidraw(root: JsonObject, fileName: string): Interchang
 				);
 				break;
 			}
+			case 'image': {
+				const fileId = typeof element.fileId === 'string' ? element.fileId : '';
+				const file = fileId && isObject(files[fileId]) ? files[fileId] : null;
+				const fileData = file && (typeof file.data === 'string' ? file.data : file.dataURL);
+				const data = typeof fileData === 'string' ? decodeImageData(fileData, file?.mimeType) : null;
+				if (!file || !data) {
+					warnings.add('excalidraw-image', 'Images without embedded file data were omitted.');
+					continue;
+				}
+				const assetId = inkId('excalidraw-file', fileId);
+				snapshot.doc.assets ??= {};
+				snapshot.doc.assets[assetId] ??= {
+					id: assetId,
+					name: typeof file.name === 'string' ? file.name : `${fileId}.image`,
+					mediaType: data.mediaType,
+					digest: assetId,
+					bytes: data.bytes
+				};
+				shape = ShapeRecord.createImage(pageId, origin.x, origin.y, { w: width, h: height, assetId }, shapeId);
+				break;
+			}
 			case 'text':
 				shape = ShapeRecord.createText(
 					pageId,
@@ -212,7 +234,6 @@ export function importExcalidraw(root: JsonObject, fileName: string): Interchang
 				warnings.add('excalidraw-frame', 'Excalidraw frames were retained only as element groups.');
 				continue;
 			case 'diamond':
-			case 'image':
 			case 'iframe':
 				warnings.add(`excalidraw-${type}`, `Excalidraw ${type} elements are not supported and were omitted.`);
 				continue;
@@ -259,13 +280,6 @@ export function importExcalidraw(root: JsonObject, fileName: string): Interchang
 		}
 	}
 
-	if (isObject(root.files) && Object.keys(root.files).length > 0) {
-		warnings.add(
-			'excalidraw-files',
-			'Embedded Excalidraw files were omitted because Inkfinite has no image shape yet.',
-			Object.keys(root.files).length
-		);
-	}
 	if (isObject(root.appState) && root.appState.viewBackgroundColor !== undefined) {
 		warnings.add('excalidraw-app-state', 'Excalidraw canvas background and editor settings were not imported.');
 	}
@@ -278,6 +292,7 @@ export function exportExcalidraw(snapshot: BoardExport, requestedPageId?: string
 	const document = ensureDocumentLayers(snapshot.doc);
 	const page = selectPage(document, snapshot.order.pageIds, requestedPageId, warnings);
 	const elements: JsonObject[] = [];
+	const files: JsonObject = {};
 	const exportedIds = new Set<string>();
 	const bindingsByTarget = new Map<string, Array<{ id: string; type: 'arrow' }>>();
 
@@ -292,8 +307,23 @@ export function exportExcalidraw(snapshot: BoardExport, requestedPageId?: string
 			const shape = document.shapes[shapeId];
 			if (!shape) continue;
 			const opacity = clamp((shape.opacity ?? 1) * layer.opacity, 0, 1);
+			if (shape.type === 'image') {
+				const asset = document.assets?.[shape.props.assetId];
+				if (!asset || asset.mediaType.startsWith('image/') === false) {
+					warnings.add('excalidraw-image', 'Images without embedded raster assets were omitted.');
+					continue;
+				}
+				const source = asset.bytes;
+				files[`${shape.id}:file`] = {
+					id: `${shape.id}:file`,
+					mimeType: asset.mediaType,
+					data: encodeBase64(source),
+					created: 0
+				};
+			}
 			const element = excalidrawElement(shape, opacity, layer.locked, warnings);
 			if (!element) continue;
+			if (shape.type === 'image') element.fileId = `${shape.id}:file`;
 			elements.push(element);
 			exportedIds.add(shape.id);
 			if (shape.type === 'arrow') {
@@ -342,7 +372,7 @@ export function exportExcalidraw(snapshot: BoardExport, requestedPageId?: string
 		source: 'https://inkfinite.app',
 		elements,
 		appState: { gridSize: null, viewBackgroundColor: '#ffffff' },
-		files: {}
+		files
 	};
 	return {
 		format: 'excalidraw',
@@ -475,6 +505,11 @@ function excalidrawElement(
 		case 'path':
 			warnings.add('excalidraw-path', 'Native paths are omitted from Excalidraw export.');
 			return null;
+		case 'image':
+			width = shape.props.w;
+			height = shape.props.h;
+			specific = { type: 'image', fileId: null, status: 'saved', scale: [1, 1] };
+			break;
 		case 'container':
 			warnings.add('excalidraw-container', 'Containers are represented by their child shapes.');
 			return null;
@@ -604,6 +639,29 @@ function excalidrawPointTuples(value: unknown, name: string): Array<[number, num
 		if (!Array.isArray(point) || point.length < 2) throw new Error(`${name}[${index}] must contain x and y.`);
 		return [finiteNumber(point[0], `${name}[${index}][0]`), finiteNumber(point[1], `${name}[${index}][1]`)];
 	});
+}
+
+function encodeBase64(bytes: number[]): string {
+	if (typeof btoa !== 'function') return '';
+	let binary = '';
+	for (const byte of bytes) binary += String.fromCharCode(byte);
+	return btoa(binary);
+}
+
+function decodeImageData(value: string, declaredMediaType: unknown): { mediaType: string; bytes: number[] } | null {
+	let mediaType = typeof declaredMediaType === 'string' ? declaredMediaType : 'image/png';
+	let encoded = value;
+	const dataUrl = /^data:([^;,]+);base64,(.*)$/s.exec(value);
+	if (dataUrl) {
+		mediaType = dataUrl[1] ?? mediaType;
+		encoded = dataUrl[2] ?? '';
+	}
+	try {
+		if (typeof atob !== 'function') return null;
+		return { mediaType, bytes: [...atob(encoded)].map((character) => character.charCodeAt(0)) };
+	} catch {
+		return null;
+	}
 }
 
 function stableSeed(value: string) {

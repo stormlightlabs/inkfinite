@@ -3,6 +3,8 @@
 
 import type {
 	ActorId,
+	AssetId,
+	AssetRecord,
 	BindingAnchor,
 	BindingId,
 	BindingKind,
@@ -567,6 +569,20 @@ export type EditorPatch =
 			 * Binding to delete.
 			 */
 			binding_id: BindingId;
+	  }
+	| {
+			type: 'create_asset';
+			/**
+			 * Complete asset record.
+			 */
+			asset: AssetRecord;
+	  }
+	| {
+			type: 'delete_asset';
+			/**
+			 * Asset to delete.
+			 */
+			asset_id: AssetId;
 	  };
 
 /**

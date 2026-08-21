@@ -83,11 +83,8 @@ fn import_svg_file(args: SvgImportArgs, json_output: bool, stdout: &mut dyn Writ
 
     if !json_output {
         if omitted_image_count > 0 {
-            writeln!(
-                stdout,
-                "Warning: omitted {omitted_image_count} embedded image node(s); native image support is pending"
-            )
-            .map_err(map_output_error)?;
+            writeln!(stdout, "Warning: omitted {omitted_image_count} embedded image node(s)")
+                .map_err(map_output_error)?;
         }
         writeln!(stdout, "Imported shapes: {shape_count}").map_err(map_output_error)?;
         writeln!(stdout, "Imported assets: {asset_count}").map_err(map_output_error)?;

@@ -58,13 +58,15 @@ pub enum BuiltinShapeKind {
     Path,
     /// Markdown shape.
     Markdown,
+    /// Embedded raster image shape.
+    Image,
     /// Container shape.
     Container,
 }
 
 impl BuiltinShapeKind {
     /// Built-in kinds in their stable serialized order.
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::Rectangle,
         Self::Ellipse,
         Self::Line,
@@ -73,6 +75,7 @@ impl BuiltinShapeKind {
         Self::Stroke,
         Self::Path,
         Self::Markdown,
+        Self::Image,
         Self::Container,
     ];
 
@@ -88,6 +91,7 @@ impl BuiltinShapeKind {
             Self::Stroke => "stroke",
             Self::Path => "path",
             Self::Markdown => "markdown",
+            Self::Image => "image",
             Self::Container => "container",
         }
     }
@@ -104,6 +108,7 @@ impl BuiltinShapeKind {
             b"stroke" => Some(Self::Stroke),
             b"path" => Some(Self::Path),
             b"markdown" => Some(Self::Markdown),
+            b"image" => Some(Self::Image),
             b"container" => Some(Self::Container),
             _ => None,
         }
@@ -132,6 +137,8 @@ pub const STROKE_KIND: &str = BuiltinShapeKind::Stroke.as_str();
 pub const PATH_KIND: &str = BuiltinShapeKind::Path.as_str();
 /// Built-in Markdown shape kind.
 pub const MARKDOWN_KIND: &str = BuiltinShapeKind::Markdown.as_str();
+/// Built-in embedded image shape kind.
+pub const IMAGE_KIND: &str = BuiltinShapeKind::Image.as_str();
 /// Built-in container shape kind.
 pub const CONTAINER_KIND: &str = BuiltinShapeKind::Container.as_str();
 
@@ -145,6 +152,7 @@ pub const BUILTIN_SHAPE_KINDS: &[&str] = &[
     STROKE_KIND,
     PATH_KIND,
     MARKDOWN_KIND,
+    IMAGE_KIND,
     CONTAINER_KIND,
 ];
 
@@ -1114,6 +1122,7 @@ mod tests {
                 STROKE_KIND,
                 PATH_KIND,
                 MARKDOWN_KIND,
+                IMAGE_KIND,
                 CONTAINER_KIND,
             ]
         );

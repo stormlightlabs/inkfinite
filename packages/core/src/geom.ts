@@ -68,6 +68,8 @@ export function localShapeBounds(shape: ShapeRecord): Box2 {
 			return Box2Ops.create(0, 0, shape.props.w ?? shape.props.fontSize * 10, shape.props.fontSize * 1.2);
 		case 'markdown':
 			return Box2Ops.create(0, 0, shape.props.w, shape.props.h ?? shape.props.fontSize * 10);
+		case 'image':
+			return Box2Ops.create(0, 0, shape.props.w, shape.props.h);
 		case 'stroke':
 			return boundsFromOutline(shape.props.points.length >= 2 ? getStrokeOutline(shape) : []);
 		case 'path':

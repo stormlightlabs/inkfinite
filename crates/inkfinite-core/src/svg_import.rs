@@ -4,8 +4,8 @@
 //! an SVG document model. Groups retain their local transforms and become
 //! container candidates; supported vector elements become the corresponding
 //! native shape kinds. Raster images are extracted as embedded assets and kept
-//! as image nodes until the document model gains a native image shape. The
-//! exact source is retained as a content-addressed SVG asset.
+//! as image nodes backed by embedded assets. The exact source is retained as a
+//! content-addressed SVG asset.
 
 use std::collections::BTreeMap;
 use std::fmt;

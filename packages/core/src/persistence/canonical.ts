@@ -346,6 +346,12 @@ export function createEditorReconciliationRequest(
 			patches.push({ type: 'delete_shape', shape_id: shapeId });
 		}
 	}
+	for (const asset of Object.values(next.assets ?? {})) {
+		if (!previous.assets?.[asset.id]) patches.push({ type: 'create_asset', asset: nativeAsset(asset) });
+	}
+	for (const assetId of Object.keys(previous.assets ?? {})) {
+		if (!next.assets?.[assetId]) patches.push({ type: 'delete_asset', asset_id: assetId });
+	}
 	for (const edit of topologyEdits) {
 		if (previousShapes[edit.shapeId] && nextShapes[edit.shapeId]) {
 			patches.push({ type: 'path_topology', shape_id: edit.shapeId, operations: edit.operations });
@@ -718,6 +724,18 @@ function sameAffine(left: Affine, right: Affine): boolean {
 		[left.e, right.e],
 		[left.f, right.f]
 	].every(([a, b]) => Math.abs(a - b) <= 1e-9 * (1 + Math.max(Math.abs(a), Math.abs(b))));
+}
+
+function nativeAsset(asset: import('../model').ImportedAsset): NativeAssetRecord {
+	return {
+		id: asset.id,
+		name: asset.name,
+		media_type: asset.mediaType,
+		digest: asset.digest,
+		source: { kind: 'embedded', bytes: [...asset.bytes] },
+		provenance: provenance(),
+		version: 1
+	};
 }
 
 function nativeBinding(binding: import('../model').BindingRecord): NativeBindingRecord {

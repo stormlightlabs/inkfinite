@@ -117,6 +117,29 @@ export function createDexieSession(
 		})();
 	}
 
+	async function importCanonicalDocument(args: {
+		name: string;
+		source: Uint8Array;
+	}): Promise<{ boardId: string; doc: LoadedDoc }> {
+		const worker = ensureDocumentWorker();
+		if (!worker || !repo.saveCanonical)
+			throw new Error('The browser document engine is unavailable.');
+		const state = await worker.openDocument(args.source, 'browser');
+		const boardName = args.name.replace(/\.[^.]+$/, '').trim() || 'Imported Board';
+		const boardId = await repo.createBoard(boardName);
+		await repo.saveCanonical(boardId, {
+			bytes: state.bytes,
+			snapshot: state.snapshot,
+			projection: state.editor_projection
+		});
+		activeBoardId = boardId;
+		documentBoardId = boardId;
+		documentReady = Promise.resolve(
+			fromEditorProjection(state.editor_projection, state.snapshot)
+		);
+		return { boardId, doc: fromEditorProjection(state.editor_projection, state.snapshot) };
+	}
+
 	async function setActiveDocument(boardId: string, doc: LoadedDoc): Promise<LoadedDoc | null> {
 		if (!canonicalEnabled) return null;
 		if (documentBoardId === boardId && documentReady) {
@@ -283,6 +306,7 @@ export function createDexieSession(
 			});
 		},
 		setActiveDocument,
+		importCanonicalDocument: importCanonicalDocument,
 		commitSvgImport,
 		dispose() {
 			subscription?.unsubscribe();

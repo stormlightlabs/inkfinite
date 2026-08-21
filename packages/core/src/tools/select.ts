@@ -198,6 +198,7 @@ export class SelectTool implements Tool {
 			shape.type === 'ellipse' ||
 			shape.type === 'text' ||
 			shape.type === 'markdown' ||
+			shape.type === 'image' ||
 			shape.type === 'container'
 		) {
 			const bounds = shapeBounds(shape);
@@ -721,6 +722,7 @@ export class SelectTool implements Tool {
 			shape.type === 'ellipse' ||
 			shape.type === 'text' ||
 			shape.type === 'markdown' ||
+			shape.type === 'image' ||
 			shape.type === 'container'
 		) {
 			const bounds = localShapeBounds(shape);
@@ -795,6 +797,7 @@ export class SelectTool implements Tool {
 			initial.type !== 'ellipse' &&
 			initial.type !== 'text' &&
 			initial.type !== 'markdown' &&
+			initial.type !== 'image' &&
 			initial.type !== 'container'
 		) {
 			return null;

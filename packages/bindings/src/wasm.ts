@@ -116,7 +116,7 @@ export type WasmSvgImportResponse =
 			 */
 			import: SvgImport;
 			/**
-			 * Number of embedded image nodes omitted by the current shape registry.
+			 * Number of embedded image nodes omitted because their source data could not be represented.
 			 */
 			omitted_image_count: number;
 	  }
@@ -143,7 +143,7 @@ export type WasmSvgImportCommitResponse =
 			 */
 			warnings: Array<SvgImportWarning>;
 			/**
-			 * Number of embedded image nodes omitted by the current shape registry.
+			 * Number of embedded image nodes omitted because their source data could not be represented.
 			 */
 			omitted_image_count: number;
 			/**

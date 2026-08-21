@@ -84,7 +84,7 @@ pub enum WasmSvgImportResponse {
     Success {
         /// The normalized Rust import tree.
         import: Box<SvgImport>,
-        /// Number of embedded image nodes omitted by the current shape registry.
+        /// Number of embedded image nodes omitted because their source data could not be represented.
         omitted_image_count: usize,
     },
     /// The source could not be imported.
@@ -104,7 +104,7 @@ pub enum WasmSvgImportCommitResponse {
         state: Box<WasmDocumentSessionState>,
         /// Non-fatal parser warnings.
         warnings: Vec<SvgImportWarning>,
-        /// Number of embedded image nodes omitted by the current shape registry.
+        /// Number of embedded image nodes omitted because their source data could not be represented.
         omitted_image_count: usize,
         /// Native shape IDs created by the transaction.
         shape_ids: Vec<ShapeId>,

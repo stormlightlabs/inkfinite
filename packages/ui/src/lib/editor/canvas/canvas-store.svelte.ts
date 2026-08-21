@@ -49,6 +49,7 @@ import type {
 } from '@inkfinite/core';
 import { stencils } from '@inkfinite/core';
 import { Action, EditorRuntime } from '@inkfinite/editor/runtime';
+import { createImageAsset, pasteImage } from '../clipboard';
 import { createRenderer, type Renderer } from '@inkfinite/editor/renderer';
 import { onDestroy, onMount } from 'svelte';
 import { computeCursor } from './canvas-helpers';
@@ -618,7 +619,7 @@ export function createCanvasController(
 									{
 										code: 'svg-images-omitted',
 										message:
-											'Embedded image nodes were omitted because image shapes are not available yet.',
+											'Some embedded image nodes could not be imported.',
 										count: imported.omitted_image_count
 									}
 								]
@@ -669,11 +670,127 @@ export function createCanvasController(
 	}
 
 	async function importSvgFile(file: File) {
+		const path = (file as File & { path?: string }).path;
+		if (desktopRepo && path) {
+			const imported = await desktopRepo.importSvgPath(path);
+			if (imported) {
+				applyLoadedDoc(imported.doc, true);
+				interchangeNotice = {
+					title: 'SVG import complete',
+					message: 'The SVG was added to the current document as native shapes.',
+					warnings: imported.warnings.map((message, index) => ({
+						code: `svg-warning-${index}`,
+						message,
+						count: 1
+					})),
+					error: false
+				};
+			}
+			return;
+		}
 		await importBrowserSvgSourceWithStatus(
 			file
 				.arrayBuffer()
 				.then((bytes) => ({ name: file.name, contents: new Uint8Array(bytes) }))
 		);
+	}
+
+	async function replaceImageFile(file: File) {
+		const state = store.getState();
+		const selected =
+			state.ui.selectionIds.length === 1
+				? state.doc.shapes[state.ui.selectionIds[0]]
+				: undefined;
+		if (!selected || selected.type !== 'image') return;
+		try {
+			if (file.size > 16 * 1024 * 1024)
+				throw new Error('The image is larger than the 16 MB import limit.');
+			const bytes = [...new Uint8Array(await file.arrayBuffer())];
+			const asset = await createImageAsset(file.name, file.type || 'image/png', bytes);
+			const next = {
+				...state,
+				doc: {
+					...state.doc,
+					assets: { ...(state.doc.assets ?? {}), [asset.id]: asset },
+					shapes: {
+						...state.doc.shapes,
+						[selected.id]: {
+							...selected,
+							props: { ...selected.props, assetId: asset.id }
+						}
+					}
+				}
+			};
+			commitLayerState('Replace image', next);
+		} catch (error) {
+			bindings.reportError(error, 'Image replace failed');
+		}
+	}
+
+	async function importImageFile(file: File, position: { x: number; y: number }) {
+		try {
+			if (file.size > 16 * 1024 * 1024)
+				throw new Error('The image is larger than the 16 MB import limit.');
+			const bytes = [...new Uint8Array(await file.arrayBuffer())];
+			const next = await pasteImage(
+				store.getState(),
+				{ name: file.name, mediaType: file.type || 'image/png', bytes },
+				position
+			);
+			commitLayerState('Import image', next);
+		} catch (error) {
+			bindings.reportError(error, 'Image import failed');
+		}
+	}
+
+	async function importDroppedFile(file: File) {
+		try {
+			if (file.size > 16 * 1024 * 1024)
+				throw new Error('The dropped file is larger than the 16 MB import limit.');
+			if (file.name.toLowerCase().endsWith('.inkfinite')) {
+				const path = (file as File & { path?: string }).path;
+				if (desktopRepo && path) {
+					const opened = await desktopRepo.openPath(path);
+					setActiveBoardId(opened.boardId);
+					applyLoadedDoc(opened.doc, true);
+					return;
+				}
+				if (!platformSession?.importCanonicalDocument) {
+					throw new Error(
+						'Opening .inkfinite files from a drop is available in the web editor.'
+					);
+				}
+				const imported = await platformSession.importCanonicalDocument({
+					name: file.name,
+					source: new Uint8Array(await file.arrayBuffer())
+				});
+				setActiveBoardId(imported.boardId);
+				applyLoadedDoc(imported.doc, true, false);
+				return;
+			}
+			if (!repo || !sink || !platformSession?.interchange) {
+				throw new Error('Document import is not available in this editor session.');
+			}
+			const imported = importInterchange(await file.text(), file.name);
+			await sink.flush();
+			const boardId = await repo.importBoard(imported.snapshot);
+			const doc = await repo.loadDoc(boardId);
+			setActiveBoardId(boardId);
+			applyLoadedDoc(doc, true);
+			interchangeNotice = {
+				title: 'Import complete',
+				message: `${file.name} is now an Inkfinite document.`,
+				warnings: imported.warnings,
+				error: false
+			};
+		} catch (error) {
+			interchangeNotice = {
+				title: 'Import failed',
+				message: error instanceof Error ? error.message : String(error),
+				warnings: [],
+				error: true
+			};
+		}
 	}
 
 	async function exportSvg(selectedOnly: boolean) {
@@ -1067,6 +1184,9 @@ export function createCanvasController(
 		importSvg,
 		importSvgMarkup,
 		importSvgFile,
+		importImageFile,
+		replaceImageFile,
+		importDroppedFile,
 		exportSvg,
 		exportEditableCanvas,
 		interchangeBusy: () => interchangeBusy,

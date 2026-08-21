@@ -94,7 +94,16 @@ export interface DesktopDocumentRepo extends PersistentDocRepo {
 	openDraft(): Promise<{ boardId: string; doc: import('@inkfinite/core').LoadedDoc }>;
 	isDraft(): boolean;
 	getCurrentFile(): FileHandle | null;
+	openPath(path: string): Promise<{ boardId: string; doc: import('@inkfinite/core').LoadedDoc }>;
 	importSvg(): Promise<{
+		doc: import('@inkfinite/core').LoadedDoc;
+		warnings: string[];
+		omitted_image_count: number;
+		shape_ids: string[];
+	} | null>;
+	importSvgPath(
+		path: string
+	): Promise<{
 		doc: import('@inkfinite/core').LoadedDoc;
 		warnings: string[];
 		omitted_image_count: number;
@@ -143,6 +152,11 @@ export type EditorPlatformSession = {
 		boardId: string,
 		doc: import('@inkfinite/core').LoadedDoc
 	) => Promise<import('@inkfinite/core').LoadedDoc | null>;
+	/** Opens dropped canonical `.inkfinite` bytes as a new browser board. */
+	importCanonicalDocument?: (args: {
+		name: string;
+		source: Uint8Array;
+	}) => Promise<{ boardId: string; doc: import('@inkfinite/core').LoadedDoc }>;
 	/** Commits browser SVG bytes through the active Rust document session. */
 	commitSvgImport?: (args: {
 		boardId: string;

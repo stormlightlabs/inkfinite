@@ -2,13 +2,20 @@
 	import {
 		Action,
 		Camera,
+		exportToSVG,
 		getSelectedShapes,
 		hitTestPoint,
 		selectionTarget,
 		stencils
 	} from '@inkfinite/core';
 	import { Button, ContextMenu, Dialog, type ContextMenuEntry } from '../../index';
-	import { copySelection, pasteClipboard, readClipboard } from '../clipboard';
+	import {
+		copySelection,
+		pasteClipboard,
+		pasteImage,
+		pasteText,
+		readClipboardContent
+	} from '../clipboard';
 	import type { SelectionCommand } from '../commands';
 	import { executeSelectionCommand, SELECTION_COMMAND_LABELS } from '../commands';
 	import HistoryViewer from '../components/HistoryViewer.svelte';
@@ -28,6 +35,7 @@
 	let { platform: platformAdapter }: { platform: EditorPlatformAdapter } = $props();
 
 	let canvasEl = $state<HTMLCanvasElement | null>(null);
+	let replaceImageInput = $state<HTMLInputElement | null>(null);
 	let textEditorEl = $state<HTMLTextAreaElement | null>(null);
 	let arrowLabelEditorEl = $state<HTMLInputElement | null>(null);
 	let markdownEditorEl = $state<HTMLTextAreaElement | null>(null);
@@ -73,12 +81,109 @@
 		}
 	}
 
-	async function pasteFromClipboard() {
+	async function pasteFromClipboard(options: { inPlace?: boolean; atCursor?: boolean } = {}) {
 		try {
-			const payload = await readClipboard();
-			if (!payload)
-				throw new Error('The clipboard does not contain an Inkfinite selection.');
-			c.commitLayerState('Paste', pasteClipboard(c.store.getState(), payload));
+			const content = await readClipboardContent();
+			if (!content)
+				throw new Error('The clipboard is empty or contains unsupported content.');
+			const position = options.atCursor ? c.cursorStore.getState().cursorWorld : undefined;
+			if (content.type === 'native') {
+				c.commitLayerState(
+					options.inPlace ? 'Paste in place' : 'Paste',
+					pasteClipboard(c.store.getState(), content.payload, {
+						inPlace: options.inPlace,
+						position: options.inPlace ? undefined : position
+					})
+				);
+			} else if (content.type === 'text') {
+				c.commitLayerState(
+					'Paste text',
+					pasteText(c.store.getState(), content.text, content.markdown, position)
+				);
+			} else if (content.type === 'image') {
+				c.commitLayerState(
+					'Paste image',
+					await pasteImage(c.store.getState(), content, position)
+				);
+			} else {
+				await c.importSvgMarkup(content.contents);
+			}
+		} catch (error) {
+			reportEditorError(error, 'Clipboard error');
+		}
+	}
+
+	async function handlePaste(event: ClipboardEvent) {
+		event.preventDefault();
+		try {
+			const content = await readClipboardContent(event.clipboardData ?? undefined);
+			if (!content)
+				throw new Error('The clipboard is empty or contains unsupported content.');
+			const position = c.cursorStore.getState().cursorWorld;
+			if (content.type === 'native') {
+				c.commitLayerState(
+					'Paste',
+					pasteClipboard(c.store.getState(), content.payload, { position })
+				);
+			} else if (content.type === 'text') {
+				c.commitLayerState(
+					'Paste text',
+					pasteText(c.store.getState(), content.text, content.markdown, position)
+				);
+			} else if (content.type === 'image') {
+				c.commitLayerState(
+					'Paste image',
+					await pasteImage(c.store.getState(), content, position)
+				);
+			} else {
+				await c.importSvgMarkup(content.contents);
+			}
+		} catch (error) {
+			reportEditorError(error, 'Clipboard error');
+		}
+	}
+
+	async function copySelectionAsSvg() {
+		try {
+			const svg = exportToSVG(c.store.getState(), { selectedOnly: true });
+			if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+				await navigator.clipboard?.writeText(svg);
+				return;
+			}
+			await navigator.clipboard.write([
+				new ClipboardItem({
+					'image/svg+xml': new Blob([svg], { type: 'image/svg+xml' }),
+					'text/plain': new Blob([svg], { type: 'text/plain' })
+				})
+			]);
+		} catch (error) {
+			reportEditorError(error, 'Clipboard error');
+		}
+	}
+
+	async function copySelectionAsPng() {
+		try {
+			const svg = exportToSVG(c.store.getState(), { selectedOnly: true });
+			const image = new Image();
+			const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+			await new Promise<void>((resolve, reject) => {
+				image.onload = () => resolve();
+				image.onerror = () => reject(new Error('Could not render the selection as PNG.'));
+				image.src = url;
+			});
+			URL.revokeObjectURL(url);
+			const canvas = document.createElement('canvas');
+			canvas.width = Math.max(1, image.naturalWidth);
+			canvas.height = Math.max(1, image.naturalHeight);
+			canvas.getContext('2d')?.drawImage(image, 0, 0);
+			const blob = await new Promise<Blob | null>((resolve) =>
+				canvas.toBlob(resolve, 'image/png')
+			);
+			if (!blob) throw new Error('Could not encode the selection as PNG.');
+			if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+				throw new Error('PNG clipboard access is not available in this browser.');
+			}
+			await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
 		} catch (error) {
 			reportEditorError(error, 'Clipboard error');
 		}
@@ -134,9 +239,32 @@
 		svgDragActive = false;
 
 		const droppedFile = e.dataTransfer?.files?.[0];
-		if (!draggingStencil.current && droppedFile?.name.toLowerCase().endsWith('.svg')) {
-			void c.importSvgFile(droppedFile);
-			return;
+		if (!draggingStencil.current && droppedFile) {
+			const rect = canvasEl?.getBoundingClientRect();
+			const screen = rect
+				? { x: e.clientX - rect.left, y: e.clientY - rect.top }
+				: { x: 0, y: 0 };
+			const world = Camera.screenToWorld(c.store.getState().camera, screen, c.getViewport());
+			const name = droppedFile.name.toLowerCase();
+			if (name.endsWith('.svg') || droppedFile.type === 'image/svg+xml') {
+				void c.importSvgFile(droppedFile);
+				return;
+			}
+			if (
+				droppedFile.type.startsWith('image/') ||
+				/\.(?:png|jpe?g|gif|webp|bmp|avif)$/i.test(name)
+			) {
+				void c.importImageFile(droppedFile, world);
+				return;
+			}
+			if (
+				name.endsWith('.excalidraw') ||
+				name.endsWith('.canvas') ||
+				name.endsWith('.inkfinite')
+			) {
+				void c.importDroppedFile(droppedFile);
+				return;
+			}
 		}
 
 		let stencil = draggingStencil.current;
@@ -163,6 +291,42 @@
 
 	function handleStencilsClick() {
 		c.stencilPaletteOpen = !c.stencilPaletteOpen;
+	}
+
+	function requestImageReplacement() {
+		replaceImageInput?.click();
+	}
+
+	function cropSelectedImage(square: boolean) {
+		const state = c.store.getState();
+		const selected =
+			state.ui.selectionIds.length === 1
+				? state.doc.shapes[state.ui.selectionIds[0]]
+				: undefined;
+		if (!selected || selected.type !== 'image') return;
+		const ratio = selected.props.w / Math.max(selected.props.h, 1);
+		const crop = square
+			? ratio > 1
+				? { top: 0, right: (1 - 1 / ratio) / 2, bottom: 0, left: (1 - 1 / ratio) / 2 }
+				: { top: (1 - ratio) / 2, right: 0, bottom: (1 - ratio) / 2, left: 0 }
+			: undefined;
+		c.commitLayerState(square ? 'Crop image' : 'Reset image crop', {
+			...state,
+			doc: {
+				...state.doc,
+				shapes: {
+					...state.doc.shapes,
+					[selected.id]: { ...selected, props: { ...selected.props, crop } }
+				}
+			}
+		});
+	}
+
+	async function handleImageReplacement(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (file) await c.replaceImageFile(file);
 	}
 
 	function openSvgMarkupDialog() {
@@ -211,6 +375,7 @@
 			(shape) => Boolean(shape.groupId) || shape.type === 'container'
 		);
 		const allLocked = selected.length > 0 && selected.every((shape) => shape.locked);
+		const imageSelected = selected.length === 1 && selected[0]?.type === 'image';
 		return [
 			{
 				id: 'copy',
@@ -219,6 +384,8 @@
 				shortcut: '⌘/Ctrl C',
 				disabled: selected.length === 0
 			},
+			{ id: 'copy-svg', label: 'Copy as SVG', icon: 'add', disabled: selected.length === 0 },
+			{ id: 'copy-png', label: 'Copy as PNG', icon: 'add', disabled: selected.length === 0 },
 			{
 				id: 'cut',
 				label: 'Cut',
@@ -227,6 +394,14 @@
 				disabled: selected.length === 0
 			},
 			{ type: 'separator' },
+			{ id: 'replace-image', label: 'Replace image', icon: 'add', disabled: !imageSelected },
+			{ id: 'crop-image', label: 'Crop to square', icon: 'add', disabled: !imageSelected },
+			{
+				id: 'reset-image-crop',
+				label: 'Reset image crop',
+				icon: 'add',
+				disabled: !imageSelected
+			},
 			{
 				id: 'duplicate',
 				label: 'Duplicate',
@@ -389,6 +564,8 @@
 			}));
 			contextMenuItems = [
 				{ id: 'paste', label: 'Paste', icon: 'add', shortcut: '⌘/Ctrl V' },
+				{ id: 'paste-at-cursor', label: 'Paste at cursor', icon: 'add' },
+				{ id: 'paste-in-place', label: 'Paste in place', icon: 'add' },
 				{ type: 'separator' },
 				{ id: 'stencils', label: 'Insert stencil', icon: 'grid-dots' },
 				{ id: 'zoom-fit', label: 'Zoom to fit', icon: 'search', shortcut: '⇧1' },
@@ -409,12 +586,28 @@
 			await copyCurrentSelection();
 			return;
 		}
+		if (id === 'copy-svg') {
+			await copySelectionAsSvg();
+			return;
+		}
+		if (id === 'copy-png') {
+			await copySelectionAsPng();
+			return;
+		}
 		if (id === 'cut') {
 			await cutCurrentSelection();
 			return;
 		}
 		if (id === 'paste') {
 			await pasteFromClipboard();
+			return;
+		}
+		if (id === 'paste-at-cursor') {
+			await pasteFromClipboard({ atCursor: true });
+			return;
+		}
+		if (id === 'paste-in-place') {
+			await pasteFromClipboard({ inPlace: true });
 			return;
 		}
 		if (id === 'zoom-selection') {
@@ -427,6 +620,18 @@
 		}
 		if (id === 'reset-zoom') {
 			c.camera.reset();
+			return;
+		}
+		if (id === 'replace-image') {
+			requestImageReplacement();
+			return;
+		}
+		if (id === 'crop-image') {
+			cropSelectedImage(true);
+			return;
+		}
+		if (id === 'reset-image-crop') {
+			cropSelectedImage(false);
 			return;
 		}
 		if (id === 'duplicate') {
@@ -480,10 +685,17 @@
 		}}
 		ondrop={handleDrop}
 		role="application">
+		<input
+			bind:this={replaceImageInput}
+			type="file"
+			accept="image/*"
+			hidden
+			onchange={handleImageReplacement} />
 		<canvas
 			bind:this={canvasEl}
 			tabindex="0"
 			aria-label="Infinite canvas"
+			onpaste={handlePaste}
 			ondblclick={c.handleCanvasDoubleClick}
 			oncontextmenu={handleCanvasContextMenu}
 			onpointerleave={c.handlePointerLeave}></canvas>
@@ -702,7 +914,7 @@
 	}
 
 	.canvas-container::after {
-		content: 'Drop an SVG to import';
+		content: 'Drop a document, SVG, or image to import';
 		position: absolute;
 		inset: var(--ink-space-5);
 		display: grid;

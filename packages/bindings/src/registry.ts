@@ -13,6 +13,7 @@ export const BUILTIN_SHAPE_KINDS = [
 	'stroke',
 	'path',
 	'markdown',
+	'image',
 	'container'
 ] as const;
 export type BuiltinShapeKind = (typeof BUILTIN_SHAPE_KINDS)[number];

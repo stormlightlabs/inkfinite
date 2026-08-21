@@ -6,6 +6,7 @@
 
 use std::collections::BTreeSet;
 
+use serde_json::json;
 use thiserror::Error;
 
 use crate::proto::{Operation, TransactionDraft, TransactionId};
@@ -45,7 +46,7 @@ pub struct SvgImportTransaction {
     pub shape_ids: Vec<ShapeId>,
     /// Asset IDs included by the transaction, including retained source data.
     pub asset_ids: Vec<AssetId>,
-    /// Number of image nodes omitted because the native registry has no image kind.
+    /// Number of image nodes omitted because their source data could not be represented.
     pub omitted_image_count: usize,
 }
 
@@ -129,11 +130,9 @@ pub fn build_svg_import_transaction(
     });
 
     let mut shape_ids = vec![root_id.clone()];
-    let mut omitted_image_count = 0;
     append_group(
         &mut operations,
         &mut shape_ids,
-        &mut omitted_image_count,
         &mut ids,
         &import.root,
         &root_id,
@@ -152,13 +151,13 @@ pub fn build_svg_import_transaction(
         },
         shape_ids,
         asset_ids,
-        omitted_image_count,
+        omitted_image_count: 0,
     })
 }
 
 fn append_group(
-    operations: &mut Vec<Operation>, shape_ids: &mut Vec<ShapeId>, omitted_image_count: &mut usize,
-    ids: &mut ShapeIdAllocator, group: &SvgGroup, parent_id: &ShapeId, options: &SvgImportTransactionOptions,
+    operations: &mut Vec<Operation>, shape_ids: &mut Vec<ShapeId>, ids: &mut ShapeIdAllocator, group: &SvgGroup,
+    parent_id: &ShapeId, options: &SvgImportTransactionOptions,
 ) {
     for node in &group.children {
         match node {
@@ -173,7 +172,7 @@ fn append_group(
                     anchor: SiblingAnchor::Last,
                 });
                 shape_ids.push(id.clone());
-                append_group(operations, shape_ids, omitted_image_count, ids, child, &id, options);
+                append_group(operations, shape_ids, ids, child, &id, options);
             }
             SvgImportNode::Shape(shape) => {
                 let id = ids.next();
@@ -197,7 +196,30 @@ fn append_group(
                 });
                 shape_ids.push(id);
             }
-            SvgImportNode::Image(_) => *omitted_image_count += 1,
+            SvgImportNode::Image(image) => {
+                let id = ids.next();
+                let mut properties = image.properties.clone();
+                properties.insert("asset_id".into(), json!(image.asset_id));
+                operations.push(Operation::CreateShape {
+                    shape: ShapeRecord {
+                        id: id.clone(),
+                        kind: crate::ShapeKind::from(crate::IMAGE_KIND),
+                        parent: ShapeParent::Shape(parent_id.clone()),
+                        transform: image.transform,
+                        child_ids: Vec::new(),
+                        layout: None,
+                        properties,
+                        metadata: metadata(
+                            image.source_id.clone().unwrap_or_else(|| "Imported SVG image".into()),
+                            options,
+                        ),
+                        style: image.style,
+                        version: RecordVersion(1),
+                    },
+                    anchor: SiblingAnchor::Last,
+                });
+                shape_ids.push(id);
+            }
         }
     }
 }
@@ -336,5 +358,37 @@ mod tests {
                 .iter()
                 .all(|operation| matches!(operation, Operation::CreateAsset { .. } | Operation::CreateShape { .. }))
         );
+    }
+
+    #[test]
+    fn maps_embedded_svg_images_to_native_shapes_and_assets() {
+        let source = r#"<svg><image id="photo" href="data:image/png;base64,AA==" width="10" height="20"/></svg>"#;
+        let import = import_svg(source).expect("SVG image should import");
+        let current = snapshot();
+        let page_id = current.document.page_ids[0].clone();
+        let layer_id = current.document.pages[&page_id].layer_ids[0].clone();
+        let transaction = build_svg_import_transaction(
+            &current,
+            &import,
+            SvgImportTransactionOptions {
+                actor_id: ActorId::from("actor:test"),
+                origin: Origin::Human,
+                page_id,
+                layer_id,
+                transaction_id: TransactionId("transaction:image".into()),
+                description: "Import SVG image".into(),
+                source_name: Some("photo.svg".into()),
+                timestamp: Timestamp(1),
+            },
+        )
+        .expect("image transaction should build");
+
+        assert_eq!(transaction.omitted_image_count, 0);
+        assert_eq!(transaction.asset_ids.len(), 2);
+        assert_eq!(transaction.shape_ids.len(), 2);
+        assert!(transaction.transaction.operations.iter().any(|operation| matches!(
+            operation,
+            Operation::CreateShape { shape, .. } if shape.kind.as_str() == crate::IMAGE_KIND
+        )));
     }
 }

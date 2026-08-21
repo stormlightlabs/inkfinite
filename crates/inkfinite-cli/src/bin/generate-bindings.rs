@@ -303,7 +303,7 @@ fn editor_bindings() -> String {
     let config = ts_config();
     let mut output = GENERATED_TS_HEADER.to_owned();
     output.push_str(
-        "import type { ActorId, BindingAnchor, BindingId, BindingKind, BindingRecord, ContainerLayout, LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord, SemanticMetadata, ShapeId, ShapeKind, ShapeParent, ShapeProperties, ShapeStyle, SiblingAnchor, Timestamp } from './model.js';\n",
+        "import type { ActorId, AssetId, AssetRecord, BindingAnchor, BindingId, BindingKind, BindingRecord, ContainerLayout, LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord, SemanticMetadata, ShapeId, ShapeKind, ShapeParent, ShapeProperties, ShapeStyle, SiblingAnchor, Timestamp } from './model.js';\n",
     );
     output.push_str("import type { LayerContentsDisposition, LayerPatch, TransactionId } from './transaction.js';\n\n");
     append_declaration::<EditorTransform>(&mut output, &config);

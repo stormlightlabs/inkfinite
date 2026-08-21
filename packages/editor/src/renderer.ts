@@ -62,6 +62,8 @@ export type RendererOptions = {
 	themeProvider?: { get(): 'light' | 'dark' };
 };
 
+const imageCache = new Map<string, HTMLImageElement>();
+
 class LruCache<Key, Value> {
 	readonly #entries = new Map<Key, Value>();
 
@@ -158,7 +160,8 @@ export function createRenderer(canvas: HTMLCanvasElement, store: Store, options?
 			theme,
 			textLayoutCache,
 			textMetricCache,
-			markdownLayoutCache
+			markdownLayoutCache,
+			markDirty
 		);
 	}
 
@@ -228,7 +231,8 @@ function drawScene(
 	theme: 'light' | 'dark' = 'light',
 	textLayoutCache = new LruCache<string, string[]>(512),
 	textMetricCache = new LruCache<string, number>(2_048),
-	markdownLayoutCache = new LruCache<string, MarkdownLine[]>(256)
+	markdownLayoutCache = new LruCache<string, MarkdownLine[]>(256),
+	onImageLoaded?: () => void
 ) {
 	context.save();
 	context.setTransform(1, 0, 0, 1, 0, 0);
@@ -247,7 +251,16 @@ function drawScene(
 	if (layers.length === 0) {
 		for (const shape of shapes) {
 			if (!isShapeVisible(state, shape, visibleBounds)) continue;
-			drawShape(context, state, shape, theme, textLayoutCache, textMetricCache, markdownLayoutCache);
+			drawShape(
+				context,
+				state,
+				shape,
+				theme,
+				textLayoutCache,
+				textMetricCache,
+				markdownLayoutCache,
+				onImageLoaded
+			);
 		}
 	} else {
 		for (const layer of layers) {
@@ -257,7 +270,16 @@ function drawScene(
 			for (const shapeId of layer.shapeIds) {
 				const shape = state.doc.shapes[shapeId];
 				if (!shape || !isShapeVisible(state, shape, visibleBounds)) continue;
-				drawShape(context, state, shape, theme, textLayoutCache, textMetricCache, markdownLayoutCache);
+				drawShape(
+					context,
+					state,
+					shape,
+					theme,
+					textLayoutCache,
+					textMetricCache,
+					markdownLayoutCache,
+					onImageLoaded
+				);
 			}
 			context.restore();
 		}
@@ -489,7 +511,8 @@ function drawShape(
 	theme: 'light' | 'dark' = 'light',
 	textLayoutCache = new LruCache<string, string[]>(512),
 	textMetricCache = new LruCache<string, number>(2_048),
-	markdownLayoutCache = new LruCache<string, MarkdownLine[]>(256)
+	markdownLayoutCache = new LruCache<string, MarkdownLine[]>(256),
+	onImageLoaded?: () => void
 ) {
 	context.save();
 	context.globalAlpha *= shape.opacity ?? 1;
@@ -521,6 +544,10 @@ function drawShape(
 			drawMarkdown(context, shape, theme, textLayoutCache, textMetricCache, markdownLayoutCache);
 			break;
 		}
+		case 'image': {
+			drawImage(context, state, shape, onImageLoaded);
+			break;
+		}
 		case 'stroke': {
 			drawStroke(context, shape);
 			break;
@@ -536,6 +563,52 @@ function drawShape(
 	}
 
 	context.restore();
+}
+
+/** Draw an embedded image, preserving its crop window when one is set. */
+function drawImage(
+	context: CanvasRenderingContext2D,
+	state: EditorState,
+	shape: Extract<ShapeRecord, { type: 'image' }>,
+	onImageLoaded?: () => void
+) {
+	const asset = state.doc.assets?.[shape.props.assetId];
+	const { w, h, crop } = shape.props;
+	context.globalAlpha *= shape.fillOpacity ?? 1;
+	if (!asset) {
+		context.fillStyle = '#e5e7eb';
+		context.fillRect(0, 0, w, h);
+		return;
+	}
+	let image = imageCache.get(asset.digest);
+	if (!image && typeof Image !== 'undefined') {
+		image = new Image();
+		image.onload = () => onImageLoaded?.();
+		image.src = `data:${asset.mediaType};base64,${bytesToBase64(asset.bytes)}`;
+		imageCache.set(asset.digest, image);
+	}
+	if (!image || !image.complete || image.naturalWidth === 0) {
+		context.fillStyle = '#e5e7eb';
+		context.fillRect(0, 0, w, h);
+		context.strokeStyle = '#9ca3af';
+		context.strokeRect(0, 0, w, h);
+		return;
+	}
+	const top = crop?.top ?? 0;
+	const right = crop?.right ?? 0;
+	const bottom = crop?.bottom ?? 0;
+	const left = crop?.left ?? 0;
+	const sourceX = image.naturalWidth * left;
+	const sourceY = image.naturalHeight * top;
+	const sourceWidth = image.naturalWidth * Math.max(0.001, 1 - left - right);
+	const sourceHeight = image.naturalHeight * Math.max(0.001, 1 - top - bottom);
+	context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, w, h);
+}
+
+function bytesToBase64(bytes: number[]): string {
+	let binary = '';
+	for (const byte of bytes) binary += String.fromCharCode(byte);
+	return typeof btoa === 'function' ? btoa(binary) : '';
 }
 
 /**

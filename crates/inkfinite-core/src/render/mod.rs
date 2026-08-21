@@ -231,6 +231,22 @@ impl Renderer<'_> {
             Some(BuiltinShapeKind::Markdown) => {
                 self.render_markdown(shape, &transform, &fill_opacity, &stroke_opacity, &mut output)?;
             }
+            Some(BuiltinShapeKind::Image) => {
+                let props: ImageProps = properties(shape)?;
+                if let Some(asset) = self.document.assets.get(&props.asset_id)
+                    && let AssetSource::Embedded { bytes } = &asset.source
+                {
+                    writeln!(
+                        output,
+                        "      <image transform=\"{transform}\" width=\"{}\" height=\"{}\" opacity=\"{fill_opacity}\" href=\"data:{};base64,{}\" preserveAspectRatio=\"none\"/>",
+                        number(props.width),
+                        number(props.height),
+                        escape_xml(&asset.media_type),
+                        base64(bytes)
+                    )
+                    .expect("writing to a String cannot fail");
+                }
+            }
             Some(BuiltinShapeKind::Stroke) => {
                 let props: StrokePaintProperties = properties(shape)?;
                 let outline = canonical_stroke_outline(&shape.properties).map_err(|message| {
@@ -569,6 +585,17 @@ struct MarkdownProps {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ImageProps {
+    #[serde(alias = "w")]
+    width: f64,
+    #[serde(alias = "h")]
+    height: f64,
+    #[serde(alias = "asset_id")]
+    asset_id: AssetId,
+}
+
+#[derive(Deserialize)]
 struct PathProps {
     subpaths: Vec<PathSubpath>,
     fill_rule: PathFillRule,
@@ -756,6 +783,10 @@ fn shape_local_bounds(shape: &ShapeRecord) -> Result<Bounds, SvgRenderError> {
         Some(BuiltinShapeKind::Markdown) => {
             let props: MarkdownProps = properties(shape)?;
             Bounds { x: 0.0, y: 0.0, width: props.width, height: props.height.unwrap_or(props.font_size * 10.0) }
+        }
+        Some(BuiltinShapeKind::Image) => {
+            let props: ImageProps = properties(shape)?;
+            Bounds { x: 0.0, y: 0.0, width: props.width, height: props.height }
         }
         Some(BuiltinShapeKind::Stroke) => canonical_stroke_outline(&shape.properties).map_or_else(
             |message| {

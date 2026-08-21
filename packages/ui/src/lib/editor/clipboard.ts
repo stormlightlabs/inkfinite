@@ -2,22 +2,36 @@ import {
 	BindingRecord,
 	createId,
 	ShapeRecord,
-	type BindingRecord as Binding,
+	shapeBounds,
 	type EditorState,
-	type ShapeRecord as Shape
+	type ImportedAsset,
+	type ShapeRecord as Shape,
+	type Vec2
 } from '@inkfinite/core';
 
+export const CLIPBOARD_MIME = 'application/x-inkfinite-selection';
 const CLIPBOARD_KIND = 'inkfinite-selection';
 let fallbackClipboard: string | null = null;
 
 /** Serialized native selection used by copy, cut, and paste commands. */
 export type ClipboardPayload = {
 	kind: typeof CLIPBOARD_KIND;
-	version: 1;
+	version: 1 | 2;
 	shapes: Shape[];
-	bindings: Binding[];
+	bindings: BindingRecord[];
 	rootIds: string[];
+	assets: ImportedAsset[];
 };
+
+/** Content read from the system clipboard, classified before it reaches the editor. */
+export type ClipboardContent =
+	| { type: 'native'; payload: ClipboardPayload }
+	| { type: 'text'; text: string; markdown: boolean }
+	| { type: 'svg'; contents: string }
+	| { type: 'image'; name: string; mediaType: string; bytes: number[] };
+
+/** Options controlling where a native selection is inserted. */
+export type PasteOptions = { offset?: number; position?: Vec2; inPlace?: boolean };
 
 /** Returns the selected shapes and descendants in page draw order. */
 export function createClipboardPayload(state: EditorState): ClipboardPayload | null {
@@ -26,12 +40,15 @@ export function createClipboardPayload(state: EditorState): ClipboardPayload | n
 		(id) => !hasSelectedAncestor(state, id, selectedIds)
 	);
 	if (rootIds.length === 0) return null;
+
 	const includedIds = new Set<string>();
 	for (const shape of Object.values(state.doc.shapes)) {
-		if (rootIds.some((rootId) => shape.id === rootId || hasAncestor(shape, rootId, state)))
+		if (rootIds.some((rootId) => shape.id === rootId || hasAncestor(shape, rootId, state))) {
 			includedIds.add(shape.id);
+		}
 	}
-	const shapes = (state.doc.pages[state.ui.currentPageId ?? '']?.shapeIds ?? [])
+	const page = state.doc.pages[state.ui.currentPageId ?? ''];
+	const shapes = (page?.shapeIds ?? [])
 		.filter((id) => includedIds.has(id))
 		.map((id) => state.doc.shapes[id])
 		.filter((shape): shape is Shape => Boolean(shape))
@@ -41,7 +58,14 @@ export function createClipboardPayload(state: EditorState): ClipboardPayload | n
 			(binding) => includedIds.has(binding.fromShapeId) && includedIds.has(binding.toShapeId)
 		)
 		.map((binding) => BindingRecord.clone(binding));
-	return { kind: CLIPBOARD_KIND, version: 1, shapes, bindings, rootIds: [...rootIds] };
+	const assetIds = new Set(
+		shapes.flatMap((shape) => (shape.type === 'image' ? [shape.props.assetId] : []))
+	);
+	const assets = [...assetIds]
+		.map((id) => state.doc.assets?.[id])
+		.filter((asset): asset is ImportedAsset => Boolean(asset))
+		.map((asset) => ({ ...asset, bytes: [...asset.bytes] }));
+	return { kind: CLIPBOARD_KIND, version: 2, shapes, bindings, rootIds: [...rootIds], assets };
 }
 
 /** Writes a native selection to the system clipboard when available. */
@@ -50,7 +74,19 @@ export async function copySelection(state: EditorState): Promise<boolean> {
 	if (!payload) return false;
 	const text = JSON.stringify(payload);
 	fallbackClipboard = text;
-	if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+	if (typeof navigator === 'undefined' || !navigator.clipboard) return true;
+	if (typeof ClipboardItem !== 'undefined' && navigator.clipboard.write) {
+		try {
+			await navigator.clipboard.write([
+				new ClipboardItem({
+					[CLIPBOARD_MIME]: new Blob([text], { type: CLIPBOARD_MIME }),
+					'text/plain': new Blob([text], { type: 'text/plain' })
+				})
+			]);
+		} catch {
+			if (navigator.clipboard.writeText) await navigator.clipboard.writeText(text);
+		}
+	} else if (navigator.clipboard.writeText) {
 		await navigator.clipboard.writeText(text);
 	}
 	return true;
@@ -58,41 +94,74 @@ export async function copySelection(state: EditorState): Promise<boolean> {
 
 /** Reads a native selection from the system clipboard or this editor session. */
 export async function readClipboard(): Promise<ClipboardPayload | null> {
+	const content = await readClipboardContent();
+	return content?.type === 'native' ? content.payload : null;
+}
+
+/** Reads and classifies native, text, SVG, and image clipboard content. */
+export async function readClipboardContent(data?: DataTransfer): Promise<ClipboardContent | null> {
+	if (data) {
+		const native = parsePayload(data.getData(CLIPBOARD_MIME) || data.getData('text/plain'));
+		if (native) return { type: 'native', payload: native };
+		const svg = data.getData('image/svg+xml');
+		if (svg.trim()) return { type: 'svg', contents: svg };
+		const markdown = data.getData('text/markdown');
+		if (markdown) return { type: 'text', text: markdown, markdown: true };
+		for (const file of Array.from(data.files ?? [])) {
+			if (file.type.startsWith('image/')) return imageContent(file);
+		}
+		const text = data.getData('text/plain');
+		return text ? { type: 'text', text, markdown: false } : null;
+	}
+
 	let text = fallbackClipboard;
-	if (typeof navigator !== 'undefined' && navigator.clipboard?.readText) {
+	if (typeof navigator === 'undefined' || !navigator.clipboard) {
+		return text ? nativeContent(text) : null;
+	}
+	if (navigator.clipboard.read) {
+		try {
+			const items = await navigator.clipboard.read();
+			for (const item of items) {
+				if (item.types.includes(CLIPBOARD_MIME)) {
+					const blob = await item.getType(CLIPBOARD_MIME);
+					const native = parsePayload(await blob.text());
+					if (native) return { type: 'native', payload: native };
+				}
+				const imageType = item.types.find((type) => type.startsWith('image/'));
+				if (imageType) return imageContent(await item.getType(imageType), imageType);
+				if (item.types.includes('image/svg+xml')) {
+					return {
+						type: 'svg',
+						contents: await (await item.getType('image/svg+xml')).text()
+					};
+				}
+			}
+		} catch {
+			// Clipboard read permissions are optional; readText below is the fallback.
+		}
+	}
+	if (navigator.clipboard.readText) {
 		try {
 			text = (await navigator.clipboard.readText()) || fallbackClipboard;
 		} catch (error) {
 			if (!fallbackClipboard) throw error;
 		}
 	}
-	if (!text) return null;
-	try {
-		const value = JSON.parse(text) as Partial<ClipboardPayload>;
-		if (value.kind !== CLIPBOARD_KIND || value.version !== 1 || !Array.isArray(value.shapes))
-			return null;
-		return {
-			kind: CLIPBOARD_KIND,
-			version: 1,
-			shapes: value.shapes as Shape[],
-			bindings: Array.isArray(value.bindings) ? (value.bindings as Binding[]) : [],
-			rootIds: Array.isArray(value.rootIds) ? value.rootIds : []
-		};
-	} catch {
-		return null;
-	}
+	return text ? nativeContent(text) : null;
 }
 
-/** Pastes a native selection into the active layer with a small offset. */
+/** Pastes a native selection while preserving its hierarchy, bindings, and assets. */
 export function pasteClipboard(
 	state: EditorState,
 	payload: ClipboardPayload,
-	offset = 24
+	options: number | PasteOptions = 24
 ): EditorState {
 	const pageId = state.ui.currentPageId;
 	if (!pageId) return state;
 	const page = state.doc.pages[pageId];
 	if (!page || payload.shapes.length === 0) return state;
+	const settings = typeof options === 'number' ? { offset: options } : options;
+	const delta = pasteDelta(payload.shapes, settings);
 	const activeLayerId = state.ui.activeLayerId ?? page.layerIds?.[0];
 	const mapping = new Map<string, string>();
 	for (const shape of payload.shapes) mapping.set(shape.id, createId('shape'));
@@ -105,15 +174,15 @@ export function pasteClipboard(
 		const translated = copy.editorTransform
 			? {
 					...copy,
-					x: copy.x + offset,
-					y: copy.y + offset,
+					x: copy.x + delta.x,
+					y: copy.y + delta.y,
 					editorTransform: {
 						...copy.editorTransform,
-						e: copy.editorTransform.e + offset,
-						f: copy.editorTransform.f + offset
+						e: copy.editorTransform.e + delta.x,
+						f: copy.editorTransform.f + delta.y
 					}
 				}
-			: { ...copy, x: copy.x + offset, y: copy.y + offset };
+			: { ...copy, x: copy.x + delta.x, y: copy.y + delta.y };
 		const parentId = copy.groupId ? mapping.get(copy.groupId) : undefined;
 		shapes[id] = {
 			...translated,
@@ -132,25 +201,148 @@ export function pasteClipboard(
 		const id = createId('binding');
 		bindings[id] = { ...BindingRecord.clone(binding), id, fromShapeId, toShapeId };
 	}
+	const assets = { ...(state.doc.assets ?? {}) };
+	for (const asset of payload.assets ?? [])
+		assets[asset.id] = { ...asset, bytes: [...asset.bytes] };
 	const layers = state.doc.layers ? { ...state.doc.layers } : undefined;
 	let pages = { ...state.doc.pages };
+	const rootMappedIds = payload.rootIds
+		.map((id) => mapping.get(id))
+		.filter((id): id is string => Boolean(id));
 	if (layers && activeLayerId && layers[activeLayerId]) {
 		layers[activeLayerId] = {
 			...layers[activeLayerId],
-			shapeIds: [...layers[activeLayerId].shapeIds, ...mapping.values()]
+			shapeIds: [...layers[activeLayerId].shapeIds, ...rootMappedIds]
 		};
 		pages[pageId] = {
 			...page,
 			shapeIds: page.layerIds?.flatMap((id) => layers[id]?.shapeIds ?? []) ?? page.shapeIds
 		};
 	} else {
-		pages[pageId] = { ...page, shapeIds: [...page.shapeIds, ...mapping.values()] };
+		pages[pageId] = { ...page, shapeIds: [...page.shapeIds, ...rootMappedIds] };
 	}
 	return {
 		...state,
-		doc: { ...state.doc, pages, shapes, bindings, ...(layers ? { layers } : {}) },
+		doc: { ...state.doc, pages, shapes, bindings, assets, ...(layers ? { layers } : {}) },
 		ui: { ...state.ui, selectionIds: pastedIds, toolId: 'select' }
 	};
+}
+
+/** Inserts ordinary text as a native text or Markdown object. */
+export function pasteText(
+	state: EditorState,
+	text: string,
+	markdown: boolean,
+	position?: Vec2
+): EditorState {
+	const pageId = state.ui.currentPageId;
+	const page = pageId ? state.doc.pages[pageId] : undefined;
+	if (!pageId || !page || !text) return state;
+	const point = position ?? { x: 0, y: 0 };
+	const shape = markdown
+		? ShapeRecord.createMarkdown(pageId, point.x, point.y, {
+				md: text,
+				w: 320,
+				fontSize: 16,
+				fontFamily: 'sans-serif',
+				color: '#1e1e1e'
+			})
+		: ShapeRecord.createText(pageId, point.x, point.y, {
+				text,
+				fontSize: 20,
+				fontFamily: 'sans-serif',
+				color: '#1e1e1e',
+				w: Math.min(480, Math.max(120, text.split('\n')[0]?.length * 10 || 120))
+			});
+	return appendShape(state, shape);
+}
+
+/** Creates an image object from clipboard or dropped file bytes. */
+export async function imageContent(file: Blob, mediaType = file.type): Promise<ClipboardContent> {
+	const buffer = await file.arrayBuffer();
+	return {
+		type: 'image',
+		name:
+			typeof File !== 'undefined' && file instanceof File && file.name
+				? file.name
+				: 'Pasted image',
+		mediaType: mediaType || 'image/png',
+		bytes: [...new Uint8Array(buffer)]
+	};
+}
+
+/** Inserts an embedded image at a world-space point and preserves its native aspect ratio. */
+export async function pasteImage(
+	state: EditorState,
+	content: { name: string; mediaType: string; bytes: number[] },
+	position?: Vec2
+): Promise<EditorState> {
+	const pageId = state.ui.currentPageId;
+	if (!pageId || !state.doc.pages[pageId]) return state;
+	const asset = await createImageAsset(content.name, content.mediaType, content.bytes);
+	const size = await imageSize(content.mediaType, content.bytes);
+	const scale = Math.min(480 / Math.max(size.width, size.height), 1);
+	const width = Math.max(1, size.width * scale);
+	const height = Math.max(1, size.height * scale);
+	const point = position ?? { x: 0, y: 0 };
+	const image = ShapeRecord.createImage(pageId, point.x, point.y, {
+		w: width,
+		h: height,
+		assetId: asset.id
+	});
+	return appendShape(
+		{
+			...state,
+			doc: { ...state.doc, assets: { ...(state.doc.assets ?? {}), [asset.id]: asset } }
+		},
+		image
+	);
+}
+
+function appendShape(state: EditorState, shape: Shape): EditorState {
+	const page = state.doc.pages[shape.pageId];
+	if (!page) return state;
+	const layerId = state.ui.activeLayerId ?? page.layerIds?.[0];
+	const nextShape = layerId ? { ...shape, layerId } : shape;
+	const layers = state.doc.layers ? { ...state.doc.layers } : undefined;
+	if (layers && layerId && layers[layerId]) {
+		layers[layerId] = {
+			...layers[layerId],
+			shapeIds: [...layers[layerId].shapeIds, shape.id]
+		};
+	}
+	const pages = {
+		...state.doc.pages,
+		[shape.pageId]: {
+			...page,
+			shapeIds:
+				layers && page.layerIds
+					? page.layerIds.flatMap((id) => layers[id]?.shapeIds ?? [])
+					: [...page.shapeIds, shape.id]
+		}
+	};
+	return {
+		...state,
+		doc: {
+			...state.doc,
+			pages,
+			shapes: { ...state.doc.shapes, [shape.id]: nextShape },
+			...(layers ? { layers } : {})
+		},
+		ui: { ...state.ui, selectionIds: [shape.id], toolId: 'select' }
+	};
+}
+
+function pasteDelta(shapes: Shape[], options: PasteOptions): Vec2 {
+	if (options.inPlace) return { x: 0, y: 0 };
+	if (options.position) {
+		const bounds = shapes.map(shapeBounds);
+		const minX = Math.min(...bounds.map((bound) => bound.min.x));
+		const minY = Math.min(...bounds.map((bound) => bound.min.y));
+		return { x: options.position.x - minX, y: options.position.y - minY };
+	}
+	const offset = options.offset ?? 24;
+	return { x: offset, y: offset };
 }
 
 function hasSelectedAncestor(
@@ -173,4 +365,86 @@ function hasAncestor(shape: Shape, ancestorId: string, state: EditorState): bool
 		parentId = state.doc.shapes[parentId]?.groupId;
 	}
 	return false;
+}
+
+function parsePayload(text: string): ClipboardPayload | null {
+	try {
+		const value = JSON.parse(text) as Partial<ClipboardPayload>;
+		if (
+			value.kind !== CLIPBOARD_KIND ||
+			(value.version !== 1 && value.version !== 2) ||
+			!Array.isArray(value.shapes)
+		)
+			return null;
+		return {
+			kind: CLIPBOARD_KIND,
+			version: value.version,
+			shapes: value.shapes as Shape[],
+			bindings: Array.isArray(value.bindings) ? (value.bindings as BindingRecord[]) : [],
+			rootIds: Array.isArray(value.rootIds) ? value.rootIds : [],
+			assets: Array.isArray(value.assets) ? (value.assets as ImportedAsset[]) : []
+		};
+	} catch {
+		return null;
+	}
+}
+
+function nativeContent(text: string): ClipboardContent | null {
+	const native = parsePayload(text);
+	if (native) return { type: 'native', payload: native };
+	if (/^\s*<svg(?:\s|>)/i.test(text)) return { type: 'svg', contents: text };
+	return { type: 'text', text, markdown: false };
+}
+
+/** Creates the content-addressed asset record used by pasted and dropped images. */
+export async function createImageAsset(
+	name: string,
+	mediaType: string,
+	bytes: number[]
+): Promise<ImportedAsset> {
+	const digest = await digestBytes(bytes);
+	return {
+		id: `asset:sha256:${digest}`,
+		name: name || 'Pasted image',
+		mediaType,
+		digest: `sha256:${digest}`,
+		bytes: [...bytes]
+	};
+}
+
+async function digestBytes(bytes: number[]): Promise<string> {
+	if (typeof crypto !== 'undefined' && crypto.subtle) {
+		const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes));
+		return [...new Uint8Array(digest)]
+			.map((value) => value.toString(16).padStart(2, '0'))
+			.join('');
+	}
+	let hash = 2166136261;
+	for (const byte of bytes) hash = Math.imul(hash ^ byte, 16777619);
+	return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+async function imageSize(
+	mediaType: string,
+	bytes: number[]
+): Promise<{ width: number; height: number }> {
+	if (
+		typeof Image === 'undefined' ||
+		typeof Blob === 'undefined' ||
+		typeof URL === 'undefined'
+	) {
+		return { width: 320, height: 200 };
+	}
+	const image = new Image();
+	const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: mediaType }));
+	try {
+		await new Promise<void>((resolve) => {
+			image.onload = () => resolve();
+			image.onerror = () => resolve();
+			image.src = url;
+		});
+		return { width: image.naturalWidth || 320, height: image.naturalHeight || 200 };
+	} finally {
+		URL.revokeObjectURL(url);
+	}
 }

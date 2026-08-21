@@ -25,8 +25,8 @@ export type DocOrder = {
 
 /** Incremental document changes accepted by persistent repositories. */
 export type DocPatch = {
-	upserts?: { pages?: PageRecord[]; shapes?: ShapeRecord[]; bindings?: BindingRecord[] };
-	deletes?: { pageIds?: string[]; shapeIds?: string[]; bindingIds?: string[] };
+	upserts?: { pages?: PageRecord[]; shapes?: ShapeRecord[]; bindings?: BindingRecord[]; assets?: ImportedAsset[] };
+	deletes?: { pageIds?: string[]; shapeIds?: string[]; bindingIds?: string[]; assetIds?: string[] };
 	order?: Partial<DocOrder>;
 	/** Canonical path operations associated with this document change. */
 	topologyEdits?: PathTopologyEdit[];
@@ -94,23 +94,27 @@ export function diffDoc(before: Document, after: Document): DocPatch {
 	const deletedPages = difference(Object.keys(before.pages), Object.keys(after.pages));
 	const deletedShapes = difference(Object.keys(before.shapes), Object.keys(after.shapes));
 	const deletedBindings = difference(Object.keys(before.bindings), Object.keys(after.bindings));
+	const deletedAssets = difference(Object.keys(before.assets ?? {}), Object.keys(after.assets ?? {}));
 
-	if (deletedPages.length > 0 || deletedShapes.length > 0 || deletedBindings.length > 0) {
+	if (deletedPages.length > 0 || deletedShapes.length > 0 || deletedBindings.length > 0 || deletedAssets.length > 0) {
 		patch.deletes = {};
 		if (deletedPages.length > 0) patch.deletes.pageIds = deletedPages;
 		if (deletedShapes.length > 0) patch.deletes.shapeIds = deletedShapes;
 		if (deletedBindings.length > 0) patch.deletes.bindingIds = deletedBindings;
+		if (deletedAssets.length > 0) patch.deletes.assetIds = deletedAssets;
 	}
 
 	const pageUpserts = Object.values(after.pages).map((page) => PageOps.clone(page));
 	const shapeUpserts = Object.values(after.shapes).map((shape) => ShapeOps.clone(shape));
 	const bindingUpserts = Object.values(after.bindings).map((binding) => BindingOps.clone(binding));
+	const assetUpserts = Object.values(after.assets ?? {}).map((asset) => ({ ...asset, bytes: [...asset.bytes] }));
 
-	if (pageUpserts.length > 0 || shapeUpserts.length > 0 || bindingUpserts.length > 0) {
+	if (pageUpserts.length > 0 || shapeUpserts.length > 0 || bindingUpserts.length > 0 || assetUpserts.length > 0) {
 		patch.upserts = {};
 		if (pageUpserts.length > 0) patch.upserts.pages = pageUpserts;
 		if (shapeUpserts.length > 0) patch.upserts.shapes = shapeUpserts;
 		if (bindingUpserts.length > 0) patch.upserts.bindings = bindingUpserts;
+		if (assetUpserts.length > 0) patch.upserts.assets = assetUpserts;
 	}
 
 	patch.order = {

@@ -4,6 +4,7 @@
 		EditorState as EditorStateType,
 		EllipseShape,
 		InterchangeFormat,
+		ImageShape,
 		LineShape,
 		MarkdownShape,
 		PathShape,
@@ -481,13 +482,14 @@
 
 	function shapeSupportsFillOpacity(
 		shape: ShapeRecord
-	): shape is RectShape | EllipseShape | TextShape | MarkdownShape | PathShape {
+	): shape is RectShape | EllipseShape | TextShape | MarkdownShape | PathShape | ImageShape {
 		return (
 			shape.type === 'rect' ||
 			shape.type === 'ellipse' ||
 			shape.type === 'text' ||
 			shape.type === 'markdown' ||
-			shape.type === 'path'
+			shape.type === 'path' ||
+			shape.type === 'image'
 		);
 	}
 

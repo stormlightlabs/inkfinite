@@ -36,13 +36,13 @@ normalized structure where representation matters and rendered output where visu
 
 ### Clipboard, drop, and images
 
-- [ ] Copy, cut, select-all, and paste native selections with hierarchy, assets, and bindings intact
-- [ ] Paste plain text, Markdown, SVG markup, SVG files, and images into editable canvas objects
-- [ ] Add paste in place and paste at cursor
-- [ ] Copy selections as SVG and PNG
-- [ ] Import `.inkfinite`, SVG, Excalidraw, and image files through drag and drop
-- [ ] Add image shapes with embedded assets, aspect-ratio resize, crop, opacity, and replace controls
-- [ ] Verify clipboard and image workflows through save/reopen, undo/redo, merge, and export
+- [x] Copy, cut, select-all, and paste native selections with hierarchy, assets, and bindings intact
+- [x] Paste plain text, Markdown, SVG markup, SVG files, and images into editable canvas objects
+- [x] Add paste in place and paste at cursor
+- [x] Copy selections as SVG and PNG
+- [x] Import `.inkfinite`, SVG, Excalidraw, and image files through drag and drop
+- [x] Add image shapes with embedded assets, aspect-ratio resize, crop, opacity, and replace controls
+- [x] Verify clipboard and image workflows through save/reopen, undo/redo, merge, and export
 
 ### Canvas structure
 

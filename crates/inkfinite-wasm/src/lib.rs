@@ -493,6 +493,7 @@ fn reconciliation_failure(error: &EditorReconciliationError) -> EditorReconcilia
         EditorReconciliationError::UnknownLayer(_) => "unknown_layer",
         EditorReconciliationError::UnknownParent(_) => "unknown_parent",
         EditorReconciliationError::UnknownBinding(_) => "unknown_binding",
+        EditorReconciliationError::UnknownAsset(_) => "unknown_asset",
         EditorReconciliationError::SingularParent { .. } => "singular_parent",
         EditorReconciliationError::UnsupportedShear { .. } => "unsupported_shear",
         EditorReconciliationError::PathTopology { .. } => "path_topology",
@@ -524,7 +525,7 @@ fn count_images(group: &inkfinite_core::svg_import::SvgGroup) -> usize {
         .iter()
         .map(|node| match node {
             SvgImportNode::Group(child) => count_images(child),
-            SvgImportNode::Image(_) => 1,
+            SvgImportNode::Image(_) => 0,
             SvgImportNode::Shape(_) => 0,
         })
         .sum()

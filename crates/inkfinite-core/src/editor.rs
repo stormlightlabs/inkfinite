@@ -19,9 +19,9 @@ use crate::proto::{
     LayerContentsDisposition, LayerPatch, Operation, ShapePatch as NativeShapePatch, TransactionDraft, TransactionId,
 };
 use crate::{
-    ActorId, BindingAnchor, BindingRecord, CONTAINER_KIND, ContainerLayout, Document, DocumentSnapshot, LayerId,
-    LayerRecord, Opacity, Origin, PageId, PageRecord, Provenance, RecordVersion, SemanticMetadata, ShapeId, ShapeKind,
-    ShapeParent, ShapeProperties, ShapeRecord, ShapeStyle, SiblingAnchor, Timestamp, Transform,
+    ActorId, AssetRecord, BindingAnchor, BindingRecord, CONTAINER_KIND, ContainerLayout, Document, DocumentSnapshot,
+    LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord, Provenance, RecordVersion, SemanticMetadata, ShapeId,
+    ShapeKind, ShapeParent, ShapeProperties, ShapeRecord, ShapeStyle, SiblingAnchor, Timestamp, Transform,
 };
 
 /// Full affine transform used by the editor projection.
@@ -299,6 +299,16 @@ pub enum EditorPatch {
         /// Binding to delete.
         binding_id: crate::BindingId,
     },
+    /// Create an embedded asset.
+    CreateAsset {
+        /// Complete asset record.
+        asset: AssetRecord,
+    },
+    /// Delete an embedded asset.
+    DeleteAsset {
+        /// Asset to delete.
+        asset_id: crate::AssetId,
+    },
 }
 
 /// Request metadata used to turn editor patches into one transaction draft.
@@ -336,6 +346,9 @@ pub enum EditorReconciliationError {
     /// The patch referred to a missing binding.
     #[error("editor patch refers to unknown binding {0}")]
     UnknownBinding(crate::BindingId),
+    /// The patch referred to a missing asset.
+    #[error("editor patch refers to unknown asset {0}")]
+    UnknownAsset(crate::AssetId),
     /// A parent transform could not be inverted.
     #[error("parent transform for shape {shape_id} is singular")]
     SingularParent {
@@ -607,6 +620,14 @@ pub fn reconcile_editor_patches(
                     .get(&binding_id)
                     .ok_or_else(|| EditorReconciliationError::UnknownBinding(binding_id.clone()))?;
                 operations.push(Operation::DeleteBinding { binding_id, expected_version: Some(binding.version) });
+            }
+            EditorPatch::CreateAsset { asset } => operations.push(Operation::CreateAsset { asset }),
+            EditorPatch::DeleteAsset { asset_id } => {
+                let asset = document
+                    .assets
+                    .get(&asset_id)
+                    .ok_or_else(|| EditorReconciliationError::UnknownAsset(asset_id.clone()))?;
+                operations.push(Operation::DeleteAsset { asset_id, expected_version: Some(asset.version) });
             }
         }
     }

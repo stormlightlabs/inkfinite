@@ -151,6 +151,15 @@ export type ArrowProps = {
 
 export type TextProps = { text: string; fontSize: number; fontFamily: string; color: string; w?: number };
 
+/** Embedded image geometry and the asset it displays. */
+export type ImageProps = {
+	w: number;
+	h: number;
+	assetId: string;
+	/** Normalized crop inset on each edge, in the range 0..1. */
+	crop?: { top: number; right: number; bottom: number; left: number };
+};
+
 /** Native container dimensions used for hierarchy selection and overlays. */
 export type ContainerProps = { w?: number; h?: number };
 
@@ -202,7 +211,17 @@ export type StrokeStyle = { color: string; opacity: number };
  */
 export type StrokeProps = { points: StrokePoint[]; style: StrokeStyle; brush: BrushConfig };
 
-export type ShapeType = 'rect' | 'ellipse' | 'line' | 'arrow' | 'text' | 'stroke' | 'path' | 'markdown' | 'container';
+export type ShapeType =
+	| 'rect'
+	| 'ellipse'
+	| 'line'
+	| 'arrow'
+	| 'text'
+	| 'stroke'
+	| 'path'
+	| 'markdown'
+	| 'image'
+	| 'container';
 
 /** Full projected transform shared with the Rust editor projection. */
 export type EditorTransform = GeneratedEditorTransform;
@@ -235,6 +254,7 @@ export type EllipseShape = BaseShape & { type: 'ellipse'; props: EllipseProps };
 export type LineShape = BaseShape & { type: 'line'; props: LineProps };
 export type ArrowShape = BaseShape & { type: 'arrow'; props: ArrowProps };
 export type TextShape = BaseShape & { type: 'text'; props: TextProps };
+export type ImageShape = BaseShape & { type: 'image'; props: ImageProps };
 export type StrokeShape = BaseShape & { type: 'stroke'; props: StrokeProps };
 export type PathShape = BaseShape & { type: 'path'; props: PathProps };
 export type MarkdownShape = BaseShape & { type: 'markdown'; props: MarkdownProps };
@@ -246,6 +266,7 @@ export type ShapeRecord =
 	| LineShape
 	| ArrowShape
 	| TextShape
+	| ImageShape
 	| StrokeShape
 	| PathShape
 	| MarkdownShape
@@ -285,6 +306,11 @@ export const ShapeRecord = {
 	 */
 	createText(pageId: string, x: number, y: number, properties: TextProps, id?: string): TextShape {
 		return { id: id ?? createId('shape'), type: 'text', pageId, x, y, rot: 0, props: properties };
+	},
+
+	/** Create an image backed by an embedded document asset. */
+	createImage(pageId: string, x: number, y: number, properties: ImageProps, id?: string): ImageShape {
+		return { id: id ?? createId('shape'), type: 'image', pageId, x, y, rot: 0, props: properties };
 	},
 
 	/**
@@ -347,6 +373,12 @@ export const ShapeRecord = {
 		}
 		if (shape.type === 'markdown') {
 			return { ...shape, props: { ...shape.props } };
+		}
+		if (shape.type === 'image') {
+			return {
+				...shape,
+				props: { ...shape.props, crop: shape.props.crop ? { ...shape.props.crop } : undefined }
+			};
 		}
 		if (shape.type === 'path') {
 			return {
@@ -661,6 +693,22 @@ export function validateDoc(document: Document): ValidationResult {
 				}
 				if (shape.props.stroke_width !== undefined && shape.props.stroke_width < 0) {
 					errors.push(`Path shape '${shapeId}' has negative stroke width`);
+				}
+				break;
+			}
+			case 'image': {
+				if (!document.assets?.[shape.props.assetId]) {
+					errors.push(`Image shape '${shapeId}' references missing asset '${shape.props.assetId}'`);
+				}
+				if (shape.props.w < 0 || shape.props.h < 0) {
+					errors.push(`Image shape '${shapeId}' has negative dimensions`);
+				}
+				if (shape.props.crop) {
+					for (const [edge, value] of Object.entries(shape.props.crop)) {
+						if (!Number.isFinite(value) || value < 0 || value > 1) {
+							errors.push(`Image shape '${shapeId}' has invalid ${edge} crop`);
+						}
+					}
 				}
 				break;
 			}

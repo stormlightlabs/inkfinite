@@ -270,6 +270,14 @@ export function createDexieDocRepo(
 				if (pageDeleteKeys.length > 0) await pages().bulkDelete(pageDeleteKeys);
 				if (shapeDeleteKeys.length > 0) await shapes().bulkDelete(shapeDeleteKeys);
 				if (bindingDeleteKeys.length > 0) await bindings().bulkDelete(bindingDeleteKeys);
+				if (patch.deletes?.assetIds?.length) {
+					const current = await meta().get(assetsKey(boardId));
+					const assets = {
+						...((current?.value as Record<string, ImportedAsset> | undefined) ?? {})
+					};
+					for (const id of patch.deletes.assetIds) delete assets[id];
+					await meta().put({ key: assetsKey(boardId), value: assets });
+				}
 
 				const upsertPages =
 					patch.upserts?.pages?.map((page) => ({
@@ -293,6 +301,15 @@ export function createDexieDocRepo(
 				if (upsertPages.length > 0) await pages().bulkPut(upsertPages);
 				if (upsertShapes.length > 0) await shapes().bulkPut(upsertShapes);
 				if (upsertBindings.length > 0) await bindings().bulkPut(upsertBindings);
+				if (patch.upserts?.assets?.length) {
+					const current = await meta().get(assetsKey(boardId));
+					const assets = {
+						...((current?.value as Record<string, ImportedAsset> | undefined) ?? {})
+					};
+					for (const asset of patch.upserts.assets)
+						assets[asset.id] = { ...asset, bytes: [...asset.bytes] };
+					await meta().put({ key: assetsKey(boardId), value: assets });
+				}
 
 				if (patch.order?.pageIds) {
 					await meta().put({
@@ -532,7 +549,18 @@ function clonePatch(patch: DocPatch): DocPatch {
 				BindingOps.clone(binding)
 			);
 		}
-		if (!cloned.upserts.pages && !cloned.upserts.shapes && !cloned.upserts.bindings) {
+		if (patch.upserts.assets) {
+			cloned.upserts.assets = patch.upserts.assets.map((asset) => ({
+				...asset,
+				bytes: [...asset.bytes]
+			}));
+		}
+		if (
+			!cloned.upserts.pages &&
+			!cloned.upserts.shapes &&
+			!cloned.upserts.bindings &&
+			!cloned.upserts.assets
+		) {
 			delete cloned.upserts;
 		}
 	}
@@ -542,10 +570,12 @@ function clonePatch(patch: DocPatch): DocPatch {
 		if (patch.deletes.pageIds) cloned.deletes.pageIds = [...patch.deletes.pageIds];
 		if (patch.deletes.shapeIds) cloned.deletes.shapeIds = [...patch.deletes.shapeIds];
 		if (patch.deletes.bindingIds) cloned.deletes.bindingIds = [...patch.deletes.bindingIds];
+		if (patch.deletes.assetIds) cloned.deletes.assetIds = [...patch.deletes.assetIds];
 		if (
 			!cloned.deletes.pageIds?.length &&
 			!cloned.deletes.shapeIds?.length &&
-			!cloned.deletes.bindingIds?.length
+			!cloned.deletes.bindingIds?.length &&
+			!cloned.deletes.assetIds?.length
 		) {
 			delete cloned.deletes;
 		}
@@ -593,12 +623,14 @@ function isPatchEmpty(patch: DocPatch): boolean {
 	const hasUpserts =
 		Boolean(patch.upserts?.pages?.length) ||
 		Boolean(patch.upserts?.shapes?.length) ||
-		Boolean(patch.upserts?.bindings?.length);
+		Boolean(patch.upserts?.bindings?.length) ||
+		Boolean(patch.upserts?.assets?.length);
 
 	const hasDeletes =
 		Boolean(patch.deletes?.pageIds?.length) ||
 		Boolean(patch.deletes?.shapeIds?.length) ||
-		Boolean(patch.deletes?.bindingIds?.length);
+		Boolean(patch.deletes?.bindingIds?.length) ||
+		Boolean(patch.deletes?.assetIds?.length);
 
 	const hasOrder =
 		Boolean(patch.order?.pageIds?.length) ||

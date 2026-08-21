@@ -213,10 +213,20 @@ describe('Excalidraw interchange', () => {
 						strokeWidth: 3,
 						isDeleted: false
 					},
-					{ id: 'image', type: 'image', x: 0, y: 0, width: 10, height: 10, angle: 0, isDeleted: false }
+					{
+						id: 'image',
+						type: 'image',
+						fileId: 'image',
+						x: 0,
+						y: 0,
+						width: 10,
+						height: 10,
+						angle: 0,
+						isDeleted: false
+					}
 				],
 				appState: { viewBackgroundColor: '#ffffff' },
-				files: { image: { dataURL: 'data:image/png;base64,AA==' } }
+				files: { image: { mimeType: 'image/png', dataURL: 'data:image/png;base64,AA==' } }
 			}),
 			'Drawing.excalidraw'
 		);
@@ -228,9 +238,9 @@ describe('Excalidraw interchange', () => {
 		expect(arrow?.type === 'arrow' && arrow.props.label?.text).toBe('Flow');
 		expect(Object.values(result.snapshot.doc.bindings)).toHaveLength(1);
 		expect(shapes.some((shape) => shape.type === 'stroke')).toBe(true);
-		expect(result.warnings.map((warning) => warning.code)).toEqual(
-			expect.arrayContaining(['excalidraw-image', 'excalidraw-files', 'excalidraw-app-state'])
-		);
+		expect(shapes.some((shape) => shape.type === 'image')).toBe(true);
+		expect(Object.keys(result.snapshot.doc.assets ?? {})).toHaveLength(1);
+		expect(result.warnings.map((warning) => warning.code)).toEqual(['excalidraw-app-state']);
 	});
 
 	it('exports an editable Excalidraw v2 scene', () => {

@@ -171,6 +171,16 @@ function shapeToSVG(shape: ShapeRecord, state: EditorState): string | null {
     case "path": {
       return pathToSVG(shape, transform);
     }
+    case "image": {
+      const asset = state.doc.assets?.[shape.props.assetId];
+      if (!asset) return null;
+      const crop = shape.props.crop;
+      const preserve = crop
+        ? ` preserveAspectRatio="none" viewBox="${crop.left ?? 0} ${crop.top ?? 0} ${1 - (crop.left ?? 0) - (crop.right ?? 0)} ${1 - (crop.top ?? 0) - (crop.bottom ?? 0)}"`
+        : '';
+      const encoded = encodeBase64(asset.bytes);
+      return `<image transform="${transform}" width="${shape.props.w}" height="${shape.props.h}" opacity="${shape.opacity ?? 1}" href="data:${escapeXML(asset.mediaType)};base64,${encoded}"${preserve}/>`;
+    }
     case "markdown": {
       return markdownToSVG(shape, transform);
     }
@@ -304,6 +314,13 @@ function markdownToSVG(shape: MarkdownShape, transform: string): string {
     `  </div>`,
     `</foreignObject>`,
   ].join("\n");
+}
+
+function encodeBase64(bytes: number[]): string {
+  if (typeof btoa !== 'function') return '';
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
 }
 
 /**
