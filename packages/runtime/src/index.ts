@@ -14,7 +14,7 @@ import {
 /** Grid settings consumed by the editor runtime. */
 export type SnapSettings = { snapEnabled: boolean; gridEnabled: boolean; gridSize: number };
 
-/** Select-tool behavior used for resize handles. */
+/** Tool behavior used for resize, anchor, and Bézier handles. */
 export type SelectionTool = Tool & {
 	getHandleAtPoint(state: EditorState, world: { x: number; y: number }): string | null;
 	getActiveHandle?(): string | null;
@@ -72,7 +72,9 @@ export class EditorRuntime {
 		const { store, selectionTool } = this.options;
 
 		if (action.type === 'pointer-move' && !this.panning && !this.spaceHeld) {
-			this.options.onHandleHover?.(selectionTool.getHandleAtPoint(store.getState(), action.world));
+			const activeTool = this.options.tools.get(store.getState().ui.toolId);
+			const handleTool = activeTool && hasHandleHitTesting(activeTool) ? activeTool : selectionTool;
+			this.options.onHandleHover?.(handleTool.getHandleAtPoint(store.getState(), action.world));
 		}
 
 		if (action.type === 'key-down' && action.key === ' ' && !action.repeat) {
@@ -176,6 +178,10 @@ export function commandKind(before: EditorState, after: EditorState): CommandKin
 	if (before.doc !== after.doc) return 'doc';
 	if (before.camera !== after.camera) return 'camera';
 	return 'ui';
+}
+
+function hasHandleHitTesting(tool: Tool): tool is SelectionTool {
+	return 'getHandleAtPoint' in tool && typeof tool.getHandleAtPoint === 'function';
 }
 
 function snapAction(action: Action, snap: SnapSettings): Action {

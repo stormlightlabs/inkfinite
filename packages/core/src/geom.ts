@@ -7,6 +7,8 @@ import type {
 	EllipseShape,
 	LineShape,
 	MarkdownShape,
+	PathAnchorRef,
+	PathControlRef,
 	PathGeometry,
 	PathShape,
 	RectShape,
@@ -131,6 +133,141 @@ export function pathGeometryBounds(geometry: PathGeometry): Box2 {
 		if (subpath.closed) points.push(current, start);
 	}
 	return points.length === 0 ? Box2Ops.create(0, 0, 0, 0) : Box2Ops.fromPoints(points);
+}
+
+/** Return every anchor destination in a native path. */
+export function pathAnchorRefs(shape: PathShape): PathAnchorRef[] {
+	return shape.props.subpaths.flatMap((subpath, subpathIndex) =>
+		subpath.segments.map((_, segmentIndex) => ({ subpathIndex, segmentIndex }))
+	);
+}
+
+/** Return the local position of a path anchor reference. */
+export function pathAnchorPosition(shape: PathShape, anchor: PathAnchorRef): Vec2 | null {
+	return shape.props.subpaths[anchor.subpathIndex]?.segments[anchor.segmentIndex]?.to ?? null;
+}
+
+/** Return the local Bézier controls and their owning anchor positions. */
+export function pathControlHandles(shape: PathShape): Array<{ ref: PathControlRef; position: Vec2; anchor: Vec2 }> {
+	const handles: Array<{ ref: PathControlRef; position: Vec2; anchor: Vec2 }> = [];
+	for (const [subpathIndex, subpath] of shape.props.subpaths.entries()) {
+		for (const [segmentIndex, segment] of subpath.segments.entries()) {
+			if (segment.type === 'quadratic') {
+				handles.push({
+					ref: { subpathIndex, segmentIndex, control: 'quadratic' },
+					position: segment.control,
+					anchor: subpath.segments[segmentIndex - 1]?.to ?? segment.to
+				});
+			} else if (segment.type === 'cubic') {
+				handles.push(
+					{
+						ref: { subpathIndex, segmentIndex, control: 'control_1' },
+						position: segment.control_1,
+						anchor: subpath.segments[segmentIndex - 1]?.to ?? segment.to
+					},
+					{
+						ref: { subpathIndex, segmentIndex, control: 'control_2' },
+						position: segment.control_2,
+						anchor: segment.to
+					}
+				);
+			}
+		}
+	}
+	return handles;
+}
+
+/** Find the closest path anchor to a world point. */
+export function hitTestPathAnchor(shape: PathShape, point: Vec2, tolerance = 10): PathAnchorRef | null {
+	let closest: PathAnchorRef | null = null;
+	let closestDistance = tolerance;
+	for (const anchor of pathAnchorRefs(shape)) {
+		const position = pathAnchorPosition(shape, anchor);
+		if (!position) continue;
+		const distance = Vec2Ops.dist(point, localToWorld(shape, position));
+		if (distance <= closestDistance) {
+			closestDistance = distance;
+			closest = anchor;
+		}
+	}
+	return closest;
+}
+
+/** Find the closest Bézier control handle to a world point. */
+export function hitTestPathControl(shape: PathShape, point: Vec2, tolerance = 10): PathControlRef | null {
+	let closest: PathControlRef | null = null;
+	let closestDistance = tolerance;
+	for (const handle of pathControlHandles(shape)) {
+		const distance = Vec2Ops.dist(point, localToWorld(shape, handle.position));
+		if (distance <= closestDistance) {
+			closestDistance = distance;
+			closest = handle.ref;
+		}
+	}
+	return closest;
+}
+
+/** Find a subpath whose rendered geometry is close to a world point. */
+export function hitTestPathSubpath(shape: PathShape, point: Vec2, tolerance = 10): number | null {
+	let closestSubpath: number | null = null;
+	let closestDistance = tolerance;
+	for (const [subpathIndex, subpath] of shape.props.subpaths.entries()) {
+		const first = subpath.segments[0];
+		if (!first || first.type !== 'move') continue;
+		let current = first.to;
+		for (const segment of subpath.segments.slice(1)) {
+			const samples =
+				segment.type === 'line'
+					? [current, segment.to]
+					: segment.type === 'quadratic'
+						? [
+								current,
+								...Array.from({ length: 24 }, (_, index) =>
+									quadraticPoint(current, segment.control, segment.to, (index + 1) / 24)
+								)
+							]
+						: segment.type === 'cubic'
+							? [
+									current,
+									...Array.from({ length: 32 }, (_, index) =>
+										cubicPoint(
+											current,
+											segment.control_1,
+											segment.control_2,
+											segment.to,
+											(index + 1) / 32
+										)
+									)
+								]
+							: [current, segment.to];
+			for (let index = 1; index < samples.length; index += 1) {
+				const from = localToWorld(shape, samples[index - 1]);
+				const to = localToWorld(shape, samples[index]);
+				const distance = distanceToSegment(point, from, to);
+				if (distance < closestDistance) {
+					closestDistance = distance;
+					closestSubpath = subpathIndex;
+				}
+			}
+			current = segment.to;
+		}
+		if (subpath.closed) {
+			const distance = distanceToSegment(point, localToWorld(shape, current), localToWorld(shape, first.to));
+			if (distance < closestDistance) {
+				closestDistance = distance;
+				closestSubpath = subpathIndex;
+			}
+		}
+	}
+	return closestSubpath;
+}
+
+function distanceToSegment(point: Vec2, from: Vec2, to: Vec2): number {
+	const segment = Vec2Ops.sub(to, from);
+	const lengthSq = Vec2Ops.lenSq(segment);
+	if (lengthSq === 0) return Vec2Ops.dist(point, from);
+	const t = Math.max(0, Math.min(1, Vec2Ops.dot(Vec2Ops.sub(point, from), segment) / lengthSq));
+	return Vec2Ops.dist(point, Vec2Ops.add(from, Vec2Ops.mulScalar(segment, t)));
 }
 
 function quadraticExtremum(start: number, control: number, end: number): number | null {

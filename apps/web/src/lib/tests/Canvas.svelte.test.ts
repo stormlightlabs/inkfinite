@@ -118,12 +118,13 @@ describe('Canvas component', () => {
 		const { container } = renderCanvas();
 		const toolButtons = container.querySelectorAll('.tool-button');
 
-		expect(toolButtons.length).toBe(9);
+		expect(toolButtons.length).toBe(10);
 
 		const toolIds = Array.from(toolButtons).map((btn) => btn.getAttribute('data-tool-id'));
 		const coreToolIds = toolIds.filter((id) => id && id !== 'history');
 		expect(coreToolIds).toEqual([
 			'select',
+			'direct-select',
 			'rect',
 			'ellipse',
 			'line',

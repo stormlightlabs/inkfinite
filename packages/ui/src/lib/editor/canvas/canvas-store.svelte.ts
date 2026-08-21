@@ -12,6 +12,7 @@ import { themeStore } from '../theme.svelte';
 import {
 	ArrowTool,
 	Camera,
+	DirectSelectTool,
 	createToolMap,
 	CursorStore,
 	diffDoc,
@@ -333,6 +334,7 @@ export function createCanvasController(
 			y: Math.round(point.y / snap.gridSize) * snap.gridSize
 		};
 	});
+	const directSelectTool = new DirectSelectTool();
 	const rectTool = new RectTool();
 	const ellipseTool = new EllipseTool();
 	const lineTool = new LineTool();
@@ -350,6 +352,7 @@ export function createCanvasController(
 	const penTool = new PenTool(getPenBrushConfig, getPenStrokeStyle);
 	const tools = createToolMap([
 		selectTool,
+		directSelectTool,
 		rectTool,
 		ellipseTool,
 		lineTool,
@@ -421,7 +424,9 @@ export function createCanvasController(
 	}
 
 	function syncHandleState() {
-		handleState.active = selectTool.getActiveHandle ? selectTool.getActiveHandle() : null;
+		const activeTool =
+			store.getState().ui.toolId === 'direct-select' ? directSelectTool : selectTool;
+		handleState.active = activeTool.getActiveHandle ? activeTool.getActiveHandle() : null;
 		refreshCursor();
 	}
 

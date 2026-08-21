@@ -96,24 +96,24 @@ document lifecycle, including SVG import and rendering.
 
 #### Selection and manipulation
 
-- [ ] Add a direct-selection tool
-- [ ] Select complete subpaths
-- [ ] Select individual anchors
-- [ ] Select multiple anchors
-- [ ] Move selected anchors
-- [ ] Move complete subpaths
-- [ ] Render quadratic control handles
-- [ ] Render cubic control handles
-- [ ] Drag quadratic control handles
-- [ ] Drag cubic control handles
+- [x] Add a direct-selection tool
+- [x] Select complete subpaths
+- [x] Select individual anchors
+- [x] Select multiple anchors
+- [x] Move selected anchors
+- [x] Move complete subpaths
+- [x] Render quadratic control handles
+- [x] Render cubic control handles
+- [x] Drag quadratic control handles
+- [x] Drag cubic control handles
 
 #### Preview, commit, and tests
 
-- [ ] Update bounds during path-edit previews
-- [ ] Update hit regions during path-edit previews
-- [ ] Commit one transaction per completed geometry gesture
-- [ ] Make one direct-edit gesture one undo step
-- [ ] Add direct-selection interaction tests
+- [x] Update bounds during path-edit previews
+- [x] Update hit regions during path-edit previews
+- [x] Commit one transaction per completed geometry gesture
+- [x] Make one direct-edit gesture one undo step
+- [x] Add direct-selection interaction tests
 
 ### Path topology
 

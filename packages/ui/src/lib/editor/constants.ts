@@ -22,6 +22,7 @@ export const DEFAULT_STROKE_COLOR = '#2e5c8a';
 
 export const TOOLS: Array<{ id: ToolId; label: string; icon: IconName }> = [
 	{ id: 'select', label: 'Select', icon: 'select' },
+	{ id: 'direct-select', label: 'Direct Select', icon: 'direct-select' },
 	{ id: 'rect', label: 'Rectangle', icon: 'rectangle' },
 	{ id: 'ellipse', label: 'Ellipse', icon: 'ellipse' },
 	{ id: 'line', label: 'Line', icon: 'line' },

@@ -65,12 +65,15 @@ current container, multi-selection removes descendant duplicates, and hit
 testing excludes locked or hidden ancestors. Rust renderer tests cover nested
 transform composition alongside runtime selection tests.
 
-Direct path editing follows:
+The initial direct-selection slice is implemented for native paths. It adds a
+separate direct-selection tool, complete-subpath and multi-anchor selection,
+anchor and subpath movement, and quadratic and cubic control-handle rendering
+and dragging. Path-edit previews recompute bounds and hit regions from the
+preview document. Each completed geometry gesture produces one history entry,
+with interaction coverage for preview, commit, and undo behavior.
 
-- select path subpaths
-- select one or more anchors
-- move anchors
-- manipulate quadratic and cubic Bezier handles
+The next direct path-editing slice covers:
+
 - add and remove anchors
 - open and close paths
 - join compatible endpoints

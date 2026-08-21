@@ -24,11 +24,12 @@ describe('Toolbar component', () => {
 		});
 
 		const buttons = container.querySelectorAll('.tool-button');
-		expect(buttons.length).toBe(8);
+		expect(buttons.length).toBe(9);
 
 		const toolIds = Array.from(buttons).map((btn) => btn.getAttribute('data-tool-id'));
 		expect(toolIds).toEqual([
 			'select',
+			'direct-select',
 			'rect',
 			'ellipse',
 			'line',
@@ -79,6 +80,7 @@ describe('Toolbar component', () => {
 
 	it.each([
 		{ toolId: 'select' as ToolId, label: 'Select' },
+		{ toolId: 'direct-select' as ToolId, label: 'Direct Select' },
 		{ toolId: 'rect' as ToolId, label: 'Rectangle' },
 		{ toolId: 'ellipse' as ToolId, label: 'Ellipse' },
 		{ toolId: 'line' as ToolId, label: 'Line' },

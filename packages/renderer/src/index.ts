@@ -24,10 +24,15 @@ import {
 	getShapesOnCurrentPage,
 	localToWorld,
 	localShapeBounds,
+	pathAnchorPosition,
+	pathAnchorRefs,
+	pathControlHandles,
 	resolveArrowEndpoints,
 	shapeBounds,
 	shapeTransform,
-	worldToLocal
+	worldToLocal,
+	pathAnchorHandleId,
+	pathControlHandleId
 } from '@inkfinite/core';
 
 export interface Renderer {
@@ -1235,6 +1240,13 @@ function drawSelection(
 
 		if (singleSelectionId === shape.id) {
 			drawHandles(context, state, shape, handleState);
+			if (
+				state.ui.toolId === 'direct-select' &&
+				state.ui.pathSelection?.pathId === shape.id &&
+				shape.type === 'path'
+			) {
+				drawPathEditingHandles(context, state, shape, handleState);
+			}
 		}
 	}
 }
@@ -1295,6 +1307,56 @@ function drawHandles(
 
 		context.restore();
 	}
+}
+
+function drawPathEditingHandles(
+	context: CanvasRenderingContext2D,
+	state: EditorState,
+	shape: PathShape,
+	handleState?: HandleRenderState
+): void {
+	const selectedAnchors = new Set(
+		(state.ui.pathSelection?.anchors ?? []).map((anchor) => `${anchor.subpathIndex}:${anchor.segmentIndex}`)
+	);
+	const scale = state.camera.zoom;
+	const anchorSize = 5 / scale;
+	const controlSize = 4 / scale;
+
+	context.save();
+	applyShapeTransform(context, shape);
+	context.lineWidth = 1 / scale;
+	context.setLineDash([]);
+
+	for (const handle of pathControlHandles(shape)) {
+		const handleId = pathControlHandleId(handle.ref);
+		context.strokeStyle = 'rgba(37, 99, 235, 0.6)';
+		context.beginPath();
+		context.moveTo(handle.anchor.x, handle.anchor.y);
+		context.lineTo(handle.position.x, handle.position.y);
+		context.stroke();
+		context.fillStyle = handleState?.active === handleId ? '#2563eb' : '#ffffff';
+		context.strokeStyle = '#2563eb';
+		context.beginPath();
+		context.arc(handle.position.x, handle.position.y, controlSize, 0, Math.PI * 2);
+		context.fill();
+		context.stroke();
+	}
+
+	for (const anchor of pathAnchorRefs(shape)) {
+		const position = pathAnchorPosition(shape, anchor);
+		if (!position) continue;
+		const anchorId = pathAnchorHandleId(anchor);
+		const key = `${anchor.subpathIndex}:${anchor.segmentIndex}`;
+		const selected = selectedAnchors.has(key);
+		context.fillStyle = selected || handleState?.active === anchorId ? '#2563eb' : '#ffffff';
+		context.strokeStyle = '#1d4ed8';
+		context.lineWidth = 1.5 / scale;
+		context.beginPath();
+		context.rect(position.x - anchorSize, position.y - anchorSize, anchorSize * 2, anchorSize * 2);
+		context.fill();
+		context.stroke();
+	}
+	context.restore();
 }
 
 function getHandlesForShape(state: EditorState, shape: ShapeRecord): HandleVisual[] {

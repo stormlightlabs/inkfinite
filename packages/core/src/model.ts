@@ -87,6 +87,15 @@ export type PathSubpath = NativePathSubpath;
 /** Native path geometry and its compound fill rule. */
 export type PathGeometry = NativePathGeometry;
 
+/** Ephemeral reference to one path anchor, identified by its segment destination. */
+export type PathAnchorRef = { subpathIndex: number; segmentIndex: number };
+
+/** Ephemeral selection state used by the direct-selection tool. */
+export type PathSelection = { pathId: string; anchors: PathAnchorRef[] };
+
+/** A path control handle exposed by the direct-selection tool. */
+export type PathControlRef = PathAnchorRef & { control: 'quadratic' | 'control_1' | 'control_2' };
+
 /** Native path painting properties stored alongside its geometry. */
 export type PathProps = PathGeometry & { fill?: string; stroke?: string; stroke_width?: number };
 

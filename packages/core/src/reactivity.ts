@@ -3,10 +3,10 @@ import type { Camera } from './camera';
 import { Camera as CameraOps } from './camera';
 import { History } from './history';
 import type { Command, HistoryAppliedEvent, HistoryEntry, HistoryOperation, HistoryState } from './history';
-import type { Document, LayerRecord, PageRecord, ShapeRecord } from './model';
+import type { Document, LayerRecord, PageRecord, PathSelection, ShapeRecord } from './model';
 import { Document as DocumentOps, ensureDocumentLayers } from './model';
 
-export type ToolId = 'select' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'text' | 'pen' | 'markdown';
+export type ToolId = 'select' | 'direct-select' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'text' | 'pen' | 'markdown';
 
 export type BindingPreview = { arrowId: string; targetShapeId: string; handle: 'start' | 'end' };
 
@@ -15,6 +15,8 @@ export type UIState = {
 	/** Active destination for newly created shapes on the current page. */
 	activeLayerId?: string | null;
 	selectionIds: string[];
+	/** Ephemeral path anchors selected by the direct-selection tool. */
+	pathSelection?: PathSelection;
 	toolId: ToolId;
 	/** Nested container scope used for hierarchical selection. */
 	containerPath?: string[];
@@ -45,6 +47,12 @@ export const EditorState = {
 				currentPageId: state.ui.currentPageId,
 				activeLayerId: state.ui.activeLayerId,
 				selectionIds: [...state.ui.selectionIds],
+				pathSelection: state.ui.pathSelection
+					? {
+							pathId: state.ui.pathSelection.pathId,
+							anchors: state.ui.pathSelection.anchors.map((anchor) => ({ ...anchor }))
+						}
+					: undefined,
 				toolId: state.ui.toolId,
 				containerPath: state.ui.containerPath ? [...state.ui.containerPath] : undefined,
 				bindingPreview: state.ui.bindingPreview ? { ...state.ui.bindingPreview } : undefined
@@ -274,9 +282,11 @@ function enforceInvariants(state: EditorState): EditorState {
 	}
 
 	let containerPath = normalizeContainerPath(state, doc, currentPageId);
+	let pathSelection = normalizePathSelection(state.ui.pathSelection, doc, currentPageId);
 	let selectionIds = state.ui.selectionIds;
 	if (currentPageId === null) {
 		containerPath = [];
+		pathSelection = undefined;
 		selectionIds = [];
 	} else {
 		const currentPage = doc.pages[currentPageId];
@@ -285,6 +295,9 @@ function enforceInvariants(state: EditorState): EditorState {
 		selectionIds = selectionIds.filter((id) => {
 			return shapes[id] && validShapeIds.has(id);
 		});
+		if (pathSelection && !selectionIds.includes(pathSelection.pathId)) {
+			pathSelection = undefined;
+		}
 	}
 
 	const currentPage = currentPageId ? doc.pages[currentPageId] : undefined;
@@ -301,7 +314,7 @@ function enforceInvariants(state: EditorState): EditorState {
 	return {
 		...state,
 		doc,
-		ui: { ...state.ui, currentPageId, activeLayerId: nextActiveLayerId, selectionIds, containerPath }
+		ui: { ...state.ui, currentPageId, activeLayerId: nextActiveLayerId, selectionIds, containerPath, pathSelection }
 	};
 }
 
@@ -411,6 +424,23 @@ function isShapeInteractiveInDocument(document: Document, shape: ShapeRecord): b
 		parentId = parent.groupId;
 	}
 	return true;
+}
+
+function normalizePathSelection(
+	selection: PathSelection | undefined,
+	document: Document,
+	pageId: string | null
+): PathSelection | undefined {
+	if (!selection || !pageId) return undefined;
+	const shape = document.shapes[selection.pathId];
+	if (!shape || shape.type !== 'path' || shape.pageId !== pageId || !isShapeInteractiveInDocument(document, shape)) {
+		return undefined;
+	}
+	const anchors = selection.anchors.filter((anchor) => {
+		const segment = shape.props.subpaths[anchor.subpathIndex]?.segments[anchor.segmentIndex];
+		return Boolean(segment);
+	});
+	return { pathId: selection.pathId, anchors };
 }
 
 function normalizeContainerPath(state: EditorState, document: Document, pageId: string | null): string[] {

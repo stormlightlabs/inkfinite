@@ -1,4 +1,14 @@
-import { Action, EditorState, SnapshotCommand, Store, type Tool } from '@inkfinite/core';
+import {
+	Action,
+	DirectSelectTool,
+	EditorState,
+	PageRecord,
+	ShapeRecord,
+	SnapshotCommand,
+	Store,
+	type PathProps,
+	type Tool
+} from '@inkfinite/core';
 import {
 	EditorRuntime,
 	type RuntimeTransactionDraft,
@@ -47,6 +57,79 @@ class DragTool implements Tool {
 }
 
 describe('editor runtime Rust commit boundary', () => {
+	it('commits one direct-edit gesture as one undoable transaction', () => {
+		const page = PageRecord.create('Page', 'page:direct-runtime');
+		const geometry: PathProps = {
+			subpaths: [
+				{
+					segments: [
+						{ type: 'move', to: { x: 0, y: 0 } },
+						{ type: 'line', to: { x: 100, y: 0 } },
+						{ type: 'line', to: { x: 100, y: 100 } },
+						{ type: 'line', to: { x: 0, y: 100 } }
+					],
+					closed: true
+				}
+			],
+			fill_rule: 'nonzero',
+			fill: '#fff'
+		};
+		const path = ShapeRecord.createPath(page.id, 0, 0, geometry, 'path:direct-runtime');
+		page.shapeIds = [path.id];
+		const store = new Store({
+			doc: { pages: { [page.id]: page }, shapes: { [path.id]: path }, bindings: {} },
+			ui: {
+				currentPageId: page.id,
+				selectionIds: [path.id],
+				toolId: 'direct-select',
+				pathSelection: { pathId: path.id, anchors: [] }
+			},
+			camera: { x: 0, y: 0, zoom: 1 }
+		});
+		const directTool = new DirectSelectTool();
+		store.setState((state) => directTool.onEnter(state));
+		const original = structuredClone(store.getState().doc);
+		const drafts: RuntimeTransactionDraft[] = [];
+		const runtime = new EditorRuntime({
+			store,
+			tools: new Map([[directTool.id, directTool]]),
+			selectionTool: directTool,
+			getSnapSettings: () => ({ snapEnabled: false, gridEnabled: false, gridSize: 25 }),
+			onTransactionDraft: (draft) => {
+				drafts.push(draft);
+				store.setState(() => draft.before);
+				store.executeCommand(
+					new SnapshotCommand(draft.name, draft.kind, draft.before, draft.after)
+				);
+			}
+		});
+
+		runtime.handleAction(
+			Action.pointerDown({ x: 0, y: 0 }, { x: 0, y: 0 }, 0, leftDown, modifiers)
+		);
+		runtime.handleAction(
+			Action.pointerMove({ x: 10, y: 0 }, { x: 10, y: 0 }, leftDown, modifiers)
+		);
+		runtime.handleAction(
+			Action.pointerMove({ x: 20, y: 0 }, { x: 20, y: 0 }, leftDown, modifiers)
+		);
+
+		expect(drafts).toHaveLength(0);
+		runtime.handleAction(
+			Action.pointerUp({ x: 20, y: 0 }, { x: 20, y: 0 }, 0, buttonsUp, modifiers)
+		);
+
+		expect(drafts).toHaveLength(1);
+		expect(store.getHistory().undoStack).toHaveLength(1);
+		const updated = store.getState().doc.shapes[path.id];
+		expect(updated?.type).toBe('path');
+		if (updated?.type === 'path') {
+			expect(updated.props.subpaths[0].segments[0]?.to).toEqual({ x: 20, y: 0 });
+		}
+		expect(store.undo()).toBe(true);
+		expect(store.getState().doc).toEqual(original);
+	});
+
 	it('keeps drag movement local, applies one committed patch, redraws, and restores the original on undo', () => {
 		const initial = EditorState.create();
 		initial.doc.pages['page:1'] = { id: 'page:1', name: 'Page 1', shapeIds: ['shape:1'] };

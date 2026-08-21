@@ -44,6 +44,10 @@
 - Hierarchical vector object editing with selectable imported containers, nested selection scopes,
   full affine hit testing, world-space child transforms for move, resize, and rotation, and
   world-space-preserving reparent operations with locked-ancestor selection rules.
+- Direct path selection with subpath and anchor selection, anchor and subpath movement, and
+  quadratic and cubic Bézier control-handle rendering and editing.
+- Direct path-edit previews update bounds and hit regions, commit one transaction per
+  completed gesture, and record each gesture as one undo step with interaction coverage.
 
 #### SVG Interop
 

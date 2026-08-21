@@ -32,6 +32,7 @@ export const ICONS = {
 	ellipse: 'i-tabler-circle',
 	rectangle: 'i-tabler-rectangle',
 	select: 'i-tabler-pointer',
+	'direct-select': 'i-tabler-point',
 	text: 'i-tabler-letter-t',
 	terminal: 'i-tabler-terminal-2',
 	moon: 'i-tabler-moon',

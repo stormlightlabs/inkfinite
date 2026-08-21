@@ -651,6 +651,66 @@ describe('Renderer', () => {
 			renderer.dispose();
 		});
 
+		it('renders direct-selection anchors and quadratic and cubic controls', () => {
+			const scheduledFrames: FrameRequestCallback[] = [];
+			globalThis.requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+				scheduledFrames.push(callback);
+				return scheduledFrames.length;
+			});
+			const page = PageRecord.create('Page', 'page:direct-render');
+			const path = ShapeRecord.createPath(
+				page.id,
+				0,
+				0,
+				{
+					subpaths: [
+						{
+							segments: [
+								{ type: 'move', to: { x: 0, y: 0 } },
+								{ type: 'line', to: { x: 40, y: 0 } },
+								{ type: 'quadratic', control: { x: 60, y: 20 }, to: { x: 40, y: 40 } },
+								{
+									type: 'cubic',
+									control_1: { x: 40, y: 60 },
+									control_2: { x: 0, y: 60 },
+									to: { x: 0, y: 40 }
+								}
+							],
+							closed: true
+						}
+					],
+					fill_rule: 'nonzero',
+					stroke: '#000',
+					stroke_width: 2
+				},
+				'path:direct-render'
+			);
+			const store = new Store();
+			store.setState((state) => ({
+				...state,
+				doc: {
+					pages: { [page.id]: { ...page, shapeIds: [path.id] } },
+					shapes: { [path.id]: path },
+					bindings: {}
+				},
+				ui: {
+					...state.ui,
+					currentPageId: page.id,
+					selectionIds: [path.id],
+					toolId: 'direct-select',
+					pathSelection: { pathId: path.id, anchors: [{ subpathIndex: 0, segmentIndex: 0 }] }
+				}
+			}));
+
+			const renderer = createRenderer(canvas, store);
+			scheduledFrames.shift()?.(0);
+
+			const controlHandleArcs = vi.mocked(context.arc).mock.calls.filter((call) => call[2] === 4);
+			expect(controlHandleArcs).toHaveLength(3);
+			expect(context.rect).toHaveBeenCalledTimes(4);
+			renderer.dispose();
+		});
+
 		it('should update render when store changes', async () => {
 			const store = new Store();
 

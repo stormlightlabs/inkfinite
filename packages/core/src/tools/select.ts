@@ -245,7 +245,8 @@ export class SelectTool implements Tool {
 			ui: {
 				...state.ui,
 				activeLayerId: clickedShape.layerId ?? state.ui.activeLayerId,
-				selectionIds: newSelectionIds
+				selectionIds: newSelectionIds,
+				pathSelection: undefined
 			}
 		};
 	}
@@ -263,7 +264,7 @@ export class SelectTool implements Tool {
 			this.toolState.marqueeEnd = action.world;
 			this.notifyMarqueeChange();
 
-			return { ...state, ui: { ...state.ui, selectionIds: [] } };
+			return { ...state, ui: { ...state.ui, selectionIds: [], pathSelection: undefined } };
 		}
 
 		return state;
@@ -492,9 +493,17 @@ export class SelectTool implements Tool {
 			const path = state.ui.containerPath ?? [];
 			if (path.length > 0) {
 				const leaving = path[path.length - 1];
-				return { ...state, ui: { ...state.ui, containerPath: path.slice(0, -1), selectionIds: [leaving] } };
+				return {
+					...state,
+					ui: {
+						...state.ui,
+						containerPath: path.slice(0, -1),
+						selectionIds: [leaving],
+						pathSelection: undefined
+					}
+				};
 			}
-			return { ...state, ui: { ...state.ui, selectionIds: [] } };
+			return { ...state, ui: { ...state.ui, selectionIds: [], pathSelection: undefined } };
 		}
 
 		if (action.key === 'Delete' || action.key === 'Backspace') {
