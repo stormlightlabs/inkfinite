@@ -3,6 +3,7 @@ members = [
   "apps/desktop/src-tauri",
   "crates/inkfinite-cli",
   "crates/inkfinite-core",
+  "crates/inkfinite-mcp",
   "crates/inkfinite-wasm",
   "xtask",
 ]
@@ -22,6 +23,7 @@ clap = { version = "4.6.1", features = ["derive"] }
 clap_complete = "4.6.9"
 clap_mangen = "0.2.33"
 inkfinite-core = { path = "crates/inkfinite-core" }
+rmcp = { version = "3.1.2", default-features = false, features = ["server", "macros", "transport-io"] }
 perfect_freehand = "=0.1.1"
 resvg = { version = "=0.48.1", default-features = false, features = ["raster-images", "system-fonts", "text"] }
 roxmltree = "0.21.1"
