@@ -20,5 +20,8 @@ export const Default: Story = {};
 export const WithRecentColors: Story = {
 	args: { recentColors: ['#8a69f7', '#00a21f', '#ff4647'], value: '#8a69f7' }
 };
+export const WithTransparentOption: Story = {
+	args: { allowNone: true, label: 'Fill color', value: 'transparent' }
+};
 export const EndAligned: Story = { args: { align: 'end' } };
 export const Disabled: Story = { args: { disabled: true } };

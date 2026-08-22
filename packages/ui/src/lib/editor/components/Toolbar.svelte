@@ -405,7 +405,7 @@
 			title="Drag toolbar; click or press Enter to rotate (arrow keys move it)"
 			role="button"
 			tabindex="0">
-			<Icon name="grip-vertical" size={16} />
+			<Icon name="grip-vertical" size={16} class="toolbar__drag-icon" />
 		</div>
 
 		<div class="toolbar__tools">
@@ -573,6 +573,10 @@
 		touch-action: none;
 		transition-property: color, background-color, opacity;
 		transition-duration: var(--ink-duration-fast);
+	}
+
+	.toolbar:not(.toolbar--horizontal) :global(.toolbar__drag-icon) {
+		transform: rotate(90deg);
 	}
 
 	.toolbar__drag-handle:hover {

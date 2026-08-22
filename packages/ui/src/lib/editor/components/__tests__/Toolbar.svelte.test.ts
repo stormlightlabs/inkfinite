@@ -91,6 +91,22 @@ describe('Editor Toolbar', () => {
 		);
 	});
 
+	it('rotates the drag icon for a vertical tool dock', async () => {
+		const screen = render(Toolbar, {
+			currentTool: 'select',
+			onToolChange: vi.fn(),
+			store: new Store(),
+			brushStore: createBrushStore()
+		});
+		const toolbar = screen.getByRole('toolbar', { name: 'Drawing tools' }).element();
+		const handle = screen.getByRole('button', { name: 'Drag toolbar' });
+		if (toolbar.classList.contains('toolbar--horizontal')) await handle.click();
+
+		const icon = toolbar.querySelector('.toolbar__drag-icon');
+		expect(icon).not.toBeNull();
+		expect(getComputedStyle(icon as HTMLElement).transform).not.toBe('none');
+	});
+
 	it('offers import choices and editable export actions', async () => {
 		const onImportEditable = vi.fn();
 		const onImportSvg = vi.fn();
@@ -225,6 +241,12 @@ describe('Editor Toolbar', () => {
 		const fillShape = store.getState().doc.shapes.shape;
 		if (fillShape.type !== 'rect') throw new Error('Expected a rectangle shape');
 		expect(fillShape.props.fill).toBe('#0089fc');
+
+		await screen.getByRole('button', { name: 'Transparent' }).click();
+		const transparentFillShape = store.getState().doc.shapes.shape;
+		if (transparentFillShape.type !== 'rect') throw new Error('Expected a rectangle shape');
+		expect(transparentFillShape.props.fill).toBe('transparent');
+		await screen.getByRole('button', { name: 'blue 3' }).click();
 
 		await screen.getByRole('button', { name: 'Stroke color' }).click();
 		await screen

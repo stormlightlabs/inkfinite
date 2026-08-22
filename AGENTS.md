@@ -22,6 +22,11 @@
 
 ## Verification
 
+For affected editor surfaces, run the relevant capture scripts (or add new ones) and inspect
+`scripts/images/__screenshots__` at their full captured size. These are in `scripts/images/*.mjs`
+
+### Code Quality
+
 ```sh
 cargo fmt --all -- --check
 cargo test --workspace --all-features

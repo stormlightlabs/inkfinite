@@ -37,6 +37,9 @@ export const REASONABLE_COLORS = {
 
 export type ColorFamily = keyof typeof REASONABLE_COLORS;
 
+/** All Reasonable Colors families in hue order. */
+export const colorFamilies = Object.keys(REASONABLE_COLORS) as ColorFamily[];
+
 export type ColorShade = 1 | 2 | 3 | 4 | 5 | 6;
 
 type CompactColor = { readonly family: ColorFamily; readonly shade: ColorShade };

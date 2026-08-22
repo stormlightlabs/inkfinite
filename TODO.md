@@ -6,108 +6,194 @@ Run representative native and fallback SVG fixtures through each complete
 document workflow. Compare normalized structure where representation matters
 and rendered output where visual fidelity matters.
 
+- [ ] Make the TypeScript browser adapter import SVG files and pasted markup
+      through the active Rust document session, page, and layer by default
+- [ ] Offer creation of a new document from SVG as a separate editor action
+- [ ] Verify and fix TypeScript editor traversal of imported root containers so
+      existing child records can be selected, edited, reparented, and deleted independently
 - [ ] Test import through save/reopen, edit/export, undo/redo, and CRDT merge
-- [ ] Test imported shapes through CLI inspect, query, and mutation
+- [ ] Test active-document import and explicit new-document creation end to end
+- [ ] Test imported child shapes through editor selection and targeted CLI
+      query and mutation
 - [ ] Verify native vectors export without rasterization
 - [ ] Verify nested transforms export deterministically
 - [ ] Verify compound fill rules survive import and export
 - [ ] Verify opaque fallback content remains visually stable
 - [ ] Add deterministic round-trip fixtures for these workflows
 
-## Editor interaction and visual system
+## Canvas interaction quality
 
-### Application chrome
+Make common drawing and editing operations fast, predictable, and consistent
+across mouse, touch, and keyboard input.
 
-Separate persistent application actions from drawing tools and
-selection-specific controls.
+### Selection and direct manipulation
 
-- [x] Split the current editor toolbar into tool, application, and contextual
-      control surfaces
-- [x] Keep the primary tool dock limited to tool selection and active-tool
-      controls
-- [x] Move import and export into file/application chrome
-- [x] Move layout, arrange, group, lock, and related commands into selection
-      context
-- [x] Move stencils into an insert/library surface
-- [x] Remove the Stormlight Labs tagline and other non-editor content from the
-      primary drawing controls
-- [x] Preserve compact layouts for narrower viewports and coarse pointers
-- [x] Verify floating controls do not obscure selection handles, dialogs, or
-      proposal review UI
+- [ ] Add duplicate-and-connect alongside the existing duplicate-and-drag flow
+- [ ] Add selection cycling for overlapping and nested shapes
+- [ ] Add a searchable command palette for existing selection and viewport
+      commands
 
-### Contextual selection controls
+### Connectors and conversion
 
-Expose only controls that apply to the active tool or current selection.
+- [ ] Implement deterministic obstacle-aware connector routing in Rust and use
+      it for TypeScript interaction previews
+- [ ] Implement shape conversion as a Rust transaction and expose it through
+      TypeScript selection commands without losing shared style or metadata
+- [ ] Cover duplicate-and-connect, selection cycling, command execution, and
+      automatic routing with Playwright integration tests
 
-- [x] Define contextual controls from shape capabilities rather than one shared
-      selection panel
-- [x] Show fill, stroke, opacity, and shape-specific controls only when
-      applicable
-- [x] Give arrows a focused stroke, endpoint, and connection control surface
-- [x] Give text and Markdown selections focused typography controls
-- [x] Give multi-selection a focused align, distribute, group, and arrange
-      surface
-- [x] Preserve mixed-value states when selected shapes do not share a property
-- [x] Keep contextual controls keyboard accessible and return focus correctly
-      when popovers close
-- [x] Add interaction tests for contextual controls across representative
-      selection types
+## Stronger content primitives
 
-### Theme and component consistency
+### Cards and frames
 
-Use one visual system across editor chrome, menus, dialogs, popovers, and
-selection UI.
+- [ ] Turn the existing TypeScript card stencil into editable card behavior
+      built from ordinary Rust container, content, and semantic records
+- [ ] Add card title, body, role, tags, source, link, and custom metadata to the
+      native model and generated bindings, then expose TypeScript controls
+- [ ] Convert cards to and from simpler content objects without losing content
+- [ ] Add persisted frame ordering and export behavior in Rust, with
+      presentation and navigation controls in TypeScript
 
-- [x] Keep one primary Inkfinite accent family across light and dark themes
-- [x] Tune accent luminance and contrast independently for each theme
-- [x] Audit `editor/styles.css` and remove or migrate legacy theme, typography,
-      reset, and token rules
-- [x] Use the shared `--ink-*` tokens for editor components instead of local
-      color or spacing systems
-- [x] Standardize panel borders, elevation, radii, and focus treatment
-- [x] Reserve irregular radii and hard offset shadows for deliberate
-      canvas-oriented accents rather than every control
-- [x] Remove duplicate and contradictory toolbar/menu CSS declarations
-- [x] Verify text, controls, selection states, and focus indicators meet
-      contrast requirements in both themes
+### Images, assets, and rich content
 
-### Color controls
+- [ ] Add image caption and mask properties, validation, and export in Rust,
+      with reusable-asset and editing controls in TypeScript
+- [ ] Add TypeScript color sampling controls for image selections; use the
+      shared grid layout operation for arrangement
+- [ ] Add native URL, file, and page-reference content with TypeScript editor
+      rendering and controls where practical
+- [ ] Verify new card, frame, and asset behavior through save/reopen, undo/redo,
+      merge, inspection, and export
+- [ ] Add end-to-end coverage for the new card, frame, and asset workflows
 
-Keep fast color selection compact while preserving the full Reasonable Colors
-palette.
+## Semantic objects and relationships
 
-- [ ] Reduce the default color picker surface to a compact quick palette
-- [ ] Keep recent colors visible in the primary picker surface
-- [ ] Move full family shades and custom hex entry behind a secondary
-      `Custom…` action
-- [ ] Add an explicit none/transparent option for properties that support it
-- [ ] Use consistent swatch geometry and selected-state treatment
-- [ ] Preserve keyboard navigation, focus restoration, and coarse-pointer hit
-      targets
-- [ ] Test color selection, recent colors, custom values, invalid values, and
-      transparent values
+Keep semantics optional while making mature documents queryable by people,
+the CLI, and agents.
 
-### Agent review UI
+### Object metadata
 
-Make model-proposed edits visually distinct from ordinary user editing.
+- [ ] Project existing Rust names, roles, tags, descriptions, and provenance
+      into TypeScript editor selection controls
+- [ ] Add optional user-defined source and structured metadata to the Rust model
+      and generated bindings
+- [ ] Preserve semantic fields in the TypeScript editor projection and through
+      conversion, grouping, duplication, import, and export where supported
 
-- [ ] Define dedicated visual tokens for proposed additions, modifications, and
+### Semantic connections
+
+- [ ] Add an optional relation type to Rust binding records and generated
+      bindings
+- [ ] Query incoming, outgoing, and typed relationships in Rust without
+      inferring them from coordinates
+- [ ] Validate dangling or invalid relationship references separately from
+      visual routing
+- [ ] Add model, CLI, and editor integration tests for typed relationships
+
+## Layout operations
+
+Treat layout as an operation that updates ordinary editable objects rather than
+as a permanent graph constraint.
+
+### Selection layout
+
+- [ ] Add deterministic Rust stack operations beside the existing shared align
+      and distribute commands, then expose them in TypeScript
+- [ ] Add Rust grid and tidy operations for mixed selections and TypeScript
+      controls and previews
+- [ ] Define deterministic spacing, ordering, nesting, and locked-object rules
+- [ ] Preserve connector attachment and semantic relationships after layout
+
+### Graph layout
+
+- [ ] Add deterministic Rust tree and flow layouts using structured connections
+- [ ] Add Rust radial layout after tree and flow behavior is stable
+- [ ] Verify layout through undo/redo, save/reopen, merge, and stale-head
+      handling
+- [ ] Add integration tests for representative before/after layout operations
+
+## Agent proposal review
+
+Turn structured agent mutations into visual proposals that people can inspect
+before committing them.
+
+### Richer canvas preview
+
+- [ ] Derive object-specific modification, removal, and move previews in Rust
+      and render them in the TypeScript canvas
+- [ ] Include relationship and metadata changes in Rust preview data and the
+      TypeScript review UI
+- [ ] Define distinct visual tokens for proposed additions, modifications, and
       removals
-- [ ] Keep proposal visuals distinct from the ordinary selection accent
-- [ ] Consolidate proposal metadata, change count, accept, and reject actions
-      into one review surface
-- [ ] Keep proposal review controls visible without covering the affected
-      content
-- [ ] Show agent editability in selection context rather than the primary tool
-      strip
-- [ ] Verify accepted and rejected proposals leave no stale ghost or review
+
+### End-to-end review
+
+- [ ] Add end-to-end tests for the existing proposal summary, partial accept,
+      reject, ghost preview, and stale-head flows
+- [ ] Verify accepted and rejected proposals leave no stale canvas or review
       state
-- [ ] Add interaction tests for proposal preview, accept, reject, and
-      non-editable selections
 
-### Interaction pass
+## Richer interoperability and embeds
 
-Apply the same behavior to equivalent controls throughout the editor.
+- [ ] Extend the existing TypeScript JSON Canvas round-trip for new card,
+      relationship, frame, and asset fields where the format supports them
+- [ ] Add integration fixtures that combine native objects, imported SVG,
+      raster assets, and external links
+- [ ] Evaluate Mermaid and D2 import against the shared object and relationship
+      model before adding a format-specific rendering path
+- [ ] Add end-to-end import, edit, and export comparisons for representative
+      mixed-format documents
+
+## Stencil and library workflows
+
+- [ ] Serialize and validate reusable selections through Rust document APIs,
+      then manage local library storage and UI in TypeScript
+- [ ] Add discovery, update, and removal behavior alongside the existing
+      built-in stencil palette
+- [ ] Preserve nested content, relationships, assets, and metadata when
+      inserting user-authored entries
+- [ ] Add end-to-end coverage for saving, finding, inserting, and updating a
+      local library entry
+
+## Templates and starter boards
+
+- [ ] Add starter documents for blank canvas, system design, brainstorming,
+      project planning, moodboards, research maps, and wireframes
+- [ ] Build starters as Rust-validated canonical documents from standard
+      primitives, roles, relationships, and libraries
+- [ ] Add the starter picker and new-board workflow in TypeScript
+- [ ] Verify every starter through open, edit, save, reopen, inspect, and export
+- [ ] Add end-to-end tests for opening and editing each starter
+
+## Board management
+
+Bring board creation, discovery, switching, and maintenance up to the quality of
+the canvas editor.
+
+### Browser and workspace
+
+- [ ] Clarify the active board, storage location, save state, and last-updated
+      information in the TypeScript board-management UI
+- [ ] Add explicit sort controls and complete keyboard navigation for large
+      board lists
+- [ ] Unify browser storage, desktop workspaces, and recent files behind the
+      same board-management interaction where their capabilities overlap
+- [ ] Make the board browser responsive and accessible on narrow viewports and
+      coarse pointers
+
+### Board actions
+
+- [ ] Add board duplication through the shared TypeScript repository interface
+      and the existing Rust desktop file/session services
+- [ ] Surface TypeScript UI busy and failure states instead of logging
+      board-action errors to the console
+- [ ] Protect board switches when pending editor changes cannot be flushed
+- [ ] Make the board inspector useful to users while retaining file, schema, and
+      document diagnostics for maintainers
+- [ ] Add end-to-end tests for the existing board actions plus duplication,
+      switching, workspace selection, and persistence across reloads
+
+## Editor polish
 
 - [ ] Standardize hover, pressed, selected, disabled, busy, and focus-visible
       states
@@ -120,6 +206,8 @@ Apply the same behavior to equivalent controls throughout the editor.
 - [ ] Verify tool changes, selection changes, and viewport actions do not cause
       unintended layout jumps
 - [ ] Add Storybook coverage for important component states and combinations
+- [ ] Add end-to-end coverage for menus, popovers, focus restoration, and
+      viewport-edge placement
 
 ## Permissioned MCP
 
@@ -134,10 +222,11 @@ Apply the same behavior to equivalent controls throughout the editor.
 
 ### Mutations
 
-- [ ] Create, patch, move, reparent, and delete shapes
-- [ ] Create and patch layers and containers
-- [ ] Apply layout operations and manage connections
-- [ ] Import SVG where appropriate
+- [ ] Create, patch, move, reparent, and delete shapes through Rust MCP tools
+- [ ] Create and patch layers, containers, cards, frames, and assets
+- [ ] Read and write semantic metadata and typed relationships
+- [ ] Apply shared layout operations and manage connections
+- [ ] Import SVG and supported interchange formats where appropriate
 - [ ] Return affected IDs and heads from every mutation
 - [ ] Expose dry-run or preview behavior where useful
 
@@ -148,14 +237,17 @@ Apply the same behavior to equivalent controls throughout the editor.
 - [ ] Apply `agent_editable` at the MCP boundary
 - [ ] Decide hidden-layer visibility policy
 - [ ] Decide how ordinary locks interact with MCP permissions
-- [ ] Decide whether proposal/review belongs in MCP
+- [ ] Expose proposal creation and review through MCP when the local session
+      permits it
 - [ ] Return authorization errors separately from validation errors
 
 ### Verification and guidance
 
 - [ ] Test read-only and restricted-write sessions
 - [ ] Test denied mutations, `agent_editable`, and locks
-- [ ] Test stale heads and invalid transactions
+- [ ] Test stale heads, invalid transactions, semantic fields, and proposal
+      permissions
+- [ ] Add end-to-end coverage from MCP proposal creation through desktop review
 - [ ] Update or split the Inkfinite skills for CLI and MCP usage
 
 ## Performance profiling

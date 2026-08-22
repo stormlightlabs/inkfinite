@@ -447,7 +447,7 @@
 									label="Fill color"
 									value={fillColorState.value}
 									mixed={fillColorState.mixed}
-									recentColors={[]}
+									allowNone
 									onchange={applyFillColor}
 									align="end" />
 							</div>
@@ -459,7 +459,7 @@
 									label="Stroke color"
 									value={strokeColorState.value}
 									mixed={strokeColorState.mixed}
-									recentColors={[]}
+									allowNone
 									onchange={applyStrokeColor}
 									align="end" />
 							</div>
@@ -666,7 +666,7 @@
 		left: 50%;
 		z-index: 95;
 		display: grid;
-		width: min(78rem, calc(100vw - 15rem));
+		width: fit-content;
 		max-width: calc(100vw - 2rem);
 		border: 1px solid color-mix(in srgb, var(--ink-border) 68%, transparent);
 		border-radius: var(--ink-radius-panel-small);
@@ -855,7 +855,8 @@
 
 	@media (max-width: 1180px) {
 		.selection-controls {
-			width: min(50rem, calc(100vw - 12rem));
+			width: fit-content;
+			max-width: calc(100vw - 12rem);
 		}
 
 		.selection-controls__sections {

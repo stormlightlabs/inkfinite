@@ -13,6 +13,7 @@ export const ICONS = {
 	dark: 'i-tabler-moon',
 	delete: 'i-bi-trash3',
 	'dots-vertical': 'i-tabler-dots-vertical',
+	expand: 'i-bi-arrows-angle-expand',
 	draw: 'i-ph-pencil-simple-line-bold',
 	eye: 'i-tabler-eye',
 	'eye-off': 'i-tabler-eye-off',
