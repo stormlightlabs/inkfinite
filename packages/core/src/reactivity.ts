@@ -4,7 +4,35 @@ import { History } from './history';
 import type { Command, HistoryAppliedEvent, HistoryEntry, HistoryOperation, HistoryState } from './history';
 import type { Document, LayerRecord, PageRecord, PathSelection, ShapeRecord } from './model';
 import { Document as DocumentOps, ensureDocumentLayers } from './model';
-import { ReactiveValue } from './reactive-value';
+
+type Listener<Value> = (value: Value) => void;
+
+/** Holds a current value and synchronously notifies subscribers when it changes. */
+export class ReactiveValue<Value> {
+	private current: Value;
+	private readonly listeners = new Set<Listener<Value>>();
+
+	constructor(initialValue: Value) {
+		this.current = initialValue;
+	}
+
+	get value(): Value {
+		return this.current;
+	}
+
+	set(value: Value): void {
+		this.current = value;
+		for (const listener of [...this.listeners]) {
+			listener(value);
+		}
+	}
+
+	subscribe(listener: Listener<Value>): () => boolean {
+		this.listeners.add(listener);
+		listener(this.current);
+		return () => this.listeners.delete(listener);
+	}
+}
 
 export type ToolId =
 	| 'select'

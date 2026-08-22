@@ -74,7 +74,8 @@ describe('editor keyboard commands', () => {
 			onCopyRequested: vi.fn(),
 			onCutRequested: vi.fn(),
 			onPasteRequested: vi.fn(),
-			onShortcutsRequested: vi.fn()
+			onShortcutsRequested: vi.fn(),
+			onCommandPaletteRequested: vi.fn()
 		};
 		const runtime = createRuntime(store, handlers);
 		const primary = { ctrl: false, shift: false, alt: false, meta: true };
@@ -86,6 +87,7 @@ describe('editor keyboard commands', () => {
 		runtime.handleAction(Action.keyDown('x', 'KeyX', primary));
 		runtime.handleAction(Action.keyDown('v', 'KeyV', primary));
 		runtime.handleAction(Action.keyDown('?', 'Slash', { ctrl: false, shift: true, alt: false, meta: false }));
+		runtime.handleAction(Action.keyDown('k', 'KeyK', primary));
 
 		expect(handlers.onUndoRequested).toHaveBeenCalledOnce();
 		expect(handlers.onRedoRequested).toHaveBeenCalledTimes(2);
@@ -93,5 +95,21 @@ describe('editor keyboard commands', () => {
 		expect(handlers.onCutRequested).toHaveBeenCalledOnce();
 		expect(handlers.onPasteRequested).toHaveBeenCalledOnce();
 		expect(handlers.onShortcutsRequested).toHaveBeenCalledOnce();
+		expect(handlers.onCommandPaletteRequested).toHaveBeenCalledOnce();
+	});
+
+	it('creates a connected duplicate as one document draft', () => {
+		const store = selectedStore();
+		store.setState((state) => ({ ...state, ui: { ...state.ui, selectionIds: ['one'] } }));
+		const onTransactionDraft = vi.fn();
+		const runtime = createRuntime(store, { onTransactionDraft });
+
+		runtime.handleAction(Action.keyDown('d', 'KeyD', { ctrl: false, shift: false, alt: true, meta: true }));
+
+		expect(onTransactionDraft).toHaveBeenCalledWith(
+			expect.objectContaining({ name: 'Duplicate and connect', kind: 'doc' })
+		);
+		const draft = onTransactionDraft.mock.calls[0][0];
+		expect(Object.values(draft.after.doc.shapes).filter((shape) => shape.type === 'arrow')).toHaveLength(1);
 	});
 });

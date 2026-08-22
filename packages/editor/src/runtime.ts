@@ -2,6 +2,7 @@ import {
 	type Action,
 	BindingRecord,
 	Camera,
+	duplicateAndConnectSelection,
 	type CommandKind,
 	createId,
 	EditorState,
@@ -59,6 +60,8 @@ export type EditorRuntimeOptions = {
 	onBrowseRequested?: () => void;
 	/** Opens the searchable keyboard shortcut panel. */
 	onShortcutsRequested?: () => void;
+	/** Opens the searchable command palette. */
+	onCommandPaletteRequested?: () => void;
 	/** Handles undo and redo before the active tool sees the key event. */
 	onUndoRequested?: () => void;
 	onRedoRequested?: () => void;
@@ -197,6 +200,7 @@ export class EditorRuntime {
 		const shortcut = applyKeyboardShortcut(before, routedAction, {
 			onBrowseRequested: this.options.onBrowseRequested,
 			onShortcutsRequested: this.options.onShortcutsRequested,
+			onCommandPaletteRequested: this.options.onCommandPaletteRequested,
 			onUndoRequested: this.options.onUndoRequested,
 			onRedoRequested: this.options.onRedoRequested,
 			onCopyRequested: this.options.onCopyRequested,
@@ -298,6 +302,7 @@ function applyKeyboardShortcut(
 	handlers: {
 		onBrowseRequested?: () => void;
 		onShortcutsRequested?: () => void;
+		onCommandPaletteRequested?: () => void;
 		onUndoRequested?: () => void;
 		onRedoRequested?: () => void;
 		onCopyRequested?: () => void;
@@ -309,6 +314,10 @@ function applyKeyboardShortcut(
 	const primary = action.modifiers.meta || action.modifiers.ctrl;
 	if (action.key === '?' || (action.key === '/' && action.modifiers.shift)) {
 		handlers.onShortcutsRequested?.();
+		return null;
+	}
+	if (primary && ['k', 'K'].includes(action.key)) {
+		handlers.onCommandPaletteRequested?.();
 		return null;
 	}
 	if (primary && ['z', 'Z'].includes(action.key)) {
@@ -351,6 +360,9 @@ function applyKeyboardShortcut(
 			const next = translateShapes(state, state.ui.selectionIds, delta);
 			return next === state ? null : next;
 		}
+	}
+	if (primary && action.modifiers.alt && ['d', 'D'].includes(action.key)) {
+		return duplicateAndConnectSelection(state);
 	}
 	if (primary && ['d', 'D'].includes(action.key)) return duplicateSelection(state);
 	if (primary && ['g', 'G'].includes(action.key)) {
@@ -492,6 +504,7 @@ function describeAction(action: Action, kind: CommandKind): string {
 	if (action.type === 'key-down') {
 		if (action.key.startsWith('Arrow')) return 'Nudge';
 		const primary = action.modifiers.meta || action.modifiers.ctrl;
+		if (primary && action.modifiers.alt && ['d', 'D'].includes(action.key)) return 'Duplicate and connect';
 		if (primary && ['d', 'D'].includes(action.key)) return 'Duplicate';
 		if (primary && action.key === ']') return action.modifiers.shift ? 'Bring to Front' : 'Bring Forward';
 		if (primary && action.key === '[') return action.modifiers.shift ? 'Send to Back' : 'Send Backward';

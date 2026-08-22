@@ -687,10 +687,23 @@ export function hitTestStroke(p: Vec2, shape: StrokeShape): boolean {
 }
 
 /**
- * Perform hit testing to find which shape is under a point
+ * Return every shape hit by a point in topmost-first draw order.
  *
- * Uses reverse order (topmost shape wins) based on page.shapeIds order.
- * Line and arrow shapes use a tolerance for easier selection.
+ * Keeping the full hit stack lets the selection tool cycle through overlapping
+ * objects while preserving `hitTestPoint`'s fast topmost-only API.
+ */
+export function hitTestPoints(state: EditorState, worldPoint: Vec2, tolerance = 5): string[] {
+	const shapes = getInteractiveShapesOnCurrentPage(state);
+	const hits: string[] = [];
+	for (let index = shapes.length - 1; index >= 0; index -= 1) {
+		const shape = shapes[index];
+		if (hitTestShape(state, shape, worldPoint, tolerance)) hits.push(shape.id);
+	}
+	return hits;
+}
+
+/**
+ * Perform hit testing to find which shape is under a point.
  *
  * @param state - Editor state
  * @param worldPoint - Point to test in world coordinates
@@ -698,85 +711,49 @@ export function hitTestStroke(p: Vec2, shape: StrokeShape): boolean {
  * @returns Shape ID of the topmost shape under the point, or null if no hit
  */
 export function hitTestPoint(state: EditorState, worldPoint: Vec2, tolerance = 5): string | null {
-	const shapes = getInteractiveShapesOnCurrentPage(state);
+	return hitTestPoints(state, worldPoint, tolerance)[0] ?? null;
+}
 
-	for (let index = shapes.length - 1; index >= 0; index--) {
-		const shape = shapes[index];
-
-		switch (shape.type) {
-			case 'rect': {
-				if (pointInRect(worldPoint, shape)) {
-					return shape.id;
-				}
-				break;
-			}
-			case 'ellipse': {
-				if (pointInEllipse(worldPoint, shape)) {
-					return shape.id;
-				}
-				break;
-			}
-			case 'line': {
-				if (pointNearLine(worldPoint, shape, tolerance)) return shape.id;
-				break;
-			}
-			case 'arrow': {
-				const resolved = resolveArrowEndpoints(state, shape.id);
-				const points = resolved
-					? arrowPath(
-							[
-								worldToLocal(resolved.a, shape),
-								...shape.props.points.slice(1, -1),
-								worldToLocal(resolved.b, shape)
-							],
-							shape.props.routing?.automatic ? 'orthogonal' : (shape.props.routing?.kind ?? 'straight')
-						)
-					: arrowPath(
-							shape.props.points,
-							shape.props.routing?.automatic ? 'orthogonal' : (shape.props.routing?.kind ?? 'straight')
-						);
-				const localPoint = worldToLocal(worldPoint, shape);
-				if (
-					points.some(
-						(point, index) => index > 0 && pointNearSegment(localPoint, points[index - 1], point, tolerance)
+function hitTestShape(state: EditorState, shape: ShapeRecord, worldPoint: Vec2, tolerance: number): boolean {
+	switch (shape.type) {
+		case 'rect':
+			return pointInRect(worldPoint, shape);
+		case 'ellipse':
+			return pointInEllipse(worldPoint, shape);
+		case 'line':
+			return pointNearLine(worldPoint, shape, tolerance);
+		case 'arrow': {
+			const resolved = resolveArrowEndpoints(state, shape.id);
+			const points = resolved
+				? arrowPath(
+						[
+							worldToLocal(resolved.a, shape),
+							...shape.props.points.slice(1, -1),
+							worldToLocal(resolved.b, shape)
+						],
+						shape.props.routing?.automatic ? 'orthogonal' : (shape.props.routing?.kind ?? 'straight')
 					)
-				) {
-					return shape.id;
-				}
-				break;
-			}
-			case 'text': {
-				if (pointInText(worldPoint, shape)) {
-					return shape.id;
-				}
-				break;
-			}
-			case 'markdown': {
-				if (pointInMarkdown(worldPoint, shape)) {
-					return shape.id;
-				}
-				break;
-			}
-			case 'stroke': {
-				if (hitTestStroke(worldPoint, shape)) {
-					return shape.id;
-				}
-				break;
-			}
-			case 'path': {
-				if (hitTestPath(worldPoint, shape, tolerance)) {
-					return shape.id;
-				}
-				break;
-			}
-			case 'container': {
-				if (Box2Ops.containsPoint(shapeBounds(shape), worldPoint)) return shape.id;
-				break;
-			}
+				: arrowPath(
+						shape.props.points,
+						shape.props.routing?.automatic ? 'orthogonal' : (shape.props.routing?.kind ?? 'straight')
+					);
+			const localPoint = worldToLocal(worldPoint, shape);
+			return points.some(
+				(point, index) => index > 0 && pointNearSegment(localPoint, points[index - 1], point, tolerance)
+			);
 		}
+		case 'text':
+			return pointInText(worldPoint, shape);
+		case 'markdown':
+			return pointInMarkdown(worldPoint, shape);
+		case 'stroke':
+			return hitTestStroke(worldPoint, shape);
+		case 'path':
+			return hitTestPath(worldPoint, shape, tolerance);
+		case 'container':
+			return Box2Ops.containsPoint(shapeBounds(shape), worldPoint);
 	}
-
-	return null;
+	return false;
 }
 
 /**

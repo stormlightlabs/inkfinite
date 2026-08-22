@@ -35,12 +35,13 @@ See [SVG import](apps/web/src/content/docs/internals/svg-import.md) and
 
 ### Canvas interaction quality
 
-Inkfinite already supports duplicate-and-drag, snapping and guides, keyboard
-nudging, fit-to-drawing and fit-to-selection, grouping, nested selection,
-connector labels and endpoint reassignment, and text and Markdown editing. The
-next interaction work should fill the remaining workflow gaps: selection
-cycling, duplicate-and-connect, quick shape conversion, a searchable command
-palette, and obstacle-aware connector routing.
+Inkfinite supports duplicate-and-drag and duplicate-and-connect, selection
+cycling for overlapping and nested objects, snapping and guides, keyboard nudging,
+fit-to-drawing and fit-to-selection, grouping, nested selection, connector
+labels and endpoint reassignment, and text and Markdown editing. A searchable
+command palette exposes the selection and viewport actions. The remaining
+interaction work is quick shape conversion and obstacle-aware connector
+routing.
 
 ### Stronger content primitives
 

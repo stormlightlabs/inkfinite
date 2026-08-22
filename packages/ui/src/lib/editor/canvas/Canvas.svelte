@@ -17,9 +17,14 @@
 		readClipboardContent
 	} from '../clipboard';
 	import type { SelectionCommand } from '../commands';
-	import { executeSelectionCommand, SELECTION_COMMAND_LABELS } from '../commands';
+	import {
+		executeSelectionCommand,
+		getCommandPaletteEntries,
+		SELECTION_COMMAND_LABELS
+	} from '../commands';
 	import HistoryViewer from '../components/HistoryViewer.svelte';
 	import KeyboardShortcuts from '../components/KeyboardShortcuts.svelte';
+	import CommandPalette from '../components/CommandPalette.svelte';
 	import LayerPanel from '../components/LayerPanel.svelte';
 	import ProposalGhostLayer from '../components/ProposalGhostLayer.svelte';
 	import ProposalReview from '../components/ProposalReview.svelte';
@@ -41,6 +46,7 @@
 	let markdownEditorEl = $state<HTMLTextAreaElement | null>(null);
 	let historyViewerOpen = $state(false);
 	let shortcutsOpen = $state(false);
+	let commandPaletteOpen = $state(false);
 	let contextMenuOpen = $state(false);
 	let contextMenuPoint = $state({ x: 0, y: 0 });
 	let contextMenuItems = $state<ContextMenuEntry[]>([]);
@@ -198,6 +204,9 @@
 		setShortcutsOpen(value: boolean) {
 			shortcutsOpen = value;
 		},
+		setCommandPaletteOpen(value: boolean) {
+			commandPaletteOpen = value;
+		},
 		reportError,
 		onCopyRequested: () => void copyCurrentSelection(),
 		onCutRequested: () => void cutCurrentSelection(),
@@ -205,6 +214,12 @@
 	});
 
 	let platformKind = $derived(c.platform());
+	let editorState = $state(c.store.getState());
+	$effect(() => {
+		const unsubscribe = c.store.subscribe((state) => (editorState = state));
+		return unsubscribe;
+	});
+	let commandPaletteCommands = $derived(getCommandPaletteEntries(editorState, platformKind));
 	let textEditorCurrent = $derived(c.textEditor.current);
 	let arrowLabelEditorCurrent = $derived(c.arrowLabelEditor.current);
 	let markdownEditorCurrent = $derived(c.markdownEditor.current);
@@ -368,6 +383,60 @@
 		c.insertStencil(stencil, world);
 	}
 
+	function handleCommandPaletteAction(id: string) {
+		if (id in SELECTION_COMMAND_LABELS) {
+			executeSelectionCommand(c.store, id as SelectionCommand);
+			return;
+		}
+		const primary = { ctrl: false, shift: false, alt: false, meta: true };
+		switch (id) {
+			case 'select-all':
+				c.handleAction(Action.keyDown('a', 'KeyA', primary));
+				break;
+			case 'clear-selection':
+				c.handleAction(
+					Action.keyDown('Escape', 'Escape', {
+						ctrl: false,
+						shift: false,
+						alt: false,
+						meta: false
+					})
+				);
+				break;
+			case 'duplicate':
+				c.handleAction(Action.keyDown('d', 'KeyD', primary));
+				break;
+			case 'duplicate-and-connect':
+				c.handleAction(Action.keyDown('d', 'KeyD', { ...primary, alt: true }));
+				break;
+			case 'delete':
+				c.handleAction(
+					Action.keyDown('Delete', 'Delete', {
+						ctrl: false,
+						shift: false,
+						alt: false,
+						meta: false
+					})
+				);
+				break;
+			case 'zoom-in':
+				c.camera.zoomIn();
+				break;
+			case 'zoom-out':
+				c.camera.zoomOut();
+				break;
+			case 'zoom-fit':
+				c.camera.fitAll();
+				break;
+			case 'zoom-selection':
+				c.camera.fitSelection();
+				break;
+			case 'reset-zoom':
+				c.camera.reset();
+				break;
+		}
+	}
+
 	function selectionContextItems(): ContextMenuEntry[] {
 		const state = c.store.getState();
 		const selected = getSelectedShapes(state);
@@ -407,6 +476,13 @@
 				label: 'Duplicate',
 				icon: 'add',
 				shortcut: '⌘/Ctrl D',
+				disabled: selected.length === 0
+			},
+			{
+				id: 'duplicate-and-connect',
+				label: 'Duplicate and connect',
+				icon: 'arrow-right',
+				shortcut: '⌥⌘/Ctrl D',
 				disabled: selected.length === 0
 			},
 			{
@@ -639,9 +715,14 @@
 			cropSelectedImage(false);
 			return;
 		}
-		if (id === 'duplicate') {
+		if (id === 'duplicate' || id === 'duplicate-and-connect') {
 			c.handleAction(
-				Action.keyDown('d', 'KeyD', { ctrl: false, shift: false, alt: false, meta: true })
+				Action.keyDown('d', 'KeyD', {
+					ctrl: false,
+					shift: false,
+					alt: id === 'duplicate-and-connect',
+					meta: true
+				})
 			);
 			return;
 		}
@@ -861,6 +942,10 @@
 		onShortcutsClick={() => (shortcutsOpen = true)}
 		onHistoryClick={c.history.handleClick} />
 	<KeyboardShortcuts bind:open={shortcutsOpen} />
+	<CommandPalette
+		bind:open={commandPaletteOpen}
+		commands={commandPaletteCommands}
+		onSelect={handleCommandPaletteAction} />
 	{#if c.fileBrowser.vm && c.fileBrowser.open}
 		<FileBrowser
 			bind:vm={c.fileBrowser.vm}

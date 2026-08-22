@@ -15,7 +15,7 @@
   Vitest command from that package's directory.
     - Do not invoke a package-local vitest from the repository root Vitest will miss the
       package Vite config, collect unrelated generated Svelte tests, run browser imports
-      in the forks pool, and fail aliases such as`$editor`.
+      in the forks pool, and fail aliases such as `$editor`.
 - The user will stage files so don't be alarmed by that. Try to not rely on git for
   reviewing the state of your edits.
 - Refrain from using the words "bounded" & "durable" and the phrase "load-bearing"

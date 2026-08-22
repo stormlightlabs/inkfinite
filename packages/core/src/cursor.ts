@@ -1,5 +1,5 @@
 import { Vec2 } from './math';
-import { ReactiveValue } from './reactive-value';
+import { ReactiveValue } from './reactivity';
 
 /**
  * Cursor position + timing in world/screen space.

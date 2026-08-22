@@ -4,6 +4,7 @@ import {
 	computePolylineLength,
 	getPointAtDistance,
 	hitTestPoint,
+	hitTestPoints,
 	localToWorld,
 	resolveArrowEndpoints,
 	shapeBounds,
@@ -12,6 +13,7 @@ import {
 	worldToLocal
 } from '../geom';
 import { Box2, clamp, Mat3, type Vec2, Vec2 as Vec2Ops } from '../math';
+import { duplicateAndConnectSelection } from '../selection';
 import { BindingRecord, createId, ShapeRecord } from '../model';
 import { EditorState, getCurrentPage, getSelectionScopeShapes, selectionTarget, type ToolId } from '../reactivity';
 import { snapAngle, type SnapResult } from '../snapping';
@@ -45,6 +47,14 @@ type SelectToolState = {
 	rotationCenter: Vec2 | null;
 	/** Starting angle for rotation handle */
 	rotationStartAngle: number | null;
+	/** Screen point used to continue a repeated overlapping-shape click cycle. */
+	cycleScreenPoint: Vec2 | null;
+	/** Selection targets under the last cycle point, topmost first. */
+	cycleCandidateIds: string[];
+	/** Candidate selected on pointer-up when a repeated click was not dragged. */
+	cyclePendingTarget: string | null;
+	/** Whether the current pointer gesture moved far enough to become a drag. */
+	gestureMoved: boolean;
 };
 
 type RectHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
@@ -114,7 +124,11 @@ export class SelectTool implements Tool {
 			handleStartBounds: null,
 			handleInitialShapes: new Map(),
 			rotationCenter: null,
-			rotationStartAngle: null
+			rotationStartAngle: null,
+			cycleScreenPoint: null,
+			cycleCandidateIds: [],
+			cyclePendingTarget: null,
+			gestureMoved: false
 		};
 	}
 
@@ -170,7 +184,7 @@ export class SelectTool implements Tool {
 			return this.beginHandleDrag(state, handleHit.shape, handleHit.handle, action.world);
 		}
 
-		const hitShapeId = hitTestPoint(state, action.world);
+		const hitShapeId = this.nextCycleTarget(state, action, hitTestPoints(state, action.world));
 
 		return hitShapeId ? this.handleShapeClick(state, hitShapeId, action) : this.handleEmptyClick(state, action);
 	}
@@ -208,6 +222,49 @@ export class SelectTool implements Tool {
 		return null;
 	}
 
+	private nextCycleTarget(
+		state: EditorState,
+		action: Extract<Action, { type: 'pointer-down' }>,
+		rawCandidateIds: string[]
+	): string | null {
+		const candidateIds = [
+			...new Set(
+				rawCandidateIds.map((id) => selectionTarget(state, id)).filter((id): id is string => Boolean(id))
+			)
+		];
+		if (candidateIds.length === 0) {
+			this.clearCycle();
+			return null;
+		}
+
+		const samePoint =
+			this.toolState.cycleScreenPoint !== null &&
+			Vec2Ops.dist(this.toolState.cycleScreenPoint, action.screen) <= 8;
+		const sameCandidates =
+			this.toolState.cycleCandidateIds.length === candidateIds.length &&
+			this.toolState.cycleCandidateIds.every((id, index) => id === candidateIds[index]);
+		const canCycle =
+			!action.modifiers.shift && !action.modifiers.alt && candidateIds.length > 1 && samePoint && sameCandidates;
+		const selectedId = state.ui.selectionIds.length === 1 ? state.ui.selectionIds[0] : null;
+		const currentIndex = selectedId ? candidateIds.indexOf(selectedId) : -1;
+		const index = canCycle && currentIndex >= 0 ? (currentIndex + 1) % candidateIds.length : 0;
+
+		this.toolState.cycleScreenPoint = { ...action.screen };
+		this.toolState.cycleCandidateIds = candidateIds;
+		this.toolState.cyclePendingTarget = null;
+		if (canCycle && currentIndex >= 0 && selectedId) {
+			this.toolState.cyclePendingTarget = candidateIds[index];
+			return selectedId;
+		}
+		return candidateIds[0];
+	}
+
+	private clearCycle(): void {
+		this.toolState.cycleScreenPoint = null;
+		this.toolState.cycleCandidateIds = [];
+		this.toolState.cyclePendingTarget = null;
+	}
+
 	private beginHandleDrag(state: EditorState, shape: ShapeRecord, handle: HandleKind, point: Vec2): EditorState {
 		this.toolState.activeHandle = handle;
 		this.toolState.handleShapeId = shape.id;
@@ -240,7 +297,7 @@ export class SelectTool implements Tool {
 		const clickedShape = targetId ? state.doc.shapes[targetId] : undefined;
 		if (!clickedShape || !targetId) return state;
 
-		const isShiftHeld = action.modifiers.shift;
+		const isShiftHeld = action.modifiers.shift && !action.modifiers.alt;
 		const legacyGroupIds =
 			clickedShape.groupId && !state.doc.shapes[clickedShape.groupId]
 				? Object.values(state.doc.shapes)
@@ -265,12 +322,15 @@ export class SelectTool implements Tool {
 				pathSelection: undefined
 			}
 		};
-		if (action.modifiers.alt && !isShiftHeld && isSelected) {
-			selectionState = duplicateSelectionForDrag(selectionState);
+		if (action.modifiers.alt && isSelected) {
+			selectionState = action.modifiers.shift
+				? (duplicateAndConnectSelection(selectionState, { x: 0, y: 0 }) ?? selectionState)
+				: duplicateSelectionForDrag(selectionState);
 		}
 		const selectionIds = selectionState.ui.selectionIds;
 
 		this.toolState.isDragging = true;
+		this.toolState.gestureMoved = false;
 		this.toolState.dragStartWorld = action.world;
 		this.toolState.initialShapePositions.clear();
 		this.toolState.initialShapes.clear();
@@ -301,6 +361,7 @@ export class SelectTool implements Tool {
 		const isShiftHeld = action.modifiers.shift;
 
 		if (!isShiftHeld) {
+			this.clearCycle();
 			this.toolState.marqueeStart = action.world;
 			this.toolState.marqueeEnd = action.world;
 			this.notifyMarqueeChange();
@@ -316,6 +377,15 @@ export class SelectTool implements Tool {
 	 */
 	private handlePointerMove(state: EditorState, action: Action): EditorState {
 		if (action.type !== 'pointer-move') return state;
+
+		if (
+			this.toolState.isDragging &&
+			this.toolState.dragStartWorld &&
+			Vec2Ops.dist(action.world, this.toolState.dragStartWorld) > 3
+		) {
+			this.toolState.gestureMoved = true;
+			this.clearCycle();
+		}
 
 		if (this.toolState.activeHandle && this.toolState.handleShapeId) {
 			return this.handleHandleDrag(state, action);
@@ -483,6 +553,13 @@ export class SelectTool implements Tool {
 
 		let newState = state;
 
+		if (this.toolState.cyclePendingTarget && !this.toolState.gestureMoved) {
+			newState = {
+				...newState,
+				ui: { ...newState.ui, selectionIds: [this.toolState.cyclePendingTarget], pathSelection: undefined }
+			};
+		}
+
 		if (this.toolState.marqueeStart && this.toolState.marqueeEnd) {
 			newState = this.completeMarqueeSelection(state);
 		}
@@ -511,6 +588,8 @@ export class SelectTool implements Tool {
 		this.toolState.rotationCenter = null;
 		this.toolState.rotationStartAngle = null;
 		this.toolState.isDragging = false;
+		this.toolState.gestureMoved = false;
+		this.toolState.cyclePendingTarget = null;
 		this.toolState.dragStartWorld = null;
 		this.toolState.initialShapePositions.clear();
 		this.toolState.initialShapes.clear();
@@ -669,7 +748,11 @@ export class SelectTool implements Tool {
 			handleStartBounds: null,
 			handleInitialShapes: new Map(),
 			rotationCenter: null,
-			rotationStartAngle: null
+			rotationStartAngle: null,
+			cycleScreenPoint: null,
+			cycleCandidateIds: [],
+			cyclePendingTarget: null,
+			gestureMoved: false
 		};
 		this.notifyMarqueeChange();
 	}

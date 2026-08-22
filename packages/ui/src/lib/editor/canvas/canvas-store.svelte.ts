@@ -70,6 +70,7 @@ type Stencil = stencils.Stencil;
 export type CanvasControllerBindings = {
 	setHistoryViewerOpen(value: boolean): void;
 	setShortcutsOpen(value: boolean): void;
+	setCommandPaletteOpen(value: boolean): void;
 	reportError(error: unknown, title?: string): void;
 	onCopyRequested?: () => void;
 	onCutRequested?: () => void;
@@ -463,6 +464,7 @@ export function createCanvasController(
 		},
 		onBrowseRequested: () => fileBrowser.handleOpen(),
 		onShortcutsRequested: () => bindings.setShortcutsOpen(true),
+		onCommandPaletteRequested: () => bindings.setCommandPaletteOpen(true),
 		onUndoRequested: () => store.undo(),
 		onRedoRequested: () => store.redo(),
 		onCopyRequested: bindings.onCopyRequested,

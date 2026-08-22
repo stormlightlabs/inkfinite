@@ -94,3 +94,157 @@ export function executeSelectionCommand(store: Store, command: SelectionCommand)
 	);
 	return true;
 }
+
+/** One searchable action shown in the editor command palette. */
+export type CommandPaletteEntry = {
+	id: string;
+	label: string;
+	group: 'Selection' | 'Viewport';
+	shortcut?: string;
+	keywords?: string;
+	disabled?: boolean;
+};
+
+/**
+ * Returns the selection and viewport actions available for the current state.
+ * Disabled actions remain visible so keyboard users can discover the complete
+ * command surface without guessing why a command is unavailable.
+ */
+export function getCommandPaletteEntries(
+	state: EditorState,
+	platform: 'web' | 'desktop' = 'web'
+): CommandPaletteEntry[] {
+	const selectedCount = state.ui.selectionIds.length;
+	const alignmentEntries: CommandPaletteEntry[] = (
+		[
+			'align-left',
+			'align-center',
+			'align-right',
+			'align-top',
+			'align-middle',
+			'align-bottom',
+			'distribute-horizontal',
+			'distribute-vertical'
+		] as SelectionCommand[]
+	).map((id) => ({
+		id,
+		label: SELECTION_COMMAND_LABELS[id],
+		group: 'Selection',
+		disabled: selectedCount < (id.startsWith('distribute-') ? 3 : 2),
+		keywords: 'align distribute layout'
+	}));
+	const entries: CommandPaletteEntry[] = [
+		{ id: 'select-all', label: 'Select all shapes', group: 'Selection', shortcut: '⌘/Ctrl A' },
+		{
+			id: 'clear-selection',
+			label: 'Clear selection',
+			group: 'Selection',
+			shortcut: 'Escape'
+		},
+		{
+			id: 'duplicate',
+			label: 'Duplicate selection',
+			group: 'Selection',
+			shortcut: '⌘/Ctrl D',
+			disabled: selectedCount === 0,
+			keywords: 'copy'
+		},
+		{
+			id: 'duplicate-and-connect',
+			label: 'Duplicate and connect',
+			group: 'Selection',
+			shortcut: '⌥⌘/Ctrl D',
+			disabled: selectedCount === 0,
+			keywords: 'copy connector arrow'
+		},
+		...alignmentEntries,
+		{
+			id: 'group',
+			label: SELECTION_COMMAND_LABELS.group,
+			group: 'Selection',
+			disabled: selectedCount < 2
+		},
+		{
+			id: 'ungroup',
+			label: SELECTION_COMMAND_LABELS.ungroup,
+			group: 'Selection',
+			disabled: selectedCount === 0
+		},
+		{
+			id: 'forward',
+			label: SELECTION_COMMAND_LABELS.forward,
+			group: 'Selection',
+			disabled: selectedCount === 0,
+			shortcut: '⌘/Ctrl ]'
+		},
+		{
+			id: 'backward',
+			label: SELECTION_COMMAND_LABELS.backward,
+			group: 'Selection',
+			disabled: selectedCount === 0,
+			shortcut: '⌘/Ctrl ['
+		},
+		{
+			id: 'front',
+			label: SELECTION_COMMAND_LABELS.front,
+			group: 'Selection',
+			disabled: selectedCount === 0,
+			shortcut: '⇧⌘/Ctrl ]'
+		},
+		{
+			id: 'back',
+			label: SELECTION_COMMAND_LABELS.back,
+			group: 'Selection',
+			disabled: selectedCount === 0,
+			shortcut: '⇧⌘/Ctrl ['
+		},
+		{
+			id: 'lock',
+			label: SELECTION_COMMAND_LABELS.lock,
+			group: 'Selection',
+			disabled: selectedCount === 0
+		},
+		{
+			id: 'unlock',
+			label: SELECTION_COMMAND_LABELS.unlock,
+			group: 'Selection',
+			disabled: selectedCount === 0
+		},
+		...(platform === 'desktop'
+			? [
+					{
+						id: 'agent-editable',
+						label: SELECTION_COMMAND_LABELS['agent-editable'],
+						group: 'Selection' as const,
+						disabled: selectedCount === 0
+					},
+					{
+						id: 'agent-readonly',
+						label: SELECTION_COMMAND_LABELS['agent-readonly'],
+						group: 'Selection' as const,
+						disabled: selectedCount === 0
+					}
+				]
+			: []),
+		{
+			id: 'delete',
+			label: 'Delete selection',
+			group: 'Selection',
+			shortcut: 'Backspace',
+			disabled: selectedCount === 0,
+			keywords: 'remove'
+		},
+		{ id: 'zoom-in', label: 'Zoom in', group: 'Viewport', shortcut: '+' },
+		{ id: 'zoom-out', label: 'Zoom out', group: 'Viewport', shortcut: '−' },
+		{ id: 'zoom-fit', label: 'Zoom to fit drawing', group: 'Viewport', shortcut: '⇧1' },
+		{
+			id: 'zoom-selection',
+			label: 'Zoom to selection',
+			group: 'Viewport',
+			shortcut: '⇧2',
+			disabled: selectedCount === 0
+		},
+		{ id: 'reset-zoom', label: 'Reset zoom', group: 'Viewport', shortcut: '0' }
+	];
+	return entries;
+}

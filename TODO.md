@@ -28,9 +28,9 @@ across mouse, touch, and keyboard input.
 
 ### Selection and direct manipulation
 
-- [ ] Add duplicate-and-connect alongside the existing duplicate-and-drag flow
-- [ ] Add selection cycling for overlapping and nested shapes
-- [ ] Add a searchable command palette for existing selection and viewport
+- [x] Add duplicate-and-connect alongside the existing duplicate-and-drag flow
+- [x] Add selection cycling for overlapping and nested shapes
+- [x] Add a searchable command palette for existing selection and viewport
       commands
 
 ### Connectors and conversion

@@ -27,6 +27,7 @@ export const KEYBOARD_SHORTCUTS = [
 	{ group: 'Editing', label: 'Cut selection', keys: '⌘/Ctrl X' },
 	{ group: 'Editing', label: 'Paste selection', keys: '⌘/Ctrl V' },
 	{ group: 'Editing', label: 'Duplicate selection', keys: '⌘/Ctrl D' },
+	{ group: 'Editing', label: 'Duplicate and connect', keys: '⌥⌘/Ctrl D' },
 	{ group: 'Editing', label: 'Group selection', keys: '⌘/Ctrl G' },
 	{ group: 'Editing', label: 'Ungroup selection', keys: '⇧⌘/Ctrl G' },
 	{ group: 'Editing', label: 'Lock selection', keys: '⇧⌘/Ctrl L' },
@@ -39,6 +40,7 @@ export const KEYBOARD_SHORTCUTS = [
 	{ group: 'Canvas', label: 'Fit drawing', keys: 'Shift + 1' },
 	{ group: 'Canvas', label: 'Fit selection', keys: 'Shift + 2' },
 	{ group: 'Navigation', label: 'Open boards', keys: '⌘/Ctrl B' },
+	{ group: 'Navigation', label: 'Open command palette', keys: '⌘/Ctrl K' },
 	{ group: 'Navigation', label: 'Show keyboard shortcuts', keys: '?' }
 ] as const;
 
