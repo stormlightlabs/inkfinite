@@ -1829,7 +1829,7 @@
         "custom_metadata": {
           "additionalProperties": true,
           "default": {},
-          "description": "User-defined structured metadata.",
+          "description": "Optional user-defined structured metadata. An empty map means no custom fields.",
           "type": "object"
         },
         "description": {

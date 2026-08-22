@@ -30,16 +30,18 @@ to 15-degree angles. Hold Alt/Option while dragging to duplicate a selection. Du
 preserves the aspect ratio and Alt/Option resizes around the center.
 
 The **Layout** menu aligns and distributes selected shapes, changes their stacking order, groups
-or ungroups them, and controls locks. Right-click the canvas or a selection for commands relevant
-to that location.
+or ungroups them, and controls locks. The **Object metadata** section edits names, roles, tags,
+descriptions, sources, links, and structured metadata for any selection. A single selected object
+also shows its provenance. Right-click the canvas or a selection for commands relevant to that
+location.
 
 ## Draw and connect
 
 The toolbar includes rectangles, ellipses, frames, lines, arrows, text, Markdown, and freehand
 pen strokes. A frame contains ordered child shapes and carries them when it moves. Select a frame
 to enter it or fit it to the viewport. The Card stencil creates a frame from ordinary text and
-Markdown objects; its selection controls edit the title, body, role, tags, source, link, and custom
-metadata.
+Markdown objects; its selection controls edit the title and body alongside the shared object
+metadata fields.
 
 Arrows may be straight, curved, or elbow-routed. Drag an endpoint onto a shape to bind it; the
 endpoint follows that shape when it moves. Arrow controls edit bends, endpoint heads, routing, and

@@ -73,11 +73,11 @@ the CLI, and agents.
 
 ### Object metadata
 
-- [ ] Project existing Rust names, roles, tags, descriptions, and provenance
+- [x] Project existing Rust names, roles, tags, descriptions, and provenance
       into TypeScript editor selection controls
-- [ ] Add optional user-defined source and structured metadata to the Rust model
+- [x] Add optional user-defined source and structured metadata to the Rust model
       and generated bindings
-- [ ] Preserve semantic fields in the TypeScript editor projection and through
+- [x] Preserve semantic fields in the TypeScript editor projection and through
       conversion, grouping, duplication, import, and export where supported
 
 ### Semantic connections

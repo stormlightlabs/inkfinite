@@ -405,7 +405,7 @@ export const ShapeRecord = {
 			? {
 					...shape.metadata,
 					tags: [...shape.metadata.tags],
-					customMetadata: { ...shape.metadata.customMetadata },
+					customMetadata: JSON.parse(JSON.stringify(shape.metadata.customMetadata)) as Record<string, unknown>,
 					...(shape.metadata.provenance ? { provenance: { ...shape.metadata.provenance } } : {})
 				}
 			: undefined;

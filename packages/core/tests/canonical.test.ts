@@ -73,6 +73,71 @@ describe('toCanonicalDocumentSnapshot', () => {
 		});
 	});
 
+	it('preserves object metadata in canonical projection and patches', () => {
+		const page = PageRecord.create('Page 1', 'page:one');
+		const rect = ShapeRecord.createRect(
+			page.id,
+			10,
+			20,
+			{ w: 40, h: 20, fill: 'red', stroke: 'none', radius: 4 },
+			'shape:rect'
+		);
+		rect.metadata = {
+			name: 'Gateway',
+			title: null,
+			role: 'architecture.service',
+			description: 'Routes requests',
+			body: null,
+			tags: ['api'],
+			source: 'architecture.md',
+			link: null,
+			customMetadata: { owner: 'platform' },
+			locked: false,
+			agentEditable: true,
+			provenance: { actorId: 'actor:test', origin: 'human', timestamp: 42, source: 'seed' }
+		};
+		page.shapeIds.push(rect.id);
+		const before: Document = { pages: { [page.id]: page }, shapes: { [rect.id]: rect }, bindings: {} };
+		const snapshot = toCanonicalDocumentSnapshot(before, { documentId: 'document:metadata' });
+		expect(snapshot.document.shapes[rect.id]?.metadata).toMatchObject({
+			name: 'Gateway',
+			role: 'architecture.service',
+			description: 'Routes requests',
+			tags: ['api'],
+			source: 'architecture.md',
+			custom_metadata: { owner: 'platform' },
+			provenance: { actor_id: 'actor:test', source: 'seed' }
+		});
+
+		const after: Document = {
+			...before,
+			shapes: {
+				[rect.id]: {
+					...rect,
+					metadata: { ...rect.metadata, role: 'architecture.gateway', tags: ['api', 'edge'] }
+				}
+			}
+		};
+		const request = createEditorReconciliationRequest(before, after, {
+			actor_id: 'browser',
+			origin: 'human',
+			transaction_id: 'transaction:metadata',
+			description: 'Update object metadata',
+			timestamp: 1
+		});
+		expect(request.patches).toEqual([
+			expect.objectContaining({
+				type: 'shape',
+				shape_id: rect.id,
+				metadata: expect.objectContaining({
+					role: 'architecture.gateway',
+					tags: ['api', 'edge'],
+					custom_metadata: { owner: 'platform' }
+				})
+			})
+		]);
+	});
+
 	it('turns editor moves into semantic Rust reconciliation patches', () => {
 		const page = PageRecord.create('Page 1', 'page:one');
 		const rect = ShapeRecord.createRect(

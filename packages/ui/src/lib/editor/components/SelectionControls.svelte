@@ -62,6 +62,29 @@
 	let selectedShapes = $derived(getSelectedShapes(editorState));
 	let selectionCount = $derived(selectedShapes.length);
 	let showContextControls = $derived(currentTool !== 'pen' && selectionCount > 0);
+	let semanticMetadata = $derived(selectedShapes.map(metadataForShape));
+	let semanticTarget = $derived(selectionCount === 1 ? semanticMetadata[0] : undefined);
+	let semanticNameState = $derived(
+		getTextState(semanticMetadata.map((metadata) => metadata.name ?? ''))
+	);
+	let semanticRoleState = $derived(
+		getTextState(semanticMetadata.map((metadata) => metadata.role ?? ''))
+	);
+	let semanticTagsState = $derived(
+		getTextState(semanticMetadata.map((metadata) => metadata.tags.join(', ')))
+	);
+	let semanticDescriptionState = $derived(
+		getTextState(semanticMetadata.map((metadata) => metadata.description ?? ''))
+	);
+	let semanticSourceState = $derived(
+		getTextState(semanticMetadata.map((metadata) => metadata.source ?? ''))
+	);
+	let semanticLinkState = $derived(
+		getTextState(semanticMetadata.map((metadata) => metadata.link ?? ''))
+	);
+	let semanticCustomMetadataState = $derived(
+		getTextState(semanticMetadata.map((metadata) => JSON.stringify(metadata.customMetadata)))
+	);
 	let fillTargets = $derived(selectedShapes.filter(shapeSupportsFill));
 	let strokeTargets = $derived(selectedShapes.filter(shapeSupportsStroke));
 	let fillOpacityTargets = $derived(selectedShapes.filter(shapeSupportsFillOpacity));
@@ -175,6 +198,24 @@
 	function getBooleanState(values: boolean[]) {
 		const shared = getSharedValue(values);
 		return { value: shared ?? true, mixed: values.length > 1 && shared === null };
+	}
+
+	function metadataForShape(shape: ShapeRecord): ShapeMetadata {
+		return (
+			shape.metadata ?? {
+				name: null,
+				title: null,
+				role: null,
+				description: null,
+				body: null,
+				tags: [],
+				source: null,
+				link: null,
+				customMetadata: {},
+				locked: shape.locked ?? false,
+				agentEditable: shape.agentEditable !== false
+			}
+		);
 	}
 
 	function shapeSupportsFill(shape: ShapeRecord): boolean {
@@ -365,6 +406,53 @@
 		if (value) applyTypography('fontFamily', value);
 	}
 
+	function updateSemanticFields(label: string, fields: Partial<ShapeMetadata>) {
+		updateSelectedShapes(label, (shape) => {
+			const currentMetadata = metadataForShape(shape);
+			return {
+				...shape,
+				metadata: {
+					...currentMetadata,
+					...fields,
+					...(fields.tags ? { tags: [...fields.tags] } : {}),
+					...(fields.customMetadata
+						? { customMetadata: { ...fields.customMetadata } }
+						: {})
+				}
+			} as ShapeRecord;
+		});
+	}
+
+	function handleSemanticTextChange(
+		event: Event,
+		field: 'name' | 'role' | 'description' | 'source' | 'link'
+	) {
+		const value = (event.currentTarget as HTMLInputElement | HTMLTextAreaElement).value;
+		updateSemanticFields(`Set ${field}`, { [field]: value || null });
+	}
+
+	function handleSemanticTagsChange(event: Event) {
+		const tags = (event.currentTarget as HTMLInputElement).value
+			.split(',')
+			.map((tag) => tag.trim())
+			.filter(Boolean);
+		updateSemanticFields('Set object tags', { tags });
+	}
+
+	function handleSemanticMetadataChange(event: Event) {
+		try {
+			const value = JSON.parse(
+				(event.currentTarget as HTMLTextAreaElement).value
+			) as unknown;
+			if (!value || typeof value !== 'object' || Array.isArray(value)) return;
+			updateSemanticFields('Set object metadata', {
+				customMetadata: value as Record<string, unknown>
+			});
+		} catch {
+			// Keep the previous value until the JSON is valid.
+		}
+	}
+
 	function updateCardFields(label: string, fields: Partial<ShapeMetadata>) {
 		if (!cardTarget) return;
 		const state = store.getState();
@@ -441,33 +529,10 @@
 		);
 	}
 
-	function handleCardTextChange(
-		event: Event,
-		field: 'title' | 'body' | 'role' | 'source' | 'link'
-	) {
+	function handleCardTextChange(event: Event, field: 'title' | 'body') {
 		updateCardFields(`Set card ${field}`, {
-			[field]: (event.currentTarget as HTMLInputElement).value
+			[field]: (event.currentTarget as HTMLInputElement | HTMLTextAreaElement).value
 		} as Partial<ShapeMetadata>);
-	}
-
-	function handleCardTagsChange(event: Event) {
-		const tags = (event.currentTarget as HTMLInputElement).value
-			.split(',')
-			.map((tag) => tag.trim())
-			.filter(Boolean);
-		updateCardFields('Set card tags', { tags });
-	}
-
-	function handleCardMetadataChange(event: Event) {
-		try {
-			const value = JSON.parse((event.currentTarget as HTMLInputElement).value) as unknown;
-			if (!value || typeof value !== 'object' || Array.isArray(value)) return;
-			updateCardFields('Set card metadata', {
-				customMetadata: value as Record<string, unknown>
-			});
-		} catch {
-			// Keep the previous value until the JSON is valid.
-		}
 	}
 
 	function handleAgentEditableChange(event: Event) {
@@ -702,6 +767,110 @@
 				</section>
 			{/if}
 
+			{#if selectionCount > 0}
+				<section
+					class="selection-controls__section selection-controls__section--metadata"
+					aria-labelledby="selection-metadata-label">
+					<h2 id="selection-metadata-label">Object metadata</h2>
+					<div class="selection-controls__metadata-fields">
+						<label class="selection-controls__field">
+							<span>Name</span>
+							<input
+								type="text"
+								value={semanticNameState.mixed ? '' : semanticNameState.value}
+								placeholder={semanticNameState.mixed ? 'Mixed' : 'Object name'}
+								onchange={(event) => handleSemanticTextChange(event, 'name')}
+								aria-label="Object name" />
+						</label>
+						<label class="selection-controls__field">
+							<span>Role</span>
+							<input
+								type="text"
+								value={semanticRoleState.mixed ? '' : semanticRoleState.value}
+								placeholder={semanticRoleState.mixed ? 'Mixed' : 'Semantic role'}
+								onchange={(event) => handleSemanticTextChange(event, 'role')}
+								aria-label="Object role" />
+						</label>
+						<label class="selection-controls__field selection-controls__field--wide">
+							<span>Tags</span>
+							<input
+								type="text"
+								value={semanticTagsState.mixed ? '' : semanticTagsState.value}
+								placeholder={semanticTagsState.mixed
+									? 'Mixed'
+									: 'Comma-separated tags'}
+								onchange={handleSemanticTagsChange}
+								aria-label="Object tags" />
+						</label>
+						<label class="selection-controls__field selection-controls__field--wide">
+							<span>Description</span>
+							<textarea
+								value={semanticDescriptionState.mixed
+									? ''
+									: semanticDescriptionState.value}
+								placeholder={semanticDescriptionState.mixed
+									? 'Mixed'
+									: 'Description'}
+								onchange={(event) =>
+									handleSemanticTextChange(event, 'description')}
+								aria-label="Object description"></textarea>
+						</label>
+						<label class="selection-controls__field">
+							<span>Source</span>
+							<input
+								type="text"
+								value={semanticSourceState.mixed ? '' : semanticSourceState.value}
+								placeholder={semanticSourceState.mixed
+									? 'Mixed'
+									: 'Citation or file'}
+								onchange={(event) => handleSemanticTextChange(event, 'source')}
+								aria-label="Object source" />
+						</label>
+						<label class="selection-controls__field">
+							<span>Link</span>
+							<input
+								type="url"
+								value={semanticLinkState.mixed ? '' : semanticLinkState.value}
+								placeholder={semanticLinkState.mixed ? 'Mixed' : 'https://'}
+								onchange={(event) => handleSemanticTextChange(event, 'link')}
+								aria-label="Object link" />
+						</label>
+						<label class="selection-controls__field selection-controls__field--wide">
+							<span>Structured metadata</span>
+							<textarea
+								value={semanticCustomMetadataState.mixed
+									? ''
+									: semanticCustomMetadataState.value}
+								placeholder={semanticCustomMetadataState.mixed ? 'Mixed' : '{ }'}
+								onchange={handleSemanticMetadataChange}
+								aria-label="Object structured metadata"></textarea>
+						</label>
+					</div>
+					{#if semanticTarget?.provenance}
+						<dl class="selection-controls__provenance" aria-label="Object provenance">
+							<div>
+								<dt>Actor</dt>
+								<dd>{semanticTarget.provenance.actorId}</dd>
+							</div>
+							<div>
+								<dt>Origin</dt>
+								<dd>{semanticTarget.provenance.origin}</dd>
+							</div>
+							<div>
+								<dt>Recorded</dt>
+								<dd>{semanticTarget.provenance.timestamp}</dd>
+							</div>
+							{#if semanticTarget.provenance.source}
+								<div>
+									<dt>Provenance source</dt>
+									<dd>{semanticTarget.provenance.source}</dd>
+								</div>
+							{/if}
+						</dl>
+					{/if}
+				</section>
+			{/if}
+
 			{#if imageTarget}
 				<section
 					class="selection-controls__section selection-controls__section--image"
@@ -880,52 +1049,12 @@
 								onchange={(event) => handleCardTextChange(event, 'title')}
 								aria-label="Card title" />
 						</label>
-						<label class="selection-controls__field">
-							<span>Role</span>
-							<input
-								type="text"
-								value={cardMetadata.role ?? ''}
-								onchange={(event) => handleCardTextChange(event, 'role')}
-								aria-label="Card role" />
-						</label>
-						<label class="selection-controls__field">
-							<span>Tags</span>
-							<input
-								type="text"
-								value={cardMetadata.tags.join(', ')}
-								onchange={handleCardTagsChange}
-								aria-label="Card tags" />
-						</label>
-						<label class="selection-controls__field">
-							<span>Source</span>
-							<input
-								type="text"
-								value={cardMetadata.source ?? ''}
-								onchange={(event) => handleCardTextChange(event, 'source')}
-								aria-label="Card source" />
-						</label>
-						<label class="selection-controls__field">
-							<span>Link</span>
-							<input
-								type="url"
-								value={cardMetadata.link ?? ''}
-								onchange={(event) => handleCardTextChange(event, 'link')}
-								aria-label="Card link" />
-						</label>
 						<label class="selection-controls__field selection-controls__field--wide">
 							<span>Body</span>
 							<textarea
 								value={cardMetadata.body ?? ''}
 								onchange={(event) => handleCardTextChange(event, 'body')}
 								aria-label="Card body"></textarea>
-						</label>
-						<label class="selection-controls__field selection-controls__field--wide">
-							<span>Metadata</span>
-							<input
-								type="text"
-								value={JSON.stringify(cardMetadata.customMetadata)}
-								onchange={handleCardMetadataChange}
-								aria-label="Card custom metadata" />
 						</label>
 					</div>
 				</section>
@@ -1201,6 +1330,10 @@
 		min-width: 24rem;
 	}
 
+	.selection-controls__section--metadata {
+		min-width: 22rem;
+	}
+
 	.selection-controls__image-fields {
 		display: grid;
 		grid-template-columns: repeat(2, minmax(9rem, 1fr));
@@ -1239,18 +1372,50 @@
 		outline-offset: 2px;
 	}
 
-	.selection-controls__card-fields {
+	.selection-controls__card-fields,
+	.selection-controls__metadata-fields {
 		display: grid;
 		grid-template-columns: repeat(2, minmax(9rem, 1fr));
 		gap: var(--ink-space-2);
 	}
 
-	.selection-controls__card-fields .selection-controls__field--wide {
+	.selection-controls__card-fields .selection-controls__field--wide,
+	.selection-controls__metadata-fields .selection-controls__field--wide {
 		grid-column: 1 / -1;
 	}
 
-	.selection-controls__card-fields .selection-controls__field input {
+	.selection-controls__card-fields .selection-controls__field input,
+	.selection-controls__metadata-fields .selection-controls__field input,
+	.selection-controls__metadata-fields .selection-controls__field textarea {
 		width: 100%;
+	}
+
+	.selection-controls__provenance {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: var(--ink-space-1) var(--ink-space-3);
+		margin: 0;
+		padding-top: var(--ink-space-2);
+		border-top: 1px solid color-mix(in srgb, var(--ink-border) 48%, transparent);
+		font: 600 var(--ink-type-xs) / 1.2 var(--ink-font-body);
+	}
+
+	.selection-controls__provenance div {
+		display: grid;
+		gap: 0.125rem;
+		min-width: 0;
+	}
+
+	.selection-controls__provenance dt {
+		color: var(--ink-text-muted);
+	}
+
+	.selection-controls__provenance dd {
+		margin: 0;
+		overflow: hidden;
+		color: var(--ink-text);
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.selection-controls__field input,

@@ -272,7 +272,7 @@ export type SemanticMetadata = {
 	 */
 	link: string | null;
 	/**
-	 * User-defined structured metadata.
+	 * Optional user-defined structured metadata. An empty map means no custom fields.
 	 */
 	custom_metadata: { [key in string]: JsonValue };
 	/**

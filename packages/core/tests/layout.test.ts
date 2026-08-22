@@ -36,19 +36,35 @@ describe('layout commands', () => {
 		expect(distributed.doc.shapes.three.x - distributed.doc.shapes.one.x - 10).toBe(25);
 	});
 
-	it('groups and ungroups without changing child world positions', () => {
+	it('groups and ungroups without changing child world positions or metadata', () => {
 		const state = stateWithShapes();
+		state.doc.shapes.one.metadata = {
+			name: 'First',
+			title: null,
+			role: 'diagram.step',
+			description: 'First step',
+			body: null,
+			tags: ['start'],
+			source: 'plan.md',
+			link: null,
+			customMetadata: { priority: 1 },
+			locked: false,
+			agentEditable: true
+		};
+		const metadata = state.doc.shapes.one.metadata;
 		const grouped = groupShapes(state, ['one', 'two']);
 		const groupId = grouped.ui.selectionIds[0];
 		const group = grouped.doc.shapes[groupId];
 		expect(group?.type).toBe('container');
 		expect(grouped.doc.shapes.one.groupId).toBe(groupId);
 		expect(grouped.doc.shapes.two.groupId).toBe(groupId);
+		expect(grouped.doc.shapes.one.metadata).toEqual(metadata);
 
 		const ungrouped = ungroupShapes(grouped, [groupId]);
 		expect(ungrouped.doc.shapes[groupId]).toBeUndefined();
 		expect(ungrouped.doc.shapes.one.x).toBe(30);
 		expect(ungrouped.doc.shapes.two.x).toBe(0);
 		expect(ungrouped.doc.shapes.one.groupId).toBeUndefined();
+		expect(ungrouped.doc.shapes.one.metadata).toEqual(metadata);
 	});
 });

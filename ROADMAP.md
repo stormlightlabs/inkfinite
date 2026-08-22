@@ -63,15 +63,14 @@ workflows.
 
 ### Semantic objects and relationships
 
-The native model and CLI already support object names, roles, tags,
-descriptions, provenance, semantic queries, and explicit directed bindings.
-The editor currently exposes only a small part of that model. It should make
-semantic fields editable without interrupting casual drawing and preserve them
-through editor projections and ordinary transformations.
+The native model, CLI, and editor projection carry object names, roles, tags,
+descriptions, provenance, user-defined sources, and structured metadata. The
+selection controls expose those fields for ordinary objects, show provenance
+for a single selection, and keep metadata through conversion, grouping,
+duplication, and SVG export where the format has a representation.
 
-User-defined source and structured metadata can extend the current native
-metadata. Bindings need an optional relation type so people and agents can
-query typed incoming and outgoing relationships without inferring meaning from
+Bindings still need an optional relation type so people and agents can query
+typed incoming and outgoing relationships without inferring meaning from
 coordinates or visual style.
 
 ### Layout operations

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Action, Modifiers, PointerButtons } from '../src/actions';
-import { convertSelectedShapes, duplicateAndConnectSelection } from '../src/selection';
+import { convertSelectedShapes, duplicateAndConnectSelection, duplicateSelection } from '../src/selection';
 import { PageRecord, ShapeRecord } from '../src/model';
 import { EditorState } from '../src/reactivity';
 import { RectTool, SelectTool } from '../src/tools';
@@ -197,6 +197,40 @@ describe('selection and movement refinements', () => {
 				expect.objectContaining({ fromShapeId: arrow.id, toShapeId: copiedId, handle: 'end' })
 			])
 		);
+	});
+
+	it('preserves semantic metadata through duplication and conversion', () => {
+		const state = selectionState();
+		const shape = state.doc.shapes['shape:one'];
+		shape.metadata = {
+			name: 'Gateway',
+			title: null,
+			role: 'architecture.service',
+			description: 'Routes requests',
+			body: null,
+			tags: ['api'],
+			source: 'architecture.md',
+			link: null,
+			customMetadata: { owner: 'platform', config: { retries: 2 } },
+			locked: false,
+			agentEditable: true,
+			provenance: { actorId: 'actor:test', origin: 'human', timestamp: 42, source: 'seed' }
+		};
+		const duplicated = duplicateSelection(state, { x: 10, y: 10 });
+		if (!duplicated) throw new Error('expected a duplicate');
+		const duplicateId = duplicated.ui.selectionIds[0];
+		expect(duplicated.doc.shapes[duplicateId]?.metadata).toEqual(shape.metadata);
+		expect(duplicated.doc.shapes[duplicateId]?.metadata).not.toBe(shape.metadata);
+		expect(duplicated.doc.shapes[duplicateId]?.metadata?.customMetadata).not.toBe(
+			shape.metadata?.customMetadata
+		);
+		expect(
+			(duplicated.doc.shapes[duplicateId]?.metadata?.customMetadata.config as { retries: number })
+		).not.toBe(shape.metadata?.customMetadata.config);
+
+		const next = convertSelectedShapes(state, 'ellipse');
+		const converted = next.doc.shapes['shape:one'];
+		expect(converted.metadata).toEqual(shape.metadata);
 	});
 
 	it('converts a selection while preserving its common shape fields', () => {

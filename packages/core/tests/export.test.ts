@@ -38,6 +38,39 @@ describe("exportToSVG", () => {
     expect(svg).toContain("stroke=\"black\"");
   });
 
+  it("should export semantic metadata for ordinary shapes", () => {
+    const { state, pageId } = createTestState();
+    const rect = ShapeRecord.createRect(pageId, 10, 20, { w: 100, h: 50, fill: "red", stroke: "black", radius: 0 });
+    rect.metadata = {
+      name: "Gateway",
+      title: null,
+      role: "architecture.service",
+      description: "Routes requests",
+      body: null,
+      tags: ["api", "critical"],
+      source: "architecture.md",
+      link: "https://example.com/gateway",
+      customMetadata: { owner: "platform" },
+      locked: false,
+      agentEditable: true,
+      provenance: {
+        actorId: "actor:test",
+        origin: "human",
+        timestamp: 42,
+        source: "seed",
+      },
+    };
+    state.doc.shapes[rect.id] = rect;
+    state.doc.pages[pageId].shapeIds.push(rect.id);
+
+    const svg = exportToSVG(state);
+    expect(svg).toContain('data-name="Gateway"');
+    expect(svg).toContain('data-role="architecture.service"');
+    expect(svg).toContain('data-description="Routes requests"');
+    expect(svg).toContain('data-tags="api,critical"');
+    expect(svg).toContain('data-metadata="{&quot;owner&quot;:&quot;platform&quot;}"');
+  });
+
   it("should export SVG with an ellipse shape", () => {
     const { state, pageId } = createTestState();
 

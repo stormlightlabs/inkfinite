@@ -22,7 +22,7 @@ function createSelectionStore(shapes: Shape[], selectionIds = shapes.map((shape)
 }
 
 describe('SelectionControls', () => {
-	it('shows only appearance controls for a selected rectangle', async () => {
+	it('shows appearance and object metadata controls for a selected rectangle', async () => {
 		const page = PageRecord.create('Test page', 'page:test');
 		const rect = ShapeRecord.createRect(
 			page.id,
@@ -49,6 +49,68 @@ describe('SelectionControls', () => {
 		await expect
 			.element(screen.getByRole('button', { name: 'Align' }))
 			.not.toBeInTheDocument();
+	});
+
+	it('projects and edits semantic metadata for ordinary objects', async () => {
+		const page = PageRecord.create('Test page', 'page:test');
+		const rect = ShapeRecord.createRect(
+			page.id,
+			0,
+			0,
+			{ w: 80, h: 50, fill: '#ffffff', stroke: '#111111', radius: 4 },
+			'rect'
+		);
+		rect.metadata = {
+			name: 'Service',
+			title: null,
+			role: 'architecture.service',
+			description: 'Handles requests',
+			body: null,
+			tags: ['api', 'critical'],
+			source: 'architecture.md',
+			link: 'https://example.com/service',
+			customMetadata: { owner: 'platform' },
+			locked: false,
+			agentEditable: true,
+			provenance: { actorId: 'actor:test', origin: 'human', timestamp: 42, source: 'seed' }
+		};
+		const store = createSelectionStore([rect]);
+		const screen = render(SelectionControls, {
+			currentTool: 'select',
+			orientation: 'vertical',
+			store
+		});
+
+		await expect
+			.element(screen.getByRole('heading', { name: 'Object metadata' }))
+			.toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('textbox', { name: 'Object name' }))
+			.toHaveValue('Service');
+		await expect
+			.element(screen.getByRole('textbox', { name: 'Object role' }))
+			.toHaveValue('architecture.service');
+		await expect
+			.element(screen.getByRole('textbox', { name: 'Object tags' }))
+			.toHaveValue('api, critical');
+		await expect.element(screen.getByText('actor:test')).toBeInTheDocument();
+
+		await screen.getByRole('textbox', { name: 'Object name' }).fill('Gateway');
+		screen
+			.getByRole('textbox', { name: 'Object name' })
+			.element()
+			.dispatchEvent(new Event('change', { bubbles: true }));
+		await screen
+			.getByRole('textbox', { name: 'Object structured metadata' })
+			.fill('{"owner":"edge","priority":1}');
+		screen
+			.getByRole('textbox', { name: 'Object structured metadata' })
+			.element()
+			.dispatchEvent(new Event('change', { bubbles: true }));
+
+		const updated = store.getState().doc.shapes.rect;
+		expect(updated.metadata?.name).toBe('Gateway');
+		expect(updated.metadata?.customMetadata).toEqual({ owner: 'edge', priority: 1 });
 	});
 
 	it('shows focused typography controls for text and Markdown selections', async () => {

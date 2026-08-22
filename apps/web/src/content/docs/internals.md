@@ -73,9 +73,11 @@ application-specific behavior.
 The most important internal distinction is between the Rust document contract and the TypeScript
 editor model.
 
-`inkfinite-core` is the durable authority. Its shapes have a registry `kind`, a parent relation, a
-parent-relative transform, ordered container children, kind-specific properties, semantic metadata,
-common style, and a record version. Pages own ordered layers; layers own ordered root shapes.
+`inkfinite-core` owns the native document session. Its shapes have a registry `kind`, a parent
+relation, a parent-relative transform, ordered container children, kind-specific properties,
+semantic metadata, common style, and a record version. Semantic metadata includes optional names,
+roles, descriptions, sources, links, tags, custom JSON fields, and provenance.
+Pages own ordered layers; layers own ordered root shapes.
 Containers can own nested shapes and optionally apply free, stack, or grid layout.
 
 `@inkfinite/core` is the interactive projection used by tools and Canvas rendering. It keeps the

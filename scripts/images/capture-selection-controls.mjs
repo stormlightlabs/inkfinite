@@ -58,14 +58,14 @@ try {
 	const desktop = await browser.newPage({ viewport: { width: 1440, height: 960 } });
 	await desktop.addInitScript(() => localStorage.setItem('theme', 'light'));
 	await desktop.goto(url, { waitUntil: 'networkidle' });
-	await drawRectangle(desktop, { x: 300, y: 330 }, { x: 480, y: 450 });
-	await selectAt(desktop, { x: 390, y: 390 });
+	await drawRectangle(desktop, { x: 300, y: 520 }, { x: 480, y: 640 });
+	await selectAt(desktop, { x: 390, y: 580 });
 	await desktop.getByRole('heading', { name: 'Appearance' }).waitFor();
 	await desktop.screenshot({ path: `${output}/selection-controls-rectangle.png` });
 
-	await drawRectangle(desktop, { x: 600, y: 430 }, { x: 780, y: 550 });
-	await selectAt(desktop, { x: 690, y: 490 });
-	await selectAt(desktop, { x: 390, y: 390 }, true);
+	await drawRectangle(desktop, { x: 600, y: 520 }, { x: 780, y: 640 });
+	await selectAt(desktop, { x: 690, y: 580 });
+	await selectAt(desktop, { x: 390, y: 580 }, true);
 	await desktop.getByRole('button', { name: 'Align' }).waitFor();
 	await desktop.screenshot({ path: `${output}/selection-controls-multi.png` });
 

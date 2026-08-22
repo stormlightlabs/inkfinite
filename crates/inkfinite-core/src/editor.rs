@@ -1024,6 +1024,32 @@ mod tests {
     }
 
     #[test]
+    fn projection_preserves_semantic_metadata() {
+        let mut snapshot = nested_snapshot();
+        let child_id = ShapeId::from("shape:child");
+        let child = snapshot.document.shapes.get_mut(&child_id).expect("child fixture");
+        child.metadata.name = Some("Gateway".into());
+        child.metadata.role = Some("architecture.service".into());
+        child.metadata.description = Some("Routes requests".into());
+        child.metadata.tags = vec!["api".into(), "critical".into()];
+        child.metadata.source = Some("architecture.md".into());
+        child
+            .metadata
+            .custom_metadata
+            .insert("owner".into(), Value::from("platform"));
+        child.metadata.provenance.source = Some("seed".into());
+
+        let projected = project_editor(&snapshot).shapes[&child_id].metadata.clone();
+        assert_eq!(projected.name.as_deref(), Some("Gateway"));
+        assert_eq!(projected.role.as_deref(), Some("architecture.service"));
+        assert_eq!(projected.description.as_deref(), Some("Routes requests"));
+        assert_eq!(projected.tags, ["api", "critical"]);
+        assert_eq!(projected.source.as_deref(), Some("architecture.md"));
+        assert_eq!(projected.custom_metadata["owner"], Value::from("platform"));
+        assert_eq!(projected.provenance.source.as_deref(), Some("seed"));
+    }
+
+    #[test]
     fn reconciliation_emits_one_relative_patch_for_a_world_move() {
         let snapshot = nested_snapshot();
         let projection = project_editor(&snapshot);

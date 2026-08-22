@@ -137,7 +137,7 @@ export function exportToSVG(state: EditorState, options: ExportOptions = {}): st
   for (const shape of shapes) {
     const svg = shapeToSVG(shape, state);
     if (svg) {
-      elements.push(svg);
+      elements.push(wrapSemanticMetadata(shape, svg));
     }
   }
 
@@ -291,21 +291,28 @@ function curvedPathData(points: Array<{ x: number; y: number }>): string {
   return `${path} Q ${svgNumber(control.x)} ${svgNumber(control.y)} ${svgNumber(end.x)} ${svgNumber(end.y)}`;
 }
 
+function wrapSemanticMetadata(shape: ShapeRecord, content: string): string {
+  const metadata = shape.metadata;
+  if (!metadata) return content;
+  const attributes = [
+    metadata.name ? ` data-name="${escapeXML(metadata.name)}"` : '',
+    metadata.title ? ` data-card-title="${escapeXML(metadata.title)}"` : '',
+    metadata.body ? ` data-card-body="${escapeXML(metadata.body)}"` : '',
+    metadata.role ? ` data-role="${escapeXML(metadata.role)}"` : '',
+    metadata.description ? ` data-description="${escapeXML(metadata.description)}"` : '',
+    metadata.tags.length > 0 ? ` data-tags="${escapeXML(metadata.tags.join(','))}"` : '',
+    metadata.source ? ` data-source="${escapeXML(metadata.source)}"` : '',
+    metadata.link ? ` data-link="${escapeXML(metadata.link)}"` : '',
+    Object.keys(metadata.customMetadata).length > 0
+      ? ` data-metadata="${escapeXML(JSON.stringify(metadata.customMetadata) ?? '')}"`
+      : '',
+  ].join('');
+  return `<g data-shape-id="${escapeXML(shape.id)}"${attributes}>${content}</g>`;
+}
+
 function containerToSVG(shape: ContainerShape, transform: string): string {
   const { w = 0, h = 0, title, fill, stroke, radius = 0 } = shape.props;
-  const metadata = shape.metadata;
-  const dataAttributes = metadata
-    ? [
-        metadata.role ? ` data-role="${escapeXML(metadata.role)}"` : '',
-        metadata.tags.length > 0 ? ` data-tags="${escapeXML(metadata.tags.join(','))}"` : '',
-        metadata.source ? ` data-source="${escapeXML(metadata.source)}"` : '',
-        metadata.link ? ` data-link="${escapeXML(metadata.link)}"` : '',
-        Object.keys(metadata.customMetadata).length > 0
-          ? ` data-metadata="${escapeXML(JSON.stringify(metadata.customMetadata) ?? '')}"`
-          : ''
-      ].join('')
-    : '';
-  const elements = [`<rect transform="${transform}" width="${svgNumber(w)}" height="${svgNumber(h)}" rx="${svgNumber(Math.min(radius, w / 2, h / 2))}" fill="${escapeXML(fill ?? "none")}" stroke="${escapeXML(stroke ?? "none")}"${dataAttributes}/>`];
+  const elements = [`<rect transform="${transform}" width="${svgNumber(w)}" height="${svgNumber(h)}" rx="${svgNumber(Math.min(radius, w / 2, h / 2))}" fill="${escapeXML(fill ?? "none")}" stroke="${escapeXML(stroke ?? "none")}"/>`];
   if (title) elements.push(`<text transform="${transform}" x="8" y="18" font-family="sans-serif" font-size="14" font-weight="600" fill="#1f2937">${escapeXML(title)}</text>`);
   return elements.join("");
 }

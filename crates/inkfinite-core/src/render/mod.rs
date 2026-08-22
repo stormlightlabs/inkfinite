@@ -1356,9 +1356,11 @@ fn number(value: f64) -> String {
 fn svg_metadata_attributes(metadata: &crate::SemanticMetadata) -> String {
     let mut attributes = String::new();
     for (name, value) in [
+        ("data-name", metadata.name.as_deref()),
         ("data-card-title", metadata.title.as_deref()),
         ("data-card-body", metadata.body.as_deref()),
         ("data-role", metadata.role.as_deref()),
+        ("data-description", metadata.description.as_deref()),
         ("data-source", metadata.source.as_deref()),
         ("data-link", metadata.link.as_deref()),
     ] {

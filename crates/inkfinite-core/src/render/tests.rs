@@ -597,6 +597,41 @@ fn renders_image_masks_captions_and_reference_cards() {
 }
 
 #[test]
+fn renders_object_metadata_attributes() {
+    let mut snapshot = fixture_snapshot();
+    let shape = snapshot
+        .document
+        .shapes
+        .get_mut(&ShapeId::from("shape:stencil-process"))
+        .expect("process fixture");
+    shape.metadata.name = Some("Gateway".into());
+    shape.metadata.role = Some("architecture.service".into());
+    shape.metadata.description = Some("Routes requests".into());
+    shape.metadata.tags = vec!["api".into(), "critical".into()];
+    shape.metadata.source = Some("architecture.md".into());
+    shape
+        .metadata
+        .custom_metadata
+        .insert("owner".into(), serde_json::json!("platform"));
+
+    let rendered = render_svg(
+        &snapshot,
+        &SvgRenderOptions { page_id: Some(PageId::from("page:fixtures")), ..Default::default() },
+    )
+    .expect("fixture renders");
+    assert!(rendered.svg.contains("data-name=\"Gateway\""));
+    assert!(rendered.svg.contains("data-role=\"architecture.service\""));
+    assert!(rendered.svg.contains("data-description=\"Routes requests\""));
+    assert!(rendered.svg.contains("data-tags=\"api,critical\""));
+    assert!(rendered.svg.contains("data-source=\"architecture.md\""));
+    assert!(
+        rendered
+            .svg
+            .contains("data-metadata=\"{&quot;owner&quot;:&quot;platform&quot;}\"")
+    );
+}
+
+#[test]
 fn render_is_deterministic_and_covers_every_visual_builtin() {
     let snapshot = fixture_snapshot();
     let options = SvgRenderOptions { page_id: Some(PageId::from("page:fixtures")), ..SvgRenderOptions::default() };

@@ -23,8 +23,9 @@ the native file preserves every page and its history.
 Shapes include rectangles, ellipses, lines, arrows, text, Markdown blocks, and freehand strokes.
 Each shape has a kind, transform, kind-specific properties, and metadata. A container can present
 ordinary text and Markdown children as an editable card with a title, body, role, tags, source,
-link, and structured metadata. Shapes can also carry a name, semantic role, and tags for reliable
-CLI queries.
+link, and structured metadata. Every shape can also carry a name, role, description, tags, source,
+link, and custom metadata for selection controls and reliable CLI queries. The editor shows the
+record's provenance as read-only actor, origin, time, and source information.
 
 Layers control stacking and visibility. Container shapes own ordered children, so a frame moves and
 exports its contents as one composition. Bindings connect arrows to source and target shapes

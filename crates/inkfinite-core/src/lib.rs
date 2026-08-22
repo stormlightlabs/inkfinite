@@ -832,7 +832,7 @@ pub struct SemanticMetadata {
     /// Optional external link associated with the content.
     #[serde(default)]
     pub link: Option<String>,
-    /// User-defined structured metadata.
+    /// Optional user-defined structured metadata. An empty map means no custom fields.
     #[serde(default)]
     pub custom_metadata: BTreeMap<String, Value>,
     /// Whether direct edits to this shape are prohibited.
