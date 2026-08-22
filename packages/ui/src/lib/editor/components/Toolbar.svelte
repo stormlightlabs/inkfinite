@@ -56,7 +56,13 @@
 	let importMenuOpen = $state(false);
 	let importMenuPoint = $state({ x: 0, y: 0 });
 	let importButtonEl = $state<HTMLButtonElement | null>(null);
+	let shapesMenuOpen = $state(false);
+	let shapesMenuPoint = $state({ x: 0, y: 0 });
+	let shapesButtonEl = $state<HTMLButtonElement | null>(null);
 	let brush = $derived<BrushSettings>(brushStore.get());
+	const shapeToolIds = new Set<ToolId>(['rect', 'ellipse', 'frame', 'line', 'arrow']);
+	let primaryTools = $derived(TOOLS.filter((tool) => !shapeToolIds.has(tool.id)));
+	let shapeTools = $derived(TOOLS.filter((tool) => shapeToolIds.has(tool.id)));
 
 	$effect(() => {
 		editorState = store.getState();
@@ -176,6 +182,21 @@
 
 	function handleToolClick(toolId: ToolId) {
 		onToolChange(toolId);
+	}
+
+	function toggleShapesMenu() {
+		if (!shapesButtonEl) return;
+		if (shapesMenuOpen) {
+			shapesMenuOpen = false;
+			return;
+		}
+		const bounds = shapesButtonEl.getBoundingClientRect();
+		shapesMenuPoint = { x: bounds.left, y: bounds.bottom + 8 };
+		shapesMenuOpen = true;
+	}
+
+	function handleShapeMenuAction(id: string) {
+		onToolChange(id as ToolId);
 	}
 
 	async function exportPNGViewport() {
@@ -413,7 +434,7 @@
 		</div>
 
 		<div class="toolbar__tools">
-			{#each TOOLS as tool (`${tool.id}:${tool.label}`)}
+			{#each primaryTools as tool (`${tool.id}:${tool.label}`)}
 				<div class="toolbar__tool-slot">
 					<button
 						class="toolbar__tool-button tool-button"
@@ -433,9 +454,36 @@
 						</div>
 					{/if}
 				</div>
+				{#if tool.id === 'direct-select'}
+					<div class="toolbar__tool-slot">
+						<button
+							bind:this={shapesButtonEl}
+							class="toolbar__tool-button tool-button"
+							class:toolbar__tool-button--active={shapeToolIds.has(currentTool)}
+							type="button"
+							onclick={toggleShapesMenu}
+							aria-label="Shapes"
+							aria-haspopup="menu"
+							aria-expanded={shapesMenuOpen}
+							aria-pressed={shapeToolIds.has(currentTool)}>
+							<span class="toolbar__tool-icon"
+								><Icon name="shapes" size={20} /></span>
+							<span class="toolbar__tool-label">Shapes</span>
+						</button>
+					</div>
+				{/if}
 			{/each}
 		</div>
 	</div>
+	<ContextMenu
+		items={shapeTools.map((tool) => ({ id: tool.id, label: tool.label, icon: tool.icon }))}
+		label="Shape tools"
+		open={shapesMenuOpen}
+		returnFocus={shapesButtonEl}
+		x={shapesMenuPoint.x}
+		y={shapesMenuPoint.y}
+		onOpenChange={(value) => (shapesMenuOpen = value)}
+		onSelect={handleShapeMenuAction} />
 
 	<SelectionControls
 		{currentTool}

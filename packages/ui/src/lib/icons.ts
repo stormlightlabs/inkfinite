@@ -43,6 +43,7 @@ export const ICONS = {
 	save: 'i-ph-floppy-disk-back-bold',
 	search: 'i-ph-magnifying-glass-bold',
 	settings: 'i-bi-sliders',
+	shapes: 'i-ph-shapes-light',
 	sun: 'i-tabler-sun',
 	trash: 'i-bi-trash3',
 	undo: 'i-tabler-arrow-back-up',

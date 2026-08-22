@@ -32,6 +32,20 @@
 
 	let dialogElement: HTMLDivElement | undefined = $state();
 
+	function portal(node: HTMLElement) {
+		const styles = getComputedStyle(node);
+		for (const property of styles) {
+			if (property.startsWith('--ink-'))
+				node.style.setProperty(property, styles.getPropertyValue(property));
+		}
+		document.body.append(node);
+		return {
+			destroy() {
+				node.remove();
+			}
+		};
+	}
+
 	function handleBackdropClick(event: MouseEvent) {
 		if (closeOnBackdrop && event.target === event.currentTarget) {
 			handleClose();
@@ -81,6 +95,7 @@
 
 {#if open}
 	<div
+		use:portal
 		class="dialog__backdrop"
 		role="presentation"
 		onclick={handleBackdropClick}

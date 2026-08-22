@@ -37,7 +37,8 @@ describe('Editor Toolbar', () => {
 			brushStore: createBrushStore()
 		});
 
-		await screen.getByRole('button', { name: 'Rectangle' }).click();
+		await screen.getByRole('button', { name: 'Shapes' }).click();
+		await screen.getByRole('menuitem', { name: 'Rectangle' }).click();
 		expect(onToolChange).toHaveBeenCalledWith('rect');
 		await expect
 			.element(screen.getByRole('button', { name: 'Zoom level' }))

@@ -37,8 +37,13 @@ async function drag(page, from, to) {
 	await page.mouse.up();
 }
 
+async function chooseShapeTool(page, name) {
+	await page.getByRole('button', { name: 'Shapes', exact: true }).click();
+	await page.getByRole('menuitem', { name, exact: true }).click();
+}
+
 async function drawRectangle(page, from, to) {
-	await page.getByRole('button', { name: 'Rectangle', exact: true }).click();
+	await chooseShapeTool(page, 'Rectangle');
 	await drag(page, from, to);
 }
 
@@ -58,15 +63,28 @@ try {
 	const desktop = await browser.newPage({ viewport: { width: 1440, height: 960 } });
 	await desktop.addInitScript(() => localStorage.setItem('theme', 'light'));
 	await desktop.goto(url, { waitUntil: 'networkidle' });
-	await drawRectangle(desktop, { x: 300, y: 520 }, { x: 480, y: 640 });
+	await desktop.getByRole('button', { name: 'Shapes', exact: true }).click();
+	await desktop.getByRole('menu', { name: 'Shape tools' }).waitFor();
+	await desktop.screenshot({ path: `${output}/toolbar-shapes-menu.png` });
+	await desktop.getByRole('menuitem', { name: 'Rectangle', exact: true }).click();
+	await drag(desktop, { x: 300, y: 520 }, { x: 480, y: 640 });
 	await selectAt(desktop, { x: 390, y: 580 });
 	await desktop.getByRole('heading', { name: 'Appearance' }).waitFor();
 	await desktop.screenshot({ path: `${output}/selection-controls-rectangle.png` });
+	await desktop.getByRole('button', { name: 'Edit metadata' }).click();
+	const metadataDialog = desktop.getByRole('dialog', { name: 'Object metadata' });
+	await metadataDialog.waitFor();
+	await metadataDialog.screenshot({ path: `${output}/selection-controls-metadata-dialog.png` });
+	await desktop.screenshot({ path: `${output}/selection-controls-metadata.png` });
+	await desktop.getByRole('button', { name: 'Done' }).click();
 
 	await drawRectangle(desktop, { x: 600, y: 520 }, { x: 780, y: 640 });
 	await selectAt(desktop, { x: 690, y: 580 });
 	await selectAt(desktop, { x: 390, y: 580 }, true);
-	await desktop.getByRole('button', { name: 'Align' }).waitFor();
+	while (!(await desktop.getByRole('button', { name: 'Align' }).isVisible())) {
+		await desktop.getByRole('button', { name: 'Show more contextual controls' }).click();
+		await desktop.waitForTimeout(250);
+	}
 	await desktop.screenshot({ path: `${output}/selection-controls-multi.png` });
 
 	await desktop.getByRole('button', { name: 'Arrange', exact: true }).click();
@@ -90,13 +108,24 @@ try {
 	await cardPage.getByRole('button', { name: 'Open stencils library' }).click();
 	await cardPage.getByRole('button', { name: 'Card', exact: true }).click();
 	await cardPage.getByRole('button', { name: 'Close stencil palette' }).click();
-	await cardPage.getByRole('heading', { name: 'Card' }).waitFor();
+	const editCardButton = cardPage.getByRole('button', { name: 'Edit card' });
+	while (true) {
+		const bounds = await editCardButton.boundingBox();
+		if (bounds && bounds.x >= 0 && bounds.x + bounds.width <= 1424) break;
+		await cardPage.getByRole('button', { name: 'Show more contextual controls' }).click();
+		await cardPage.waitForTimeout(250);
+	}
+	await cardPage.waitForTimeout(500);
 	await cardPage.screenshot({ path: `${output}/selection-controls-card.png` });
+	await cardPage.getByRole('button', { name: 'Edit card' }).click();
+	const cardDialog = cardPage.getByRole('dialog', { name: 'Card details' });
+	await cardDialog.waitFor();
+	await cardDialog.screenshot({ path: `${output}/selection-controls-card-dialog.png` });
 
 	const arrowPage = await browser.newPage({ viewport: { width: 1440, height: 960 } });
 	await arrowPage.addInitScript(() => localStorage.setItem('theme', 'dark'));
 	await arrowPage.goto(url, { waitUntil: 'networkidle' });
-	await arrowPage.getByRole('button', { name: 'Arrow', exact: true }).click();
+	await chooseShapeTool(arrowPage, 'Arrow');
 	await drag(arrowPage, { x: 320, y: 500 }, { x: 720, y: 500 });
 	await selectAt(arrowPage, { x: 520, y: 500 });
 	await arrowPage.getByRole('button', { name: 'Arrow settings' }).waitFor();

@@ -26,6 +26,8 @@
 		onOpenChange: (open: boolean) => void;
 		onSelect: (id: string) => void;
 		open: boolean;
+		/** Uses denser rows for long command collections. */
+		compact?: boolean;
 		returnFocus?: HTMLElement | null;
 		x: number;
 		y: number;
@@ -40,6 +42,7 @@
 	let {
 		items,
 		label = 'Context menu',
+		compact = false,
 		onOpenChange,
 		onSelect,
 		open,
@@ -137,6 +140,7 @@
 	<div
 		bind:this={menuEl}
 		class="ink-context-menu"
+		data-compact={compact}
 		role="menu"
 		tabindex="-1"
 		aria-label={label}
@@ -181,7 +185,9 @@
 		display: grid;
 		min-width: 13rem;
 		max-width: min(20rem, calc(100vw - 1rem));
+		max-height: calc(100vh - 1rem);
 		padding: var(--ink-space-1);
+		overflow-y: auto;
 		border-radius: var(--ink-radius-panel-small);
 		color: var(--ink-text);
 		background: color-mix(in srgb, var(--ink-surface-raised) 96%, transparent);
@@ -189,6 +195,10 @@
 			0 0 0 1px color-mix(in srgb, var(--ink-border) 72%, transparent),
 			var(--ink-shadow-popover);
 		backdrop-filter: blur(16px);
+	}
+
+	.ink-context-menu[data-compact='true'] {
+		min-width: min(18rem, calc(100vw - 1rem));
 	}
 
 	.ink-context-menu__item {
@@ -208,6 +218,14 @@
 		transition-property: color, background-color, scale;
 		transition-duration: var(--ink-duration-fast);
 		transition-timing-function: var(--ink-ease-out);
+	}
+
+	.ink-context-menu[data-compact='true'] .ink-context-menu__item {
+		min-height: 2.25rem;
+	}
+
+	.ink-context-menu[data-compact='true'] .ink-context-menu__separator {
+		margin-block: 0.125rem;
 	}
 
 	.ink-context-menu__item:hover:not(:disabled),

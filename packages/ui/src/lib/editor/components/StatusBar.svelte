@@ -42,6 +42,33 @@
 	}: Props = $props();
 
 	let infoOpen = $state(false);
+	let statusViewport: HTMLDivElement | undefined = $state();
+	let canScrollBack = $state(false);
+	let canScrollForward = $state(false);
+
+	function updateScrollState() {
+		if (!statusViewport) return;
+		canScrollBack = statusViewport.scrollLeft > 1;
+		canScrollForward =
+			statusViewport.scrollLeft + statusViewport.clientWidth <
+			statusViewport.scrollWidth - 1;
+	}
+
+	function shiftStatus(direction: -1 | 1) {
+		statusViewport?.scrollBy({
+			left: direction * Math.max(240, statusViewport.clientWidth * 0.8),
+			behavior: 'smooth'
+		});
+	}
+
+	$effect(() => {
+		if (!statusViewport) return;
+		const observer = new ResizeObserver(updateScrollState);
+		observer.observe(statusViewport);
+		for (const child of statusViewport.children) observer.observe(child);
+		updateScrollState();
+		return () => observer.disconnect();
+	});
 
 	let editorSnapshot: EditorState = EditorStateOps.create();
 	let cameraSnapshot = $state(Camera.create());
@@ -171,122 +198,138 @@
 </script>
 
 <div class="status-bar" data-agent-occlusion>
-	<div class="status-bar__section">
-		<span class="status-bar__label">Tool</span>
-		<span class="status-bar__value">{statusVm.toolId}</span>
-		<span class="status-bar__mode">{statusVm.mode}</span>
-	</div>
+	<button
+		class="status-bar__scroll-button"
+		aria-label="Show previous status items"
+		disabled={!canScrollBack}
+		onclick={() => shiftStatus(-1)}>
+		<Icon name="chevron-left" size={16} />
+	</button>
+	<div bind:this={statusViewport} class="status-bar__viewport" onscroll={updateScrollState}>
+		<div class="status-bar__section">
+			<span class="status-bar__label">Tool</span>
+			<span class="status-bar__value">{statusVm.toolId}</span>
+			<span class="status-bar__mode">{statusVm.mode}</span>
+		</div>
 
-	<div class="status-bar__section">
-		<span class="status-bar__label">Cursor</span>
-		<span class="status-bar__value">
-			{formatCursorCoord(statusVm.cursorWorld.x)}, {formatCursorCoord(
-				statusVm.cursorWorld.y
-			)}
-		</span>
-	</div>
+		<div class="status-bar__section">
+			<span class="status-bar__label">Cursor</span>
+			<span class="status-bar__value">
+				{formatCursorCoord(statusVm.cursorWorld.x)}, {formatCursorCoord(
+					statusVm.cursorWorld.y
+				)}
+			</span>
+		</div>
 
-	<div
-		class="status-bar__section"
-		title="World-space viewport origin. Pan with a trackpad, middle-drag, or Space-drag.">
-		<span class="status-bar__label">Viewport</span>
-		<span class="status-bar__value">
-			{formatCursorCoord(viewportOrigin().x)}, {formatCursorCoord(viewportOrigin().y)}
-		</span>
-	</div>
+		<div
+			class="status-bar__section"
+			title="World-space viewport origin. Pan with a trackpad, middle-drag, or Space-drag.">
+			<span class="status-bar__label">Viewport</span>
+			<span class="status-bar__value">
+				{formatCursorCoord(viewportOrigin().x)}, {formatCursorCoord(viewportOrigin().y)}
+			</span>
+		</div>
 
-	<div class="status-bar__section">
-		<span class="status-bar__label">Selection</span>
-		<span class="status-bar__value">{formatSelection()}</span>
-	</div>
+		<div class="status-bar__section">
+			<span class="status-bar__label">Selection</span>
+			<span class="status-bar__value">{formatSelection()}</span>
+		</div>
 
-	<div class="status-bar__section">
-		<div class="status-bar__toggle-row">
-			<label class="status-bar__toggle">
-				<span>Snap</span>
-				<input
-					type="checkbox"
-					checked={snapSnapshot.snapEnabled}
-					onchange={handleSnapToggle}
-					aria-label="Enable main snapping" />
-			</label>
-			<label class="status-bar__toggle">
-				<span>Grid</span>
-				<input
-					type="checkbox"
-					checked={snapSnapshot.gridEnabled}
-					onchange={handleGridToggle}
-					aria-label="Enable grid snapping" />
-			</label>
-			{#if snapSnapshot.gridEnabled}
-				<label class="status-bar__grid-size">
-					<span>Size</span>
+		<div class="status-bar__section">
+			<div class="status-bar__toggle-row">
+				<label class="status-bar__toggle">
+					<span>Snap</span>
 					<input
-						type="number"
-						min="1"
-						step="1"
-						value={snapSnapshot.gridSize}
-						onchange={handleGridSizeInput}
-						aria-label="Grid size" />
+						type="checkbox"
+						checked={snapSnapshot.snapEnabled}
+						onchange={handleSnapToggle}
+						aria-label="Enable main snapping" />
 				</label>
+				<label class="status-bar__toggle">
+					<span>Grid</span>
+					<input
+						type="checkbox"
+						checked={snapSnapshot.gridEnabled}
+						onchange={handleGridToggle}
+						aria-label="Enable grid snapping" />
+				</label>
+				{#if snapSnapshot.gridEnabled}
+					<label class="status-bar__grid-size">
+						<span>Size</span>
+						<input
+							type="number"
+							min="1"
+							step="1"
+							value={snapSnapshot.gridSize}
+							onchange={handleGridSizeInput}
+							aria-label="Grid size" />
+					</label>
+				{/if}
+			</div>
+		</div>
+
+		<div class="status-bar__section status-bar__section--persistence">
+			<span class="status-bar__label">Save</span>
+			<span
+				class="status-bar__value"
+				class:status-bar__value--error={statusVm.persistence.state === 'error'}
+				role={statusVm.persistence.state === 'error' ? 'alert' : undefined}
+				title={statusVm.persistence.errorMsg ?? undefined}>
+				{formatPersistenceSummary()}
+			</span>
+		</div>
+
+		<div class="status-bar__actions" aria-label="Editor utilities">
+			<button
+				class="status-bar__action"
+				onclick={() => themeStore.toggle()}
+				aria-label="Toggle Dark Mode"
+				title="Toggle Dark Mode">
+				<Icon name={themeStore.current === 'dark' ? 'sun' : 'moon'} size={15} />
+				<span>{themeStore.current === 'dark' ? 'Light' : 'Dark'}</span>
+			</button>
+			{#if onOpenBrowser}
+				<button
+					class="status-bar__action"
+					onclick={onOpenBrowser}
+					aria-label="Browse boards"
+					title="Boards (Cmd/Ctrl+B)">
+					<Icon name="folder" size={15} />
+					<span>Boards</span>
+				</button>
+			{/if}
+			{#if onShortcutsClick}
+				<button
+					class="status-bar__action"
+					onclick={onShortcutsClick}
+					aria-label="Keyboard shortcuts"
+					title="Keyboard shortcuts (?)">
+					<span aria-hidden="true">?</span>
+					<span>Shortcuts</span>
+				</button>
+			{/if}
+			<button
+				class="status-bar__action"
+				onclick={() => (infoOpen = true)}
+				aria-label="About Inkfinite">
+				<Icon name="info-circle" size={15} />
+				<span>Info</span>
+			</button>
+			{#if onHistoryClick}
+				<button class="status-bar__action" onclick={onHistoryClick} aria-label="History">
+					<Icon name="history" size={15} />
+					<span>History</span>
+				</button>
 			{/if}
 		</div>
 	</div>
-
-	<div class="status-bar__section status-bar__section--persistence">
-		<span class="status-bar__label">Save</span>
-		<span
-			class="status-bar__value"
-			class:status-bar__value--error={statusVm.persistence.state === 'error'}
-			role={statusVm.persistence.state === 'error' ? 'alert' : undefined}
-			title={statusVm.persistence.errorMsg ?? undefined}>
-			{formatPersistenceSummary()}
-		</span>
-	</div>
-
-	<div class="status-bar__actions" aria-label="Editor utilities">
-		<button
-			class="status-bar__action"
-			onclick={() => themeStore.toggle()}
-			aria-label="Toggle Dark Mode"
-			title="Toggle Dark Mode">
-			<Icon name={themeStore.current === 'dark' ? 'sun' : 'moon'} size={15} />
-			<span>{themeStore.current === 'dark' ? 'Light' : 'Dark'}</span>
-		</button>
-		{#if onOpenBrowser}
-			<button
-				class="status-bar__action"
-				onclick={onOpenBrowser}
-				aria-label="Browse boards"
-				title="Boards (Cmd/Ctrl+B)">
-				<Icon name="folder" size={15} />
-				<span>Boards</span>
-			</button>
-		{/if}
-		{#if onShortcutsClick}
-			<button
-				class="status-bar__action"
-				onclick={onShortcutsClick}
-				aria-label="Keyboard shortcuts"
-				title="Keyboard shortcuts (?)">
-				<span aria-hidden="true">?</span>
-				<span>Shortcuts</span>
-			</button>
-		{/if}
-		<button
-			class="status-bar__action"
-			onclick={() => (infoOpen = true)}
-			aria-label="About Inkfinite">
-			<Icon name="info-circle" size={15} />
-			<span>Info</span>
-		</button>
-		{#if onHistoryClick}
-			<button class="status-bar__action" onclick={onHistoryClick} aria-label="History">
-				<Icon name="history" size={15} />
-				<span>History</span>
-			</button>
-		{/if}
-	</div>
+	<button
+		class="status-bar__scroll-button"
+		aria-label="Show more status items"
+		disabled={!canScrollForward}
+		onclick={() => shiftStatus(1)}>
+		<Icon name="chevron-right" size={16} />
+	</button>
 </div>
 
 <Dialog
@@ -327,18 +370,55 @@
 	.status-bar {
 		display: flex;
 		align-items: center;
-		gap: var(--ink-space-4);
 		min-width: 0;
-		padding: 0.5rem 0.75rem;
+		padding: var(--ink-space-1);
 		background: var(--ink-surface-raised);
 		border-top: 1px solid color-mix(in srgb, var(--ink-border) 46%, transparent);
 		box-shadow: 0 -8px 24px color-mix(in srgb, var(--ink-shadow-color) 10%, transparent);
 		font-size: 0.75rem;
 		min-height: 48px;
-		overflow-x: auto;
-		overflow-y: hidden;
 		white-space: nowrap;
-		scrollbar-width: thin;
+	}
+
+	.status-bar__viewport {
+		display: flex;
+		align-items: center;
+		gap: var(--ink-space-4);
+		flex: 1 1 auto;
+		width: auto;
+		overflow: hidden;
+		scrollbar-width: none;
+	}
+
+	.status-bar__viewport::-webkit-scrollbar {
+		display: none;
+	}
+
+	.status-bar__scroll-button {
+		display: grid;
+		flex: 0 0 auto;
+		width: 2rem;
+		height: 2rem;
+		place-items: center;
+		padding: 0;
+		border: 0;
+		border-radius: var(--ink-radius-control-small);
+		background: transparent;
+		color: var(--ink-text-muted);
+		cursor: pointer;
+	}
+
+	.status-bar__scroll-button:hover:not(:disabled) {
+		background: var(--ink-surface-hover);
+		color: var(--ink-text);
+	}
+	.status-bar__scroll-button:focus-visible {
+		outline: 2px solid var(--ink-accent);
+		outline-offset: 1px;
+	}
+	.status-bar__scroll-button:disabled {
+		opacity: 0.25;
+		cursor: default;
 	}
 
 	.status-bar__actions {
@@ -488,14 +568,12 @@
 
 	@media (max-width: 960px) {
 		.status-bar {
-			display: flex;
 			min-height: 48px;
-			gap: var(--ink-space-4);
-			padding: var(--ink-space-1) var(--ink-space-3);
-			overflow-x: auto;
-			overflow-y: hidden;
-			white-space: nowrap;
-			scrollbar-width: thin;
+			padding: var(--ink-space-1);
+		}
+
+		.status-bar__viewport {
+			width: auto;
 		}
 
 		.status-bar__section,

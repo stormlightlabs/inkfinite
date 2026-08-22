@@ -81,8 +81,13 @@ describe('SelectionControls', () => {
 			store
 		});
 
+		await expect.element(screen.getByText('Service')).toBeInTheDocument();
 		await expect
-			.element(screen.getByRole('heading', { name: 'Object metadata' }))
+			.element(screen.getByRole('textbox', { name: 'Object name' }))
+			.not.toBeInTheDocument();
+		await screen.getByRole('button', { name: 'Edit metadata' }).click();
+		await expect
+			.element(screen.getByRole('dialog', { name: 'Object metadata' }))
 			.toBeInTheDocument();
 		await expect
 			.element(screen.getByRole('textbox', { name: 'Object name' }))
@@ -223,6 +228,10 @@ describe('SelectionControls', () => {
 		});
 
 		await expect.element(screen.getByRole('heading', { name: 'Card' })).toBeInTheDocument();
+		await screen.getByRole('button', { name: 'Edit card' }).click();
+		await expect
+			.element(screen.getByRole('dialog', { name: 'Card details' }))
+			.toBeInTheDocument();
 		await expect
 			.element(screen.getByRole('textbox', { name: 'Card title' }))
 			.toHaveValue('Title');
@@ -238,6 +247,7 @@ describe('SelectionControls', () => {
 		expect(updatedTitleShape?.type === 'text' ? updatedTitleShape.props.text : undefined).toBe(
 			'Updated title'
 		);
+		await screen.getByRole('button', { name: 'Done' }).click();
 
 		await screen.getByRole('button', { name: 'Enter selected frame' }).click();
 		await screen.getByRole('button', { name: 'Fit selected frame' }).click();

@@ -10,7 +10,14 @@
 		ToolId
 	} from '@inkfinite/core';
 	import { EditorState, getSelectedShapes, SnapshotCommand } from '@inkfinite/core';
-	import { ColorPicker, ContextMenu, Icon, type ContextMenuEntry } from '../../index';
+	import {
+		Button,
+		ColorPicker,
+		ContextMenu,
+		Dialog,
+		Icon,
+		type ContextMenuEntry
+	} from '../../index';
 	import {
 		executeSelectionCommand,
 		SELECTION_COMMAND_LABELS,
@@ -51,6 +58,51 @@
 	let sampledColors = $state<SampledImageColor[]>([]);
 	let samplingColors = $state(false);
 	let sampledColorMessage = $state<string | null>(null);
+	let metadataOpen = $state(false);
+	let cardOpen = $state(false);
+	let sectionsViewport: HTMLDivElement | undefined = $state();
+	let canScrollSectionsBack = $state(false);
+	let canScrollSectionsForward = $state(false);
+
+	function updateSectionsScrollState() {
+		if (!sectionsViewport) return;
+		canScrollSectionsBack = sectionsViewport.scrollLeft > 1;
+		canScrollSectionsForward =
+			sectionsViewport.scrollLeft + sectionsViewport.clientWidth <
+			sectionsViewport.scrollWidth - 1;
+	}
+
+	function shiftSections(direction: -1 | 1) {
+		if (!sectionsViewport) return;
+		const sections = Array.from(
+			sectionsViewport.querySelectorAll<HTMLElement>(':scope > .selection-controls__section')
+		);
+		const current = sectionsViewport.scrollLeft;
+		const target =
+			direction > 0
+				? sections.find((section) => section.offsetLeft > current + 1)
+				: sections.filter((section) => section.offsetLeft < current - 1).at(-1);
+		sectionsViewport.scrollTo({
+			left: target?.offsetLeft ?? (direction > 0 ? sectionsViewport.scrollWidth : 0),
+			behavior: 'smooth'
+		});
+	}
+
+	$effect(() => {
+		selectionCount;
+		cardOpen;
+		metadataOpen;
+		queueMicrotask(updateSectionsScrollState);
+	});
+
+	$effect(() => {
+		if (!sectionsViewport) return;
+		const observer = new ResizeObserver(updateSectionsScrollState);
+		observer.observe(sectionsViewport);
+		for (const child of sectionsViewport.children) observer.observe(child);
+		updateSectionsScrollState();
+		return () => observer.disconnect();
+	});
 
 	$effect(() => {
 		const unsubscribe = store.subscribe((state) => {
@@ -687,9 +739,26 @@
 			<strong
 				>{selectionCount}
 				{selectionCount === 1 ? 'object' : 'objects'} selected</strong>
+			<div
+				class="selection-controls__scroll-actions"
+				aria-label="Browse contextual controls">
+				<button
+					aria-label="Show previous contextual controls"
+					disabled={!canScrollSectionsBack}
+					onclick={() => shiftSections(-1)}
+					><Icon name="chevron-left" size={16} /></button>
+				<button
+					aria-label="Show more contextual controls"
+					disabled={!canScrollSectionsForward}
+					onclick={() => shiftSections(1)}
+					><Icon name="chevron-right" size={16} /></button>
+			</div>
 		</header>
 
-		<div class="selection-controls__sections">
+		<div
+			bind:this={sectionsViewport}
+			class="selection-controls__sections"
+			onscroll={updateSectionsScrollState}>
 			{#if fillTargets.length > 0 || strokeTargets.length > 0 || fillOpacityTargets.length > 0 || strokeOpacityTargets.length > 0}
 				<section
 					class="selection-controls__section"
@@ -790,103 +859,145 @@
 					class="selection-controls__section selection-controls__section--metadata"
 					aria-labelledby="selection-metadata-label">
 					<h2 id="selection-metadata-label">Object metadata</h2>
-					<div class="selection-controls__metadata-fields">
-						<label class="selection-controls__field">
-							<span>Name</span>
-							<input
-								type="text"
-								value={semanticNameState.mixed ? '' : semanticNameState.value}
-								placeholder={semanticNameState.mixed ? 'Mixed' : 'Object name'}
-								onchange={(event) => handleSemanticTextChange(event, 'name')}
-								aria-label="Object name" />
-						</label>
-						<label class="selection-controls__field">
-							<span>Role</span>
-							<input
-								type="text"
-								value={semanticRoleState.mixed ? '' : semanticRoleState.value}
-								placeholder={semanticRoleState.mixed ? 'Mixed' : 'Semantic role'}
-								onchange={(event) => handleSemanticTextChange(event, 'role')}
-								aria-label="Object role" />
-						</label>
-						<label class="selection-controls__field selection-controls__field--wide">
-							<span>Tags</span>
-							<input
-								type="text"
-								value={semanticTagsState.mixed ? '' : semanticTagsState.value}
-								placeholder={semanticTagsState.mixed
-									? 'Mixed'
-									: 'Comma-separated tags'}
-								onchange={handleSemanticTagsChange}
-								aria-label="Object tags" />
-						</label>
-						<label class="selection-controls__field selection-controls__field--wide">
-							<span>Description</span>
-							<textarea
-								value={semanticDescriptionState.mixed
-									? ''
-									: semanticDescriptionState.value}
-								placeholder={semanticDescriptionState.mixed
-									? 'Mixed'
-									: 'Description'}
-								onchange={(event) =>
-									handleSemanticTextChange(event, 'description')}
-								aria-label="Object description"></textarea>
-						</label>
-						<label class="selection-controls__field">
-							<span>Source</span>
-							<input
-								type="text"
-								value={semanticSourceState.mixed ? '' : semanticSourceState.value}
-								placeholder={semanticSourceState.mixed
-									? 'Mixed'
-									: 'Citation or file'}
-								onchange={(event) => handleSemanticTextChange(event, 'source')}
-								aria-label="Object source" />
-						</label>
-						<label class="selection-controls__field">
-							<span>Link</span>
-							<input
-								type="url"
-								value={semanticLinkState.mixed ? '' : semanticLinkState.value}
-								placeholder={semanticLinkState.mixed ? 'Mixed' : 'https://'}
-								onchange={(event) => handleSemanticTextChange(event, 'link')}
-								aria-label="Object link" />
-						</label>
-						<label class="selection-controls__field selection-controls__field--wide">
-							<span>Structured metadata</span>
-							<textarea
-								value={semanticCustomMetadataState.mixed
-									? ''
-									: semanticCustomMetadataState.value}
-								placeholder={semanticCustomMetadataState.mixed ? 'Mixed' : '{ }'}
-								onchange={handleSemanticMetadataChange}
-								aria-label="Object structured metadata"></textarea>
-						</label>
+					<div class="selection-controls__metadata-summary">
+						<span
+							class="selection-controls__metadata-name"
+							title={semanticNameState.mixed
+								? 'Mixed names'
+								: semanticNameState.value || 'Unnamed object'}>
+							{semanticNameState.mixed
+								? 'Mixed names'
+								: semanticNameState.value || 'Unnamed object'}
+						</span>
+						<Button size="small" onclick={() => (metadataOpen = true)}
+							>Edit metadata</Button>
 					</div>
-					{#if semanticTarget?.provenance}
-						<dl class="selection-controls__provenance" aria-label="Object provenance">
-							<div>
-								<dt>Actor</dt>
-								<dd>{semanticTarget.provenance.actorId}</dd>
-							</div>
-							<div>
-								<dt>Origin</dt>
-								<dd>{semanticTarget.provenance.origin}</dd>
-							</div>
-							<div>
-								<dt>Recorded</dt>
-								<dd>{semanticTarget.provenance.timestamp}</dd>
-							</div>
-							{#if semanticTarget.provenance.source}
-								<div>
-									<dt>Provenance source</dt>
-									<dd>{semanticTarget.provenance.source}</dd>
-								</div>
-							{/if}
-						</dl>
-					{/if}
 				</section>
+			{/if}
+
+			{#if metadataOpen && selectionCount > 0}
+				<Dialog
+					bind:open={metadataOpen}
+					title="Object metadata"
+					class="object-metadata-dialog">
+					<div class="selection-controls__metadata-drawer">
+						<header class="selection-controls__metadata-header">
+							<div>
+								<span>Selected object</span>
+								<h2>Object metadata</h2>
+							</div>
+							<Button size="small" onclick={() => (metadataOpen = false)}
+								>Done</Button>
+						</header>
+						<div class="selection-controls__metadata-fields">
+							<label class="selection-controls__field">
+								<span>Name</span>
+								<input
+									type="text"
+									value={semanticNameState.mixed ? '' : semanticNameState.value}
+									placeholder={semanticNameState.mixed ? 'Mixed' : 'Object name'}
+									onchange={(event) => handleSemanticTextChange(event, 'name')}
+									aria-label="Object name" />
+							</label>
+							<label class="selection-controls__field">
+								<span>Role</span>
+								<input
+									type="text"
+									value={semanticRoleState.mixed ? '' : semanticRoleState.value}
+									placeholder={semanticRoleState.mixed
+										? 'Mixed'
+										: 'Semantic role'}
+									onchange={(event) => handleSemanticTextChange(event, 'role')}
+									aria-label="Object role" />
+							</label>
+							<label
+								class="selection-controls__field selection-controls__field--wide">
+								<span>Tags</span>
+								<input
+									type="text"
+									value={semanticTagsState.mixed ? '' : semanticTagsState.value}
+									placeholder={semanticTagsState.mixed
+										? 'Mixed'
+										: 'Comma-separated tags'}
+									onchange={handleSemanticTagsChange}
+									aria-label="Object tags" />
+							</label>
+							<label
+								class="selection-controls__field selection-controls__field--wide">
+								<span>Description</span>
+								<textarea
+									value={semanticDescriptionState.mixed
+										? ''
+										: semanticDescriptionState.value}
+									placeholder={semanticDescriptionState.mixed
+										? 'Mixed'
+										: 'Description'}
+									onchange={(event) =>
+										handleSemanticTextChange(event, 'description')}
+									aria-label="Object description"></textarea>
+							</label>
+							<label class="selection-controls__field">
+								<span>Source</span>
+								<input
+									type="text"
+									value={semanticSourceState.mixed
+										? ''
+										: semanticSourceState.value}
+									placeholder={semanticSourceState.mixed
+										? 'Mixed'
+										: 'Citation or file'}
+									onchange={(event) => handleSemanticTextChange(event, 'source')}
+									aria-label="Object source" />
+							</label>
+							<label class="selection-controls__field">
+								<span>Link</span>
+								<input
+									type="url"
+									value={semanticLinkState.mixed ? '' : semanticLinkState.value}
+									placeholder={semanticLinkState.mixed ? 'Mixed' : 'https://'}
+									onchange={(event) => handleSemanticTextChange(event, 'link')}
+									aria-label="Object link" />
+							</label>
+							<label
+								class="selection-controls__field selection-controls__field--wide">
+								<span>Structured metadata</span>
+								<textarea
+									value={semanticCustomMetadataState.mixed
+										? ''
+										: semanticCustomMetadataState.value}
+									placeholder={semanticCustomMetadataState.mixed
+										? 'Mixed'
+										: '{ }'}
+									onchange={handleSemanticMetadataChange}
+									aria-label="Object structured metadata"></textarea>
+							</label>
+						</div>
+						{#if semanticTarget?.provenance}
+							<dl
+								class="selection-controls__provenance"
+								aria-label="Object provenance">
+								<div>
+									<dt>Actor</dt>
+									<dd>{semanticTarget.provenance.actorId}</dd>
+								</div>
+								<div>
+									<dt>Origin</dt>
+									<dd>{semanticTarget.provenance.origin}</dd>
+								</div>
+								<div>
+									<dt>Recorded</dt>
+									<dd>{semanticTarget.provenance.timestamp}</dd>
+								</div>
+								{#if semanticTarget.provenance.source}
+									<div>
+										<dt>Provenance source</dt>
+										<dd>{semanticTarget.provenance.source}</dd>
+									</div>
+								{/if}
+							</dl>
+						{/if}
+					</div>
+				</Dialog>
 			{/if}
 
 			{#if imageTarget}
@@ -1058,24 +1169,45 @@
 					class="selection-controls__section selection-controls__section--card"
 					aria-labelledby="selection-card-label">
 					<h2 id="selection-card-label">Card</h2>
-					<div class="selection-controls__card-fields">
-						<label class="selection-controls__field">
-							<span>Title</span>
-							<input
-								type="text"
-								value={cardMetadata.title ?? ''}
-								onchange={(event) => handleCardTextChange(event, 'title')}
-								aria-label="Card title" />
-						</label>
-						<label class="selection-controls__field selection-controls__field--wide">
-							<span>Body</span>
-							<textarea
-								value={cardMetadata.body ?? ''}
-								onchange={(event) => handleCardTextChange(event, 'body')}
-								aria-label="Card body"></textarea>
-						</label>
+					<div class="selection-controls__card-summary">
+						<span title={cardMetadata.title ?? 'Untitled card'}
+							>{cardMetadata.title ?? 'Untitled card'}</span>
+						<Button size="small" onclick={() => (cardOpen = true)}>Edit card</Button>
 					</div>
 				</section>
+			{/if}
+
+			{#if cardOpen && cardTarget && cardMetadata}
+				<Dialog bind:open={cardOpen} title="Card details" class="card-details-dialog">
+					<div class="selection-controls__card-dialog">
+						<header class="selection-controls__metadata-header">
+							<div>
+								<span>Selected object</span>
+								<h2>Card details</h2>
+							</div>
+							<Button size="small" onclick={() => (cardOpen = false)}>Done</Button>
+						</header>
+						<div class="selection-controls__card-fields">
+							<label
+								class="selection-controls__field selection-controls__field--wide">
+								<span>Title</span>
+								<input
+									type="text"
+									value={cardMetadata.title ?? ''}
+									onchange={(event) => handleCardTextChange(event, 'title')}
+									aria-label="Card title" />
+							</label>
+							<label
+								class="selection-controls__field selection-controls__field--wide">
+								<span>Body</span>
+								<textarea
+									value={cardMetadata.body ?? ''}
+									onchange={(event) => handleCardTextChange(event, 'body')}
+									aria-label="Card body"></textarea>
+							</label>
+						</div>
+					</div>
+				</Dialog>
 			{/if}
 
 			{#if textTargets.length > 0}
@@ -1225,6 +1357,7 @@
 
 	<ContextMenu
 		items={getLayoutMenuItems(layoutMenuMode)}
+		compact={layoutMenuMode === 'arrange'}
 		label={layoutMenuMode === 'align' ? 'Alignment commands' : 'Arrange commands'}
 		open={layoutMenuOpen}
 		returnFocus={layoutMenuReturnFocus}
@@ -1241,7 +1374,7 @@
 		left: 50%;
 		z-index: 95;
 		display: grid;
-		width: fit-content;
+		width: min(72rem, calc(100vw - 2rem));
 		max-width: calc(100vw - 2rem);
 		border: 1px solid color-mix(in srgb, var(--ink-border) 68%, transparent);
 		border-radius: var(--ink-radius-panel-small);
@@ -1286,8 +1419,41 @@
 		align-items: stretch;
 		gap: var(--ink-space-3);
 		padding: var(--ink-space-2) var(--ink-space-3);
-		overflow-x: auto;
-		scrollbar-width: thin;
+		padding-inline-end: calc(100% - var(--ink-space-3));
+		overflow-x: hidden;
+		scrollbar-width: none;
+	}
+
+	.selection-controls__scroll-actions {
+		display: flex;
+		align-items: center;
+		gap: var(--ink-space-1);
+	}
+
+	.selection-controls__scroll-actions button {
+		display: grid;
+		width: 2rem;
+		height: 2rem;
+		place-items: center;
+		padding: 0;
+		border: 0;
+		border-radius: var(--ink-radius-control-small);
+		background: transparent;
+		color: var(--ink-text-muted);
+		cursor: pointer;
+	}
+
+	.selection-controls__scroll-actions button:hover:not(:disabled) {
+		background: var(--ink-surface-hover);
+		color: var(--ink-text);
+	}
+	.selection-controls__scroll-actions button:focus-visible {
+		outline: 2px solid var(--ink-accent);
+		outline-offset: 1px;
+	}
+	.selection-controls__scroll-actions button:disabled {
+		opacity: 0.25;
+		cursor: default;
 	}
 
 	.selection-controls__section {
@@ -1343,13 +1509,83 @@
 		text-align: right;
 	}
 
-	.selection-controls__section--card,
 	.selection-controls__section--image {
 		min-width: 24rem;
 	}
 
+	.selection-controls__section--card {
+		min-width: 15rem;
+	}
+
+	.selection-controls__card-summary {
+		display: flex;
+		align-items: center;
+		gap: var(--ink-space-2);
+	}
+
+	.selection-controls__card-summary span {
+		max-width: 12rem;
+		overflow: hidden;
+		color: var(--ink-text);
+		font: 650 var(--ink-type-sm) / 1.2 var(--ink-font-body);
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.selection-controls__card-dialog {
+		width: min(34rem, 92vw);
+		padding: var(--ink-space-5);
+	}
+
+	:global(.dialog__content.card-details-dialog) {
+		border-radius: var(--ink-radius-panel);
+	}
+
 	.selection-controls__section--metadata {
-		min-width: 22rem;
+		min-width: 15rem;
+	}
+
+	.selection-controls__metadata-summary {
+		display: flex;
+		align-items: center;
+		gap: var(--ink-space-2);
+	}
+
+	.selection-controls__metadata-name {
+		min-width: 0;
+		max-width: 12rem;
+		overflow: hidden;
+		color: var(--ink-text);
+		font: 650 var(--ink-type-sm) / 1.2 var(--ink-font-body);
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.selection-controls__metadata-drawer {
+		width: min(34rem, 92vw);
+		padding: var(--ink-space-5);
+	}
+
+	.selection-controls__metadata-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--ink-space-4);
+		margin-bottom: var(--ink-space-4);
+	}
+
+	.selection-controls__metadata-header span {
+		color: var(--ink-text-muted);
+		font: 650 var(--ink-type-xs) / 1 var(--ink-font-body);
+	}
+
+	.selection-controls__metadata-header h2 {
+		margin: var(--ink-space-1) 0 0;
+		font-size: var(--ink-type-lg);
+	}
+
+	:global(.dialog__content.object-metadata-dialog) {
+		border-radius: var(--ink-radius-panel);
 	}
 
 	.selection-controls__image-fields {

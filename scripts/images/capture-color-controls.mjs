@@ -38,7 +38,8 @@ async function waitForServer(url) {
 }
 
 async function createSelectedRectangle(page) {
-	await page.getByRole('button', { name: 'Rectangle', exact: true }).click();
+	await page.getByRole('button', { name: 'Shapes', exact: true }).click();
+	await page.getByRole('menuitem', { name: 'Rectangle', exact: true }).click();
 	const canvas = page.locator('canvas').first();
 	const bounds = await canvas.boundingBox();
 	if (!bounds) throw new Error('Editor canvas is not visible');
