@@ -345,12 +345,10 @@
 		height: 2.5rem;
 		padding: 0.25rem;
 		border: var(--ink-line-width) solid var(--ink-border-strong);
-		border-radius: var(--ink-radius-wobbly-small);
-		box-shadow: var(--ink-shadow-offset) var(--ink-shadow-offset) 0 var(--ink-shadow-color);
+		border-radius: var(--ink-radius-control-small);
+		box-shadow: var(--ink-shadow-control);
 		cursor: pointer;
-		transition:
-			translate var(--ink-duration-fast) var(--ink-ease-out),
-			box-shadow var(--ink-duration-fast) var(--ink-ease-out);
+		transition: transform var(--ink-duration-fast) var(--ink-ease-out);
 	}
 
 	.color-picker__trigger--mixed {
@@ -364,22 +362,19 @@
 	}
 
 	.color-picker__trigger:hover:not(:disabled) {
-		translate: -1px -1px;
-		box-shadow: calc(var(--ink-shadow-offset) + 1px) calc(var(--ink-shadow-offset) + 1px) 0
-			var(--ink-shadow-color);
+		transform: translateY(-1px);
 	}
 
 	.color-picker__trigger:active:not(:disabled) {
-		translate: var(--ink-shadow-offset) var(--ink-shadow-offset);
-		box-shadow: 0 0 0 var(--ink-shadow-color);
+		transform: scale(0.98);
 	}
 
 	.color-picker__trigger:focus-visible,
 	.color-picker__swatch:focus-visible,
 	.color-picker__apply:focus-visible,
 	.color-picker__hex-input:focus-visible {
-		outline: 3px solid var(--ink-focus);
-		outline-offset: 3px;
+		outline: var(--ink-line-width-strong) solid var(--ink-focus);
+		outline-offset: 2px;
 	}
 
 	.color-picker__trigger:disabled {
@@ -496,7 +491,7 @@
 		min-height: var(--ink-control-height-sm);
 		padding: 0 var(--ink-space-2);
 		border: var(--ink-line-width) solid var(--ink-border);
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		color: var(--ink-text);
 		background: var(--ink-surface);
 		font: 600 var(--ink-type-sm) / 1 var(--ink-font-body);
@@ -511,7 +506,7 @@
 		min-height: var(--ink-control-height-sm);
 		padding-inline: var(--ink-space-2);
 		border: var(--ink-line-width) solid var(--ink-border-strong);
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		color: var(--ink-text);
 		background: var(--ink-surface);
 		font-size: var(--ink-type-xs);

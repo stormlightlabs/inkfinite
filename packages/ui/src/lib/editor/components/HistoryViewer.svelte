@@ -131,10 +131,10 @@
 		min-height: var(--ink-control-height);
 		padding: var(--ink-space-2) var(--ink-space-4);
 		border: 1px solid var(--ink-border);
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		background: var(--ink-canvas);
 		color: var(--ink-text);
-		box-shadow: 2px 2px 0 color-mix(in srgb, var(--ink-shadow-color) 82%, transparent);
+		box-shadow: var(--ink-shadow-control);
 		cursor: pointer;
 		font-family: inherit;
 		font-size: var(--ink-type-sm);
@@ -147,8 +147,8 @@
 	.history-actions button:hover:not(:disabled) {
 		background: var(--ink-surface-hover);
 		border-color: var(--ink-border-strong);
-		box-shadow: 3px 3px 0 color-mix(in srgb, var(--ink-shadow-color) 90%, transparent);
-		transform: translate(-1px, -1px);
+		box-shadow: var(--ink-shadow-panel);
+		transform: translateY(-1px);
 	}
 
 	.history-actions button:active:not(:disabled) {
@@ -156,7 +156,7 @@
 	}
 
 	.history-actions button:focus-visible {
-		outline: 2px solid var(--ink-focus);
+		outline: var(--ink-line-width-strong) solid var(--ink-focus);
 		outline-offset: 2px;
 	}
 

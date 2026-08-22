@@ -98,7 +98,7 @@
 		width: 2.75rem;
 		height: 2.75rem;
 		border: 0;
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		color: var(--ink-text-muted);
 		background: transparent;
 		font-size: 1.5rem;
@@ -128,7 +128,7 @@
 		min-height: 2.75rem;
 		padding: 0 var(--ink-space-3);
 		border: 1px solid var(--ink-border-strong);
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		color: var(--ink-text);
 		background: var(--ink-canvas);
 		font: 500 var(--ink-type-sm) / 1 var(--ink-font-body);
@@ -151,7 +151,7 @@
 		gap: var(--ink-space-4);
 		min-height: 2.75rem;
 		padding: var(--ink-space-2) var(--ink-space-3);
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		background: color-mix(in srgb, var(--ink-canvas) 68%, transparent);
 	}
 

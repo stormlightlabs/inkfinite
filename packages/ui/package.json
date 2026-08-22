@@ -34,7 +34,6 @@
 			"default": "./dist/editor/index.js"
 		},
 		"./editor/favicon.svg": "./dist/editor/assets/favicon.svg",
-		"./editor/styles.css": "./dist/editor/styles.css",
 		"./styles.css": "./dist/styles/index.css"
 	},
 	"files": [

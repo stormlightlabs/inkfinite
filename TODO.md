@@ -58,17 +58,17 @@ Expose only controls that apply to the active tool or current selection.
 Use one visual system across editor chrome, menus, dialogs, popovers, and
 selection UI.
 
-- [ ] Keep one primary Inkfinite accent family across light and dark themes
-- [ ] Tune accent luminance and contrast independently for each theme
-- [ ] Audit `editor/styles.css` and remove or migrate legacy theme, typography,
+- [x] Keep one primary Inkfinite accent family across light and dark themes
+- [x] Tune accent luminance and contrast independently for each theme
+- [x] Audit `editor/styles.css` and remove or migrate legacy theme, typography,
       reset, and token rules
-- [ ] Use the shared `--ink-*` tokens for editor components instead of local
+- [x] Use the shared `--ink-*` tokens for editor components instead of local
       color or spacing systems
-- [ ] Standardize panel borders, elevation, radii, and focus treatment
-- [ ] Reserve irregular radii and hard offset shadows for deliberate
+- [x] Standardize panel borders, elevation, radii, and focus treatment
+- [x] Reserve irregular radii and hard offset shadows for deliberate
       canvas-oriented accents rather than every control
-- [ ] Remove duplicate and contradictory toolbar/menu CSS declarations
-- [ ] Verify text, controls, selection states, and focus indicators meet
+- [x] Remove duplicate and contradictory toolbar/menu CSS declarations
+- [x] Verify text, controls, selection states, and focus indicators meet
       contrast requirements in both themes
 
 ### Color controls
@@ -195,4 +195,4 @@ Apply the same behavior to equivalent controls throughout the editor.
 - [ ] Revisit skill organization after SVG and MCP workflows stabilize
 - [ ] Export SVG as copyable code
 - [ ] Export PNG to clipboard
-- [ ] Add a move handle to the layer pane
+- [x] Add a move handle to the layer pane

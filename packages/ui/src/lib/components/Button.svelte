@@ -58,34 +58,30 @@
 		gap: var(--ink-space-2);
 		padding-inline: var(--ink-space-4);
 		border: var(--ink-line-width) solid var(--ink-border-strong);
-		border-radius: var(--ink-radius-wobbly);
+		border-radius: var(--ink-radius-control);
 		color: var(--ink-text);
 		background: var(--ink-surface-raised);
-		box-shadow: var(--ink-shadow-offset) var(--ink-shadow-offset) 0 var(--ink-shadow-color);
+		box-shadow: var(--ink-shadow-control);
 		font: 650 var(--ink-type-sm) / 1 var(--ink-font-body);
 		letter-spacing: 0.01em;
 		cursor: pointer;
 		transition:
-			translate var(--ink-duration-fast) var(--ink-ease-out),
-			box-shadow var(--ink-duration-fast) var(--ink-ease-out),
+			transform var(--ink-duration-fast) var(--ink-ease-out),
 			background-color var(--ink-duration-fast) var(--ink-ease-out);
 	}
 
 	.ink-button:hover:not(:disabled) {
 		background: var(--ink-surface-hover);
-		translate: -1px -1px;
-		box-shadow: calc(var(--ink-shadow-offset) + 1px) calc(var(--ink-shadow-offset) + 1px) 0
-			var(--ink-shadow-color);
+		transform: translateY(-1px);
 	}
 
 	.ink-button:active:not(:disabled) {
-		translate: var(--ink-shadow-offset) var(--ink-shadow-offset);
-		box-shadow: 0 0 0 var(--ink-shadow-color);
+		transform: scale(0.98);
 	}
 
 	.ink-button:focus-visible {
-		outline: 3px solid var(--ink-focus);
-		outline-offset: 3px;
+		outline: var(--ink-line-width-strong) solid var(--ink-focus);
+		outline-offset: 2px;
 	}
 
 	.ink-button:disabled {
@@ -114,8 +110,12 @@
 		box-shadow: none;
 	}
 
+	.ink-button[data-variant='ghost']:focus-visible {
+		outline-offset: 0;
+	}
+
 	.ink-button[data-variant='ghost']:hover:not(:disabled) {
-		translate: 0;
+		transform: none;
 		box-shadow: none;
 	}
 

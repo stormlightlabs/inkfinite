@@ -357,7 +357,7 @@
 		gap: var(--ink-space-1);
 		padding: var(--ink-space-1) var(--ink-space-2);
 		border: 1px solid transparent;
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		color: var(--ink-text-muted);
 		background: transparent;
 		cursor: pointer;
@@ -429,7 +429,7 @@
 		width: 3.5rem;
 		padding: 0.125rem 0.25rem;
 		border: 1px solid var(--ink-border);
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		background: var(--ink-canvas);
 		color: var(--ink-text);
 		font: inherit;

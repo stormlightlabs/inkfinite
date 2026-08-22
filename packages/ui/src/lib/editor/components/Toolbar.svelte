@@ -456,10 +456,7 @@
 		border: 1px solid color-mix(in srgb, var(--ink-border) 68%, transparent);
 		border-radius: var(--ink-radius-panel);
 		background: color-mix(in srgb, var(--ink-surface-raised) 96%, transparent);
-		box-shadow:
-			0 1px 0 color-mix(in srgb, white 10%, transparent) inset,
-			0 12px 30px color-mix(in srgb, var(--ink-shadow-color) 18%, transparent),
-			0 2px 7px color-mix(in srgb, var(--ink-shadow-color) 18%, transparent);
+		box-shadow: var(--ink-shadow-toolbar);
 		backdrop-filter: blur(16px);
 	}
 
@@ -505,7 +502,7 @@
 		gap: var(--ink-space-2);
 		padding: 0 var(--ink-space-3);
 		border: 1px solid var(--ink-border);
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		color: var(--ink-text);
 		background: var(--ink-canvas);
 		font: 650 var(--ink-type-sm) / 1 var(--ink-font-body);
@@ -547,10 +544,7 @@
 		border: 1px solid color-mix(in srgb, var(--ink-border) 68%, transparent);
 		border-radius: var(--ink-radius-panel);
 		background: color-mix(in srgb, var(--ink-surface-raised) 96%, transparent);
-		box-shadow:
-			0 1px 0 color-mix(in srgb, white 9%, transparent) inset,
-			0 12px 32px color-mix(in srgb, var(--ink-shadow-color) 25%, transparent),
-			0 2px 7px color-mix(in srgb, var(--ink-shadow-color) 20%, transparent);
+		box-shadow: var(--ink-shadow-toolbar);
 		backdrop-filter: blur(14px);
 		z-index: 100;
 		overflow: auto;
@@ -561,9 +555,7 @@
 
 	.toolbar[data-dragging='true'] {
 		transform: scale(0.99);
-		box-shadow:
-			0 10px 26px color-mix(in srgb, var(--ink-shadow-color) 34%, transparent),
-			0 2px 7px color-mix(in srgb, var(--ink-shadow-color) 28%, transparent);
+		box-shadow: var(--ink-shadow-popover);
 	}
 
 	.toolbar__drag-handle {
@@ -574,7 +566,7 @@
 		align-items: center;
 		justify-content: center;
 		flex: 0 0 auto;
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		color: var(--ink-text-muted);
 		cursor: grab;
 		opacity: 0.52;
@@ -651,7 +643,7 @@
 		flex-direction: column;
 		padding: var(--ink-space-2) var(--ink-space-1);
 		border: var(--ink-line-width) solid transparent;
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		color: var(--ink-text);
 		background: transparent;
 		font: inherit;
@@ -684,7 +676,7 @@
 		border-color: var(--ink-border-strong);
 		color: var(--ink-on-accent);
 		background: var(--ink-accent);
-		box-shadow: 2px 2px 0 var(--ink-shadow-color);
+		box-shadow: var(--ink-shadow-accent);
 		opacity: 1;
 	}
 
@@ -712,9 +704,7 @@
 		border: 1px solid color-mix(in srgb, var(--ink-border) 64%, transparent);
 		border-radius: var(--ink-radius-panel-small);
 		background: color-mix(in srgb, var(--ink-surface-raised) 96%, transparent);
-		box-shadow:
-			0 10px 26px color-mix(in srgb, var(--ink-shadow-color) 25%, transparent),
-			0 2px 7px color-mix(in srgb, var(--ink-shadow-color) 18%, transparent);
+		box-shadow: var(--ink-shadow-popover);
 		backdrop-filter: blur(14px);
 	}
 
@@ -735,14 +725,14 @@
 		border-radius: var(--ink-radius-panel-small);
 		color: var(--ink-text);
 		background: var(--ink-surface-raised);
-		box-shadow: var(--ink-shadow-toolbar);
+		box-shadow: var(--ink-shadow-popover);
 	}
 
 	.toolbar__menu-item {
 		min-height: 2.5rem;
 		padding: 0 var(--ink-space-2);
 		border: 0;
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		color: var(--ink-text);
 		background: transparent;
 		font: 600 var(--ink-type-sm) / 1.2 var(--ink-font-body);

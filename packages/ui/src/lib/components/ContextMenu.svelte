@@ -187,8 +187,7 @@
 		background: color-mix(in srgb, var(--ink-surface-raised) 96%, transparent);
 		box-shadow:
 			0 0 0 1px color-mix(in srgb, var(--ink-border) 72%, transparent),
-			0 12px 32px color-mix(in srgb, var(--ink-shadow-color) 30%, transparent),
-			0 2px 7px color-mix(in srgb, var(--ink-shadow-color) 22%, transparent);
+			var(--ink-shadow-popover);
 		backdrop-filter: blur(16px);
 	}
 
@@ -200,7 +199,7 @@
 		gap: var(--ink-space-2);
 		padding: 0 var(--ink-space-2);
 		border: 0;
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		color: inherit;
 		background: transparent;
 		font: 600 var(--ink-type-sm) / 1.2 var(--ink-font-body);

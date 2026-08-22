@@ -147,12 +147,14 @@
 		z-index: 120;
 		width: min(24rem, calc(100% - 2rem));
 		box-sizing: border-box;
-		border-radius: 0.9rem;
+		border: var(--ink-line-width) solid
+			color-mix(in srgb, var(--ink-accent) 30%, var(--ink-border));
+		border-radius: var(--ink-radius-panel);
 		background: color-mix(in srgb, var(--ink-canvas) 94%, var(--ink-accent) 6%);
 		color: var(--ink-text);
 		box-shadow:
-			0 1rem 2.5rem color-mix(in srgb, #000 22%, transparent),
-			0 0 0 1px color-mix(in srgb, var(--ink-accent) 24%, transparent);
+			0 0 0 1px color-mix(in srgb, var(--ink-accent) 24%, transparent),
+			var(--ink-shadow-popover);
 		-webkit-font-smoothing: antialiased;
 	}
 
@@ -216,7 +218,7 @@
 
 	.change-grid div {
 		padding: 0.45rem 0.3rem;
-		border-radius: 0.5rem;
+		border-radius: var(--ink-radius-control-small);
 		background: color-mix(in srgb, var(--ink-surface) 88%, var(--ink-accent) 12%);
 		text-align: center;
 	}
@@ -279,13 +281,13 @@
 	.error {
 		margin: 0 0 0.8rem;
 		padding: 0.55rem 0.65rem;
-		border-radius: 0.5rem;
+		border-radius: var(--ink-radius-control-small);
 		font-size: 0.75rem;
 		line-height: 1.35;
 	}
 
 	.warnings {
-		background: color-mix(in srgb, #e5a84b 14%, transparent);
+		background: color-mix(in srgb, var(--ink-warning) 14%, transparent);
 	}
 
 	.warnings p {
@@ -293,7 +295,7 @@
 	}
 
 	.error {
-		background: color-mix(in srgb, #d96060 16%, transparent);
+		background: color-mix(in srgb, var(--ink-danger) 16%, transparent);
 	}
 
 	.actions {
@@ -305,7 +307,7 @@
 		min-height: 2.5rem;
 		padding: 0.45rem 0.72rem;
 		border: 0;
-		border-radius: 0.55rem;
+		border-radius: var(--ink-radius-control);
 		font: inherit;
 		font-size: 0.75rem;
 		font-weight: 700;
@@ -326,6 +328,11 @@
 	button.primary {
 		background: var(--ink-accent);
 		color: var(--ink-on-accent);
+	}
+
+	button:focus-visible {
+		outline: var(--ink-line-width-strong) solid var(--ink-focus);
+		outline-offset: 2px;
 	}
 
 	button.secondary {

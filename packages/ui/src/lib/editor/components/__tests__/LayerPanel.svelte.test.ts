@@ -1,5 +1,5 @@
 import { EditorState, ShapeRecord, Store } from '@inkfinite/core';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
 import LayerPanel from '../LayerPanel.svelte';
@@ -35,6 +35,23 @@ describe('LayerPanel', () => {
 		await expect
 			.element(screen.getByRole('complementary', { name: 'Layers' }))
 			.toHaveStyle({ bottom: '12px' });
+	});
+
+	it('moves from the accessible panel handle with the keyboard', async () => {
+		const { screen } = renderPanel();
+		const panel = screen.getByRole('complementary', { name: 'Layers' }).element();
+		const handle = screen.getByRole('button', { name: 'Move layers panel' }).element();
+		const initialLeft = Number.parseFloat(getComputedStyle(panel).left);
+
+		handle.dispatchEvent(
+			new KeyboardEvent('keydown', { key: 'ArrowLeft', shiftKey: true, bubbles: true })
+		);
+
+		await vi.waitFor(() =>
+			expect(Number.parseFloat(panel.style.left)).toBeLessThan(initialLeft)
+		);
+		expect(panel.style.right).toBe('auto');
+		expect(panel.style.bottom).toBe('auto');
 	});
 
 	it('provides compact accessible controls for visibility, locking, and activation', async () => {

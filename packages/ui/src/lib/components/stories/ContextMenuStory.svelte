@@ -64,7 +64,7 @@
 		min-height: var(--ink-control-height);
 		padding-inline: var(--ink-space-4);
 		border: var(--ink-line-width) solid var(--ink-border-strong);
-		border-radius: var(--ink-radius-wobbly);
+		border-radius: var(--ink-radius-control);
 		color: var(--ink-text);
 		background: var(--ink-surface-raised);
 		font: 650 var(--ink-type-sm) / 1 var(--ink-font-body);

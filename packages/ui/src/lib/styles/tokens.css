@@ -1,4 +1,4 @@
-/* Color palette adapted from Eldritch: https://github.com/eldritch-theme/eldritch */
+/* Inkfinite's shared visual language. Keep component styles on these semantic roles. */
 
 :root,
 [data-ink-theme='light'] {
@@ -6,23 +6,23 @@
 
 	--ink-canvas: #f0f3f4;
 	--ink-surface: #e2e6e8;
-	--ink-surface-raised: #fff;
-	--ink-surface-hover: #d5d9db;
+	--ink-surface-raised: #ffffff;
+	--ink-surface-hover: #d7dcdf;
 	--ink-text: #1e2029;
 	--ink-text-muted: #495063;
 	--ink-heading: #4d348f;
 	--ink-border: #858a98;
-	--ink-border-strong: #1e2029;
+	--ink-border-strong: #343746;
 	--ink-accent: #8a69f7;
-	--ink-accent-hover: #7556dc;
+	--ink-accent-hover: #9175fb;
 	--ink-accent-text: #6044bd;
-	--ink-focus: #5b73dc;
-	--ink-danger: #fb5b66;
-	--ink-danger-surface: color-mix(in srgb, var(--ink-danger) 14%, var(--ink-surface-raised));
-	--ink-warning: #ffaf4d;
-	--ink-warning-surface: color-mix(in srgb, var(--ink-warning) 14%, var(--ink-surface-raised));
-	--ink-on-accent: #11131b;
-	--ink-on-danger: #11131b;
+	--ink-focus: #5b4bd8;
+	--ink-danger: #b4233c;
+	--ink-danger-surface: color-mix(in srgb, var(--ink-danger) 12%, var(--ink-surface-raised));
+	--ink-warning: #a85d0a;
+	--ink-warning-surface: color-mix(in srgb, var(--ink-warning) 12%, var(--ink-surface-raised));
+	--ink-on-accent: #17121f;
+	--ink-on-danger: #ffffff;
 	--ink-shadow-color: #1e2029;
 
 	--ink-font-body: 'IBM Plex Sans Variable', 'Segoe UI', sans-serif;
@@ -31,6 +31,7 @@
 	--ink-type-sm: 0.875rem;
 	--ink-type-base: 1rem;
 	--ink-type-lg: clamp(1.2rem, 1rem + 0.5vw, 1.5rem);
+	--ink-type-xl: clamp(1.5rem, 1.25rem + 0.75vw, 2rem);
 
 	--ink-space-1: 0.25rem;
 	--ink-space-2: 0.5rem;
@@ -40,15 +41,26 @@
 	--ink-space-6: 2rem;
 	--ink-control-height-sm: 2rem;
 	--ink-control-height: 2.5rem;
-	--ink-line-width: 2px;
-	--ink-shadow-offset: 2px;
-	--ink-radius-wobbly: 4px 8px 5px 7px / 7px 5px 8px 4px;
-	--ink-radius-wobbly-small: 3px 6px 4px 5px / 5px 4px 6px 3px;
-	--ink-radius-panel: 9px 15px 11px 13px / 13px 9px 15px 11px;
-	--ink-radius-panel-small: 6px 10px 7px 9px / 9px 6px 10px 7px;
-	--ink-shadow-panel: 5px 6px 0 var(--ink-shadow-color);
-	--ink-shadow-toolbar: 3px 4px 0 var(--ink-shadow-color);
+	--ink-line-width: 1px;
+	--ink-line-width-strong: 2px;
+	--ink-radius-control: 0.5rem;
+	--ink-radius-control-small: 0.375rem;
+	--ink-radius-panel: 0.75rem;
+	--ink-radius-panel-small: 0.625rem;
+	--ink-radius-accent: 4px 8px 5px 7px / 7px 5px 8px 4px;
+	--ink-shadow-control: 0 1px 2px color-mix(in srgb, var(--ink-shadow-color) 18%, transparent);
+	--ink-shadow-panel:
+		0 10px 24px color-mix(in srgb, var(--ink-shadow-color) 18%, transparent),
+		0 2px 6px color-mix(in srgb, var(--ink-shadow-color) 14%, transparent);
+	--ink-shadow-toolbar:
+		0 12px 28px color-mix(in srgb, var(--ink-shadow-color) 22%, transparent),
+		0 2px 7px color-mix(in srgb, var(--ink-shadow-color) 16%, transparent);
+	--ink-shadow-popover:
+		0 16px 36px color-mix(in srgb, var(--ink-shadow-color) 28%, transparent),
+		0 2px 8px color-mix(in srgb, var(--ink-shadow-color) 18%, transparent);
+	--ink-shadow-accent: 2px 2px 0 var(--ink-shadow-color);
 	--ink-duration-fast: 120ms;
+	--ink-duration-overlay: 180ms;
 	--ink-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -57,21 +69,23 @@
 
 	--ink-canvas: #171928;
 	--ink-surface: #252738;
-	--ink-surface-raised: #353746;
-	--ink-surface-hover: #474852;
+	--ink-surface-raised: #303244;
+	--ink-surface-hover: #414356;
 	--ink-text: #d8e6e6;
 	--ink-text-muted: #a7b4bc;
-	--ink-heading: #c2b5f0;
-	--ink-border: #646675;
+	--ink-heading: #d7caff;
+	--ink-border: #6f7285;
 	--ink-border-strong: #b8c5c8;
-	--ink-accent: #2dcc82;
-	--ink-accent-hover: #45dda0;
-	--ink-accent-text: #8de2bc;
-	--ink-focus: #7f91d8;
-	--ink-danger: #cc5860;
-	--ink-warning: #d4a666;
-	--ink-on-accent: #101b18;
-	--ink-on-danger: #171928;
+	--ink-accent: #a78bfa;
+	--ink-accent-hover: #b8a4ff;
+	--ink-accent-text: #c8baff;
+	--ink-focus: #b9a6ff;
+	--ink-danger: #f08383;
+	--ink-danger-surface: color-mix(in srgb, var(--ink-danger) 16%, var(--ink-surface-raised));
+	--ink-warning: #e7b467;
+	--ink-warning-surface: color-mix(in srgb, var(--ink-warning) 16%, var(--ink-surface-raised));
+	--ink-on-accent: #17121f;
+	--ink-on-danger: #17121f;
 	--ink-shadow-color: #080910;
 }
 
@@ -81,21 +95,27 @@
 
 		--ink-canvas: #171928;
 		--ink-surface: #252738;
-		--ink-surface-raised: #353746;
-		--ink-surface-hover: #474852;
+		--ink-surface-raised: #303244;
+		--ink-surface-hover: #414356;
 		--ink-text: #d8e6e6;
 		--ink-text-muted: #a7b4bc;
-		--ink-heading: #c2b5f0;
-		--ink-border: #646675;
+		--ink-heading: #d7caff;
+		--ink-border: #6f7285;
 		--ink-border-strong: #b8c5c8;
-		--ink-accent: #2dcc82;
-		--ink-accent-hover: #45dda0;
-		--ink-accent-text: #8de2bc;
-		--ink-focus: #7f91d8;
-		--ink-danger: #cc5860;
-		--ink-warning: #d4a666;
-		--ink-on-accent: #101b18;
-		--ink-on-danger: #171928;
+		--ink-accent: #a78bfa;
+		--ink-accent-hover: #b8a4ff;
+		--ink-accent-text: #c8baff;
+		--ink-focus: #b9a6ff;
+		--ink-danger: #f08383;
+		--ink-danger-surface: color-mix(in srgb, var(--ink-danger) 16%, var(--ink-surface-raised));
+		--ink-warning: #e7b467;
+		--ink-warning-surface: color-mix(
+			in srgb,
+			var(--ink-warning) 16%,
+			var(--ink-surface-raised)
+		);
+		--ink-on-accent: #17121f;
+		--ink-on-danger: #17121f;
 		--ink-shadow-color: #080910;
 	}
 }

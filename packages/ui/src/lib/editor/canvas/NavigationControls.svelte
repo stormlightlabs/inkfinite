@@ -115,7 +115,7 @@
 		background: var(--ink-surface-raised);
 		box-shadow:
 			0 0 0 1px color-mix(in srgb, var(--ink-border) 58%, transparent),
-			var(--ink-shadow-toolbar);
+			var(--ink-shadow-control);
 	}
 
 	.navigation-controls button {
@@ -126,7 +126,7 @@
 		height: var(--ink-control-height);
 		padding: 0 var(--ink-space-2);
 		border: 0;
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		background: transparent;
 		color: var(--ink-text);
 		cursor: pointer;
@@ -179,7 +179,7 @@
 		background: var(--ink-surface-raised);
 		box-shadow:
 			0 0 0 1px color-mix(in srgb, var(--ink-border) 58%, transparent),
-			var(--ink-shadow-toolbar);
+			var(--ink-shadow-popover);
 	}
 
 	.navigation-controls__menu button {

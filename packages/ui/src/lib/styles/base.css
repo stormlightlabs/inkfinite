@@ -13,6 +13,11 @@ body {
 	-webkit-font-smoothing: antialiased;
 }
 
+:where(button, input, textarea, select, [role='button']):focus-visible {
+	outline: var(--ink-line-width-strong) solid var(--ink-focus);
+	outline-offset: 2px;
+}
+
 ::selection {
 	color: var(--ink-on-accent);
 	background: var(--ink-accent);

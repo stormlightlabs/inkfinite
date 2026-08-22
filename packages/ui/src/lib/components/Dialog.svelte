@@ -109,19 +109,19 @@
 		align-items: center;
 		justify-content: center;
 		z-index: 1000;
-		animation: fadeIn 0.15s ease-out;
+		animation: fadeIn var(--ink-duration-overlay) var(--ink-ease-out);
 	}
 
 	.dialog__content {
 		background-color: var(--ink-surface-raised);
 		color: var(--ink-text);
-		border: 0.75px solid var(--ink-border-strong);
+		border: var(--ink-line-width) solid var(--ink-border);
 		border-radius: var(--ink-dialog-radius, var(--ink-radius-panel));
-		box-shadow: var(--ink-shadow-panel);
+		box-shadow: var(--ink-shadow-popover);
 		max-width: 90vw;
 		max-height: 90vh;
 		overflow: auto;
-		animation: slideIn 0.2s ease-out;
+		animation: slideIn var(--ink-duration-overlay) var(--ink-ease-out);
 		outline: none;
 	}
 

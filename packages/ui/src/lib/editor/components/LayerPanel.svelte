@@ -31,6 +31,10 @@
 	let menuOpen = $state(false);
 	let menuPoint = $state({ x: 0, y: 0 });
 	let menuTrigger = $state<HTMLElement | null>(null);
+	let panelEl = $state<HTMLElement | null>(null);
+	let panelPosition = $state<{ left: number; top: number } | null>(null);
+	let panelDragOffset = $state({ x: 0, y: 0 });
+	let panelDragging = $state(false);
 	let layers = $derived(getLayersOnCurrentPage(editorState));
 	let activeLayer = $derived(
 		layers.find((layer) => layer.id === editorState.ui.activeLayerId) ?? null
@@ -80,6 +84,87 @@
 
 	function commit(name: string, next: EditorState) {
 		if (next !== editorState) onCommit(name, next);
+	}
+
+	function panelParent(): HTMLElement | null {
+		return (panelEl?.offsetParent as HTMLElement | null) ?? panelEl?.parentElement ?? null;
+	}
+
+	function clampPanelPosition(left: number, top: number) {
+		const parent = panelParent();
+		if (!parent || !panelEl) return { left, top };
+
+		const gutter = 8;
+		return {
+			left: Math.min(
+				Math.max(gutter, left),
+				Math.max(gutter, parent.clientWidth - panelEl.offsetWidth - gutter)
+			),
+			top: Math.min(
+				Math.max(gutter, top),
+				Math.max(gutter, parent.clientHeight - panelEl.offsetHeight - gutter)
+			)
+		};
+	}
+
+	function currentPanelPosition() {
+		if (panelPosition) return panelPosition;
+		const parent = panelParent();
+		if (!parent || !panelEl) return { left: 8, top: 8 };
+
+		const parentBounds = parent.getBoundingClientRect();
+		const panelBounds = panelEl.getBoundingClientRect();
+		return clampPanelPosition(
+			panelBounds.left - parentBounds.left,
+			panelBounds.top - parentBounds.top
+		);
+	}
+
+	function setPanelPosition(left: number, top: number) {
+		panelPosition = clampPanelPosition(left, top);
+	}
+
+	function beginPanelDrag(event: PointerEvent) {
+		if (event.button !== 0 || !panelEl) return;
+		const bounds = panelEl.getBoundingClientRect();
+		panelDragOffset = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+		panelPosition = currentPanelPosition();
+		panelDragging = true;
+		event.preventDefault();
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+	}
+
+	function movePanel(event: PointerEvent) {
+		if (!panelDragging || !panelEl) return;
+		const parent = panelParent();
+		if (!parent) return;
+		const parentBounds = parent.getBoundingClientRect();
+		setPanelPosition(
+			event.clientX - parentBounds.left - panelDragOffset.x,
+			event.clientY - parentBounds.top - panelDragOffset.y
+		);
+	}
+
+	function endPanelDrag(event: PointerEvent) {
+		if (!panelDragging) return;
+		panelDragging = false;
+		const handle = event.currentTarget as HTMLElement;
+		if (handle.hasPointerCapture(event.pointerId))
+			handle.releasePointerCapture(event.pointerId);
+	}
+
+	function handlePanelKeyDown(event: KeyboardEvent) {
+		const distance = event.shiftKey ? 32 : 8;
+		const position = currentPanelPosition();
+		let { left, top } = position;
+		if (event.key === 'ArrowLeft') left -= distance;
+		else if (event.key === 'ArrowRight') left += distance;
+		else if (event.key === 'ArrowUp') top -= distance;
+		else if (event.key === 'ArrowDown') top += distance;
+		else return;
+
+		event.preventDefault();
+		setPanelPosition(left, top);
 	}
 
 	function selectLayer(layer: LayerRecord) {
@@ -160,12 +245,29 @@
 </script>
 
 <aside
+	bind:this={panelEl}
 	class="layer-panel"
 	class:layer-panel--collapsed={collapsed}
 	aria-label="Layers"
-	data-agent-occlusion>
+	data-agent-occlusion
+	data-dragging={panelDragging}
+	style={panelPosition
+		? `left: ${panelPosition.left}px; top: ${panelPosition.top}px; right: auto; bottom: auto;`
+		: undefined}>
 	<header class="layer-panel__header">
 		<div class="layer-panel__title">
+			<button
+				class="layer-panel__move-handle"
+				type="button"
+				aria-label="Move layers panel"
+				title="Move layers panel"
+				onpointerdown={beginPanelDrag}
+				onpointermove={movePanel}
+				onpointerup={endPanelDrag}
+				onpointercancel={endPanelDrag}
+				onkeydown={handlePanelKeyDown}>
+				<Icon name="grip-vertical" size="1rem" />
+			</button>
 			{#if !collapsed}<Icon name="layers" size="1rem" />{/if}
 			<h2>Layers</h2>
 		</div>
@@ -370,8 +472,7 @@
 		background: color-mix(in srgb, var(--ink-surface-raised) 94%, transparent);
 		box-shadow:
 			0 0 0 1px color-mix(in srgb, var(--ink-border) 65%, transparent),
-			0 12px 30px color-mix(in srgb, var(--ink-shadow-color) 24%, transparent),
-			0 2px 7px color-mix(in srgb, var(--ink-shadow-color) 18%, transparent);
+			var(--ink-shadow-panel);
 		backdrop-filter: blur(14px);
 		transition-property: width, box-shadow;
 		transition-duration: var(--ink-duration-fast);
@@ -407,6 +508,42 @@
 		color: var(--ink-heading);
 	}
 
+	.layer-panel__move-handle {
+		display: grid;
+		width: 1.75rem;
+		min-width: 1.75rem;
+		height: 2rem;
+		place-items: center;
+		padding: 0;
+		border: var(--ink-line-width) solid transparent;
+		border-radius: var(--ink-radius-control-small);
+		color: var(--ink-text-muted);
+		background: transparent;
+		cursor: grab;
+		touch-action: none;
+		transition:
+			color var(--ink-duration-fast) var(--ink-ease-out),
+			background-color var(--ink-duration-fast) var(--ink-ease-out),
+			border-color var(--ink-duration-fast) var(--ink-ease-out);
+	}
+
+	.layer-panel__move-handle:hover,
+	.layer-panel__move-handle:focus-visible {
+		border-color: var(--ink-border);
+		color: var(--ink-text);
+		background: var(--ink-surface-hover);
+	}
+
+	.layer-panel__move-handle:focus-visible {
+		outline: var(--ink-line-width-strong) solid var(--ink-focus);
+		outline-offset: 1px;
+	}
+
+	.layer-panel[data-dragging='true'] .layer-panel__move-handle {
+		color: var(--ink-accent);
+		cursor: grabbing;
+	}
+
 	.layer-panel__title h2 {
 		margin: 0;
 		font: 650 var(--ink-type-base) / 1 var(--ink-font-display);
@@ -426,8 +563,9 @@
 	}
 
 	.layer-panel__item {
+		border: var(--ink-line-width) solid transparent;
 		border-radius: calc(var(--ink-radius-panel-small) - 2px);
-		transition-property: background-color, box-shadow, opacity;
+		transition-property: background-color, border-color, opacity;
 		transition-duration: var(--ink-duration-fast);
 		transition-timing-function: var(--ink-ease-out);
 	}
@@ -437,8 +575,8 @@
 	}
 
 	.layer-panel__item--active {
+		border-color: color-mix(in srgb, var(--ink-accent) 58%, var(--ink-border));
 		background: color-mix(in srgb, var(--ink-accent) 14%, transparent);
-		box-shadow: inset 3px 0 0 var(--ink-accent);
 	}
 
 	.layer-panel__item--muted {
@@ -496,7 +634,7 @@
 	.layer-panel__rename:focus-visible,
 	select:focus-visible,
 	input[type='range']:focus-visible {
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		outline: 3px solid var(--ink-focus);
 		outline-offset: 1px;
 	}
@@ -507,7 +645,7 @@
 		height: 2rem;
 		padding: 0 var(--ink-space-2);
 		border: 1px solid var(--ink-border);
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		color: var(--ink-text);
 		background: var(--ink-canvas);
 		font: 600 var(--ink-type-sm) / 1 var(--ink-font-body);
@@ -578,7 +716,7 @@
 		min-height: var(--ink-control-height-sm);
 		padding-inline: var(--ink-space-2);
 		border: 1px solid var(--ink-border);
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		color: var(--ink-text);
 		background: var(--ink-surface-raised);
 		font: 600 var(--ink-type-xs) / 1 var(--ink-font-body);

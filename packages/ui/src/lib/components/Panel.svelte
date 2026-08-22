@@ -46,7 +46,7 @@
 		gap: var(--ink-space-5);
 		min-width: min(100%, 18rem);
 		padding: var(--ink-space-5);
-		border: var(--ink-line-width) solid var(--ink-border-strong);
+		border: var(--ink-line-width) solid var(--ink-border);
 		border-radius: var(--ink-radius-panel);
 		color: var(--ink-text);
 		background: var(--ink-surface-raised);

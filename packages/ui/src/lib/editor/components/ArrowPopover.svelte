@@ -399,7 +399,7 @@
 	.arrow-popover__routing-buttons button,
 	.arrow-popover__connection button {
 		border: 1px solid var(--ink-border);
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		color: var(--ink-text);
 		background: var(--ink-canvas);
 		font: 650 var(--ink-type-xs) / 1 var(--ink-font-body);
@@ -492,7 +492,7 @@
 		min-height: var(--ink-control-height);
 		padding: 0 var(--ink-space-2);
 		border: 1px solid var(--ink-border);
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		color: var(--ink-text);
 		background: var(--ink-canvas);
 		font: 600 var(--ink-type-xs) / 1 var(--ink-font-body);

@@ -91,7 +91,7 @@
 		background-color: color-mix(in srgb, var(--ink-shadow-color) 52%, transparent);
 		display: flex;
 		z-index: 1000;
-		animation: fadeIn 0.15s ease-out;
+		animation: fadeIn var(--ink-duration-overlay) var(--ink-ease-out);
 	}
 
 	.sheet__content {
@@ -100,8 +100,7 @@
 		border: 0;
 		box-shadow:
 			0 0 0 1px color-mix(in srgb, var(--ink-border) 58%, transparent),
-			0 18px 48px color-mix(in srgb, var(--ink-shadow-color) 38%, transparent),
-			0 2px 8px color-mix(in srgb, var(--ink-shadow-color) 28%, transparent);
+			var(--ink-shadow-popover);
 		overflow: auto;
 		outline: none;
 	}

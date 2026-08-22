@@ -190,7 +190,7 @@
 					type="button"
 					onclick={closeBrowser}
 					aria-label="Close board browser">
-					<Icon name="close" size={20} color="#e27878" />
+					<Icon name="close" size={20} color="var(--ink-danger)" />
 				</button>
 			</div>
 			<button
@@ -362,7 +362,7 @@
 				class="inspector__close"
 				onclick={() => (inspectorOpen = false)}
 				aria-label="Close inspector">
-				<Icon name="close" size={20} color="#e27878" />
+				<Icon name="close" size={20} color="var(--ink-danger)" />
 			</button>
 		</div>
 
@@ -444,60 +444,61 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 1rem;
-		border-bottom: 1px solid var(--filebrowser-divider);
+		padding: var(--ink-space-4);
+		border-bottom: var(--ink-line-width) solid var(--filebrowser-divider);
 	}
 
 	.filebrowser__title-row {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: var(--ink-space-2);
 	}
 
 	.filebrowser__title {
 		margin: 0;
-		font-size: 1.25rem;
-		font-weight: 600;
+		font-size: var(--ink-type-lg);
+		font-weight: 650;
 	}
 
 	.filebrowser__close {
 		background: none;
 		border: 1px solid transparent;
-		color: var(--ink-text-muted, #666);
+		color: var(--ink-text-muted);
 		font-size: 1.5rem;
 		cursor: pointer;
-		padding: 0.25rem;
-		border-radius: 0.25rem;
+		padding: var(--ink-space-1);
+		border-radius: var(--ink-radius-control-small);
 		display: flex;
 		align-items: center;
 	}
 
 	.filebrowser__close:hover,
 	.filebrowser__close:focus-visible {
-		background-color: rgba(0, 0, 0, 0.05);
+		background-color: var(--ink-surface-hover);
 		color: var(--ink-text);
-		border: 1px solid #e27878;
+		border-color: var(--ink-danger);
 	}
 
 	.filebrowser__action {
-		padding: 0.5rem 1rem;
-		background-color: var(--ink-accent, #007bff);
-		color: var(--ink-on-accent, white);
-		border: none;
-		border-radius: 0.25rem;
+		min-height: var(--ink-control-height);
+		padding: 0 var(--ink-space-4);
+		background-color: var(--ink-accent);
+		color: var(--ink-on-accent);
+		border: var(--ink-line-width) solid var(--ink-accent);
+		border-radius: var(--ink-radius-control);
 		cursor: pointer;
-		font-size: 0.875rem;
-		font-weight: 500;
+		font-size: var(--ink-type-sm);
+		font-weight: 650;
 	}
 
 	.filebrowser__action:hover {
-		background-color: var(--ink-accent-hover, #0056b3);
+		background-color: var(--ink-accent-hover);
 	}
 
 	.filebrowser__workspace {
-		padding: 0.75rem 1rem;
-		border-bottom: 1px solid var(--ink-border, #e0e0e0);
-		background-color: var(--ink-surface, #f9f9f9);
+		padding: var(--ink-space-3) var(--ink-space-4);
+		border-bottom: var(--ink-line-width) solid var(--ink-border);
+		background-color: var(--ink-surface);
 	}
 
 	.filebrowser__workspace-info {
@@ -518,10 +519,11 @@
 
 	.filebrowser__workspace-change,
 	.filebrowser__workspace-clear {
-		padding: 0.25rem 0.5rem;
+		min-height: var(--ink-control-height-sm);
+		padding: 0 var(--ink-space-2);
 		background-color: transparent;
-		border: 1px solid var(--ink-border, #e0e0e0);
-		border-radius: 0.25rem;
+		border: var(--ink-line-width) solid var(--ink-border);
+		border-radius: var(--ink-radius-control-small);
 		cursor: pointer;
 		font-size: 0.75rem;
 		color: var(--ink-text);
@@ -529,7 +531,7 @@
 
 	.filebrowser__workspace-change:hover,
 	.filebrowser__workspace-clear:hover {
-		background-color: var(--ink-surface-hover, #f5f5f5);
+		background-color: var(--ink-surface-hover);
 	}
 
 	.filebrowser__workspace-pick {
@@ -537,23 +539,24 @@
 		align-items: center;
 		gap: 0.5rem;
 		width: 100%;
-		padding: 0.5rem;
-		background-color: var(--ink-accent, #007bff);
-		color: var(--ink-on-accent, white);
-		border: none;
-		border-radius: 0.25rem;
+		min-height: var(--ink-control-height);
+		padding: 0 var(--ink-space-2);
+		background-color: var(--ink-accent);
+		color: var(--ink-on-accent);
+		border: var(--ink-line-width) solid var(--ink-accent);
+		border-radius: var(--ink-radius-control);
 		cursor: pointer;
 		font-size: 0.875rem;
 	}
 
 	.filebrowser__workspace-pick:hover {
-		background-color: var(--ink-accent-hover, #0056b3);
+		background-color: var(--ink-accent-hover);
 	}
 
 	.filebrowser__workspace-hint {
 		margin-top: 0.5rem;
 		font-size: 0.75rem;
-		color: var(--ink-text-muted, #6c757d);
+		color: var(--ink-text-muted);
 		text-align: center;
 	}
 
@@ -564,40 +567,43 @@
 
 	.filebrowser__search-input {
 		width: 100%;
-		padding: 0.5rem;
-		border: 1px solid color-mix(in srgb, var(--ink-border) 62%, transparent);
-		border-radius: 0.25rem;
-		font-size: 0.875rem;
-		background-color: var(--ink-surface-raised, white);
+		min-height: var(--ink-control-height);
+		padding: 0 var(--ink-space-2);
+		border: var(--ink-line-width) solid color-mix(in srgb, var(--ink-border) 62%, transparent);
+		border-radius: var(--ink-radius-control-small);
+		font-size: var(--ink-type-sm);
+		background-color: var(--ink-surface-raised);
 		color: var(--ink-text);
 	}
 
-	.filebrowser__search-input:focus {
-		outline: none;
-		border-color: var(--ink-accent, #007bff);
+	.filebrowser__search-input:focus-visible {
+		border-color: var(--ink-accent);
+		outline: var(--ink-line-width-strong) solid var(--ink-focus);
+		outline-offset: 2px;
 	}
 
 	.filebrowser__create-form,
 	.filebrowser__edit-form {
 		padding: 1rem;
-		border-bottom: 1px solid var(--ink-border, #e0e0e0);
-		background-color: var(--ink-surface-hover, #f5f5f5);
+		border-bottom: 1px solid var(--ink-border);
+		background-color: var(--ink-surface-hover);
 	}
 
 	.filebrowser__input {
 		width: 100%;
 		padding: 0.5rem;
-		border: 1px solid var(--ink-border, #e0e0e0);
-		border-radius: 0.25rem;
+		border: 1px solid var(--ink-border);
+		border-radius: var(--ink-radius-control-small);
 		font-size: 0.875rem;
 		margin-bottom: 0.5rem;
-		background-color: var(--ink-surface-raised, white);
+		background-color: var(--ink-surface-raised);
 		color: var(--ink-text);
 	}
 
-	.filebrowser__input:focus {
-		outline: none;
-		border-color: var(--ink-accent, #007bff);
+	.filebrowser__input:focus-visible {
+		border-color: var(--ink-accent);
+		outline: var(--ink-line-width-strong) solid var(--ink-focus);
+		outline-offset: 2px;
 	}
 
 	.filebrowser__create-actions,
@@ -607,29 +613,30 @@
 	}
 
 	.filebrowser__btn {
-		padding: 0.375rem 0.75rem;
-		border: none;
-		border-radius: 0.25rem;
+		min-height: var(--ink-control-height-sm);
+		padding: 0 var(--ink-space-3);
+		border: var(--ink-line-width) solid transparent;
+		border-radius: var(--ink-radius-control-small);
 		cursor: pointer;
-		font-size: 0.875rem;
+		font-size: var(--ink-type-sm);
 	}
 
 	.filebrowser__btn--primary {
-		background-color: var(--ink-accent, #007bff);
-		color: var(--ink-on-accent, white);
+		background-color: var(--ink-accent);
+		color: var(--ink-on-accent);
 	}
 
 	.filebrowser__btn--primary:hover {
-		background-color: var(--ink-accent-hover, #0056b3);
+		background-color: var(--ink-accent-hover);
 	}
 
 	.filebrowser__btn--secondary {
-		background-color: var(--ink-surface, #6c757d);
-		color: var(--ink-text, white);
+		background-color: var(--ink-surface);
+		color: var(--ink-text);
 	}
 
 	.filebrowser__btn--secondary:hover {
-		background-color: var(--ink-surface-hover, #5a6268);
+		background-color: var(--ink-surface-hover);
 	}
 
 	.filebrowser__list {
@@ -640,7 +647,7 @@
 	.filebrowser__empty {
 		padding: 2rem;
 		text-align: center;
-		color: var(--ink-text-muted, #6c757d);
+		color: var(--ink-text-muted);
 	}
 
 	.filebrowser__board {
@@ -654,7 +661,7 @@
 	}
 
 	.filebrowser__board:hover {
-		background-color: color-mix(in srgb, var(--ink-surface-hover, #f5f5f5) 72%, transparent);
+		background-color: color-mix(in srgb, var(--ink-surface-hover) 72%, transparent);
 	}
 
 	.filebrowser__board-info {
@@ -668,7 +675,7 @@
 
 	.filebrowser__board-meta {
 		font-size: 0.75rem;
-		color: var(--ink-text-muted, #6c757d);
+		color: var(--ink-text-muted);
 	}
 
 	.filebrowser__board-actions {
@@ -704,7 +711,7 @@
 		align-items: center;
 		justify-content: space-between;
 		padding: 1rem;
-		border-bottom: 1px solid var(--ink-border, #e0e0e0);
+		border-bottom: 1px solid var(--ink-border);
 	}
 
 	.inspector__title {
@@ -724,27 +731,27 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		border-radius: 0.25rem;
+		border-radius: var(--ink-radius-control-small);
 		transition: background-color 0.15s;
 	}
 
 	.inspector__close:hover {
-		background-color: var(--ink-surface-hover, #f5f5f5);
+		background-color: var(--ink-surface-hover);
 	}
 
 	.inspector__loading {
 		padding: 2rem;
 		text-align: center;
-		color: var(--ink-text-muted, #6c757d);
+		color: var(--ink-text-muted);
 	}
 
 	.inspector__error {
 		padding: 1rem;
 		margin: 1rem;
-		background-color: var(--ink-danger-surface, #f8d7da);
-		color: var(--ink-danger, #721c24);
-		border-radius: 0.25rem;
-		border: 1px solid var(--ink-danger, #f5c6cb);
+		background-color: var(--ink-danger-surface);
+		color: var(--ink-danger);
+		border-radius: var(--ink-radius-control-small);
+		border: 1px solid var(--ink-danger);
 	}
 
 	.inspector__content {
@@ -762,14 +769,14 @@
 		font-size: 0.875rem;
 		font-weight: 600;
 		text-transform: uppercase;
-		color: var(--ink-text-muted, #6c757d);
+		color: var(--ink-text-muted);
 	}
 
 	.inspector__item {
 		display: flex;
 		justify-content: space-between;
 		padding: 0.5rem 0;
-		border-bottom: 1px solid var(--ink-border, #f0f0f0);
+		border-bottom: 1px solid var(--ink-border);
 	}
 
 	.inspector__label {
@@ -778,6 +785,6 @@
 	}
 
 	.inspector__value {
-		color: var(--ink-text-muted, #6c757d);
+		color: var(--ink-text-muted);
 	}
 </style>

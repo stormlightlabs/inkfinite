@@ -674,8 +674,7 @@
 		background: color-mix(in srgb, var(--ink-surface-raised) 97%, transparent);
 		box-shadow:
 			0 0 0 1px color-mix(in srgb, var(--ink-border) 18%, transparent),
-			0 10px 26px color-mix(in srgb, var(--ink-shadow-color) 24%, transparent),
-			0 2px 6px color-mix(in srgb, var(--ink-shadow-color) 18%, transparent);
+			var(--ink-shadow-panel);
 		translate: -50% 0;
 		backdrop-filter: blur(14px);
 	}
@@ -775,7 +774,7 @@
 		height: var(--ink-control-height);
 		padding: 0 var(--ink-space-2);
 		border: 1px solid var(--ink-border);
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		color: var(--ink-text);
 		background: var(--ink-canvas);
 		font: 600 var(--ink-type-xs) / 1 var(--ink-font-body);
@@ -803,7 +802,7 @@
 		gap: var(--ink-space-1);
 		padding: 0 var(--ink-space-2);
 		border: 1px solid var(--ink-border);
-		border-radius: var(--ink-radius-wobbly-small);
+		border-radius: var(--ink-radius-control-small);
 		color: var(--ink-text);
 		background: var(--ink-canvas);
 		font: 650 var(--ink-type-xs) / 1 var(--ink-font-body);

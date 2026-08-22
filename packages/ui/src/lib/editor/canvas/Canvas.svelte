@@ -945,7 +945,7 @@
 		display: block;
 		touch-action: none;
 		cursor:
-			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M4 2.75 22.2 16.1l-8.05 1.15 4.2 7.25-4.2 2.4-4.05-7.2-5.35 6.1z' fill='%23171928' stroke='%2388edc4' stroke-width='2.25' stroke-linejoin='round'/%3E%3C/svg%3E")
+			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M4 2.75 22.2 16.1l-8.05 1.15 4.2 7.25-4.2 2.4-4.05-7.2-5.35 6.1z' fill='%23171928' stroke='%23a78bfa' stroke-width='2.25' stroke-linejoin='round'/%3E%3C/svg%3E")
 				4 3,
 			default;
 	}
@@ -1085,9 +1085,7 @@
 		line-height: 1.2;
 		font-family: inherit;
 		z-index: 2;
-		box-shadow:
-			0 0 0 1px rgba(0, 0, 0, 0.05),
-			0 8px 20px rgba(0, 0, 0, 0.15);
+		box-shadow: var(--ink-shadow-popover);
 	}
 
 	.canvas-arrow-label-editor {
@@ -1101,10 +1099,8 @@
 		font-family: sans-serif;
 		text-align: center;
 		z-index: 2;
-		box-shadow:
-			0 0 0 1px rgba(0, 0, 0, 0.05),
-			0 8px 20px rgba(0, 0, 0, 0.15);
-		border-radius: 0.25rem;
+		box-shadow: var(--ink-shadow-popover);
+		border-radius: var(--ink-radius-control-small);
 	}
 
 	.canvas-markdown-editor {
@@ -1119,18 +1115,23 @@
 		line-height: 1.4;
 		font-family: monospace;
 		z-index: 2;
-		box-shadow:
-			0 0 0 1px rgba(0, 0, 0, 0.05),
-			0 8px 20px rgba(0, 0, 0, 0.15);
+		box-shadow: var(--ink-shadow-popover);
 		white-space: pre-wrap;
 		overflow: auto;
 	}
 
+	.canvas-text-editor:focus-visible,
+	.canvas-arrow-label-editor:focus-visible,
+	.canvas-markdown-editor:focus-visible {
+		outline: var(--ink-line-width-strong) solid var(--ink-focus);
+		outline-offset: 2px;
+	}
+
 	.canvas-marquee {
 		position: absolute;
-		border: 1px solid rgba(136, 192, 208, 0.7);
-		background-color: rgba(136, 192, 208, 0.2);
-		box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+		border: var(--ink-line-width) solid color-mix(in srgb, var(--ink-focus) 72%, transparent);
+		background-color: color-mix(in srgb, var(--ink-focus) 18%, transparent);
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink-surface-raised) 25%, transparent);
 		pointer-events: none;
 		z-index: 1;
 	}

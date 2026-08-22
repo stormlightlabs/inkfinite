@@ -4,7 +4,6 @@
 	import { listen } from '@tauri-apps/api/event';
 	import { onMount } from 'svelte';
 
-	import '$editor/styles.css';
 	import '@inkfinite/ui/styles.css';
 
 	let { children } = $props();
