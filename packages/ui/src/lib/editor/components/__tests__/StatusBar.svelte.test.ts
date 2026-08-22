@@ -43,6 +43,28 @@ describe('StatusBar', () => {
 		expect(snap.get()).toMatchObject({ snapEnabled: true, gridEnabled: false });
 	});
 
+	it('hides grid size when the grid is disabled', async () => {
+		const snap = createSnapStore({ gridEnabled: true });
+		const screen = render(StatusBar, {
+			store: new Store(),
+			cursor: new CursorStore(),
+			persistence: createStatusStore({
+				backend: 'indexeddb',
+				state: 'saved',
+				pendingWrites: 0
+			}),
+			snap
+		});
+
+		await expect
+			.element(screen.getByRole('spinbutton', { name: 'Grid size' }))
+			.toBeInTheDocument();
+		await screen.getByRole('checkbox', { name: 'Enable grid snapping' }).click();
+		await expect
+			.element(screen.getByRole('spinbutton', { name: 'Grid size' }))
+			.not.toBeInTheDocument();
+	});
+
 	it('surfaces persistence failures', async () => {
 		const screen = render(StatusBar, {
 			store: new Store(),

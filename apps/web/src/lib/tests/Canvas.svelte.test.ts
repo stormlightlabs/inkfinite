@@ -114,15 +114,14 @@ describe('Canvas component', () => {
 		expect(statusBar?.querySelector('[aria-label="History"]')).toBeTruthy();
 	});
 
-	it('should render all tool buttons in toolbar', () => {
+	it('keeps the tool dock limited to drawing tools', () => {
 		const { container } = renderCanvas();
-		const toolButtons = container.querySelectorAll('.tool-button');
+		const toolButtons = container.querySelectorAll('.toolbar .tool-button');
 
-		expect(toolButtons.length).toBe(11);
+		expect(toolButtons.length).toBe(10);
 
 		const toolIds = Array.from(toolButtons).map((btn) => btn.getAttribute('data-tool-id'));
-		const coreToolIds = toolIds.filter((id) => id && id !== 'history');
-		expect(coreToolIds).toEqual([
+		expect(toolIds).toEqual([
 			'select',
 			'direct-select',
 			'rect',
@@ -135,8 +134,11 @@ describe('Canvas component', () => {
 			'pen'
 		]);
 
-		const historyButton = container.querySelector('.status-bar__action[aria-label="History"]');
-		expect(historyButton).toBeTruthy();
+		const insertButton = container.querySelector(
+			'.application-chrome [aria-label="Open stencils library"]'
+		);
+		expect(insertButton).toBeTruthy();
+		expect(insertButton?.closest('.toolbar')).toBeNull();
 	});
 
 	it('should have select tool active by default', () => {

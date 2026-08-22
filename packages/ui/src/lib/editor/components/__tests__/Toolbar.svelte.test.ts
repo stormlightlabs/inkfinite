@@ -74,6 +74,23 @@ describe('Editor Toolbar', () => {
 		await vi.waitFor(() => expect(toolbar.style.left).toBe('8px'));
 	});
 
+	it('rotates the tool dock from its handle', async () => {
+		const screen = render(Toolbar, {
+			currentTool: 'select',
+			onToolChange: vi.fn(),
+			store: new Store(),
+			brushStore: createBrushStore()
+		});
+		const toolbar = screen.getByRole('toolbar', { name: 'Drawing tools' }).element();
+		const handle = screen.getByRole('button', { name: 'Drag toolbar' });
+		const initialHorizontal = toolbar.classList.contains('toolbar--horizontal');
+
+		await handle.click();
+		await vi.waitFor(() =>
+			expect(toolbar.classList.contains('toolbar--horizontal')).toBe(!initialHorizontal)
+		);
+	});
+
 	it('offers import choices and editable export actions', async () => {
 		const onImportEditable = vi.fn();
 		const onImportSvg = vi.fn();
@@ -166,7 +183,12 @@ describe('Editor Toolbar', () => {
 			.getBoundingClientRect();
 
 		expect(brushBounds.top).toBeGreaterThan(penBounds.bottom);
-		expect(brushBounds.right).toBeCloseTo(penBounds.right, 0);
+		expect(
+			screen
+				.getByRole('button', { name: 'Brush settings' })
+				.element()
+				.closest('.toolbar__pen-context')
+		).toBeTruthy();
 	});
 
 	it('changes selected colors and opacity through labeled undoable controls', async () => {

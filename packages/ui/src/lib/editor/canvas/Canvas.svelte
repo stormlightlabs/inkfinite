@@ -501,19 +501,24 @@
 				icon: allLocked ? 'lock-open' : 'lock',
 				disabled: selected.length === 0
 			},
-			{
-				id: 'agent-editable',
-				label: SELECTION_COMMAND_LABELS['agent-editable'],
-				icon: 'terminal',
-				disabled: selected.length === 0
-			},
-			{
-				id: 'agent-readonly',
-				label: SELECTION_COMMAND_LABELS['agent-readonly'],
-				icon: 'lock-open',
-				disabled: selected.length === 0
-			},
-			{ type: 'separator' },
+			...(platformKind === 'desktop'
+				? [
+						{ type: 'separator' as const },
+						{
+							id: 'agent-editable',
+							label: SELECTION_COMMAND_LABELS['agent-editable'],
+							icon: 'terminal' as const,
+							disabled: selected.length === 0
+						},
+						{
+							id: 'agent-readonly',
+							label: SELECTION_COMMAND_LABELS['agent-readonly'],
+							icon: 'lock-open' as const,
+							disabled: selected.length === 0
+						},
+						{ type: 'separator' as const }
+					]
+				: []),
 			{
 				id: 'zoom-selection',
 				label: 'Zoom to selection',

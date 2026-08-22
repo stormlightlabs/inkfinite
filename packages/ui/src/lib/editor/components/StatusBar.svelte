@@ -211,23 +211,25 @@
 					aria-label="Enable main snapping" />
 			</label>
 			<label class="status-bar__toggle">
-				<span>Show Grid</span>
+				<span>Grid</span>
 				<input
 					type="checkbox"
 					checked={snapSnapshot.gridEnabled}
 					onchange={handleGridToggle}
 					aria-label="Enable grid snapping" />
 			</label>
-			<label class="status-bar__grid-size">
-				<span>Grid</span>
-				<input
-					type="number"
-					min="1"
-					step="1"
-					value={snapSnapshot.gridSize}
-					onchange={handleGridSizeInput}
-					aria-label="Grid size" />
-			</label>
+			{#if snapSnapshot.gridEnabled}
+				<label class="status-bar__grid-size">
+					<span>Size</span>
+					<input
+						type="number"
+						min="1"
+						step="1"
+						value={snapSnapshot.gridSize}
+						onchange={handleGridSizeInput}
+						aria-label="Grid size" />
+				</label>
+			{/if}
 		</div>
 	</div>
 
@@ -323,16 +325,20 @@
 
 <style>
 	.status-bar {
-		display: grid;
-		grid-template-columns: repeat(5, minmax(110px, 1fr)) auto auto;
-		gap: 1.5rem;
+		display: flex;
+		align-items: center;
+		gap: var(--ink-space-4);
+		min-width: 0;
 		padding: 0.5rem 0.75rem;
 		background: var(--ink-surface-raised);
 		border-top: 1px solid color-mix(in srgb, var(--ink-border) 46%, transparent);
 		box-shadow: 0 -8px 24px color-mix(in srgb, var(--ink-shadow-color) 10%, transparent);
 		font-size: 0.75rem;
-		align-items: center;
 		min-height: 48px;
+		overflow-x: auto;
+		overflow-y: hidden;
+		white-space: nowrap;
+		scrollbar-width: thin;
 	}
 
 	.status-bar__actions {
@@ -340,6 +346,8 @@
 		align-items: center;
 		justify-content: flex-end;
 		gap: var(--ink-space-1);
+		margin-left: auto;
+		flex: 0 0 auto;
 	}
 
 	.status-bar__action {
@@ -378,6 +386,7 @@
 
 	.status-bar__section {
 		display: flex;
+		flex: 0 0 auto;
 		flex-direction: row;
 		align-items: center;
 		gap: 0.75rem;

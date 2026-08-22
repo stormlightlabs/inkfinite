@@ -144,7 +144,7 @@
 		position: absolute;
 		top: 1rem;
 		right: 1rem;
-		z-index: 4;
+		z-index: 120;
 		width: min(24rem, calc(100% - 2rem));
 		box-sizing: border-box;
 		border-radius: 0.9rem;

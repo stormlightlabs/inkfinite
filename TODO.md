@@ -21,18 +21,18 @@ and rendered output where visual fidelity matters.
 Separate persistent application actions from drawing tools and
 selection-specific controls.
 
-- [ ] Split the current editor toolbar into tool, application, and contextual
+- [x] Split the current editor toolbar into tool, application, and contextual
       control surfaces
-- [ ] Keep the primary tool dock limited to tool selection and active-tool
+- [x] Keep the primary tool dock limited to tool selection and active-tool
       controls
-- [ ] Move import and export into file/application chrome
-- [ ] Move layout, arrange, group, lock, and related commands into selection
+- [x] Move import and export into file/application chrome
+- [x] Move layout, arrange, group, lock, and related commands into selection
       context
-- [ ] Move stencils into an insert/library surface
-- [ ] Remove the Stormlight Labs tagline and other non-editor content from the
+- [x] Move stencils into an insert/library surface
+- [x] Remove the Stormlight Labs tagline and other non-editor content from the
       primary drawing controls
-- [ ] Preserve compact layouts for narrower viewports and coarse pointers
-- [ ] Verify floating controls do not obscure selection handles, dialogs, or
+- [x] Preserve compact layouts for narrower viewports and coarse pointers
+- [x] Verify floating controls do not obscure selection handles, dialogs, or
       proposal review UI
 
 ### Contextual selection controls
