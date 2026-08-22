@@ -28,7 +28,7 @@ pub struct DocumentSnapshot {
 }
 ```
 
-The `format` field is `"inkfinite.document"` and `format_version` is currently `2`. The document contains normalized pages, layers, shapes, bindings, and assets. Pages own ordered layers; layers own ordered root shapes; containers own their ordered child shapes. IDs remain stable across saves and replicas.
+The `format` field is `"inkfinite.document"` and `format_version` is currently `2`. The document contains normalized pages, layers, shapes, bindings, and assets. Pages own ordered layers; layers own ordered root shapes; containers own their ordered child shapes. Container child order drives frame presentation and SVG export. Card fields are stored in the container's semantic metadata while title and body remain ordinary text and Markdown children. IDs remain stable across saves and replicas.
 
 The CLI can print a deterministic JSON projection for inspection and CI. That projection is not a second file format and cannot replace the Automerge history or causal heads stored in the canonical file.
 

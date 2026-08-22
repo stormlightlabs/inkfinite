@@ -25,6 +25,7 @@ import {
 	type Document,
 	type LayerRecord,
 	type PathTopologyEdit,
+	type ShapeMetadata,
 	type ShapeRecord
 } from '../model';
 
@@ -178,6 +179,7 @@ export function fromEditorProjection(projection: EditorProjection, snapshot?: Na
 			layerId: shape.layer_id,
 			locked: shape.locked,
 			agentEditable: shape.agent_editable,
+			metadata: fromNativeMetadata(shape.metadata),
 			props: shape.props as ShapeRecord['props']
 		} as ShapeRecord;
 	}
@@ -366,7 +368,7 @@ export function createEditorReconciliationRequest(
 					id: shape.id,
 					kind: shape.type,
 					properties: cloneProperties(shape.props),
-					metadata: null,
+					metadata: shape.metadata ? toNativeMetadata(shape.metadata) : null,
 					style: shapeStyle(shape),
 					layout: null
 				},
@@ -495,8 +497,96 @@ function editorShape(
 		...(native.style.stroke_opacity === null ? {} : { strokeOpacity: native.style.stroke_opacity }),
 		locked: native.metadata.locked,
 		agentEditable: native.metadata.agent_editable,
+		metadata: fromNativeMetadata(native.metadata),
 		props: editorProperties(native.properties)
 	} as ShapeRecord;
+}
+
+function fromNativeMetadata(metadata: SemanticMetadata): ShapeMetadata {
+	return {
+		name: metadata.name,
+		title: metadata.title,
+		role: metadata.role,
+		description: metadata.description,
+		body: metadata.body,
+		tags: [...metadata.tags],
+		source: metadata.source,
+		link: metadata.link,
+		customMetadata: JSON.parse(JSON.stringify(metadata.custom_metadata)) as Record<string, unknown>,
+		locked: metadata.locked,
+		agentEditable: metadata.agent_editable,
+		provenance: {
+			actorId: metadata.provenance.actor_id,
+			origin: metadata.provenance.origin,
+			timestamp: metadata.provenance.timestamp,
+			source: metadata.provenance.source
+		}
+	};
+}
+
+function shapeMetadata(shape: ShapeRecord): ShapeMetadata {
+	if (shape.metadata) {
+		return {
+			...shape.metadata,
+			locked: shape.locked ?? shape.metadata.locked,
+			agentEditable: shape.agentEditable ?? shape.metadata.agentEditable,
+			tags: [...shape.metadata.tags],
+			customMetadata: { ...shape.metadata.customMetadata }
+		};
+	}
+	return {
+		name: null,
+		title: null,
+		role: null,
+		description: null,
+		body: null,
+		tags: [],
+		source: null,
+		link: null,
+		customMetadata: {},
+		locked: shape.locked ?? false,
+		agentEditable: shape.agentEditable !== false
+	};
+}
+
+function toNativeMetadata(
+	metadata: ShapeMetadata | undefined,
+	overrides: { locked?: boolean; agentEditable?: boolean } = {}
+): SemanticMetadata {
+	const value = metadata ?? {
+		name: null,
+		title: null,
+		role: null,
+		description: null,
+		body: null,
+		tags: [],
+		source: null,
+		link: null,
+		customMetadata: {},
+		locked: false,
+		agentEditable: true
+	};
+	return {
+		name: value.name,
+		title: value.title,
+		role: value.role,
+		description: value.description,
+		body: value.body,
+		tags: [...value.tags],
+		source: value.source,
+		link: value.link,
+		custom_metadata: JSON.parse(JSON.stringify(value.customMetadata)),
+		locked: overrides.locked ?? value.locked,
+		agent_editable: overrides.agentEditable ?? value.agentEditable,
+		provenance: value.provenance
+			? {
+					actor_id: value.provenance.actorId,
+					origin: value.provenance.origin,
+					timestamp: value.provenance.timestamp,
+					source: value.provenance.source
+				}
+			: provenance()
+	};
 }
 
 function editorProperties(properties: ShapeProperties): ShapeProperties {
@@ -609,6 +699,7 @@ function shapePatch(
 		}
 	}
 	const propertiesChanged = !skipProperties && JSON.stringify(before.props) !== JSON.stringify(after.props);
+	const metadataChanged = JSON.stringify(shapeMetadata(before)) !== JSON.stringify(shapeMetadata(after));
 	const styleChanged = JSON.stringify(shapeStyle(before)) !== JSON.stringify(shapeStyle(after));
 	const orderChanged = skipDeletedLayerParent
 		? false
@@ -617,6 +708,7 @@ function shapePatch(
 	if (
 		!transformChanged &&
 		!propertiesChanged &&
+		!metadataChanged &&
 		!styleChanged &&
 		(!parentChanged || skipDeletedLayerParent) &&
 		!orderChanged
@@ -627,7 +719,12 @@ function shapePatch(
 		shape_id: after.id,
 		transform: transformChanged ? editorTransform(after, before) : null,
 		properties: propertiesChanged ? cloneProperties(after.props) : null,
-		metadata: null,
+		metadata: metadataChanged
+			? toNativeMetadata(after.metadata, {
+					locked: after.locked ?? false,
+					agentEditable: after.agentEditable ?? true
+				})
+			: null,
 		style: styleChanged ? shapeStyle(after) : null,
 		parent: !parentChanged || skipDeletedLayerParent ? null : parentAfter,
 		anchor: orderChanged ? orderAnchor(after.id, parentAfter, afterDocument) : null
@@ -774,15 +871,10 @@ function nativeBinding(binding: import('../model').BindingRecord): NativeBinding
 }
 
 function nativeShape(shape: ShapeRecord, layerId: string, document: Document): NativeShapeRecord {
-	const metadata: SemanticMetadata = {
-		name: null,
-		role: null,
-		description: null,
-		tags: [],
+	const metadata = toNativeMetadata(shape.metadata, {
 		locked: shape.locked ?? false,
-		agent_editable: shape.agentEditable ?? true,
-		provenance: provenance()
-	};
+		agentEditable: shape.agentEditable ?? true
+	});
 	const style: ShapeStyle = {
 		opacity: clampOpacity(shape.opacity),
 		fill_opacity: optionalOpacity(shape.fillOpacity),

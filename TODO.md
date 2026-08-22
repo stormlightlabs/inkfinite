@@ -46,12 +46,12 @@ across mouse, touch, and keyboard input.
 
 ### Cards and frames
 
-- [ ] Turn the existing TypeScript card stencil into editable card behavior
+- [x] Turn the existing TypeScript card stencil into editable card behavior
       built from ordinary Rust container, content, and semantic records
-- [ ] Add card title, body, role, tags, source, link, and custom metadata to the
+- [x] Add card title, body, role, tags, source, link, and custom metadata to the
       native model and generated bindings, then expose TypeScript controls
-- [ ] Convert cards to and from simpler content objects without losing content
-- [ ] Add persisted frame ordering and export behavior in Rust, with
+- [x] Convert cards to and from simpler content objects without losing content
+- [x] Add persisted frame ordering and export behavior in Rust, with
       presentation and navigation controls in TypeScript
 
 ### Images, assets, and rich content

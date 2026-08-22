@@ -3,6 +3,7 @@ import {
 	PageRecord,
 	ShapeRecord,
 	Store,
+	contentObjectToCard,
 	type ShapeRecord as Shape
 } from '@inkfinite/core';
 import { describe, expect, it } from 'vitest';
@@ -139,6 +140,47 @@ describe('SelectionControls', () => {
 		expect(document.activeElement).toBe(
 			screen.getByRole('button', { name: 'Align' }).element()
 		);
+	});
+
+	it('edits card fields and exposes frame navigation', async () => {
+		const page = PageRecord.create('Test page', 'page:test');
+		const cardShapes = contentObjectToCard(
+			'page:test',
+			{ x: 0, y: 0 },
+			{ title: 'Title', body: 'Body', role: 'note', tags: ['draft'] }
+		);
+		const store = createSelectionStore(cardShapes, [cardShapes[0].id]);
+		let enteredFrame: string | undefined;
+		let fitted = false;
+		const screen = render(SelectionControls, {
+			currentTool: 'select',
+			orientation: 'vertical',
+			store,
+			onEnterFrame: (id) => (enteredFrame = id),
+			onFitSelection: () => (fitted = true)
+		});
+
+		await expect.element(screen.getByRole('heading', { name: 'Card' })).toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('textbox', { name: 'Card title' }))
+			.toHaveValue('Title');
+		await screen.getByRole('textbox', { name: 'Card title' }).fill('Updated title');
+		await screen
+			.getByRole('textbox', { name: 'Card title' })
+			.element()
+			.dispatchEvent(new Event('change', { bubbles: true }));
+		const updated = store.getState().doc.shapes[cardShapes[0].id];
+		if (updated.type !== 'container') throw new Error('Expected a card container');
+		expect(updated.metadata?.title).toBe('Updated title');
+		const updatedTitleShape = store.getState().doc.shapes[cardShapes[1].id];
+		expect(updatedTitleShape?.type === 'text' ? updatedTitleShape.props.text : undefined).toBe(
+			'Updated title'
+		);
+
+		await screen.getByRole('button', { name: 'Enter selected frame' }).click();
+		await screen.getByRole('button', { name: 'Fit selected frame' }).click();
+		expect(enteredFrame).toBe(cardShapes[0].id);
+		expect(fitted).toBe(true);
 	});
 
 	it('keeps agent controls opt-in for desktop callers', async () => {

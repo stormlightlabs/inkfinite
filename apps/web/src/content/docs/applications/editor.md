@@ -36,8 +36,10 @@ to that location.
 ## Draw and connect
 
 The toolbar includes rectangles, ellipses, frames, lines, arrows, text, Markdown, and freehand
-pen strokes. A frame contains shapes dropped inside it and carries them when it moves. Zooming to
-a frame fits its contents.
+pen strokes. A frame contains ordered child shapes and carries them when it moves. Select a frame
+to enter it or fit it to the viewport. The Card stencil creates a frame from ordinary text and
+Markdown objects; its selection controls edit the title, body, role, tags, source, link, and custom
+metadata.
 
 Arrows may be straight, curved, or elbow-routed. Drag an endpoint onto a shape to bind it; the
 endpoint follows that shape when it moves. Arrow controls edit bends, endpoint heads, routing, and

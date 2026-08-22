@@ -41,9 +41,14 @@ const shape: ShapeRecord = {
 	properties,
 	metadata: {
 		name: 'Fixture rectangle',
+		title: null,
 		role: 'fixture.shape',
 		description: null,
+		body: null,
 		tags: ['fixture'],
+		source: null,
+		link: null,
+		custom_metadata: {},
 		locked: false,
 		agent_editable: true,
 		provenance: {

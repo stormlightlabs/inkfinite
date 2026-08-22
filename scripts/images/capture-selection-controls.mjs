@@ -8,11 +8,10 @@ const webApp = fileURLToPath(new URL('../../apps/web', import.meta.url));
 const output = fileURLToPath(new URL('./__screenshots__/', import.meta.url));
 const port = 4189;
 const url = `http://127.0.0.1:${port}/app`;
-const server = spawn(
-	'node_modules/.bin/vite',
-	['dev', '--host', '127.0.0.1', '--port', String(port)],
-	{ cwd: webApp, stdio: ['ignore', 'pipe', 'pipe'] }
-);
+const server = spawn('node_modules/.bin/vite', ['dev', '--host', '127.0.0.1', '--port', String(port)], {
+	cwd: webApp,
+	stdio: ['ignore', 'pipe', 'pipe']
+});
 
 server.stdout.on('data', (chunk) => process.stdout.write(`[vite] ${chunk}`));
 server.stderr.on('data', (chunk) => process.stderr.write(`[vite] ${chunk}`));
@@ -85,6 +84,15 @@ try {
 	await textPage.getByRole('heading', { name: 'Typography' }).waitFor();
 	await textPage.screenshot({ path: `${output}/selection-controls-typography.png` });
 
+	const cardPage = await browser.newPage({ viewport: { width: 1440, height: 960 } });
+	await cardPage.addInitScript(() => localStorage.setItem('theme', 'light'));
+	await cardPage.goto(url, { waitUntil: 'networkidle' });
+	await cardPage.getByRole('button', { name: 'Open stencils library' }).click();
+	await cardPage.getByRole('button', { name: 'Card', exact: true }).click();
+	await cardPage.getByRole('button', { name: 'Close stencil palette' }).click();
+	await cardPage.getByRole('heading', { name: 'Card' }).waitFor();
+	await cardPage.screenshot({ path: `${output}/selection-controls-card.png` });
+
 	const arrowPage = await browser.newPage({ viewport: { width: 1440, height: 960 } });
 	await arrowPage.addInitScript(() => localStorage.setItem('theme', 'dark'));
 	await arrowPage.goto(url, { waitUntil: 'networkidle' });
@@ -104,6 +112,7 @@ try {
 	await mobile.getByRole('heading', { name: 'Appearance' }).waitFor();
 	await mobile.screenshot({ path: `${output}/selection-controls-mobile.png`, fullPage: true });
 
+	await cardPage.close();
 	await arrowPage.close();
 	await textPage.close();
 	await desktop.close();

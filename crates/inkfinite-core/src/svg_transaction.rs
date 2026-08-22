@@ -4,7 +4,7 @@
 //! its normalized tree into one ordered transaction so file, desktop, and CLI
 //! callers share the same validation and history path.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::json;
 use thiserror::Error;
@@ -244,9 +244,14 @@ fn group_record(
 fn metadata(name: String, options: &SvgImportTransactionOptions) -> SemanticMetadata {
     SemanticMetadata {
         name: Some(name),
+        title: None,
         role: None,
         description: Some("Imported from SVG".into()),
+        body: None,
         tags: vec!["svg-import".into()],
+        source: None,
+        link: None,
+        custom_metadata: BTreeMap::new(),
         locked: false,
         agent_editable: true,
         provenance: Provenance {

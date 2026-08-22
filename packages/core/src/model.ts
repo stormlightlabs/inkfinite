@@ -224,6 +224,27 @@ export type StrokeStyle = { color: string; opacity: number };
  */
 export type StrokeProps = { points: StrokePoint[]; style: StrokeStyle; brush: BrushConfig };
 
+/** Semantic fields shared by native shapes and card containers. */
+export type ShapeMetadata = {
+	name: string | null;
+	title: string | null;
+	role: string | null;
+	description: string | null;
+	body: string | null;
+	tags: string[];
+	source: string | null;
+	link: string | null;
+	customMetadata: Record<string, unknown>;
+	locked: boolean;
+	agentEditable: boolean;
+	provenance?: {
+		actorId: string;
+		origin: 'human' | 'agent' | 'sync' | 'system';
+		timestamp: number;
+		source: string | null;
+	};
+};
+
 export type ShapeType =
 	| 'rect'
 	| 'ellipse'
@@ -261,6 +282,8 @@ export type BaseShape = {
 	locked?: boolean;
 	/** Whether an agent may propose or apply edits to this shape; omitted values allow edits. */
 	agentEditable?: boolean;
+	/** Semantic fields projected from the native record. */
+	metadata?: ShapeMetadata;
 };
 export type RectShape = BaseShape & { type: 'rect'; props: RectProps };
 export type EllipseShape = BaseShape & { type: 'ellipse'; props: EllipseProps };
@@ -354,9 +377,18 @@ export const ShapeRecord = {
 	 * Clone a shape record
 	 */
 	clone(shape: ShapeRecord): ShapeRecord {
+		const metadata = shape.metadata
+			? {
+					...shape.metadata,
+					tags: [...shape.metadata.tags],
+					customMetadata: { ...shape.metadata.customMetadata },
+					...(shape.metadata.provenance ? { provenance: { ...shape.metadata.provenance } } : {})
+				}
+			: undefined;
 		if (shape.type === 'stroke') {
 			return {
 				...shape,
+				...(metadata ? { metadata } : {}),
 				props: {
 					...shape.props,
 					points: shape.props.points.map((p) => [...p] as StrokePoint),
@@ -367,10 +399,11 @@ export const ShapeRecord = {
 		}
 		if (shape.type === 'arrow') {
 			if (!Array.isArray(shape.props.points)) {
-				return { ...shape, props: { ...shape.props } } as ArrowShape;
+				return { ...shape, ...(metadata ? { metadata } : {}), props: { ...shape.props } } as ArrowShape;
 			}
 			return {
 				...shape,
+				...(metadata ? { metadata } : {}),
 				props: {
 					points: shape.props.points.map((p) => ({ ...p })),
 					start: { ...shape.props.start },
@@ -385,17 +418,19 @@ export const ShapeRecord = {
 			};
 		}
 		if (shape.type === 'markdown') {
-			return { ...shape, props: { ...shape.props } };
+			return { ...shape, ...(metadata ? { metadata } : {}), props: { ...shape.props } };
 		}
 		if (shape.type === 'image') {
 			return {
 				...shape,
+				...(metadata ? { metadata } : {}),
 				props: { ...shape.props, crop: shape.props.crop ? { ...shape.props.crop } : undefined }
 			};
 		}
 		if (shape.type === 'path') {
 			return {
 				...shape,
+				...(metadata ? { metadata } : {}),
 				props: {
 					...shape.props,
 					subpaths: shape.props.subpaths.map((subpath) => ({
@@ -413,7 +448,7 @@ export const ShapeRecord = {
 				}
 			} as PathShape;
 		}
-		return { ...shape, props: { ...shape.props } } as ShapeRecord;
+		return { ...shape, ...(metadata ? { metadata } : {}), props: { ...shape.props } } as ShapeRecord;
 	}
 };
 

@@ -123,9 +123,14 @@ fn crate_test_shape(index: u32) -> crate::ShapeRecord {
         properties: BTreeMap::from([("width".into(), json!(10.0)), ("height".into(), json!(10.0))]),
         metadata: SemanticMetadata {
             name: None,
+            title: None,
             role: None,
             description: None,
+            body: None,
             tags: Vec::new(),
+            source: None,
+            link: None,
+            custom_metadata: BTreeMap::new(),
             locked: false,
             agent_editable: true,
             provenance: Provenance {

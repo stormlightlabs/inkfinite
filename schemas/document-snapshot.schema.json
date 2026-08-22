@@ -577,8 +577,30 @@
           "description": "Whether an agent may propose or apply edits to this shape.",
           "type": "boolean"
         },
+        "body": {
+          "default": null,
+          "description": "Optional card body.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "custom_metadata": {
+          "additionalProperties": true,
+          "default": {},
+          "description": "User-defined structured metadata.",
+          "type": "object"
+        },
         "description": {
           "description": "Optional longer description.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "link": {
+          "default": null,
+          "description": "Optional external link associated with the content.",
           "type": [
             "string",
             "null"
@@ -606,12 +628,28 @@
             "null"
           ]
         },
+        "source": {
+          "default": null,
+          "description": "Optional content source, such as a citation or file path.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "tags": {
           "description": "Searchable, user-defined tags.",
           "items": {
             "type": "string"
           },
           "type": "array"
+        },
+        "title": {
+          "default": null,
+          "description": "Optional card title.",
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "required": [
@@ -673,7 +711,7 @@
       "description": "A shape record shared by all built-in shape definitions.",
       "properties": {
         "child_ids": {
-          "description": "Ordered children when this shape is a container.",
+          "description": "Ordered children when this shape is a container. This list is the\nframe presentation and export order.",
           "items": {
             "$ref": "#/$defs/ShapeId"
           },

@@ -18,9 +18,14 @@ use crate::engine::geometry::world_transform;
 fn metadata(actor: &str, name: &str) -> SemanticMetadata {
     SemanticMetadata {
         name: Some(name.into()),
+        title: None,
         role: Some("diagram.process".into()),
         description: None,
+        body: None,
         tags: vec!["important".into()],
+        source: None,
+        link: None,
+        custom_metadata: BTreeMap::new(),
         locked: false,
         agent_editable: true,
         provenance: Provenance {
@@ -148,6 +153,39 @@ fn conversion_changes_kind_without_losing_style_or_metadata() {
     assert_eq!(restored.properties, before.properties);
     assert_eq!(restored.metadata, before.metadata);
     assert_eq!(restored.style, before.style);
+}
+
+#[test]
+fn card_metadata_survives_commit_and_undo() {
+    let mut engine = engine();
+    let shape_id = ShapeId::from("shape:a");
+    let before = engine.snapshot().unwrap().document.shapes[&shape_id].clone();
+    let mut card = before.metadata.clone();
+    card.title = Some("Research note".into());
+    card.body = Some("Read the source".into());
+    card.source = Some("paper.pdf".into());
+    card.link = Some("https://example.com".into());
+    card.tags = vec!["source".into()];
+    card.custom_metadata.insert("priority".into(), json!(1));
+
+    let transaction = transaction(
+        &mut engine,
+        "actor:local",
+        "transaction:card-metadata",
+        vec![Operation::PatchShape {
+            shape_id: shape_id.clone(),
+            patch: ShapePatch { metadata: Some(card.clone()), ..ShapePatch::default() },
+            expected_version: Some(before.version),
+        }],
+    );
+    engine.commit(transaction).unwrap();
+
+    assert_eq!(engine.snapshot().unwrap().document.shapes[&shape_id].metadata, card);
+    engine.undo(&ActorId::from("actor:local")).unwrap();
+    assert_eq!(
+        engine.snapshot().unwrap().document.shapes[&shape_id].metadata,
+        before.metadata
+    );
 }
 
 #[test]

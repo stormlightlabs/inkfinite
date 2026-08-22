@@ -1,4 +1,5 @@
 import type { Vec2 } from '../math';
+import { createCardShapes } from '../cards';
 import { ShapeRecord, type ShapeRecord as Shape } from '../model';
 
 import { registry } from './registry';
@@ -128,7 +129,11 @@ const BUILTIN_STENCILS: readonly StencilDefinition[] = [
 		'UI',
 		['container', 'panel'],
 		'<svg viewBox="0 0 100 80"><rect x="2" y="2" width="96" height="76" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><line x1="2" y1="20" x2="98" y2="20" stroke="currentColor"/></svg>',
-		(at) => [rect(at, 300, 200, 8), line(at, 0, 50, 300, 0)]
+		(at) =>
+			createCardShapes(PLACEHOLDER_PAGE_ID, at.x, at.y, {
+				title: 'Card title',
+				body: 'Add context, notes, or a link.'
+			})
 	),
 	stencil(
 		'ui:button',

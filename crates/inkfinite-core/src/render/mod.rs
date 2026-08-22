@@ -173,10 +173,12 @@ impl Renderer<'_> {
         if inner.is_empty() {
             return Ok(());
         }
+        let metadata_attributes = svg_metadata_attributes(&shape.metadata);
         writeln!(
             output,
-            "    <g data-shape-id=\"{}\" opacity=\"{}\">",
+            "    <g data-shape-id=\"{}\"{} opacity=\"{}\">",
             escape_xml(shape.id.as_str()),
+            metadata_attributes,
             number(f64::from(shape.style.opacity.get()))
         )
         .expect("writing to a String cannot fail");
@@ -1240,6 +1242,31 @@ fn number(value: f64) -> String {
     }
     let formatted = format!("{value:.6}");
     formatted.trim_end_matches('0').trim_end_matches('.').to_owned()
+}
+
+fn svg_metadata_attributes(metadata: &crate::SemanticMetadata) -> String {
+    let mut attributes = String::new();
+    for (name, value) in [
+        ("data-card-title", metadata.title.as_deref()),
+        ("data-card-body", metadata.body.as_deref()),
+        ("data-role", metadata.role.as_deref()),
+        ("data-source", metadata.source.as_deref()),
+        ("data-link", metadata.link.as_deref()),
+    ] {
+        if let Some(value) = value.filter(|value| !value.is_empty()) {
+            write!(attributes, " {name}=\"{}\"", escape_xml(value)).expect("writing to a String cannot fail");
+        }
+    }
+    if !metadata.tags.is_empty() {
+        write!(attributes, " data-tags=\"{}\"", escape_xml(&metadata.tags.join(",")))
+            .expect("writing to a String cannot fail");
+    }
+    if !metadata.custom_metadata.is_empty()
+        && let Ok(value) = serde_json::to_string(&metadata.custom_metadata)
+    {
+        write!(attributes, " data-metadata=\"{}\"", escape_xml(&value)).expect("writing to a String cannot fail");
+    }
+    attributes
 }
 
 fn escape_xml(value: &str) -> String {

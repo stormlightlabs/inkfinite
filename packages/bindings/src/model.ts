@@ -244,6 +244,10 @@ export type SemanticMetadata = {
 	 */
 	name: string | null;
 	/**
+	 * Optional card title.
+	 */
+	title: string | null;
+	/**
 	 * Optional semantic selector such as `architecture.service`.
 	 */
 	role: string | null;
@@ -252,9 +256,25 @@ export type SemanticMetadata = {
 	 */
 	description: string | null;
 	/**
+	 * Optional card body.
+	 */
+	body: string | null;
+	/**
 	 * Searchable, user-defined tags.
 	 */
 	tags: Array<string>;
+	/**
+	 * Optional content source, such as a citation or file path.
+	 */
+	source: string | null;
+	/**
+	 * Optional external link associated with the content.
+	 */
+	link: string | null;
+	/**
+	 * User-defined structured metadata.
+	 */
+	custom_metadata: { [key in string]: JsonValue };
 	/**
 	 * Whether direct edits to this shape are prohibited.
 	 */
@@ -393,7 +413,8 @@ export type ShapeRecord = {
 	 */
 	transform: Transform;
 	/**
-	 * Ordered children when this shape is a container.
+	 * Ordered children when this shape is a container. This list is the
+	 * frame presentation and export order.
 	 */
 	child_ids: Array<ShapeId>;
 	/**

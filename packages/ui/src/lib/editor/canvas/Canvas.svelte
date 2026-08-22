@@ -213,6 +213,17 @@
 		onPasteRequested: () => void pasteFromClipboard()
 	});
 
+	function enterFrame(frameId: string) {
+		c.store.setState((state) => ({
+			...state,
+			ui: {
+				...state.ui,
+				containerPath: [...(state.ui.containerPath ?? []), frameId],
+				selectionIds: []
+			}
+		}));
+	}
+
 	let platformKind = $derived(c.platform());
 	let editorState = $state(c.store.getState());
 	$effect(() => {
@@ -760,6 +771,8 @@
 		onStencilsClick={handleStencilsClick}
 		showAgentControl={platformKind === 'desktop'}
 		store={c.store}
+		onEnterFrame={enterFrame}
+		onFitSelection={() => c.camera.fitSelection()}
 		canvas={canvasEl ?? undefined}
 		brushStore={c.brushStore}
 		onImportEditable={c.importEditableCanvas}

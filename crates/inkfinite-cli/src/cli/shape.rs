@@ -204,9 +204,14 @@ fn create_shape(args: ShapeCreateArgs, json_output: bool, stdout: &mut dyn Write
         properties,
         metadata: SemanticMetadata {
             name: args.name,
+            title: None,
             role: args.role,
             description: None,
+            body: None,
             tags: args.tags,
+            source: None,
+            link: None,
+            custom_metadata: BTreeMap::new(),
             locked: args.locked,
             agent_editable: args.agent_editable,
             provenance: Provenance {

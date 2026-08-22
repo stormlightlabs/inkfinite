@@ -280,7 +280,19 @@ function curvedPathData(points: Array<{ x: number; y: number }>): string {
 
 function containerToSVG(shape: ContainerShape, transform: string): string {
   const { w = 0, h = 0, title, fill, stroke, radius = 0 } = shape.props;
-  const elements = [`<rect transform="${transform}" width="${svgNumber(w)}" height="${svgNumber(h)}" rx="${svgNumber(Math.min(radius, w / 2, h / 2))}" fill="${escapeXML(fill ?? "none")}" stroke="${escapeXML(stroke ?? "none")}"/>`];
+  const metadata = shape.metadata;
+  const dataAttributes = metadata
+    ? [
+        metadata.role ? ` data-role="${escapeXML(metadata.role)}"` : '',
+        metadata.tags.length > 0 ? ` data-tags="${escapeXML(metadata.tags.join(','))}"` : '',
+        metadata.source ? ` data-source="${escapeXML(metadata.source)}"` : '',
+        metadata.link ? ` data-link="${escapeXML(metadata.link)}"` : '',
+        Object.keys(metadata.customMetadata).length > 0
+          ? ` data-metadata="${escapeXML(JSON.stringify(metadata.customMetadata) ?? '')}"`
+          : ''
+      ].join('')
+    : '';
+  const elements = [`<rect transform="${transform}" width="${svgNumber(w)}" height="${svgNumber(h)}" rx="${svgNumber(Math.min(radius, w / 2, h / 2))}" fill="${escapeXML(fill ?? "none")}" stroke="${escapeXML(stroke ?? "none")}"${dataAttributes}/>`];
   if (title) elements.push(`<text transform="${transform}" x="8" y="18" font-family="sans-serif" font-size="14" font-weight="600" fill="#1f2937">${escapeXML(title)}</text>`);
   return elements.join("");
 }

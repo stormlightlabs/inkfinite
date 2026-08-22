@@ -200,9 +200,14 @@ function createFakeSessionApi() {
 						properties: properties as ShapeProperties,
 						metadata: patch.shape.metadata ?? {
 							name: null,
+							title: null,
 							role: null,
 							description: null,
+							body: null,
 							tags: [],
+							source: null,
+							link: null,
+							custom_metadata: {},
 							locked: false,
 							agent_editable: true,
 							provenance: { actor_id: 'actor:desktop', origin: 'human', timestamp: 0, source: null }

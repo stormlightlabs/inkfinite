@@ -369,6 +369,12 @@ pub fn merge_shape_compensation(
             &current.metadata.name,
             "shape name",
         )?;
+        merged.title = merge_history_value(
+            &before.title,
+            &expected.metadata.title,
+            &current.metadata.title,
+            "card title",
+        )?;
         merged.role = merge_history_value(
             &before.role,
             &expected.metadata.role,
@@ -381,11 +387,35 @@ pub fn merge_shape_compensation(
             &current.metadata.description,
             "shape description",
         )?;
+        merged.body = merge_history_value(
+            &before.body,
+            &expected.metadata.body,
+            &current.metadata.body,
+            "card body",
+        )?;
         merged.tags = merge_history_value(
             &before.tags,
             &expected.metadata.tags,
             &current.metadata.tags,
             "shape tags",
+        )?;
+        merged.source = merge_history_value(
+            &before.source,
+            &expected.metadata.source,
+            &current.metadata.source,
+            "card source",
+        )?;
+        merged.link = merge_history_value(
+            &before.link,
+            &expected.metadata.link,
+            &current.metadata.link,
+            "card link",
+        )?;
+        merged.custom_metadata = merge_history_map(
+            &before.custom_metadata,
+            &expected.metadata.custom_metadata,
+            &current.metadata.custom_metadata,
+            "card metadata",
         )?;
         merged.locked = merge_history_value(
             &before.locked,

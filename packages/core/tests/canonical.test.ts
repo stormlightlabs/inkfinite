@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEditorReconciliationRequest, toCanonicalDocumentSnapshot } from '../src/persistence/canonical';
+import { contentObjectToCard } from '../src/cards';
 import { LayerRecord, PageRecord, ShapeRecord, type Document, type PathProps } from '../src/model';
 
 describe('toCanonicalDocumentSnapshot', () => {
@@ -32,6 +33,43 @@ describe('toCanonicalDocumentSnapshot', () => {
 			transform: { translation: { x: 10, y: 20 }, rotation: 0 },
 			properties: { w: 40, h: 20, fill: 'red' },
 			metadata: { agent_editable: true }
+		});
+	});
+
+	it('persists card metadata and child ordering in the native container', () => {
+		const page = PageRecord.create('Page 1', 'page:one');
+		const cardShapes = contentObjectToCard(
+			'page:one',
+			{ x: 10, y: 20 },
+			{
+				title: 'Research note',
+				body: 'Read the source',
+				role: 'research.note',
+				tags: ['source'],
+				source: 'paper.pdf',
+				link: 'https://example.com',
+				customMetadata: { priority: 1 }
+			}
+		);
+		page.shapeIds = cardShapes.map((shape) => shape.id);
+		const snapshot = toCanonicalDocumentSnapshot(
+			{
+				pages: { [page.id]: page },
+				shapes: Object.fromEntries(cardShapes.map((shape) => [shape.id, shape])),
+				bindings: {}
+			},
+			{ documentId: 'document:card' }
+		);
+		const container = snapshot.document.shapes[cardShapes[0].id];
+		expect(container.child_ids).toEqual(cardShapes.slice(1).map((shape) => shape.id));
+		expect(container.metadata).toMatchObject({
+			title: 'Research note',
+			body: 'Read the source',
+			role: 'research.note',
+			tags: ['source'],
+			source: 'paper.pdf',
+			link: 'https://example.com',
+			custom_metadata: { priority: 1 }
 		});
 	});
 

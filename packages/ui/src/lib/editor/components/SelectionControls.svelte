@@ -3,6 +3,7 @@
 		ArrowShape,
 		EditorState as EditorStateType,
 		MarkdownShape,
+		ShapeMetadata,
 		ShapeRecord,
 		Store,
 		TextShape,
@@ -24,12 +25,21 @@
 		orientation: 'vertical' | 'horizontal';
 		/** Whether to expose the desktop-only agent editability control. */
 		showAgentControl?: boolean;
+		onEnterFrame?: (frameId: string) => void;
+		onFitSelection?: () => void;
 	};
 
 	type LayoutMenuMode = 'align' | 'arrange';
 	type TypographyField = 'fontSize' | 'fontFamily';
 
-	let { currentTool, store, orientation, showAgentControl = false }: Props = $props();
+	let {
+		currentTool,
+		store,
+		orientation,
+		showAgentControl = false,
+		onEnterFrame,
+		onFitSelection
+	}: Props = $props();
 
 	let editorState = $derived<EditorStateType>(store.getState());
 	let layoutMenuOpen = $state(false);
@@ -57,6 +67,21 @@
 			(shape): shape is TextShape | MarkdownShape =>
 				shape.type === 'text' || shape.type === 'markdown'
 		)
+	);
+	let cardTargets = $derived(
+		selectedShapes.filter(
+			(shape): shape is Extract<ShapeRecord, { type: 'container' }> =>
+				shape.type === 'container' &&
+				shape.metadata?.title !== null &&
+				shape.metadata?.title !== undefined
+		)
+	);
+	let cardTarget = $derived(cardTargets.length === 1 ? cardTargets[0] : undefined);
+	let cardMetadata = $derived(cardTarget?.metadata);
+	let frameTarget = $derived(
+		selectionCount === 1 && selectedShapes[0]?.type === 'container'
+			? selectedShapes[0]
+			: undefined
 	);
 	let arrowTargets = $derived(
 		selectedShapes.filter((shape): shape is ArrowShape => shape.type === 'arrow')
@@ -316,6 +341,72 @@
 		if (value) applyTypography('fontFamily', value);
 	}
 
+	function updateCardFields(label: string, fields: Partial<ShapeMetadata>) {
+		if (!cardTarget) return;
+		const state = store.getState();
+		const before = EditorState.clone(state);
+		const currentMetadata = cardTarget.metadata;
+		if (!currentMetadata) return;
+		const nextMetadata: ShapeMetadata = {
+			...currentMetadata,
+			...fields,
+			...(fields.title !== undefined
+				? { name: fields.title || null, title: fields.title }
+				: {}),
+			...(fields.body !== undefined
+				? { description: fields.body || null, body: fields.body }
+				: {})
+		};
+		const shapes = {
+			...state.doc.shapes,
+			[cardTarget.id]: { ...cardTarget, metadata: nextMetadata } as ShapeRecord
+		};
+		for (const shape of Object.values(state.doc.shapes)) {
+			if (shape.groupId !== cardTarget.id) continue;
+			if (fields.title !== undefined && shape.type === 'text') {
+				shapes[shape.id] = {
+					...shape,
+					props: { ...shape.props, text: fields.title ?? '' }
+				};
+			}
+			if (fields.body !== undefined && shape.type === 'markdown') {
+				shapes[shape.id] = { ...shape, props: { ...shape.props, md: fields.body ?? '' } };
+			}
+		}
+		store.executeCommand(
+			new SnapshotCommand(label, 'doc', before, { ...state, doc: { ...state.doc, shapes } })
+		);
+	}
+
+	function handleCardTextChange(
+		event: Event,
+		field: 'title' | 'body' | 'role' | 'source' | 'link'
+	) {
+		updateCardFields(`Set card ${field}`, {
+			[field]: (event.currentTarget as HTMLInputElement).value
+		} as Partial<ShapeMetadata>);
+	}
+
+	function handleCardTagsChange(event: Event) {
+		const tags = (event.currentTarget as HTMLInputElement).value
+			.split(',')
+			.map((tag) => tag.trim())
+			.filter(Boolean);
+		updateCardFields('Set card tags', { tags });
+	}
+
+	function handleCardMetadataChange(event: Event) {
+		try {
+			const value = JSON.parse((event.currentTarget as HTMLInputElement).value) as unknown;
+			if (!value || typeof value !== 'object' || Array.isArray(value)) return;
+			updateCardFields('Set card metadata', {
+				customMetadata: value as Record<string, unknown>
+			});
+		} catch {
+			// Keep the previous value until the JSON is valid.
+		}
+	}
+
 	function handleAgentEditableChange(event: Event) {
 		const value = (event.currentTarget as HTMLInputElement).checked;
 		updateSelectedShapes(value ? 'Allow Agent Edits' : 'Prevent Agent Edits', (shape) => ({
@@ -542,6 +633,71 @@
 				</section>
 			{/if}
 
+			{#if cardTarget && cardMetadata}
+				<section
+					class="selection-controls__section selection-controls__section--card"
+					aria-labelledby="selection-card-label">
+					<h2 id="selection-card-label">Card</h2>
+					<div class="selection-controls__card-fields">
+						<label class="selection-controls__field">
+							<span>Title</span>
+							<input
+								type="text"
+								value={cardMetadata.title ?? ''}
+								onchange={(event) => handleCardTextChange(event, 'title')}
+								aria-label="Card title" />
+						</label>
+						<label class="selection-controls__field">
+							<span>Role</span>
+							<input
+								type="text"
+								value={cardMetadata.role ?? ''}
+								onchange={(event) => handleCardTextChange(event, 'role')}
+								aria-label="Card role" />
+						</label>
+						<label class="selection-controls__field">
+							<span>Tags</span>
+							<input
+								type="text"
+								value={cardMetadata.tags.join(', ')}
+								onchange={handleCardTagsChange}
+								aria-label="Card tags" />
+						</label>
+						<label class="selection-controls__field">
+							<span>Source</span>
+							<input
+								type="text"
+								value={cardMetadata.source ?? ''}
+								onchange={(event) => handleCardTextChange(event, 'source')}
+								aria-label="Card source" />
+						</label>
+						<label class="selection-controls__field">
+							<span>Link</span>
+							<input
+								type="url"
+								value={cardMetadata.link ?? ''}
+								onchange={(event) => handleCardTextChange(event, 'link')}
+								aria-label="Card link" />
+						</label>
+						<label class="selection-controls__field selection-controls__field--wide">
+							<span>Body</span>
+							<textarea
+								value={cardMetadata.body ?? ''}
+								onchange={(event) => handleCardTextChange(event, 'body')}
+								aria-label="Card body"></textarea>
+						</label>
+						<label class="selection-controls__field selection-controls__field--wide">
+							<span>Metadata</span>
+							<input
+								type="text"
+								value={JSON.stringify(cardMetadata.customMetadata)}
+								onchange={handleCardMetadataChange}
+								aria-label="Card custom metadata" />
+						</label>
+					</div>
+				</section>
+			{/if}
+
 			{#if textTargets.length > 0}
 				<section
 					class="selection-controls__section"
@@ -568,6 +724,32 @@
 								onchange={handleFontSizeChange}
 								aria-label="Font size" />
 						</label>
+					</div>
+				</section>
+			{/if}
+
+			{#if frameTarget}
+				<section
+					class="selection-controls__section"
+					aria-labelledby="selection-frame-label">
+					<h2 id="selection-frame-label">Frame</h2>
+					<div class="selection-controls__actions">
+						<button
+							class="selection-controls__action"
+							type="button"
+							onclick={() => onEnterFrame?.(frameTarget.id)}
+							aria-label="Enter selected frame">
+							<Icon name="layers" size={15} />
+							<span>Enter</span>
+						</button>
+						<button
+							class="selection-controls__action"
+							type="button"
+							onclick={() => onFitSelection?.()}
+							aria-label="Fit selected frame">
+							<Icon name="expand" size={15} />
+							<span>Fit</span>
+						</button>
 					</div>
 				</section>
 			{/if}
@@ -781,6 +963,24 @@
 		text-align: right;
 	}
 
+	.selection-controls__section--card {
+		min-width: 24rem;
+	}
+
+	.selection-controls__card-fields {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(9rem, 1fr));
+		gap: var(--ink-space-2);
+	}
+
+	.selection-controls__card-fields .selection-controls__field--wide {
+		grid-column: 1 / -1;
+	}
+
+	.selection-controls__card-fields .selection-controls__field input {
+		width: 100%;
+	}
+
 	.selection-controls__field input {
 		box-sizing: border-box;
 		width: 9rem;
@@ -801,7 +1001,25 @@
 		color: var(--ink-text-muted);
 	}
 
-	.selection-controls__field input:focus-visible {
+	.selection-controls__field textarea {
+		box-sizing: border-box;
+		width: 14rem;
+		min-height: 4rem;
+		padding: var(--ink-space-2);
+		border: 1px solid var(--ink-border);
+		border-radius: var(--ink-radius-control-small);
+		color: var(--ink-text);
+		background: var(--ink-canvas);
+		font: 600 var(--ink-type-xs) / 1.3 var(--ink-font-body);
+		resize: vertical;
+	}
+
+	.selection-controls__field--wide {
+		align-items: flex-start;
+	}
+
+	.selection-controls__field input:focus-visible,
+	.selection-controls__field textarea:focus-visible {
 		outline: 3px solid var(--ink-focus);
 		outline-offset: 2px;
 	}
@@ -929,6 +1147,10 @@
 
 		.selection-controls__field input {
 			width: auto;
+		}
+
+		.selection-controls__section--card {
+			min-width: max-content;
 		}
 	}
 

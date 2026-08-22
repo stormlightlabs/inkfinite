@@ -729,12 +729,27 @@ pub struct Provenance {
 pub struct SemanticMetadata {
     /// Optional display name.
     pub name: Option<String>,
+    /// Optional card title.
+    #[serde(default)]
+    pub title: Option<String>,
     /// Optional semantic selector such as `architecture.service`.
     pub role: Option<String>,
     /// Optional longer description.
     pub description: Option<String>,
+    /// Optional card body.
+    #[serde(default)]
+    pub body: Option<String>,
     /// Searchable, user-defined tags.
     pub tags: Vec<String>,
+    /// Optional content source, such as a citation or file path.
+    #[serde(default)]
+    pub source: Option<String>,
+    /// Optional external link associated with the content.
+    #[serde(default)]
+    pub link: Option<String>,
+    /// User-defined structured metadata.
+    #[serde(default)]
+    pub custom_metadata: BTreeMap<String, Value>,
     /// Whether direct edits to this shape are prohibited.
     pub locked: bool,
     /// Whether an agent may propose or apply edits to this shape.
@@ -778,7 +793,8 @@ pub struct ShapeRecord {
     pub parent: ShapeParent,
     /// Transform relative to `parent`.
     pub transform: Transform,
-    /// Ordered children when this shape is a container.
+    /// Ordered children when this shape is a container. This list is the
+    /// frame presentation and export order.
     pub child_ids: Vec<ShapeId>,
     /// Optional automatic layout for container shapes.
     pub layout: Option<ContainerLayout>,

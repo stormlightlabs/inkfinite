@@ -397,7 +397,10 @@
       "layout": null,
       "metadata": {
         "agent_editable": true,
+        "body": null,
+        "custom_metadata": {},
         "description": null,
+        "link": null,
         "locked": false,
         "name": "Fixture rectangle",
         "provenance": {
@@ -407,9 +410,11 @@
           "timestamp": 1700000000000
         },
         "role": "fixture.shape",
+        "source": null,
         "tags": [
           "fixture"
-        ]
+        ],
+        "title": null
       },
       "parent": {
         "id": "layer:fixture",

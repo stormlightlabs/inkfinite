@@ -197,9 +197,14 @@ fn query_forwards_semantic_hierarchy_kind_and_bounds_filters() {
         properties: BTreeMap::from([("width".into(), 40.0.into()), ("height".into(), 30.0.into())]),
         metadata: SemanticMetadata {
             name: Some("API".into()),
+            title: None,
             role: Some("architecture.service".into()),
             description: None,
+            body: None,
             tags: vec!["backend".into()],
+            source: None,
+            link: None,
+            custom_metadata: BTreeMap::new(),
             locked: false,
             agent_editable: true,
             provenance: Provenance {
@@ -394,9 +399,14 @@ fn apply_dry_run_then_save_validate_reopen_and_render_is_atomic() {
                 properties: BTreeMap::from([("width".into(), 40.0.into()), ("height".into(), 30.0.into())]),
                 metadata: SemanticMetadata {
                     name: None,
+                    title: None,
                     role: Some("architecture.service".into()),
                     description: None,
+                    body: None,
                     tags: Vec::new(),
+                    source: None,
+                    link: None,
+                    custom_metadata: BTreeMap::new(),
                     locked: false,
                     agent_editable: true,
                     provenance: Provenance {

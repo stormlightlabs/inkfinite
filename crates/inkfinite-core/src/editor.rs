@@ -94,6 +94,8 @@ pub struct EditorShape {
     pub locked: bool,
     /// Agent editability retained for editor policy surfaces.
     pub agent_editable: bool,
+    /// Semantic fields exposed to card and inspector controls.
+    pub metadata: SemanticMetadata,
     /// Kind-specific properties using editor property names.
     #[ts(type = "ShapeProperties")]
     pub props: ShapeProperties,
@@ -480,6 +482,7 @@ fn append_projected_shape(
             stroke_opacity: shape.style.stroke_opacity,
             locked: shape.metadata.locked,
             agent_editable: shape.metadata.agent_editable,
+            metadata: shape.metadata.clone(),
             props: properties,
         },
     );
@@ -529,6 +532,7 @@ pub fn reconcile_editor_patches(
     let document = &snapshot.document;
     let mut operations = Vec::new();
     let mut created_layers = BTreeSet::new();
+    let mut created_shapes = BTreeMap::new();
     let mut touched_layers = BTreeSet::new();
     let mut touched_pages = BTreeSet::new();
     let default_metadata = default_metadata(&request);
@@ -565,6 +569,7 @@ pub fn reconcile_editor_patches(
                     shape_id,
                     ReconcileShapeOptions { transform, properties, metadata, style, parent: parent.as_ref(), anchor },
                     &created_layers,
+                    &created_shapes,
                     &mut operations,
                 )?;
             }
@@ -585,7 +590,14 @@ pub fn reconcile_editor_patches(
                 reconcile_path_topology(document, shape_id, &topology, &mut operations)?;
             }
             EditorPatch::CreateShape { shape, parent, transform, anchor } => {
-                let local_transform = local_transform(document, &shape.id, &parent, transform, &created_layers)?;
+                let local_transform = local_transform(
+                    document,
+                    &shape.id,
+                    &parent,
+                    transform,
+                    &created_layers,
+                    &created_shapes,
+                )?;
                 let metadata = shape.metadata.unwrap_or_else(|| default_metadata.clone());
                 let native_shape = ShapeRecord {
                     id: shape.id,
@@ -599,6 +611,7 @@ pub fn reconcile_editor_patches(
                     style: shape.style,
                     version: RecordVersion(1),
                 };
+                created_shapes.insert(native_shape.id.clone(), transform);
                 operations.push(Operation::CreateShape { shape: native_shape, anchor });
             }
             EditorPatch::DeleteShape { shape_id } => {
@@ -727,7 +740,7 @@ struct ReconcileShapeOptions<'a> {
 
 fn reconcile_shape(
     document: &Document, shape_id: ShapeId, options: ReconcileShapeOptions<'_>, created_layers: &BTreeSet<LayerId>,
-    operations: &mut Vec<Operation>,
+    created_shapes: &BTreeMap<ShapeId, EditorTransform>, operations: &mut Vec<Operation>,
 ) -> Result<(), EditorReconciliationError> {
     let ReconcileShapeOptions { transform, properties, metadata, style, parent, anchor } = options;
     let shape = document
@@ -740,7 +753,14 @@ fn reconcile_shape(
     let mut shape_patch = NativeShapePatch::default();
 
     if let Some(world) = transform {
-        let local = local_transform(document, &shape_id, &target_parent, world, created_layers)?;
+        let local = local_transform(
+            document,
+            &shape_id,
+            &target_parent,
+            world,
+            created_layers,
+            created_shapes,
+        )?;
         let current_world = world_transform(document, shape);
         if !same_affine(current_world, world.into()) || parent_changed {
             shape_patch.transform = Some(local);
@@ -790,7 +810,7 @@ fn reconcile_shape(
 
 fn local_transform(
     document: &Document, shape_id: &ShapeId, parent: &ShapeParent, world: EditorTransform,
-    created_layers: &BTreeSet<LayerId>,
+    created_layers: &BTreeSet<LayerId>, created_shapes: &BTreeMap<ShapeId, EditorTransform>,
 ) -> Result<Transform, EditorReconciliationError> {
     let parent_world = match parent {
         ShapeParent::Layer(layer_id) => {
@@ -802,11 +822,15 @@ fn local_transform(
             }
         }
         ShapeParent::Shape(parent_id) => {
-            if !document.shapes.contains_key(parent_id) {
-                return Err(EditorReconciliationError::UnknownParent(parent_id.clone()));
+            if let Some(parent_world) = created_shapes.get(parent_id) {
+                (*parent_world).into()
+            } else {
+                if !document.shapes.contains_key(parent_id) {
+                    return Err(EditorReconciliationError::UnknownParent(parent_id.clone()));
+                }
+                parent_world_transform(document, parent)
+                    .ok_or_else(|| EditorReconciliationError::UnknownParent(parent_id.clone()))?
             }
-            parent_world_transform(document, parent)
-                .ok_or_else(|| EditorReconciliationError::UnknownParent(parent_id.clone()))?
         }
     };
     let Some(inverse) = parent_world.inverse() else {
@@ -839,9 +863,14 @@ fn layer_patch_changes(layer: &crate::LayerRecord, patch: &LayerPatch) -> bool {
 fn default_metadata(request: &EditorReconciliationRequest) -> SemanticMetadata {
     SemanticMetadata {
         name: None,
+        title: None,
         role: None,
         description: None,
+        body: None,
         tags: Vec::new(),
+        source: None,
+        link: None,
+        custom_metadata: BTreeMap::new(),
         locked: false,
         agent_editable: true,
         provenance: Provenance {
@@ -862,9 +891,14 @@ mod tests {
     fn metadata() -> SemanticMetadata {
         SemanticMetadata {
             name: None,
+            title: None,
             role: None,
             description: None,
+            body: None,
             tags: Vec::new(),
+            source: None,
+            link: None,
+            custom_metadata: BTreeMap::new(),
             locked: false,
             agent_editable: true,
             provenance: Provenance {
@@ -1168,6 +1202,60 @@ mod tests {
 
         assert_eq!(transaction.operations.len(), 2);
         assert!(matches!(transaction.operations[0], Operation::CreateLayer { .. }));
+        assert!(matches!(transaction.operations[1], Operation::CreateShape { .. }));
+    }
+
+    #[test]
+    fn reconciliation_accepts_children_created_with_their_container() {
+        let snapshot = nested_snapshot();
+        let page_id = snapshot.document.page_ids[0].clone();
+        let layer_id = snapshot.document.pages[&page_id].layer_ids[0].clone();
+        let container_id = ShapeId::from("shape:card");
+        let child_id = ShapeId::from("shape:card-title");
+        let transaction = reconcile_editor_patches(
+            &snapshot,
+            request(vec![
+                EditorPatch::CreateShape {
+                    shape: EditorShapeDraft {
+                        id: container_id.clone(),
+                        kind: ShapeKind::from(CONTAINER_KIND),
+                        properties: BTreeMap::from([
+                            ("w".into(), Value::from(320.0)),
+                            ("h".into(), Value::from(220.0)),
+                        ]),
+                        metadata: Some(metadata()),
+                        style: style(),
+                        layout: Some(ContainerLayout::Free),
+                    },
+                    parent: ShapeParent::Layer(layer_id),
+                    transform: EditorTransform { a: 1.0, b: 0.0, c: 0.0, d: 1.0, e: 10.0, f: 20.0 },
+                    anchor: SiblingAnchor::Last,
+                },
+                EditorPatch::CreateShape {
+                    shape: EditorShapeDraft {
+                        id: child_id,
+                        kind: ShapeKind::from("text"),
+                        properties: BTreeMap::from([
+                            ("text".into(), Value::from("Card")),
+                            ("fontSize".into(), Value::from(18.0)),
+                            ("fontFamily".into(), Value::from("sans-serif")),
+                            ("color".into(), Value::from("#111827")),
+                            ("w".into(), Value::from(288.0)),
+                        ]),
+                        metadata: None,
+                        style: style(),
+                        layout: None,
+                    },
+                    parent: ShapeParent::Shape(container_id),
+                    transform: EditorTransform { a: 1.0, b: 0.0, c: 0.0, d: 1.0, e: 26.0, f: 36.0 },
+                    anchor: SiblingAnchor::Last,
+                },
+            ]),
+        )
+        .expect("a card child can be created with its new container");
+
+        assert_eq!(transaction.operations.len(), 2);
+        assert!(matches!(transaction.operations[0], Operation::CreateShape { .. }));
         assert!(matches!(transaction.operations[1], Operation::CreateShape { .. }));
     }
 

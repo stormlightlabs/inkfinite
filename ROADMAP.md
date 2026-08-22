@@ -47,14 +47,17 @@ transform, and identity.
 
 ### Stronger content primitives
 
-Inkfinite already has native containers and frames, Markdown blocks, image
-records backed by separate assets, image paste and drop, non-destructive crop,
-and reusable built-in card stencils. Build richer cards from those ordinary
-records instead of adding a parallel rendering system.
+Inkfinite has native containers and frames, Markdown blocks, image records backed
+by separate assets, image paste and drop, non-destructive crop, and reusable
+built-in card stencils. The card stencil now creates a container with ordinary
+text and Markdown children. Its title, body, role, tags, source, link, and
+structured metadata are stored on the native semantic record and can be edited
+from the TypeScript selection controls. Container child order drives frame
+presentation and native SVG export; the editor exposes frame entry and fitting.
 
-The remaining content work adds editable card fields, frame presentation and
-export, image captions and masks, asset reuse controls, collection arrangement,
-color sampling, and first-class URL, file, and page references.
+The remaining content work adds image captions and masks, asset reuse controls,
+collection arrangement, color sampling, and first-class URL, file, and page
+references.
 
 ### Semantic objects and relationships
 

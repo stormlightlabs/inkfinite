@@ -37,8 +37,10 @@ export function insertStencil(
 	const spawned = definition.spawn(at);
 	if (spawned.length === 0) return state;
 
-	const groupId = spawned.length > 1 ? createId('group') : undefined;
+	const hasContainerRoot = spawned.some((shape) => shape.type === 'container' && !shape.groupId);
+	const groupId = spawned.length > 1 && !hasContainerRoot ? createId('group') : undefined;
 	const shapes = { ...state.doc.shapes };
+	const insertedIds: string[] = [];
 	const selectionIds: string[] = [];
 	for (const spawnedShape of spawned) {
 		const shape: ShapeRecord = {
@@ -48,7 +50,8 @@ export function insertStencil(
 			...(groupId ? { groupId } : {})
 		};
 		shapes[shape.id] = shape;
-		selectionIds.push(shape.id);
+		insertedIds.push(shape.id);
+		if (!hasContainerRoot || !shape.groupId) selectionIds.push(shape.id);
 	}
 
 	return {
@@ -56,12 +59,12 @@ export function insertStencil(
 		doc: {
 			...state.doc,
 			shapes,
-			pages: { ...state.doc.pages, [pageId]: { ...page, shapeIds: [...page.shapeIds, ...selectionIds] } },
+			pages: { ...state.doc.pages, [pageId]: { ...page, shapeIds: [...page.shapeIds, ...insertedIds] } },
 			...(activeLayer
 				? {
 						layers: {
 							...state.doc.layers,
-							[activeLayer.id]: { ...activeLayer, shapeIds: [...activeLayer.shapeIds, ...selectionIds] }
+							[activeLayer.id]: { ...activeLayer, shapeIds: [...activeLayer.shapeIds, ...insertedIds] }
 						}
 					}
 				: {})

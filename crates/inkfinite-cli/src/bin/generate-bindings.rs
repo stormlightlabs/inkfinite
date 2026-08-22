@@ -531,9 +531,14 @@ fn fixture_shape() -> inkfinite_core::ShapeRecord {
         properties: BTreeMap::from([("width".into(), json!(40.0)), ("height".into(), json!(20.0))]),
         metadata: SemanticMetadata {
             name: Some("Fixture rectangle".into()),
+            title: None,
             role: Some("fixture.shape".into()),
             description: None,
+            body: None,
             tags: vec!["fixture".into()],
+            source: None,
+            link: None,
+            custom_metadata: BTreeMap::new(),
             locked: false,
             agent_editable: true,
             provenance: Provenance {

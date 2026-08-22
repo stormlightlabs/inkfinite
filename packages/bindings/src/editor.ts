@@ -126,6 +126,10 @@ export type EditorShape = {
 	 */
 	agent_editable: boolean;
 	/**
+	 * Semantic fields exposed to card and inspector controls.
+	 */
+	metadata: SemanticMetadata;
+	/**
 	 * Kind-specific properties using editor property names.
 	 */
 	props: ShapeProperties;

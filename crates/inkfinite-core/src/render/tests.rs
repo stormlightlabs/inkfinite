@@ -503,9 +503,14 @@ fn shape_with_style(
 fn metadata() -> SemanticMetadata {
     SemanticMetadata {
         name: None,
+        title: None,
         role: None,
         description: None,
+        body: None,
         tags: Vec::new(),
+        source: None,
+        link: None,
+        custom_metadata: BTreeMap::new(),
         locked: false,
         agent_editable: true,
         provenance: Provenance {
@@ -564,6 +569,33 @@ fn render_is_deterministic_and_covers_every_visual_builtin() {
             },
         ]
     );
+}
+
+#[test]
+fn frame_child_order_controls_svg_presentation_order() {
+    let mut snapshot = fixture_snapshot();
+    let frame_id = ShapeId::from("group:card");
+    snapshot
+        .document
+        .shapes
+        .get_mut(&frame_id)
+        .expect("fixture frame")
+        .child_ids
+        .reverse();
+    let output = render_svg(
+        &snapshot,
+        &SvgRenderOptions { page_id: Some(PageId::from("page:fixtures")), ..SvgRenderOptions::default() },
+    )
+    .expect("frame renders");
+    let divider = output
+        .svg
+        .find("data-shape-id=\"shape:stencil-card-divider\"")
+        .expect("divider exported");
+    let card = output
+        .svg
+        .find("data-shape-id=\"shape:stencil-card\"")
+        .expect("card exported");
+    assert!(divider < card, "export follows the persisted child order");
 }
 
 #[test]

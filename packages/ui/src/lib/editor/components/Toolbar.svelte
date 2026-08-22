@@ -21,6 +21,8 @@
 		onStencilsClick?: () => void;
 		/** Whether to expose the desktop-only agent editability control. */
 		showAgentControl?: boolean;
+		onEnterFrame?: (frameId: string) => void;
+		onFitSelection?: () => void;
 		onImportEditable?: () => void;
 		onImportSvg?: () => void;
 		onImportSvgMarkup?: () => void;
@@ -37,6 +39,8 @@
 		brushStore,
 		onStencilsClick,
 		showAgentControl = false,
+		onEnterFrame,
+		onFitSelection,
 		onImportEditable,
 		onImportSvg,
 		onImportSvgMarkup,
@@ -433,7 +437,13 @@
 		</div>
 	</div>
 
-	<SelectionControls {currentTool} {store} {orientation} {showAgentControl} />
+	<SelectionControls
+		{currentTool}
+		{store}
+		{orientation}
+		{showAgentControl}
+		{onEnterFrame}
+		{onFitSelection} />
 </div>
 
 <style>
