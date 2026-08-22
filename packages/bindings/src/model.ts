@@ -545,6 +545,10 @@ export type BindingRecord = {
 	 */
 	anchor: BindingAnchor;
 	/**
+	 * Optional semantic relationship type, such as `depends_on`.
+	 */
+	relation_type?: string | null;
+	/**
 	 * Version used by optimistic operation preconditions.
 	 */
 	version: RecordVersion;

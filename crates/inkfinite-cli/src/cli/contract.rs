@@ -60,7 +60,7 @@ pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(
         "mutation_commands": {
             "apply": ["--transaction", "--dry-run"],
             "import svg": ["--input", "--page", "--layer", "--dry-run", "--transaction-out", "--app"],
-            "connect": ["--binding-id", "--source", "--source-role", "--target", "--target-role", "--dry-run", "--transaction-out", "--app"],
+            "connect": ["--binding-id", "--source", "--source-role", "--target", "--target-role", "--kind", "--relation-type", "--dry-run", "--transaction-out", "--app"],
             "layout": ["align", "distribute"],
             "shape": ["create", "patch", "delete", "kinds", "describe"],
             "semantic_placement": ["inside", "below", "right-of", "align-left", "align-center", "align-right", "align-top", "align-middle", "align-bottom"],
@@ -68,7 +68,7 @@ pub fn print_capabilities(json_output: bool, stdout: &mut dyn Write) -> Result<(
         },
         "path_format": "forward_slashes",
         "protocol": { "id": PROTOCOL_ID, "version": PROTOCOL_VERSION },
-        "query_filters": ["id", "name", "role", "tag", "kind", "page", "layer", "parent", "bounds"],
+        "query_filters": ["id", "name", "role", "tag", "relation-type", "incoming-to", "outgoing-from", "kind", "page", "layer", "parent", "bounds"],
         "query_options": ["detail", "limit"],
         "render_filters": ["page", "layer", "shape", "role", "region"],
         "schemas": ["document", "transaction", "protocol", "protocol-request", "protocol-response", "protocol-error"],

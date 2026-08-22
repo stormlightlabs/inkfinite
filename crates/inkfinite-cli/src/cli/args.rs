@@ -392,9 +392,12 @@ pub struct ConnectArgs {
     /// Select the unique target shape by semantic role.
     #[arg(long, conflicts_with = "target")]
     pub target_role: Option<String>,
-    /// Binding registry key.
+    /// Binding registry key. Use `relation` for a semantic-only connection.
     #[arg(long, default_value = "arrow")]
     pub kind: String,
+    /// Optional semantic relationship type, such as `depends_on`.
+    #[arg(long)]
+    pub relation_type: Option<String>,
     /// Named handle on the source shape.
     #[arg(long, default_value = "end")]
     pub source_handle: String,
@@ -526,6 +529,15 @@ pub struct QueryArgs {
     /// Match one exact semantic tag.
     #[arg(long)]
     pub tag: Option<String>,
+    /// Match one exact semantic relationship type.
+    #[arg(long)]
+    pub relation_type: Option<String>,
+    /// Restrict relationship records to those incoming to this shape.
+    #[arg(long)]
+    pub incoming_to: Option<String>,
+    /// Restrict relationship records to those outgoing from this shape.
+    #[arg(long)]
+    pub outgoing_from: Option<String>,
     /// Match an exact shape registry key.
     #[arg(long = "kind")]
     pub shape_kind: Option<String>,
@@ -676,6 +688,15 @@ pub struct AppQueryArgs {
     /// Match one exact semantic tag.
     #[arg(long)]
     pub tag: Option<String>,
+    /// Match one exact semantic relationship type.
+    #[arg(long)]
+    pub relation_type: Option<String>,
+    /// Restrict relationship records to those incoming to this shape.
+    #[arg(long)]
+    pub incoming_to: Option<String>,
+    /// Restrict relationship records to those outgoing from this shape.
+    #[arg(long)]
+    pub outgoing_from: Option<String>,
     /// Match an exact shape registry key.
     #[arg(long = "kind")]
     pub shape_kind: Option<String>,

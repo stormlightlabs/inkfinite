@@ -8,7 +8,7 @@ use super::hierarchy::{
     insert_shape_child, is_descendant, layer, layer_mut, move_anchored, next_version, page, page_mut,
     remove_shape_child, shape, shape_mut, shape_siblings,
 };
-use super::validation::ensure_binding_endpoints;
+use super::validation::{ensure_binding_endpoints, ensure_relationship_reference};
 use super::{
     AssetId, AssetPatch, BTreeMap, BTreeSet, Document, EngineError, LayerContentsDisposition, LayerId, LayerPatch,
     LayoutAxis, Operation, PageId, RecordVersion, ShapeAlignment, ShapeId, ShapeParent, ShapePatch, ShapeProperties,
@@ -106,6 +106,7 @@ pub fn apply_operation(document: &mut Document, operation: &Operation) -> Result
         Operation::CreateBinding { binding } => {
             ensure_absent(document.bindings.contains_key(&binding.id), "binding", &binding.id)?;
             ensure_version_one(binding.version, "new binding")?;
+            ensure_relationship_reference(document, binding)?;
             ensure_binding_endpoints(document, binding)?;
             document.bindings.insert(binding.id.clone(), binding.clone());
             Ok(vec![Operation::DeleteBinding {

@@ -61,6 +61,12 @@ pub struct QueryRecordsParams {
     pub role: Option<String>,
     /// Match one exact semantic tag.
     pub tag: Option<String>,
+    /// Match one exact semantic relationship type.
+    pub relation_type: Option<String>,
+    /// Restrict relationship records to those incoming to this shape.
+    pub incoming_to: Option<String>,
+    /// Restrict relationship records to those outgoing from this shape.
+    pub outgoing_from: Option<String>,
     /// Match one exact built-in shape kind.
     pub shape_kind: Option<String>,
     /// Restrict results to one page.
@@ -488,6 +494,9 @@ impl InkfiniteMcp {
             name: params.name,
             role: params.role,
             tag: params.tag,
+            relation_type: params.relation_type,
+            incoming_to: params.incoming_to.map(Into::into),
+            outgoing_from: params.outgoing_from.map(Into::into),
             shape_kind: params.shape_kind,
             page_id: params.page_id.map(Into::into),
             layer_id: params.layer_id.map(Into::into),

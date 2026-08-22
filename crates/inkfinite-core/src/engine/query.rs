@@ -7,6 +7,8 @@ pub fn query_document(snapshot: &DocumentSnapshot, query: &Query) -> QueryResult
     let document = &snapshot.document;
     let mut records = Vec::new();
     let mut bounds = BTreeMap::new();
+    let relationship_query =
+        query.relation_type.is_some() || query.incoming_to.is_some() || query.outgoing_from.is_some();
     for page in document.pages.values() {
         if matches_common(query, page.id.as_str(), Some(&page.name))
             && query.role.is_none()
@@ -15,6 +17,7 @@ pub fn query_document(snapshot: &DocumentSnapshot, query: &Query) -> QueryResult
             && query.layer_id.is_none()
             && query.parent_id.is_none()
             && query.bounds.is_none()
+            && !relationship_query
         {
             records.push(RecordId::Page(page.id.clone()));
         }
@@ -28,6 +31,7 @@ pub fn query_document(snapshot: &DocumentSnapshot, query: &Query) -> QueryResult
             && query.layer_id.as_ref().is_none_or(|id| id == &layer.id)
             && query.parent_id.is_none()
             && query.bounds.is_none()
+            && !relationship_query
         {
             records.push(RecordId::Layer(layer.id.clone()));
         }
@@ -57,7 +61,8 @@ pub fn query_document(snapshot: &DocumentSnapshot, query: &Query) -> QueryResult
             && query
                 .bounds
                 .as_ref()
-                .is_none_or(|filter| intersects(&shape_bounds, filter));
+                .is_none_or(|filter| intersects(&shape_bounds, filter))
+            && !relationship_query;
         if matches {
             records.push(RecordId::Shape(shape.id.clone()));
             bounds.insert(shape.id.clone(), shape_bounds);
@@ -72,6 +77,18 @@ pub fn query_document(snapshot: &DocumentSnapshot, query: &Query) -> QueryResult
             && query.layer_id.is_none()
             && query.parent_id.is_none()
             && query.bounds.is_none()
+            && query
+                .relation_type
+                .as_ref()
+                .is_none_or(|relation_type| binding.relation_type.as_ref() == Some(relation_type))
+            && query
+                .incoming_to
+                .as_ref()
+                .is_none_or(|shape_id| &binding.target_shape_id == shape_id)
+            && query
+                .outgoing_from
+                .as_ref()
+                .is_none_or(|shape_id| &binding.source_shape_id == shape_id)
         {
             records.push(RecordId::Binding(binding.id.clone()));
         }
@@ -85,6 +102,7 @@ pub fn query_document(snapshot: &DocumentSnapshot, query: &Query) -> QueryResult
             && query.layer_id.is_none()
             && query.parent_id.is_none()
             && query.bounds.is_none()
+            && !relationship_query
         {
             records.push(RecordId::Asset(asset.id.clone()));
         }

@@ -94,6 +94,7 @@ pub fn validate_document(document: &Document) -> Result<(), EngineError> {
         return Err(EngineError::Invariant("one or more shapes are unlisted".into()));
     }
     for binding in document.bindings.values() {
+        ensure_relationship_reference(document, binding)?;
         ensure_binding_endpoints(document, binding)?;
     }
     Ok(())
@@ -221,6 +222,43 @@ pub fn ensure_acyclic(document: &Document, start: &ShapeId) -> Result<(), Engine
     Ok(())
 }
 
+/// Validates the optional semantic relationship attached to a binding.
+///
+/// Relationship references use the same stable shape IDs as visual bindings,
+/// but their type is checked independently so a semantic connection does not
+/// rely on routing fields or coordinates.
+///
+/// # Errors
+///
+/// Returns an error when a relationship type is empty or one of its shape
+/// references is missing.
+pub fn ensure_relationship_reference(document: &Document, binding: &crate::BindingRecord) -> Result<(), EngineError> {
+    if binding.relation_type.is_none() && binding.kind.as_str() != "relation" {
+        return Ok(());
+    }
+    let relation_type = binding.relation_type.as_deref();
+    if relation_type.is_some_and(|value| value.trim().is_empty()) {
+        return Err(EngineError::Schema(format!(
+            "binding {} has an empty relationship type",
+            binding.id
+        )));
+    }
+    if !document.shapes.contains_key(&binding.source_shape_id) {
+        return Err(EngineError::Invariant(format!(
+            "relationship {} references missing source shape {}",
+            binding.id, binding.source_shape_id
+        )));
+    }
+    if !document.shapes.contains_key(&binding.target_shape_id) {
+        return Err(EngineError::Invariant(format!(
+            "relationship {} references missing target shape {}",
+            binding.id, binding.target_shape_id
+        )));
+    }
+    Ok(())
+}
+
+/// Validates the shape references used by visual binding routing.
 pub fn ensure_binding_endpoints(document: &Document, binding: &crate::BindingRecord) -> Result<(), EngineError> {
     if !document.shapes.contains_key(&binding.source_shape_id)
         || !document.shapes.contains_key(&binding.target_shape_id)

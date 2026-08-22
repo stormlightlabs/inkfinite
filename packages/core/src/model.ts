@@ -405,7 +405,10 @@ export const ShapeRecord = {
 			? {
 					...shape.metadata,
 					tags: [...shape.metadata.tags],
-					customMetadata: JSON.parse(JSON.stringify(shape.metadata.customMetadata)) as Record<string, unknown>,
+					customMetadata: JSON.parse(JSON.stringify(shape.metadata.customMetadata)) as Record<
+						string,
+						unknown
+					>,
 					...(shape.metadata.provenance ? { provenance: { ...shape.metadata.provenance } } : {})
 				}
 			: undefined;
@@ -483,7 +486,7 @@ export const ShapeRecord = {
 	}
 };
 
-export type BindingType = 'arrow-end';
+export type BindingType = 'arrow-end' | 'relation';
 export type BindingHandle = 'start' | 'end';
 
 /**
@@ -500,6 +503,8 @@ export type BindingRecord = {
 	toShapeId: string;
 	handle: BindingHandle;
 	anchor: BindingAnchor;
+	/** Optional semantic relationship type, such as `depends_on`. */
+	relationType?: string;
 };
 
 export const BindingRecord = {
@@ -511,12 +516,34 @@ export const BindingRecord = {
 		toShapeId: string,
 		handle: BindingHandle,
 		anchor?: BindingAnchor,
-		id?: string
+		id?: string,
+		relationType?: string
 	): BindingRecord {
 		if (!anchor) {
 			anchor = { kind: 'center' };
 		}
-		return { id: id ?? createId('binding'), type: 'arrow-end', fromShapeId, toShapeId, handle, anchor };
+		return {
+			id: id ?? createId('binding'),
+			type: 'arrow-end',
+			fromShapeId,
+			toShapeId,
+			handle,
+			anchor,
+			...(relationType === undefined ? {} : { relationType })
+		};
+	},
+
+	/** Creates a typed relationship that does not participate in arrow routing. */
+	createRelation(fromShapeId: string, toShapeId: string, relationType: string, id?: string): BindingRecord {
+		return {
+			id: id ?? createId('binding'),
+			type: 'relation',
+			fromShapeId,
+			toShapeId,
+			handle: 'end',
+			anchor: { kind: 'center' },
+			relationType
+		};
 	},
 
 	/**
@@ -872,22 +899,29 @@ export function validateDoc(document: Document): ValidationResult {
 			errors.push(`Binding key '${bindingId}' does not match binding.id '${binding.id}'`);
 		}
 
+		const semanticRelationship = binding.type === 'relation' || binding.relationType !== undefined;
+		const visualBinding = binding.type !== 'relation';
+		const recordLabel = semanticRelationship ? 'Relationship' : 'Binding';
 		const fromShape = document.shapes[binding.fromShapeId];
 		if (!fromShape) {
-			errors.push(`Binding '${bindingId}' references non-existent fromShape '${binding.fromShapeId}'`);
-		} else if (fromShape.type !== 'arrow') {
+			errors.push(`${recordLabel} '${bindingId}' references non-existent fromShape '${binding.fromShapeId}'`);
+		} else if (visualBinding && fromShape.type !== 'arrow') {
 			errors.push(`Binding '${bindingId}' fromShape '${binding.fromShapeId}' is not an arrow`);
 		}
 
 		if (!document.shapes[binding.toShapeId]) {
-			errors.push(`Binding '${bindingId}' references non-existent toShape '${binding.toShapeId}'`);
+			errors.push(`${recordLabel} '${bindingId}' references non-existent toShape '${binding.toShapeId}'`);
 		}
 
-		if (binding.handle !== 'start' && binding.handle !== 'end') {
+		if (binding.relationType !== undefined && binding.relationType.trim() === '') {
+			errors.push(`Relationship '${bindingId}' has an empty relation type`);
+		}
+
+		if (visualBinding && binding.handle !== 'start' && binding.handle !== 'end') {
 			errors.push(`Binding '${bindingId}' has invalid handle '${binding.handle}'`);
 		}
 
-		if (binding.anchor.kind === 'edge') {
+		if (visualBinding && binding.anchor.kind === 'edge') {
 			if (binding.anchor.nx < -1 || binding.anchor.nx > 1) {
 				errors.push(`Binding '${bindingId}' has invalid nx '${binding.anchor.nx}' (must be in [-1, 1])`);
 			}

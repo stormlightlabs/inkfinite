@@ -615,6 +615,73 @@ fn permissions_preconditions_and_final_invariants_reject_without_mutation() {
 }
 
 #[test]
+fn typed_relationships_are_queryable_by_direction_and_type() {
+    let mut engine = engine();
+    let binding_id = BindingId::from("binding:depends-on");
+    let relation = BindingRecord {
+        id: binding_id.clone(),
+        kind: BindingKind::from("relation"),
+        source_shape_id: ShapeId::from("shape:a"),
+        target_shape_id: ShapeId::from("shape:b"),
+        source_handle: "end".into(),
+        anchor: BindingAnchor::Center,
+        relation_type: Some("depends_on".into()),
+        version: RecordVersion(1),
+    };
+    let create = transaction(
+        &mut engine,
+        "actor:local",
+        "create-typed-relationship",
+        vec![Operation::CreateBinding { binding: relation }],
+    );
+    engine.commit(create).unwrap();
+
+    let outgoing = engine
+        .query(&Query {
+            outgoing_from: Some(ShapeId::from("shape:a")),
+            relation_type: Some("depends_on".into()),
+            ..Query::default()
+        })
+        .unwrap();
+    assert_eq!(
+        outgoing.records,
+        vec![crate::proto::RecordId::Binding(binding_id.clone())]
+    );
+
+    let incoming = engine
+        .query(&Query { incoming_to: Some(ShapeId::from("shape:b")), include_records: true, ..Query::default() })
+        .unwrap();
+    assert_eq!(incoming.records, vec![crate::proto::RecordId::Binding(binding_id)]);
+    assert!(
+        matches!(incoming.details.first(), Some(crate::proto::QueryRecord::Binding(binding)) if binding.relation_type.as_deref() == Some("depends_on"))
+    );
+}
+
+#[test]
+fn relationship_types_reject_empty_values() {
+    let mut engine = engine();
+    let relation = BindingRecord {
+        id: BindingId::from("binding:invalid-relation"),
+        kind: BindingKind::from("relation"),
+        source_shape_id: ShapeId::from("shape:a"),
+        target_shape_id: ShapeId::from("shape:b"),
+        source_handle: "end".into(),
+        anchor: BindingAnchor::Center,
+        relation_type: Some("  ".into()),
+        version: RecordVersion(1),
+    };
+    let create = transaction(
+        &mut engine,
+        "actor:local",
+        "create-invalid-relationship",
+        vec![Operation::CreateBinding { binding: relation }],
+    );
+    assert!(
+        matches!(engine.commit(create), Err(EngineError::Schema(message)) if message.contains("empty relationship type"))
+    );
+}
+
+#[test]
 fn queries_bounds_alignment_and_distribution_share_the_transaction_engine() {
     let mut engine = engine();
     let query = Query {
@@ -689,6 +756,7 @@ fn remote_changes_are_repaired_on_a_fork_before_adoption() {
             target_shape_id: ShapeId::from("shape:missing"),
             source_handle: "end".into(),
             anchor: BindingAnchor::Center,
+            relation_type: None,
             version: RecordVersion(1),
         },
     );
@@ -855,6 +923,7 @@ fn offline_list_text_delete_and_reparent_edits_converge() {
             target_shape_id: ShapeId::from("shape:b"),
             source_handle: "end".into(),
             anchor: BindingAnchor::Center,
+            relation_type: None,
             version: RecordVersion(1),
         },
     );

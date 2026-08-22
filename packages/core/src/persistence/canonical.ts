@@ -101,6 +101,7 @@ export function toCanonicalDocumentSnapshot(
 				binding.anchor.kind === 'center'
 					? { kind: 'center' }
 					: { kind: 'edge', x: binding.anchor.nx, y: binding.anchor.ny },
+			relation_type: binding.relationType ?? null,
 			version: 1
 		};
 	}
@@ -193,7 +194,10 @@ export function fromEditorProjection(projection: EditorProjection, snapshot?: Na
 			anchor:
 				binding.anchor.kind === 'center'
 					? { kind: 'center' }
-					: { kind: 'edge', nx: binding.anchor.x, ny: binding.anchor.y }
+					: { kind: 'edge', nx: binding.anchor.x, ny: binding.anchor.y },
+			...(binding.relation_type === null || binding.relation_type === undefined
+				? {}
+				: { relationType: binding.relation_type })
 		};
 	}
 	const assets = Object.fromEntries(
@@ -278,7 +282,10 @@ export function fromCanonicalDocumentSnapshot(snapshot: NativeDocumentSnapshot):
 			anchor:
 				binding.anchor.kind === 'center'
 					? { kind: 'center' }
-					: { kind: 'edge', nx: binding.anchor.x, ny: binding.anchor.y }
+					: { kind: 'edge', nx: binding.anchor.x, ny: binding.anchor.y },
+			...(binding.relation_type === null || binding.relation_type === undefined
+				? {}
+				: { relationType: binding.relation_type })
 		};
 	}
 
@@ -874,6 +881,7 @@ function nativeBinding(binding: import('../model').BindingRecord): NativeBinding
 			binding.anchor.kind === 'center'
 				? { kind: 'center' }
 				: { kind: 'edge', x: binding.anchor.nx, y: binding.anchor.ny },
+		relation_type: binding.relationType ?? null,
 		version: 1
 	};
 }

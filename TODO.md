@@ -82,13 +82,13 @@ the CLI, and agents.
 
 ### Semantic connections
 
-- [ ] Add an optional relation type to Rust binding records and generated
+- [x] Add an optional relation type to Rust binding records and generated
       bindings
-- [ ] Query incoming, outgoing, and typed relationships in Rust without
+- [x] Query incoming, outgoing, and typed relationships in Rust without
       inferring them from coordinates
-- [ ] Validate dangling or invalid relationship references separately from
+- [x] Validate dangling or invalid relationship references separately from
       visual routing
-- [ ] Add model, CLI, and editor integration tests for typed relationships
+- [x] Add model, CLI, and editor integration tests for typed relationships
 
 ## Layout operations
 

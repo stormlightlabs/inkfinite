@@ -943,6 +943,9 @@ pub struct BindingRecord {
     pub source_handle: String,
     /// Attachment point on the target.
     pub anchor: BindingAnchor,
+    /// Optional semantic relationship type, such as `depends_on`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relation_type: Option<String>,
     /// Version used by optimistic operation preconditions.
     pub version: RecordVersion,
 }

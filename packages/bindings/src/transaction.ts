@@ -585,6 +585,18 @@ export type Query = {
 	 */
 	tag: string | null;
 	/**
+	 * Match one exact semantic relationship type.
+	 */
+	relation_type: string | null;
+	/**
+	 * Restrict relationship records to those incoming to this shape.
+	 */
+	incoming_to: ShapeId | null;
+	/**
+	 * Restrict relationship records to those outgoing from this shape.
+	 */
+	outgoing_from: ShapeId | null;
+	/**
 	 * Match one exact shape registry key.
 	 */
 	shape_kind: string | null;

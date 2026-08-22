@@ -423,6 +423,12 @@ pub struct Query {
     pub role: Option<String>,
     /// Match one exact tag.
     pub tag: Option<String>,
+    /// Match one exact semantic relationship type.
+    pub relation_type: Option<String>,
+    /// Restrict relationship records to those incoming to this shape.
+    pub incoming_to: Option<ShapeId>,
+    /// Restrict relationship records to those outgoing from this shape.
+    pub outgoing_from: Option<ShapeId>,
     /// Match one exact shape registry key.
     pub shape_kind: Option<String>,
     /// Restrict the query to one page.

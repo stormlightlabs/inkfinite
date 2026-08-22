@@ -185,6 +185,13 @@
           "$ref": "#/$defs/BindingKind",
           "description": "Registry key describing binding behavior."
         },
+        "relation_type": {
+          "description": "Optional semantic relationship type, such as `depends_on`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "source_handle": {
           "description": "Named source handle, such as `start` or `end`.",
           "type": "string"
@@ -1266,6 +1273,17 @@
           "description": "Include complete matching records in the response.",
           "type": "boolean"
         },
+        "incoming_to": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShapeId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Restrict relationship records to those incoming to this shape."
+        },
         "layer_id": {
           "anyOf": [
             {
@@ -1294,6 +1312,17 @@
             "null"
           ]
         },
+        "outgoing_from": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShapeId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Restrict relationship records to those outgoing from this shape."
+        },
         "page_id": {
           "anyOf": [
             {
@@ -1307,6 +1336,13 @@
         },
         "parent_id": {
           "description": "Restrict shapes to one direct parent.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "relation_type": {
+          "description": "Match one exact semantic relationship type.",
           "type": [
             "string",
             "null"

@@ -69,9 +69,11 @@ selection controls expose those fields for ordinary objects, show provenance
 for a single selection, and keep metadata through conversion, grouping,
 duplication, and SVG export where the format has a representation.
 
-Bindings still need an optional relation type so people and agents can query
-typed incoming and outgoing relationships without inferring meaning from
-coordinates or visual style.
+Bindings carry an optional relation type for semantic connections. Rust, the
+CLI, and the editor projection preserve the type and shape references. Queries
+can select typed bindings and filter their incoming or outgoing shape, while
+visual routing validation remains separate from relationship-reference
+validation.
 
 ### Layout operations
 

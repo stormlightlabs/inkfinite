@@ -185,6 +185,13 @@
           "$ref": "#/$defs/BindingKind",
           "description": "Registry key describing binding behavior."
         },
+        "relation_type": {
+          "description": "Optional semantic relationship type, such as `depends_on`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "source_handle": {
           "description": "Named source handle, such as `start` or `end`.",
           "type": "string"

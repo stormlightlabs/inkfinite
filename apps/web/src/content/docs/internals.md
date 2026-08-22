@@ -76,7 +76,9 @@ editor model.
 `inkfinite-core` owns the native document session. Its shapes have a registry `kind`, a parent
 relation, a parent-relative transform, ordered container children, kind-specific properties,
 semantic metadata, common style, and a record version. Semantic metadata includes optional names,
-roles, descriptions, sources, links, tags, custom JSON fields, and provenance.
+roles, descriptions, sources, links, tags, custom JSON fields, and provenance. Binding records can
+also carry an optional relation type with source and target shape IDs; the query API filters those
+records by type and direction.
 Pages own ordered layers; layers own ordered root shapes.
 Containers can own nested shapes and optionally apply free, stack, or grid layout.
 

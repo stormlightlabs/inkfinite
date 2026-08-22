@@ -55,6 +55,7 @@ pub fn connect_shapes(args: ConnectArgs, json_output: bool, stdout: &mut dyn Wri
         target_shape_id: target_shape,
         source_handle: args.source_handle,
         anchor,
+        relation_type: args.relation_type,
         version: RecordVersion(1),
     };
     let transaction = target.transaction(

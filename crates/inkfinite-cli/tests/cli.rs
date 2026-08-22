@@ -699,6 +699,41 @@ fn structured_commands_use_semantic_selectors_for_layout_and_connections() {
     ]);
     assert_success(&connected);
     assert_eq!(parse_stdout(&connected)["created"][0]["kind"], "binding");
+
+    let relation = run([
+        "connect",
+        path(&document_path),
+        "--binding-id",
+        "binding:service-database",
+        "--source",
+        "shape:one",
+        "--target",
+        "shape:two",
+        "--kind",
+        "relation",
+        "--relation-type",
+        "depends_on",
+        "--json",
+    ]);
+    assert_success(&relation);
+
+    let outgoing = run([
+        "query",
+        path(&document_path),
+        "--outgoing-from",
+        "shape:one",
+        "--relation-type",
+        "depends_on",
+        "--detail",
+        "--json",
+    ]);
+    assert_success(&outgoing);
+    let result = parse_stdout(&outgoing);
+    assert_eq!(
+        result["records"],
+        serde_json::json!([{ "kind": "binding", "id": "binding:service-database" }])
+    );
+    assert_eq!(result["details"][0]["record"]["relation_type"], "depends_on");
 }
 
 #[test]

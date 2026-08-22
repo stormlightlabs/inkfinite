@@ -458,6 +458,18 @@ describe("BindingRecord", () => {
       expect(binding.id).toBe("binding:custom");
     });
 
+    it("should create a typed semantic relationship", () => {
+      const relation = BindingRecord.createRelation("service", "database", "depends_on", "binding:depends-on");
+
+      expect(relation).toMatchObject({
+        id: "binding:depends-on",
+        type: "relation",
+        fromShapeId: "service",
+        toShapeId: "database",
+        relationType: "depends_on"
+      });
+    });
+
     it.each([{ handle: "start" as const }, { handle: "end" as const }])(
       "should create binding with handle: $handle",
       ({ handle }) => {
@@ -677,15 +689,46 @@ describe("validateDoc", () => {
         "rect1",
       );
       const binding = BindingRecord.create("arrow1", "rect1", "end", { kind: "center" }, "binding1");
+      const relation = BindingRecord.createRelation("rect1", "arrow1", "depends_on", "relation1");
 
       page.shapeIds = ["arrow1", "rect1"];
       doc.pages = { page1: page };
       doc.shapes = { arrow1: arrow, rect1: rect };
-      doc.bindings = { binding1: binding };
+      doc.bindings = { binding1: binding, relation1: relation };
 
       const result = validateDoc(doc);
 
       expect(result.ok).toBe(true);
+    });
+
+    it("should reject an empty semantic relationship type", () => {
+      const doc = Document.create();
+      const page = PageRecord.create("Page 1", "page1");
+      const source = ShapeRecord.createRect("page1", 0, 0, {
+        w: 50,
+        h: 50,
+        fill: "#fff",
+        stroke: "#000",
+        radius: 0,
+      }, "source");
+      const target = ShapeRecord.createRect("page1", 100, 0, {
+        w: 50,
+        h: 50,
+        fill: "#fff",
+        stroke: "#000",
+        radius: 0,
+      }, "target");
+      const relation = BindingRecord.createRelation(source.id, target.id, "", "relation1");
+
+      page.shapeIds = [source.id, target.id];
+      doc.pages = { page1: page };
+      doc.shapes = { source, target };
+      doc.bindings = { relation1: relation };
+
+      const result = validateDoc(doc);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.errors).toContain("Relationship 'relation1' has an empty relation type");
     });
   });
 

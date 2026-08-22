@@ -168,6 +168,8 @@ pub struct EditorBinding {
     pub handle: String,
     /// Target anchor.
     pub anchor: BindingAnchor,
+    /// Optional semantic relationship type.
+    pub relation_type: Option<String>,
 }
 
 /// Ordering information accompanying an editor projection.
@@ -443,6 +445,7 @@ pub fn project_editor(snapshot: &DocumentSnapshot) -> EditorProjection {
                     to_shape_id: binding.target_shape_id.clone(),
                     handle: binding.source_handle.clone(),
                     anchor: binding.anchor,
+                    relation_type: binding.relation_type.clone(),
                 },
             )
         })
@@ -1350,11 +1353,18 @@ mod tests {
             target_shape_id: ShapeId::from("shape:child"),
             source_handle: "end".into(),
             anchor: BindingAnchor::Center,
+            relation_type: Some("depends_on".into()),
             version: RecordVersion(1),
         };
         snapshot.document.bindings.insert(binding.id.clone(), binding);
         let projection = project_editor(&snapshot);
         assert_eq!(projection.order.page_ids, snapshot.document.page_ids);
         assert_eq!(projection.bindings[&BindingId::from("binding:one")].handle, "end");
+        assert_eq!(
+            projection.bindings[&BindingId::from("binding:one")]
+                .relation_type
+                .as_deref(),
+            Some("depends_on")
+        );
     }
 }

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createEditorReconciliationRequest, toCanonicalDocumentSnapshot } from '../src/persistence/canonical';
+import {
+	createEditorReconciliationRequest,
+	fromCanonicalDocumentSnapshot,
+	toCanonicalDocumentSnapshot
+} from '../src/persistence/canonical';
 import { contentObjectToCard } from '../src/cards';
-import { LayerRecord, PageRecord, ShapeRecord, type Document, type PathProps } from '../src/model';
+import { BindingRecord, LayerRecord, PageRecord, ShapeRecord, type Document, type PathProps } from '../src/model';
 
 describe('toCanonicalDocumentSnapshot', () => {
 	it('projects browser shapes into the canonical renderer input', () => {
@@ -34,6 +38,42 @@ describe('toCanonicalDocumentSnapshot', () => {
 			properties: { w: 40, h: 20, fill: 'red' },
 			metadata: { agent_editable: true }
 		});
+	});
+
+	it('round-trips typed relationships through the native projection', () => {
+		const page = PageRecord.create('Page 1', 'page:one');
+		const source = ShapeRecord.createRect(
+			page.id,
+			0,
+			0,
+			{ w: 40, h: 20, fill: 'red', stroke: 'none', radius: 0 },
+			'shape:source'
+		);
+		const target = ShapeRecord.createRect(
+			page.id,
+			100,
+			0,
+			{ w: 40, h: 20, fill: 'blue', stroke: 'none', radius: 0 },
+			'shape:target'
+		);
+		page.shapeIds = [source.id, target.id];
+		const relation = BindingRecord.createRelation(source.id, target.id, 'depends_on', 'binding:depends-on');
+		const document: Document = {
+			pages: { [page.id]: page },
+			shapes: { [source.id]: source, [target.id]: target },
+			bindings: { [relation.id]: relation }
+		};
+
+		const snapshot = toCanonicalDocumentSnapshot(document, { documentId: 'document:relation' });
+		expect(snapshot.document.bindings[relation.id]).toMatchObject({
+			kind: 'relation',
+			relation_type: 'depends_on',
+			source_shape_id: source.id,
+			target_shape_id: target.id
+		});
+
+		const roundTripped = fromCanonicalDocumentSnapshot(snapshot);
+		expect(roundTripped.bindings[relation.id]).toMatchObject(relation);
 	});
 
 	it('persists card metadata and child ordering in the native container', () => {

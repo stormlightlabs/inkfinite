@@ -249,6 +249,10 @@ export type EditorBinding = {
 	 * Target anchor.
 	 */
 	anchor: BindingAnchor;
+	/**
+	 * Optional semantic relationship type.
+	 */
+	relation_type: string | null;
 };
 
 /**

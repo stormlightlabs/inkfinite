@@ -124,6 +124,18 @@ To hand the edit to another process without changing the document, add
 and refuses to overwrite an existing output file. Run `shape kinds` or `shape describe KIND` to
 discover shape contracts.
 
+Use `connect --kind relation --relation-type TYPE` for a semantic connection that does not
+participate in arrow routing. Query its direction or type with `--outgoing-from`, `--incoming-to`,
+and `--relation-type`:
+
+```sh
+inkfinite connect architecture.inkfinite \
+  --source shape:service --target shape:database \
+  --kind relation --relation-type depends_on --json
+inkfinite query architecture.inkfinite \
+  --outgoing-from shape:service --relation-type depends_on --detail --json
+```
+
 ## Live mode
 
 With the desktop app running, use `app status`, `app context`, `app inspect`, and `app query` for
