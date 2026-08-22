@@ -91,7 +91,7 @@ pub enum Command {
     inkfinite connect architecture.inkfinite --binding-id binding:api-db --source shape:arrow --target-role architecture.database
 ")]
     Connect(ConnectArgs),
-    /// Align or distribute shapes through the transaction engine.
+    /// Arrange selected shapes through the transaction engine.
     #[command(subcommand)]
     Layout(LayoutCommand),
     /// Render a canonical document to SVG or PNG.
@@ -417,6 +417,12 @@ pub enum LayoutCommand {
     Align(LayoutAlignArgs),
     /// Distribute three or more selected shapes with equal gaps.
     Distribute(LayoutDistributeArgs),
+    /// Stack two or more selected shapes along one axis.
+    Stack(LayoutStackArgs),
+    /// Arrange two or more selected shapes in a row-major grid.
+    Grid(LayoutGridArgs),
+    /// Tidy two or more selected shapes into a balanced grid.
+    Tidy(LayoutTidyArgs),
 }
 
 #[derive(Debug, Args)]
@@ -451,6 +457,57 @@ pub struct LayoutDistributeArgs {
     /// Distribution axis.
     #[arg(long, value_enum)]
     pub axis: AxisArg,
+    #[command(flatten)]
+    pub selection: LayoutSelectionArgs,
+    #[command(flatten)]
+    pub mutation: MutationOptions,
+}
+
+#[derive(Debug, Args)]
+pub struct LayoutStackArgs {
+    /// Canonical document to change. Omit when using --app.
+    #[arg(value_name = "FILE")]
+    pub path: Option<PathBuf>,
+    /// Stack axis.
+    #[arg(long, value_enum)]
+    pub axis: AxisArg,
+    /// Space between adjacent shapes.
+    #[arg(long, default_value_t = 24.0)]
+    pub gap: f64,
+    #[command(flatten)]
+    pub selection: LayoutSelectionArgs,
+    #[command(flatten)]
+    pub mutation: MutationOptions,
+}
+
+#[derive(Debug, Args)]
+pub struct LayoutGridArgs {
+    /// Canonical document to change. Omit when using --app.
+    #[arg(value_name = "FILE")]
+    pub path: Option<PathBuf>,
+    /// Number of columns in the grid.
+    #[arg(long, default_value_t = 2, value_parser = clap::value_parser!(u32).range(1..))]
+    pub columns: u32,
+    /// Horizontal space between columns.
+    #[arg(long, default_value_t = 24.0)]
+    pub column_gap: f64,
+    /// Vertical space between rows.
+    #[arg(long, default_value_t = 24.0)]
+    pub row_gap: f64,
+    #[command(flatten)]
+    pub selection: LayoutSelectionArgs,
+    #[command(flatten)]
+    pub mutation: MutationOptions,
+}
+
+#[derive(Debug, Args)]
+pub struct LayoutTidyArgs {
+    /// Canonical document to change. Omit when using --app.
+    #[arg(value_name = "FILE")]
+    pub path: Option<PathBuf>,
+    /// Space between tidy grid cells.
+    #[arg(long, default_value_t = 24.0)]
+    pub gap: f64,
     #[command(flatten)]
     pub selection: LayoutSelectionArgs,
     #[command(flatten)]

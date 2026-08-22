@@ -588,6 +588,24 @@
 				icon: 'grid-dots',
 				disabled: selectionCount < 2
 			},
+			{
+				id: 'tidy',
+				label: SELECTION_COMMAND_LABELS.tidy,
+				icon: 'grid-dots',
+				disabled: selectionCount < 2
+			},
+			{
+				id: 'stack-horizontal',
+				label: SELECTION_COMMAND_LABELS['stack-horizontal'],
+				icon: 'arrow-right',
+				disabled: selectionCount < 2
+			},
+			{
+				id: 'stack-vertical',
+				label: SELECTION_COMMAND_LABELS['stack-vertical'],
+				icon: 'arrow-down',
+				disabled: selectionCount < 2
+			},
 			{ type: 'separator' },
 			{
 				id: 'group',

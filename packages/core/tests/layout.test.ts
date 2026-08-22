@@ -1,4 +1,13 @@
-import { alignShapes, distributeShapes, EditorState, groupShapes, ShapeRecord, ungroupShapes } from '../src';
+import {
+	alignShapes,
+	distributeShapes,
+	EditorState,
+	groupShapes,
+	ShapeRecord,
+	stackShapes,
+	tidyShapes,
+	ungroupShapes
+} from '../src';
 import { describe, expect, it } from 'vitest';
 
 function stateWithShapes() {
@@ -34,6 +43,31 @@ describe('layout commands', () => {
 		expect(positions).toEqual([45, 0, 80]);
 		expect(distributed.doc.shapes.one.x - distributed.doc.shapes.two.x - 20).toBe(25);
 		expect(distributed.doc.shapes.three.x - distributed.doc.shapes.one.x - 10).toBe(25);
+	});
+
+	it('stacks selected shapes in deterministic order and keeps locked anchors fixed', () => {
+		const state = stateWithShapes();
+		state.doc.shapes.two.locked = true;
+		const stacked = stackShapes(state, state.ui.selectionIds, 'horizontal', 5);
+
+		expect(stacked.doc.shapes.one.x).toBe(25);
+		expect(stacked.doc.shapes.two.x).toBe(0);
+		expect(stacked.doc.shapes.three.x).toBe(40);
+	});
+
+	it('tidies mixed-size selections into a stable grid', () => {
+		const state = stateWithShapes();
+		const tidied = tidyShapes(state, state.ui.selectionIds, 10);
+		const bounds = state.ui.selectionIds.map((id) => {
+			const shape = tidied.doc.shapes[id];
+			return [shape.x, shape.y];
+		});
+
+		expect(bounds).toEqual([
+			[30, 0],
+			[0, 0],
+			[0, 30]
+		]);
 	});
 
 	it('groups and ungroups without changing child world positions or metadata', () => {

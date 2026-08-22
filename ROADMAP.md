@@ -77,16 +77,16 @@ validation.
 
 ### Layout operations
 
-Align and distribute already use the shared transaction engine across the
-editor and CLI, and the native model can represent stack and grid container
-layouts. The next operations are stack, grid, and tidy for ordinary selections.
-Add tree and flow layouts once typed connections can guide them, followed by
-radial layout where it serves real documents.
+Align, distribute, stack, grid, and tidy use the shared transaction engine
+across the editor and CLI. Selection layout orders shapes by world-space bounds,
+works across layers and nested parents, translates nested shapes in their local
+coordinate systems, and treats locked objects as fixed anchors. Grid and tidy
+use deterministic row-major placement with spacing derived from the selection.
 
-New operations need deterministic ordering and spacing rules, must respect
-nesting and locks, and must preserve connector attachment and semantic
-relationships. They should participate in the normal transaction, undo, merge,
-inspection, and stale-head workflows.
+Layout changes move shape records only. Connector endpoints and semantic
+relationship bindings keep their shape references and attachment metadata, and
+all selection operations use the normal transaction, undo, merge, inspection,
+and stale-head workflows.
 
 ### Agent proposal review
 

@@ -1150,6 +1150,129 @@
             "expected_versions"
           ],
           "type": "object"
+        },
+        {
+          "description": "Stack two or more shapes along one axis with a shared cross-axis center.",
+          "properties": {
+            "axis": {
+              "$ref": "#/$defs/LayoutAxis",
+              "description": "Axis on which to stack the shapes."
+            },
+            "expected_versions": {
+              "additionalProperties": {
+                "$ref": "#/$defs/RecordVersion"
+              },
+              "description": "Optional optimistic versions keyed by shape ID.",
+              "type": "object"
+            },
+            "gap": {
+              "description": "Space between adjacent shape bounds.",
+              "format": "double",
+              "type": "number"
+            },
+            "shape_ids": {
+              "description": "Shapes to stack.",
+              "items": {
+                "$ref": "#/$defs/ShapeId"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "stack_shapes",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "shape_ids",
+            "axis",
+            "gap",
+            "expected_versions"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Arrange two or more shapes in a deterministic row-major grid.",
+          "properties": {
+            "column_gap": {
+              "description": "Horizontal space between grid columns.",
+              "format": "double",
+              "type": "number"
+            },
+            "columns": {
+              "description": "Number of columns in the grid.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "expected_versions": {
+              "additionalProperties": {
+                "$ref": "#/$defs/RecordVersion"
+              },
+              "description": "Optional optimistic versions keyed by shape ID.",
+              "type": "object"
+            },
+            "row_gap": {
+              "description": "Vertical space between grid rows.",
+              "format": "double",
+              "type": "number"
+            },
+            "shape_ids": {
+              "description": "Shapes to arrange.",
+              "items": {
+                "$ref": "#/$defs/ShapeId"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "grid_shapes",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "shape_ids",
+            "columns",
+            "column_gap",
+            "row_gap",
+            "expected_versions"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Tidy two or more shapes into a balanced row-major grid.",
+          "properties": {
+            "expected_versions": {
+              "additionalProperties": {
+                "$ref": "#/$defs/RecordVersion"
+              },
+              "description": "Optional optimistic versions keyed by shape ID.",
+              "type": "object"
+            },
+            "gap": {
+              "description": "Space between grid cells.",
+              "format": "double",
+              "type": "number"
+            },
+            "shape_ids": {
+              "description": "Shapes to tidy.",
+              "items": {
+                "$ref": "#/$defs/ShapeId"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "tidy_shapes",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "shape_ids",
+            "gap",
+            "expected_versions"
+          ],
+          "type": "object"
         }
       ]
     },

@@ -112,6 +112,11 @@ inkfinite import svg architecture.inkfinite \
   --input icon.svg --dry-run --json
 ```
 
+`layout` supports `align`, `distribute`, `stack`, `grid`, and `tidy`. Select
+shapes with repeated `--shape` flags or one `--role` selector; stack accepts
+`--axis` and `--gap`, grid accepts `--columns`, `--column-gap`, and
+`--row-gap`, and tidy accepts `--gap`.
+
 `import svg` creates the retained source asset, native group containers, and
 supported shapes in one validated transaction. Use `--page` or `--layer` to
 choose a target; otherwise the first page and layer receive the import.

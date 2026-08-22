@@ -3,7 +3,9 @@
 use std::collections::BTreeMap;
 
 use crate::crdt::{AutomergeDocument, CrdtDocument};
-use crate::proto::{Bounds, LayerPatch, Operation, Query, ShapeAlignment, ShapePatch, TransactionDraft, TransactionId};
+use crate::proto::{
+    Bounds, LayerPatch, LayoutAxis, Operation, Query, ShapeAlignment, ShapePatch, TransactionDraft, TransactionId,
+};
 use crate::{
     ActorId, BindingAnchor, BindingId, BindingKind, BindingRecord, Document, DocumentId, LayerId, LayerRecord, Opacity,
     Origin, PageId, PageRecord, Provenance, RecordVersion, SemanticMetadata, ShapeId, ShapeKind, ShapeParent,
@@ -13,7 +15,7 @@ use proptest::prelude::*;
 use serde_json::json;
 
 use super::{EngineError, TransactionEngine};
-use crate::engine::geometry::world_transform;
+use crate::engine::geometry::{world_shape_bounds, world_transform};
 
 fn metadata(actor: &str, name: &str) -> SemanticMetadata {
     SemanticMetadata {
@@ -729,6 +731,109 @@ fn queries_bounds_alignment_and_distribution_share_the_transaction_engine() {
             .translation
             .x
     );
+}
+
+#[test]
+fn selection_layout_operations_are_deterministic_and_undoable() {
+    let mut engine = engine();
+    let ids = vec![
+        ShapeId::from("shape:a"),
+        ShapeId::from("shape:b"),
+        ShapeId::from("shape:c"),
+    ];
+    let before = engine.snapshot().unwrap().document;
+    let stack_transaction = transaction(
+        &mut engine,
+        "actor:layout",
+        "stack",
+        vec![Operation::StackShapes {
+            shape_ids: ids.clone(),
+            axis: LayoutAxis::Horizontal,
+            gap: 5.0,
+            expected_versions: BTreeMap::new(),
+        }],
+    );
+    engine.commit(stack_transaction).unwrap();
+    let stacked = engine.snapshot().unwrap().document;
+    assert_eq!(stacked.shapes[&ids[0]].transform.translation.x, 0.0);
+    assert_eq!(stacked.shapes[&ids[1]].transform.translation.x, 15.0);
+    assert_eq!(stacked.shapes[&ids[2]].transform.translation.x, 30.0);
+
+    engine.undo(&ActorId::from("actor:layout")).unwrap();
+    let restored = engine.snapshot().unwrap().document;
+    for id in &ids {
+        assert_eq!(restored.shapes[id].transform, before.shapes[id].transform);
+    }
+
+    let grid_transaction = transaction(
+        &mut engine,
+        "actor:layout",
+        "grid",
+        vec![Operation::GridShapes {
+            shape_ids: ids.clone(),
+            columns: 2,
+            column_gap: 10.0,
+            row_gap: 10.0,
+            expected_versions: BTreeMap::new(),
+        }],
+    );
+    engine.commit(grid_transaction).unwrap();
+    let gridded = engine.snapshot().unwrap().document;
+    assert_eq!(gridded.shapes[&ids[0]].transform.translation, Vec2 { x: 0.0, y: 20.0 });
+    assert_eq!(gridded.shapes[&ids[1]].transform.translation, Vec2 { x: 20.0, y: 20.0 });
+    assert_eq!(gridded.shapes[&ids[2]].transform.translation, Vec2 { x: 0.0, y: 35.0 });
+}
+
+#[test]
+fn mixed_nested_locked_layout_preserves_bindings_and_world_geometry() {
+    let mut document = document();
+    let container_id = ShapeId::from("shape:a");
+    let child_id = ShapeId::from("shape:c");
+    let locked_id = ShapeId::from("shape:b");
+    document.shapes.get_mut(&container_id).unwrap().kind = ShapeKind::from(crate::CONTAINER_KIND);
+    document.shapes.get_mut(&container_id).unwrap().layout = Some(crate::ContainerLayout::Free);
+    document.shapes.get_mut(&container_id).unwrap().child_ids = vec![child_id.clone()];
+    document.shapes.get_mut(&container_id).unwrap().transform.scale_x = 2.0;
+    document.shapes.get_mut(&child_id).unwrap().parent = ShapeParent::Shape(container_id.clone());
+    document.layers.get_mut(&LayerId::from("layer:one")).unwrap().shape_ids = vec![container_id, locked_id.clone()];
+    document.shapes.get_mut(&locked_id).unwrap().metadata.locked = true;
+    document.bindings.insert(
+        BindingId::from("binding:layout"),
+        BindingRecord {
+            id: BindingId::from("binding:layout"),
+            kind: BindingKind::from("relation"),
+            source_shape_id: ShapeId::from("shape:a"),
+            target_shape_id: locked_id.clone(),
+            source_handle: "end".into(),
+            anchor: BindingAnchor::Center,
+            relation_type: Some("depends_on".into()),
+            version: RecordVersion(1),
+        },
+    );
+    let mut engine = TransactionEngine::create(
+        DocumentId::from("document:layout-nesting"),
+        ActorId::from("actor:layout"),
+        document,
+    )
+    .unwrap();
+    let before_binding = engine.snapshot().unwrap().document.bindings;
+    let transaction = transaction(
+        &mut engine,
+        "actor:layout",
+        "align nested selection",
+        vec![Operation::AlignShapes {
+            shape_ids: vec![child_id.clone(), locked_id.clone()],
+            alignment: ShapeAlignment::Left,
+            expected_versions: BTreeMap::new(),
+        }],
+    );
+    engine.commit(transaction).unwrap();
+    let after = engine.snapshot().unwrap().document;
+    let child_bounds = world_shape_bounds(&after, &child_id);
+    let locked_bounds = world_shape_bounds(&after, &locked_id);
+    assert_eq!(child_bounds.x, locked_bounds.x);
+    assert_eq!(after.shapes[&locked_id].transform.translation.x, 30.0);
+    assert_eq!(after.bindings, before_binding);
 }
 
 #[test]

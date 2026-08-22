@@ -1,5 +1,5 @@
 use super::geometry::{union, world_shape_bounds};
-use super::hierarchy::{containing_layer, descendant_ids_for_layer};
+use super::hierarchy::{containing_layer, descendant_ids_for_layer, descendant_ids_for_shape};
 use super::query::record_id_order;
 use super::{AffectedRegion, BTreeMap, BTreeSet, Bounds, Document, DocumentPatch, PageId, RecordId, ShapeId};
 
@@ -111,8 +111,9 @@ pub fn visual_shape_ids(document: &Document, id: &RecordId) -> BTreeSet<ShapeId>
         RecordId::Shape(shape_id) => document
             .shapes
             .contains_key(shape_id)
-            .then(|| shape_id.clone())
+            .then(|| std::iter::once(shape_id.clone()).chain(descendant_ids_for_shape(document, shape_id)))
             .into_iter()
+            .flatten()
             .collect(),
         RecordId::Layer(layer_id) => descendant_ids_for_layer(document, layer_id).collect(),
         RecordId::Page(page_id) => document

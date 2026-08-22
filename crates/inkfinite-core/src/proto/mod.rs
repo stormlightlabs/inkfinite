@@ -15,7 +15,7 @@ use ts_rs::TS;
 pub const PROTOCOL_ID: &str = "inkfinite.protocol";
 
 /// Current transport-independent protocol version.
-pub const PROTOCOL_VERSION: u32 = 6;
+pub const PROTOCOL_VERSION: u32 = 7;
 
 /// Stable identifier for a transaction.
 #[derive(Clone, Debug, Eq, Hash, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS)]
@@ -292,6 +292,39 @@ pub enum Operation {
         shape_ids: Vec<ShapeId>,
         /// Axis on which to distribute the shapes.
         axis: LayoutAxis,
+        /// Optional optimistic versions keyed by shape ID.
+        expected_versions: BTreeMap<ShapeId, RecordVersion>,
+    },
+    /// Stack two or more shapes along one axis with a shared cross-axis center.
+    StackShapes {
+        /// Shapes to stack.
+        shape_ids: Vec<ShapeId>,
+        /// Axis on which to stack the shapes.
+        axis: LayoutAxis,
+        /// Space between adjacent shape bounds.
+        gap: f64,
+        /// Optional optimistic versions keyed by shape ID.
+        expected_versions: BTreeMap<ShapeId, RecordVersion>,
+    },
+    /// Arrange two or more shapes in a deterministic row-major grid.
+    GridShapes {
+        /// Shapes to arrange.
+        shape_ids: Vec<ShapeId>,
+        /// Number of columns in the grid.
+        columns: u32,
+        /// Horizontal space between grid columns.
+        column_gap: f64,
+        /// Vertical space between grid rows.
+        row_gap: f64,
+        /// Optional optimistic versions keyed by shape ID.
+        expected_versions: BTreeMap<ShapeId, RecordVersion>,
+    },
+    /// Tidy two or more shapes into a balanced row-major grid.
+    TidyShapes {
+        /// Shapes to tidy.
+        shape_ids: Vec<ShapeId>,
+        /// Space between grid cells.
+        gap: f64,
         /// Optional optimistic versions keyed by shape ID.
         expected_versions: BTreeMap<ShapeId, RecordVersion>,
     },

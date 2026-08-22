@@ -1318,6 +1318,21 @@ fn operation_preview(
             shape_ids.iter().cloned().map(RecordId::Shape).collect(),
             shape_ids.clone(),
         ),
+        Operation::StackShapes { shape_ids, .. } => (
+            format!("Stack {} shapes", shape_ids.len()),
+            shape_ids.iter().cloned().map(RecordId::Shape).collect(),
+            shape_ids.clone(),
+        ),
+        Operation::GridShapes { shape_ids, .. } => (
+            format!("Arrange {} shapes in a grid", shape_ids.len()),
+            shape_ids.iter().cloned().map(RecordId::Shape).collect(),
+            shape_ids.clone(),
+        ),
+        Operation::TidyShapes { shape_ids, .. } => (
+            format!("Tidy {} shapes", shape_ids.len()),
+            shape_ids.iter().cloned().map(RecordId::Shape).collect(),
+            shape_ids.clone(),
+        ),
     };
     let mut bounds = Vec::new();
     for shape_id in shape_ids {

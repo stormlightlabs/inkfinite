@@ -404,6 +404,63 @@ export type Operation =
 			 * Optional optimistic versions keyed by shape ID.
 			 */
 			expected_versions: { [key in ShapeId]: RecordVersion };
+	  }
+	| {
+			type: 'stack_shapes';
+			/**
+			 * Shapes to stack.
+			 */
+			shape_ids: Array<ShapeId>;
+			/**
+			 * Axis on which to stack the shapes.
+			 */
+			axis: LayoutAxis;
+			/**
+			 * Space between adjacent shape bounds.
+			 */
+			gap: number;
+			/**
+			 * Optional optimistic versions keyed by shape ID.
+			 */
+			expected_versions: { [key in ShapeId]: RecordVersion };
+	  }
+	| {
+			type: 'grid_shapes';
+			/**
+			 * Shapes to arrange.
+			 */
+			shape_ids: Array<ShapeId>;
+			/**
+			 * Number of columns in the grid.
+			 */
+			columns: number;
+			/**
+			 * Horizontal space between grid columns.
+			 */
+			column_gap: number;
+			/**
+			 * Vertical space between grid rows.
+			 */
+			row_gap: number;
+			/**
+			 * Optional optimistic versions keyed by shape ID.
+			 */
+			expected_versions: { [key in ShapeId]: RecordVersion };
+	  }
+	| {
+			type: 'tidy_shapes';
+			/**
+			 * Shapes to tidy.
+			 */
+			shape_ids: Array<ShapeId>;
+			/**
+			 * Space between grid cells.
+			 */
+			gap: number;
+			/**
+			 * Optional optimistic versions keyed by shape ID.
+			 */
+			expected_versions: { [key in ShapeId]: RecordVersion };
 	  };
 
 /**

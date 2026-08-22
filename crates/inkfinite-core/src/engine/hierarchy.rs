@@ -318,7 +318,11 @@ pub fn operation_shape_ids(operation: &Operation) -> Vec<ShapeId> {
         | Operation::ReparentShape { shape_id, .. }
         | Operation::DeleteShape { shape_id, .. } => vec![shape_id.clone()],
         Operation::CreateBinding { binding } => vec![binding.source_shape_id.clone(), binding.target_shape_id.clone()],
-        Operation::AlignShapes { shape_ids, .. } | Operation::DistributeShapes { shape_ids, .. } => shape_ids.clone(),
+        Operation::AlignShapes { shape_ids, .. }
+        | Operation::DistributeShapes { shape_ids, .. }
+        | Operation::StackShapes { shape_ids, .. }
+        | Operation::GridShapes { shape_ids, .. }
+        | Operation::TidyShapes { shape_ids, .. } => shape_ids.clone(),
         _ => Vec::new(),
     }
 }

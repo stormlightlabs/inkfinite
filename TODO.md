@@ -97,12 +97,12 @@ as a permanent graph constraint.
 
 ### Selection layout
 
-- [ ] Add deterministic Rust stack operations beside the existing shared align
+- [x] Add deterministic Rust stack operations beside the existing shared align
       and distribute commands, then expose them in TypeScript
-- [ ] Add Rust grid and tidy operations for mixed selections and TypeScript
+- [x] Add Rust grid and tidy operations for mixed selections and TypeScript
       controls and previews
-- [ ] Define deterministic spacing, ordering, nesting, and locked-object rules
-- [ ] Preserve connector attachment and semantic relationships after layout
+- [x] Define deterministic spacing, ordering, nesting, and locked-object rules
+- [x] Preserve connector attachment and semantic relationships after layout
 
 ### Graph layout
 

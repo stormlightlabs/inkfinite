@@ -20,6 +20,18 @@ pub fn validate_transaction_schema(transaction: &TransactionDraft) -> Result<(),
 }
 
 pub fn validate_locks(document: &Document, operation: &Operation) -> Result<(), EngineError> {
+    // Layout treats locked records as fixed anchors and skips their transforms;
+    // the operation itself must therefore be allowed to inspect them.
+    if matches!(
+        operation,
+        Operation::AlignShapes { .. }
+            | Operation::DistributeShapes { .. }
+            | Operation::StackShapes { .. }
+            | Operation::GridShapes { .. }
+            | Operation::TidyShapes { .. }
+    ) {
+        return Ok(());
+    }
     let mut shape_ids = operation_shape_ids(operation);
     if let Operation::ReparentShape { parent: crate::ShapeParent::Shape(parent_id), .. } = operation {
         shape_ids.push(parent_id.clone());

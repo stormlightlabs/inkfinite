@@ -1,5 +1,5 @@
 use super::geometry::{
-    bottom, center_x, center_y, count_as_f64, decompose_transform, local_shape_bounds, parent_world_transform, right,
+    bottom, center_x, center_y, count_as_f64, decompose_transform, parent_world_transform, right, world_shape_bounds,
     world_transform,
 };
 use super::hierarchy::{
@@ -10,9 +10,9 @@ use super::hierarchy::{
 };
 use super::validation::{ensure_binding_endpoints, ensure_relationship_reference};
 use super::{
-    AssetId, AssetPatch, BTreeMap, BTreeSet, Document, EngineError, LayerContentsDisposition, LayerId, LayerPatch,
-    LayoutAxis, Operation, PageId, RecordVersion, ShapeAlignment, ShapeId, ShapeParent, ShapePatch, ShapeProperties,
-    SiblingAnchor, normalize_shape_properties,
+    AssetId, AssetPatch, BTreeMap, BTreeSet, Bounds, Document, EngineError, LayerContentsDisposition, LayerId,
+    LayerPatch, LayoutAxis, Operation, PageId, RecordVersion, ShapeAlignment, ShapeId, ShapeParent, ShapePatch,
+    ShapeProperties, SiblingAnchor, normalize_shape_properties,
 };
 
 #[allow(clippy::too_many_lines)]
@@ -150,6 +150,15 @@ pub fn apply_operation(document: &mut Document, operation: &Operation) -> Result
         }
         Operation::DistributeShapes { shape_ids, axis, expected_versions } => {
             distribute_shapes(document, shape_ids, *axis, expected_versions)
+        }
+        Operation::StackShapes { shape_ids, axis, gap, expected_versions } => {
+            stack_shapes(document, shape_ids, *axis, *gap, expected_versions)
+        }
+        Operation::GridShapes { shape_ids, columns, column_gap, row_gap, expected_versions } => {
+            grid_shapes(document, shape_ids, *columns, *column_gap, *row_gap, expected_versions)
+        }
+        Operation::TidyShapes { shape_ids, gap, expected_versions } => {
+            tidy_shapes(document, shape_ids, *gap, expected_versions)
         }
     }
 }
@@ -550,185 +559,337 @@ pub fn append_binding_restoration(document: &Document, shape_ids: &BTreeSet<Shap
     }
 }
 
+#[derive(Clone, Debug)]
+struct LayoutItem {
+    id: ShapeId,
+    bounds: Bounds,
+    locked: bool,
+}
+
 pub fn align_shapes(
     document: &mut Document, shape_ids: &[ShapeId], alignment: ShapeAlignment,
     expected_versions: &BTreeMap<ShapeId, RecordVersion>,
 ) -> Result<Vec<Operation>, EngineError> {
-    require_distinct_shapes(document, shape_ids, 2, expected_versions)?;
-    require_common_parent(document, shape_ids)?;
-    let bounds: Vec<_> = shape_ids
-        .iter()
-        .map(|id| {
-            document
-                .shapes
-                .get(id)
-                .map(local_shape_bounds)
-                .ok_or_else(|| EngineError::Precondition(format!("shape {id} is missing")))
-        })
-        .collect::<Result<_, _>>()?;
+    let items = layout_items(document, shape_ids, 2, expected_versions)?;
     let target = match alignment {
-        ShapeAlignment::Left => bounds.iter().map(|bounds| bounds.x).fold(f64::INFINITY, f64::min),
-        ShapeAlignment::Center => bounds.iter().map(center_x).sum::<f64>() / count_as_f64(bounds.len())?,
-        ShapeAlignment::Right => bounds.iter().map(right).fold(f64::NEG_INFINITY, f64::max),
-        ShapeAlignment::Top => bounds.iter().map(|bounds| bounds.y).fold(f64::INFINITY, f64::min),
-        ShapeAlignment::Middle => bounds.iter().map(center_y).sum::<f64>() / count_as_f64(bounds.len())?,
-        ShapeAlignment::Bottom => bounds.iter().map(bottom).fold(f64::NEG_INFINITY, f64::max),
+        ShapeAlignment::Left => items.iter().map(|item| item.bounds.x).fold(f64::INFINITY, f64::min),
+        ShapeAlignment::Center => {
+            items.iter().map(|item| center_x(&item.bounds)).sum::<f64>() / count_as_f64(items.len())?
+        }
+        ShapeAlignment::Right => items
+            .iter()
+            .map(|item| right(&item.bounds))
+            .fold(f64::NEG_INFINITY, f64::max),
+        ShapeAlignment::Top => items.iter().map(|item| item.bounds.y).fold(f64::INFINITY, f64::min),
+        ShapeAlignment::Middle => {
+            items.iter().map(|item| center_y(&item.bounds)).sum::<f64>() / count_as_f64(items.len())?
+        }
+        ShapeAlignment::Bottom => items
+            .iter()
+            .map(|item| bottom(&item.bounds))
+            .fold(f64::NEG_INFINITY, f64::max),
     };
-    let deltas = shape_ids
+    let deltas = items
         .iter()
-        .zip(&bounds)
-        .map(|(id, bounds)| {
+        .map(|item| {
             let delta = match alignment {
-                ShapeAlignment::Left => (target - bounds.x, 0.0),
-                ShapeAlignment::Center => (target - center_x(bounds), 0.0),
-                ShapeAlignment::Right => (target - right(bounds), 0.0),
-                ShapeAlignment::Top => (0.0, target - bounds.y),
-                ShapeAlignment::Middle => (0.0, target - center_y(bounds)),
-                ShapeAlignment::Bottom => (0.0, target - bottom(bounds)),
+                ShapeAlignment::Left => (target - item.bounds.x, 0.0),
+                ShapeAlignment::Center => (target - center_x(&item.bounds), 0.0),
+                ShapeAlignment::Right => (target - right(&item.bounds), 0.0),
+                ShapeAlignment::Top => (0.0, target - item.bounds.y),
+                ShapeAlignment::Middle => (0.0, target - center_y(&item.bounds)),
+                ShapeAlignment::Bottom => (0.0, target - bottom(&item.bounds)),
             };
-            (id.clone(), delta)
+            (item.id.clone(), delta)
         })
         .collect();
-    apply_layout_translations(document, shape_ids, &deltas)
+    apply_layout_translations(document, &items, &deltas)
 }
 
 pub fn distribute_shapes(
     document: &mut Document, shape_ids: &[ShapeId], axis: LayoutAxis,
     expected_versions: &BTreeMap<ShapeId, RecordVersion>,
 ) -> Result<Vec<Operation>, EngineError> {
-    require_distinct_shapes(document, shape_ids, 3, expected_versions)?;
-    require_common_parent(document, shape_ids)?;
-    let mut ordered: Vec<_> = shape_ids
-        .iter()
-        .map(|id| {
-            document
-                .shapes
-                .get(id)
-                .map(|shape| (id.clone(), local_shape_bounds(shape)))
-                .ok_or_else(|| EngineError::Precondition(format!("shape {id} is missing")))
-        })
-        .collect::<Result<_, _>>()?;
-    ordered.sort_by(|left, right| {
-        let left_position = match axis {
-            LayoutAxis::Horizontal => left.1.x,
-            LayoutAxis::Vertical => left.1.y,
-        };
-        let right_position = match axis {
-            LayoutAxis::Horizontal => right.1.x,
-            LayoutAxis::Vertical => right.1.y,
-        };
-        left_position
-            .total_cmp(&right_position)
-            .then_with(|| left.0.cmp(&right.0))
-    });
-    let first = ordered
-        .first()
-        .ok_or_else(|| EngineError::Schema("distribution selection is empty".into()))?;
-    let last = ordered
-        .last()
-        .ok_or_else(|| EngineError::Schema("distribution selection is empty".into()))?;
-    let start = match axis {
-        LayoutAxis::Horizontal => first.1.x,
-        LayoutAxis::Vertical => first.1.y,
-    };
-    let end = match axis {
-        LayoutAxis::Horizontal => right(&last.1),
-        LayoutAxis::Vertical => bottom(&last.1),
-    };
-    let total_size: f64 = ordered
-        .iter()
-        .map(|(_, bounds)| match axis {
-            LayoutAxis::Horizontal => bounds.width,
-            LayoutAxis::Vertical => bounds.height,
-        })
-        .sum();
+    let items = layout_items(document, shape_ids, 3, expected_versions)?;
+    let mut ordered = items.clone();
+    ordered.sort_by(|left, right| layout_order(left, right, axis));
+    let first = ordered.first().expect("layout selection has at least three items");
+    let last = ordered.last().expect("layout selection has at least three items");
+    let start = axis_position(&first.bounds, axis);
+    let end = axis_end(&last.bounds, axis);
+    let total_size: f64 = ordered.iter().map(|item| axis_size(&item.bounds, axis)).sum();
     let gap = (end - start - total_size) / count_as_f64(ordered.len() - 1)?;
     let mut cursor = start;
     let mut deltas = BTreeMap::new();
-    for (id, bounds) in &ordered {
-        let position = match axis {
-            LayoutAxis::Horizontal => bounds.x,
-            LayoutAxis::Vertical => bounds.y,
-        };
-        let delta = cursor - position;
-        deltas.insert(
-            id.clone(),
-            match axis {
-                LayoutAxis::Horizontal => (delta, 0.0),
-                LayoutAxis::Vertical => (0.0, delta),
-            },
-        );
-        cursor += match axis {
-            LayoutAxis::Horizontal => bounds.width,
-            LayoutAxis::Vertical => bounds.height,
-        } + gap;
+    for item in &ordered {
+        let delta = cursor - axis_position(&item.bounds, axis);
+        deltas.insert(item.id.clone(), axis_delta(axis, delta));
+        cursor += axis_size(&item.bounds, axis) + gap;
     }
-    apply_layout_translations(document, shape_ids, &deltas)
+    apply_layout_translations(document, &items, &deltas)
 }
 
-pub fn apply_layout_translations(
-    document: &mut Document, shape_ids: &[ShapeId], deltas: &BTreeMap<ShapeId, (f64, f64)>,
+/// Places selected shapes in reading order along one axis and centers them on the other.
+pub fn stack_shapes(
+    document: &mut Document, shape_ids: &[ShapeId], axis: LayoutAxis, gap: f64,
+    expected_versions: &BTreeMap<ShapeId, RecordVersion>,
+) -> Result<Vec<Operation>, EngineError> {
+    ensure_non_negative_spacing(gap, "stack gap")?;
+    let items = layout_items(document, shape_ids, 2, expected_versions)?;
+    let mut ordered = items.clone();
+    ordered.sort_by(|left, right| layout_order(left, right, axis));
+    let axis_start = ordered
+        .iter()
+        .map(|item| axis_position(&item.bounds, axis))
+        .fold(f64::INFINITY, f64::min);
+    let cross_center = ordered
+        .iter()
+        .map(|item| cross_center_position(&item.bounds, axis))
+        .sum::<f64>()
+        / count_as_f64(ordered.len())?;
+    let mut cursor = axis_start;
+    let mut deltas = BTreeMap::new();
+    for item in &ordered {
+        let axis_delta = cursor - axis_position(&item.bounds, axis);
+        let cross_delta = cross_center - cross_center_position(&item.bounds, axis);
+        deltas.insert(item.id.clone(), combine_axis_delta(axis, axis_delta, cross_delta));
+        cursor += axis_size(&item.bounds, axis) + gap;
+    }
+    apply_layout_translations(document, &items, &deltas)
+}
+
+/// Places selected shapes in a deterministic row-major grid.
+pub fn grid_shapes(
+    document: &mut Document, shape_ids: &[ShapeId], columns: u32, column_gap: f64, row_gap: f64,
+    expected_versions: &BTreeMap<ShapeId, RecordVersion>,
+) -> Result<Vec<Operation>, EngineError> {
+    ensure_non_negative_spacing(column_gap, "grid column gap")?;
+    ensure_non_negative_spacing(row_gap, "grid row gap")?;
+    let items = layout_items(document, shape_ids, 2, expected_versions)?;
+    let columns = usize::try_from(columns).map_err(|_| EngineError::Schema("grid columns are too large".into()))?;
+    if columns == 0 {
+        return Err(EngineError::Schema("grid columns must be positive".into()));
+    }
+    let columns = columns.min(items.len());
+    let mut ordered = items.clone();
+    ordered.sort_by(|left, right| {
+        left.bounds
+            .y
+            .total_cmp(&right.bounds.y)
+            .then_with(|| left.bounds.x.total_cmp(&right.bounds.x))
+            .then_with(|| left.id.cmp(&right.id))
+    });
+    let cell_width = ordered.iter().map(|item| item.bounds.width).fold(0.0, f64::max);
+    let cell_height = ordered.iter().map(|item| item.bounds.height).fold(0.0, f64::max);
+    let row_count = ordered.len().div_ceil(columns);
+    let origin_x = ordered.iter().map(|item| item.bounds.x).fold(f64::INFINITY, f64::min);
+    let origin_y = ordered.iter().map(|item| item.bounds.y).fold(f64::INFINITY, f64::min);
+    let mut column_x = vec![origin_x; columns];
+    for column in 1..columns {
+        column_x[column] = column_x[column - 1] + cell_width + column_gap;
+    }
+    let mut row_y = vec![origin_y; row_count];
+    for row in 1..row_count {
+        row_y[row] = row_y[row - 1] + cell_height + row_gap;
+    }
+    let deltas = ordered
+        .iter()
+        .enumerate()
+        .map(|(index, item)| {
+            let column = index % columns;
+            let row = index / columns;
+            (
+                item.id.clone(),
+                (column_x[column] - item.bounds.x, row_y[row] - item.bounds.y),
+            )
+        })
+        .collect();
+    apply_layout_translations(document, &items, &deltas)
+}
+
+/// Tidies a selection into a balanced row-major grid using its current extent.
+pub fn tidy_shapes(
+    document: &mut Document, shape_ids: &[ShapeId], gap: f64, expected_versions: &BTreeMap<ShapeId, RecordVersion>,
+) -> Result<Vec<Operation>, EngineError> {
+    let count = shape_ids.iter().collect::<BTreeSet<_>>().len();
+    let columns = (count as f64).sqrt().ceil().max(1.0) as u32;
+    grid_shapes(document, shape_ids, columns, gap, gap, expected_versions)
+}
+
+fn layout_items(
+    document: &Document, shape_ids: &[ShapeId], minimum: usize, expected_versions: &BTreeMap<ShapeId, RecordVersion>,
+) -> Result<Vec<LayoutItem>, EngineError> {
+    let selected: BTreeSet<_> = shape_ids.iter().collect();
+    if selected.len() != shape_ids.len() {
+        return Err(EngineError::Schema("layout operation requires distinct shapes".into()));
+    }
+    for shape_id in shape_ids {
+        shape(document, shape_id, expected_versions.get(shape_id).copied())?;
+    }
+    let mut roots = shape_ids
+        .iter()
+        .filter(|shape_id| !has_selected_ancestor(document, shape_id, &selected))
+        .cloned()
+        .collect::<Vec<_>>();
+    roots.sort();
+    if roots.len() < minimum {
+        return Err(EngineError::Schema(format!(
+            "layout operation requires at least {minimum} independent shapes"
+        )));
+    }
+    let page_id = containing_layer(document, &document.shapes[&roots[0]])
+        .ok_or_else(|| EngineError::Invariant(format!("shape {} has no containing layer", roots[0])))?
+        .page_id
+        .clone();
+    let items = roots
+        .into_iter()
+        .map(|id| {
+            let shape = document.shapes.get(&id).expect("layout shape was validated");
+            let layer = containing_layer(document, shape)
+                .ok_or_else(|| EngineError::Invariant(format!("shape {id} has no containing layer")))?;
+            if layer.page_id != page_id {
+                return Err(EngineError::Invariant("layout selection must stay on one page".into()));
+            }
+            Ok(LayoutItem { bounds: world_shape_bounds(document, &id), locked: shape_is_locked(document, &id), id })
+        })
+        .collect::<Result<Vec<_>, EngineError>>()?;
+    if items.iter().all(|item| item.locked) {
+        return Err(EngineError::Permission(
+            "layout selection has no editable shapes".into(),
+        ));
+    }
+    Ok(items)
+}
+
+fn has_selected_ancestor(document: &Document, shape_id: &ShapeId, selected: &BTreeSet<&ShapeId>) -> bool {
+    let mut parent = document.shapes[shape_id].parent.clone();
+    while let ShapeParent::Shape(parent_id) = parent {
+        if selected.contains(&parent_id) {
+            return true;
+        }
+        let Some(shape) = document.shapes.get(&parent_id) else { break };
+        parent = shape.parent.clone();
+    }
+    false
+}
+
+fn shape_is_locked(document: &Document, shape_id: &ShapeId) -> bool {
+    let mut current = Some(shape_id.clone());
+    while let Some(id) = current {
+        let Some(shape) = document.shapes.get(&id) else { return true };
+        if shape.metadata.locked {
+            return true;
+        }
+        current = match &shape.parent {
+            ShapeParent::Layer(layer_id) => {
+                return document.layers.get(layer_id).is_none_or(|layer| layer.locked);
+            }
+            ShapeParent::Shape(parent_id) => Some(parent_id.clone()),
+        };
+    }
+    true
+}
+
+fn layout_order(left: &LayoutItem, right: &LayoutItem, axis: LayoutAxis) -> std::cmp::Ordering {
+    axis_position(&left.bounds, axis)
+        .total_cmp(&axis_position(&right.bounds, axis))
+        .then_with(|| cross_start(&left.bounds, axis).total_cmp(&cross_start(&right.bounds, axis)))
+        .then_with(|| left.id.cmp(&right.id))
+}
+
+fn axis_position(bounds: &Bounds, axis: LayoutAxis) -> f64 {
+    match axis {
+        LayoutAxis::Horizontal => bounds.x,
+        LayoutAxis::Vertical => bounds.y,
+    }
+}
+
+fn axis_end(bounds: &Bounds, axis: LayoutAxis) -> f64 {
+    axis_position(bounds, axis) + axis_size(bounds, axis)
+}
+
+fn axis_size(bounds: &Bounds, axis: LayoutAxis) -> f64 {
+    match axis {
+        LayoutAxis::Horizontal => bounds.width,
+        LayoutAxis::Vertical => bounds.height,
+    }
+}
+
+fn cross_start(bounds: &Bounds, axis: LayoutAxis) -> f64 {
+    match axis {
+        LayoutAxis::Horizontal => bounds.y,
+        LayoutAxis::Vertical => bounds.x,
+    }
+}
+
+fn cross_center_position(bounds: &Bounds, axis: LayoutAxis) -> f64 {
+    cross_start(bounds, axis) + axis_size(bounds, cross_axis(axis)) / 2.0
+}
+
+fn cross_axis(axis: LayoutAxis) -> LayoutAxis {
+    match axis {
+        LayoutAxis::Horizontal => LayoutAxis::Vertical,
+        LayoutAxis::Vertical => LayoutAxis::Horizontal,
+    }
+}
+
+fn axis_delta(axis: LayoutAxis, delta: f64) -> (f64, f64) {
+    match axis {
+        LayoutAxis::Horizontal => (delta, 0.0),
+        LayoutAxis::Vertical => (0.0, delta),
+    }
+}
+
+fn combine_axis_delta(axis: LayoutAxis, axis_delta: f64, cross_delta: f64) -> (f64, f64) {
+    match axis {
+        LayoutAxis::Horizontal => (axis_delta, cross_delta),
+        LayoutAxis::Vertical => (cross_delta, axis_delta),
+    }
+}
+
+fn ensure_non_negative_spacing(value: f64, name: &str) -> Result<(), EngineError> {
+    if value.is_finite() && value >= 0.0 {
+        Ok(())
+    } else {
+        Err(EngineError::Schema(format!("{name} must be finite and non-negative")))
+    }
+}
+
+fn apply_layout_translations(
+    document: &mut Document, items: &[LayoutItem], deltas: &BTreeMap<ShapeId, (f64, f64)>,
 ) -> Result<Vec<Operation>, EngineError> {
     let mut inverse = Vec::new();
-    for shape_id in shape_ids {
+    for item in items {
+        if item.locked {
+            continue;
+        }
+        let Some((world_x, world_y)) = deltas.get(&item.id).copied() else {
+            return Err(EngineError::Invariant(format!("shape {} has no layout delta", item.id)));
+        };
+        let parent_shape_parent = document
+            .shapes
+            .get(&item.id)
+            .ok_or_else(|| EngineError::Precondition(format!("shape {} is missing", item.id)))?
+            .parent
+            .clone();
+        let parent = parent_world_transform(document, &parent_shape_parent)
+            .and_then(|transform| transform.inverse())
+            .ok_or_else(|| EngineError::Invariant(format!("shape {} has a singular parent transform", item.id)))?;
         let shape = document
             .shapes
-            .get_mut(shape_id)
-            .ok_or_else(|| EngineError::Precondition(format!("shape {shape_id} is missing")))?;
+            .get_mut(&item.id)
+            .ok_or_else(|| EngineError::Precondition(format!("shape {} is missing", item.id)))?;
         let old_transform = shape.transform;
-        let (x, y) = deltas
-            .get(shape_id)
-            .copied()
-            .ok_or_else(|| EngineError::Invariant(format!("shape {shape_id} has no layout delta")))?;
-        shape.transform.translation.x += x;
-        shape.transform.translation.y += y;
+        shape.transform.translation.x += parent.a * world_x + parent.c * world_y;
+        shape.transform.translation.y += parent.b * world_x + parent.d * world_y;
         shape.version = next_version(shape.version)?;
         inverse.push(Operation::PatchShape {
-            shape_id: shape_id.clone(),
+            shape_id: item.id.clone(),
             patch: ShapePatch { transform: Some(old_transform), ..ShapePatch::default() },
             expected_version: Some(shape.version),
         });
     }
     Ok(inverse)
-}
-
-pub fn require_distinct_shapes(
-    document: &Document, shape_ids: &[ShapeId], minimum: usize, expected_versions: &BTreeMap<ShapeId, RecordVersion>,
-) -> Result<(), EngineError> {
-    let unique: BTreeSet<_> = shape_ids.iter().collect();
-    if unique.len() != shape_ids.len() || shape_ids.len() < minimum {
-        return Err(EngineError::Schema(format!(
-            "layout operation requires at least {minimum} distinct shapes"
-        )));
-    }
-    for shape_id in shape_ids {
-        shape(document, shape_id, expected_versions.get(shape_id).copied())?;
-    }
-    Ok(())
-}
-
-pub fn require_common_parent(document: &Document, shape_ids: &[ShapeId]) -> Result<(), EngineError> {
-    let first = &document
-        .shapes
-        .get(
-            shape_ids
-                .first()
-                .ok_or_else(|| EngineError::Schema("layout operation selection is empty".into()))?,
-        )
-        .ok_or_else(|| EngineError::Precondition("layout shape is missing".into()))?
-        .parent;
-    for id in shape_ids.iter().skip(1) {
-        let shape = document
-            .shapes
-            .get(id)
-            .ok_or_else(|| EngineError::Precondition(format!("shape {id} is missing")))?;
-        if &shape.parent != first {
-            return Err(EngineError::Invariant(
-                "alignment and distribution require a common parent".into(),
-            ));
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]

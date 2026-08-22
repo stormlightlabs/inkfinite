@@ -44,7 +44,10 @@ pub fn refresh_inverse_preconditions(operations: &mut [Operation], document: &Do
                 *expected_version = document.assets.get(asset_id).map(|record| record.version);
             }
             Operation::AlignShapes { shape_ids, expected_versions, .. }
-            | Operation::DistributeShapes { shape_ids, expected_versions, .. } => {
+            | Operation::DistributeShapes { shape_ids, expected_versions, .. }
+            | Operation::StackShapes { shape_ids, expected_versions, .. }
+            | Operation::GridShapes { shape_ids, expected_versions, .. }
+            | Operation::TidyShapes { shape_ids, expected_versions, .. } => {
                 expected_versions.clear();
                 expected_versions.extend(shape_ids.iter().filter_map(|shape_id| {
                     document
@@ -96,7 +99,11 @@ pub fn capture_expected_records(operations: &[Operation], document: &Document) -
                     expected.assets.insert(asset_id.clone(), record.clone());
                 }
             }
-            Operation::AlignShapes { shape_ids, .. } | Operation::DistributeShapes { shape_ids, .. } => {
+            Operation::AlignShapes { shape_ids, .. }
+            | Operation::DistributeShapes { shape_ids, .. }
+            | Operation::StackShapes { shape_ids, .. }
+            | Operation::GridShapes { shape_ids, .. }
+            | Operation::TidyShapes { shape_ids, .. } => {
                 for shape_id in shape_ids {
                     if let Some(record) = document.shapes.get(shape_id) {
                         expected.shapes.insert(shape_id.clone(), record.clone());
@@ -303,7 +310,11 @@ pub fn prepare_compensation(entry: &HistoryEntry, current: &Document) -> Result<
             Operation::CreateAsset { asset } => {
                 guard_absent_record(&entry.expected.assets, &current.assets, &asset.id, "asset")?;
             }
-            Operation::AlignShapes { .. } | Operation::DistributeShapes { .. } => {
+            Operation::AlignShapes { .. }
+            | Operation::DistributeShapes { .. }
+            | Operation::StackShapes { .. }
+            | Operation::GridShapes { .. }
+            | Operation::TidyShapes { .. } => {
                 return Err(history_conflict(
                     "history contains an unsupported aggregate layout operation",
                 ));
