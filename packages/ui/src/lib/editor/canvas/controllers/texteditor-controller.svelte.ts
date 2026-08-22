@@ -36,7 +36,8 @@ export class TextEditorController {
 			top: screenPos.y,
 			width: widthWorld * zoom,
 			height: shape.props.fontSize * 1.4 * zoom,
-			fontSize: shape.props.fontSize * zoom
+			fontSize: shape.props.fontSize * zoom,
+			fontFamily: shape.props.fontFamily
 		};
 	};
 

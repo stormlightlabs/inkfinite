@@ -830,7 +830,7 @@
 						`width:${layout.width}px`,
 						`height:${layout.height}px`,
 						`font-size:${layout.fontSize}px`,
-						''
+						`font-family:${layout.fontFamily}`
 					].join('; ')}
 					value={textEditorCurrent.value}
 					oninput={c.textEditor.handleInput}
@@ -1193,7 +1193,6 @@
 		resize: none;
 		outline: none;
 		line-height: 1.2;
-		font-family: inherit;
 		z-index: 2;
 		box-shadow: var(--ink-shadow-popover);
 	}

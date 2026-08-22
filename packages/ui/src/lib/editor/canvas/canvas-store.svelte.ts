@@ -985,6 +985,9 @@ export function createCanvasController(
 		});
 
 		const unsubSnap = snapStore.subscribe(() => renderer?.markDirty());
+		const redrawLoadedFonts = () => renderer?.markDirty();
+		document.fonts.addEventListener('loadingdone', redrawLoadedFonts);
+		void document.fonts.ready.then(redrawLoadedFonts);
 
 		$effect(() => {
 			if (themeStore.current) {
@@ -1007,6 +1010,7 @@ export function createCanvasController(
 		return () => {
 			resizeObserver?.disconnect();
 			unsubSnap();
+			document.fonts.removeEventListener('loadingdone', redrawLoadedFonts);
 			inputAdapter?.dispose();
 			inputAdapter = null;
 			renderer?.dispose();

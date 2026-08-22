@@ -66,16 +66,22 @@ try {
 	await desktop.getByRole('button', { name: 'Shapes', exact: true }).click();
 	await desktop.getByRole('menu', { name: 'Shape tools' }).waitFor();
 	await desktop.screenshot({ path: `${output}/toolbar-shapes-menu.png` });
+	console.log('[capture] shapes captured');
+
 	await desktop.getByRole('menuitem', { name: 'Rectangle', exact: true }).click();
 	await drag(desktop, { x: 300, y: 520 }, { x: 480, y: 640 });
 	await selectAt(desktop, { x: 390, y: 580 });
 	await desktop.getByRole('heading', { name: 'Appearance' }).waitFor();
 	await desktop.screenshot({ path: `${output}/selection-controls-rectangle.png` });
+	console.log('[capture] rect captured');
+
 	await desktop.getByRole('button', { name: 'Edit metadata' }).click();
 	const metadataDialog = desktop.getByRole('dialog', { name: 'Object metadata' });
 	await metadataDialog.waitFor();
 	await metadataDialog.screenshot({ path: `${output}/selection-controls-metadata-dialog.png` });
 	await desktop.screenshot({ path: `${output}/selection-controls-metadata.png` });
+	console.log('[capture] metadata captured');
+
 	await desktop.getByRole('button', { name: 'Done' }).click();
 
 	await drawRectangle(desktop, { x: 600, y: 520 }, { x: 780, y: 640 });
@@ -86,21 +92,31 @@ try {
 		await desktop.waitForTimeout(250);
 	}
 	await desktop.screenshot({ path: `${output}/selection-controls-multi.png` });
+	console.log('[capture] multi controls captured');
 
 	await desktop.getByRole('button', { name: 'Arrange', exact: true }).click();
 	await desktop.getByRole('menu', { name: 'Arrange commands' }).waitFor();
 	await desktop.screenshot({ path: `${output}/selection-controls-arrange-menu.png` });
+	console.log('[capture] arrange menu captured');
 
 	const textPage = await browser.newPage({ viewport: { width: 1440, height: 960 } });
 	await textPage.addInitScript(() => localStorage.setItem('theme', 'light'));
 	await textPage.goto(url, { waitUntil: 'networkidle' });
 	await textPage.getByRole('button', { name: 'Text', exact: true }).click();
 	await textPage.mouse.click(500, 420);
-	await textPage.keyboard.type('Heading');
-	await textPage.keyboard.press('Control+Enter');
-	await selectAt(textPage, { x: 500, y: 420 });
+	await textPage.mouse.dblclick(500, 420);
+	const textEditor = textPage.locator('.canvas-text-editor');
+	await textEditor.waitFor();
+	await textEditor.fill("It's Instrument Sans!");
+	await textEditor.press('Control+Enter');
+	await textEditor.waitFor({ state: 'detached' });
 	await textPage.getByRole('heading', { name: 'Typography' }).waitFor();
+	const fontSize = textPage.getByRole('spinbutton', { name: 'Font size' });
+	await fontSize.fill('32');
+	await fontSize.press('Enter');
+	await textPage.evaluate(() => document.fonts.ready);
 	await textPage.screenshot({ path: `${output}/selection-controls-typography.png` });
+	console.log('[capture] typography captured');
 
 	const cardPage = await browser.newPage({ viewport: { width: 1440, height: 960 } });
 	await cardPage.addInitScript(() => localStorage.setItem('theme', 'light'));
@@ -115,12 +131,14 @@ try {
 		await cardPage.getByRole('button', { name: 'Show more contextual controls' }).click();
 		await cardPage.waitForTimeout(250);
 	}
-	await cardPage.waitForTimeout(500);
+	await cardPage.evaluate(() => document.fonts.ready);
+	await cardPage.waitForTimeout(100);
 	await cardPage.screenshot({ path: `${output}/selection-controls-card.png` });
 	await cardPage.getByRole('button', { name: 'Edit card' }).click();
 	const cardDialog = cardPage.getByRole('dialog', { name: 'Card details' });
 	await cardDialog.waitFor();
 	await cardDialog.screenshot({ path: `${output}/selection-controls-card-dialog.png` });
+	console.log('[capture] card dialog captured');
 
 	const arrowPage = await browser.newPage({ viewport: { width: 1440, height: 960 } });
 	await arrowPage.addInitScript(() => localStorage.setItem('theme', 'dark'));
@@ -132,6 +150,7 @@ try {
 	await arrowPage.getByRole('button', { name: 'Arrow settings' }).click();
 	await arrowPage.getByRole('heading', { name: 'Connections' }).waitFor();
 	await arrowPage.screenshot({ path: `${output}/selection-controls-arrow.png` });
+	console.log('[capture] arrow captured');
 
 	const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 	await mobile.addInitScript(() => localStorage.setItem('theme', 'dark'));
@@ -140,6 +159,7 @@ try {
 	await selectAt(mobile, { x: 210, y: 415 });
 	await mobile.getByRole('heading', { name: 'Appearance' }).waitFor();
 	await mobile.screenshot({ path: `${output}/selection-controls-mobile.png`, fullPage: true });
+	console.log('[capture] mobile captured');
 
 	await cardPage.close();
 	await arrowPage.close();
