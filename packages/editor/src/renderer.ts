@@ -1438,6 +1438,7 @@ function drawSelection(
 
 type HandleVisual = { id: string; position: Vec2; connectorFrom?: Vec2 };
 const ROTATE_HANDLE_OFFSET = 40;
+const TEXT_HANDLE_OFFSET = 7;
 
 function drawHandles(
 	context: CanvasRenderingContext2D,
@@ -1563,20 +1564,21 @@ function getHandlesForShape(state: EditorState, shape: ShapeRecord): HandleVisua
 		const maxY = bounds.max.y;
 		const centerX = (minX + maxX) / 2;
 		const centerY = (minY + maxY) / 2;
+		const offset = shape.type === 'text' ? TEXT_HANDLE_OFFSET / state.camera.zoom : 0;
 		const world = (point: Vec2) => localToWorld(shape, point);
 		handles.push(
-			{ id: 'nw', position: world({ x: minX, y: minY }) },
-			{ id: 'n', position: world({ x: centerX, y: minY }) },
-			{ id: 'ne', position: world({ x: maxX, y: minY }) },
-			{ id: 'e', position: world({ x: maxX, y: centerY }) },
-			{ id: 'se', position: world({ x: maxX, y: maxY }) },
-			{ id: 's', position: world({ x: centerX, y: maxY }) },
-			{ id: 'sw', position: world({ x: minX, y: maxY }) },
-			{ id: 'w', position: world({ x: minX, y: centerY }) },
+			{ id: 'nw', position: world({ x: minX - offset, y: minY - offset }) },
+			{ id: 'n', position: world({ x: centerX, y: minY - offset }) },
+			{ id: 'ne', position: world({ x: maxX + offset, y: minY - offset }) },
+			{ id: 'e', position: world({ x: maxX + offset, y: centerY }) },
+			{ id: 'se', position: world({ x: maxX + offset, y: maxY + offset }) },
+			{ id: 's', position: world({ x: centerX, y: maxY + offset }) },
+			{ id: 'sw', position: world({ x: minX - offset, y: maxY + offset }) },
+			{ id: 'w', position: world({ x: minX - offset, y: centerY }) },
 			{
 				id: 'rotate',
 				position: world({ x: centerX, y: minY - ROTATE_HANDLE_OFFSET }),
-				connectorFrom: world({ x: centerX, y: minY })
+				connectorFrom: world({ x: centerX, y: minY - offset })
 			}
 		);
 		return handles;

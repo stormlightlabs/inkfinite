@@ -46,7 +46,7 @@ export class TextTool implements Tool {
     const shape = ShapeRecord.createText(currentPage.id, action.world.x, action.world.y, {
       text: "Text",
       fontSize: 16,
-      fontFamily: "sans-serif",
+      fontFamily: "Instrument Sans Variable",
       color: "#1f2933",
     }, shapeId);
 

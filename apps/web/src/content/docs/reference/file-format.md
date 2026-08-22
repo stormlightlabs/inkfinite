@@ -30,6 +30,8 @@ pub struct DocumentSnapshot {
 
 The `format` field is `"inkfinite.document"` and `format_version` is currently `2`. The document contains normalized pages, layers, shapes, bindings, and assets. Binding records may include a `relation_type` alongside their source and target shape IDs. Pages own ordered layers; layers own ordered root shapes; containers own their ordered child shapes. Container child order drives frame presentation and SVG export. Card fields are stored in the container's semantic metadata while title and body remain ordinary text and Markdown children. IDs remain stable across saves and replicas.
 
+Text and Markdown shapes store their CSS font family as a string. Card titles and bodies use the font families on their text and Markdown child shapes, so changing a card's font does not require a document format migration. The web and desktop editors load their bundled fonts at runtime; a headless renderer needs the requested family supplied as a font asset or an available font family and otherwise reports a fallback warning.
+
 The CLI can print a deterministic JSON projection for inspection and CI. That projection is not a second file format and cannot replace the Automerge history or causal heads stored in the canonical file.
 
 ## Safe writes

@@ -145,7 +145,7 @@ describe('SelectionControls', () => {
 			.element(screen.getByRole('heading', { name: 'Typography' }))
 			.toBeInTheDocument();
 		await expect
-			.element(screen.getByRole('textbox', { name: 'Font family' }))
+			.element(screen.getByRole('combobox', { name: 'Font family' }))
 			.toHaveValue('Inter');
 		await expect
 			.element(screen.getByRole('spinbutton', { name: 'Font size' }))
@@ -228,6 +228,19 @@ describe('SelectionControls', () => {
 		});
 
 		await expect.element(screen.getByRole('heading', { name: 'Card' })).toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('heading', { name: 'Typography' }))
+			.toBeInTheDocument();
+		await screen
+			.getByRole('combobox', { name: 'Font family' })
+			.selectOptions('Newsreader Variable');
+		for (const child of cardShapes.slice(1)) {
+			const updatedChild = store.getState().doc.shapes[child.id];
+			if (updatedChild.type !== 'text' && updatedChild.type !== 'markdown') {
+				throw new Error('Expected card typography child');
+			}
+			expect(updatedChild.props.fontFamily).toBe('Newsreader Variable');
+		}
 		await screen.getByRole('button', { name: 'Edit card' }).click();
 		await expect
 			.element(screen.getByRole('dialog', { name: 'Card details' }))

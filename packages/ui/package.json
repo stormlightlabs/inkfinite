@@ -43,8 +43,17 @@
 		"svelte": "^5.45.6"
 	},
 	"dependencies": {
+		"@fontsource-variable/atkinson-hyperlegible-next": "^5.3.0",
+		"@fontsource-variable/azeret-mono": "^5.3.0",
+		"@fontsource-variable/fraunces": "^5.3.0",
+		"@fontsource-variable/geist-mono": "^5.3.0",
+		"@fontsource-variable/google-sans": "^5.3.1",
 		"@fontsource-variable/ibm-plex-sans": "^5.2.8",
+		"@fontsource-variable/instrument-sans": "^5.3.0",
+		"@fontsource-variable/jetbrains-mono": "^5.3.0",
+		"@fontsource-variable/newsreader": "^5.3.0",
 		"@fontsource-variable/playpen-sans": "^5.2.9",
+		"@fontsource-variable/source-serif-4": "^5.3.0",
 		"@inkfinite/core": "workspace:*",
 		"@inkfinite/editor": "workspace:*",
 		"culori": "^4.0.2"
@@ -61,9 +70,9 @@
 		"@sveltejs/kit": "^2.49.1",
 		"@sveltejs/package": "^2.5.8",
 		"@sveltejs/vite-plugin-svelte": "^6.2.1",
+		"@unocss/preset-icons": "^66.7.5",
 		"@vitest/browser-playwright": "^4.0.15",
 		"@vitest/coverage-v8": "^4.0.16",
-		"@unocss/preset-icons": "^66.7.5",
 		"jsdom": "^27.3.0",
 		"prettier": "^3.7.4",
 		"prettier-plugin-svelte": "^3.4.0",

@@ -47,9 +47,13 @@ Arrows may be straight, curved, or elbow-routed. Drag an endpoint onto a shape t
 endpoint follows that shape when it moves. Arrow controls edit bends, endpoint heads, routing, and
 labels.
 
-Select a shape to edit its fill, stroke, and opacity. **Direct Select** exposes anchors and Bézier
-handles for native paths. Path commands can open or close a path, split or join segments, and
-change segment geometry.
+Select a shape to edit its fill, stroke, and opacity. Text, Markdown, and Card selections also
+show font and size controls. The editor bundles Instrument Sans, Atkinson Hyperlegible Next,
+IBM Plex Sans, Google Sans, Playpen Sans, Source Serif 4, Newsreader, Fraunces, JetBrains Mono,
+Geist Mono, and Azeret Mono. New canvas text uses Instrument Sans.
+
+**Direct Select** exposes anchors and Bézier handles for native paths. Path commands can open or
+close a path, split or join segments, and change segment geometry.
 
 ## Clipboard and import
 

@@ -9,7 +9,12 @@
 		TextShape,
 		ToolId
 	} from '@inkfinite/core';
-	import { EditorState, getSelectedShapes, SnapshotCommand } from '@inkfinite/core';
+	import {
+		cardChildren,
+		EditorState,
+		getSelectedShapes,
+		SnapshotCommand
+	} from '@inkfinite/core';
 	import {
 		Button,
 		ColorPicker,
@@ -24,6 +29,7 @@
 		type SelectionCommand
 	} from '../commands';
 	import { DEFAULT_FILL_COLOR, DEFAULT_STROKE_COLOR } from '../constants';
+	import { EDITOR_FONT_GROUPS } from '../fonts';
 	import ArrowPopover from './ArrowPopover.svelte';
 	import { sampleImageColors, type SampledImageColor } from '../image-sampling';
 
@@ -157,6 +163,15 @@
 	);
 	let cardTarget = $derived(cardTargets.length === 1 ? cardTargets[0] : undefined);
 	let cardMetadata = $derived(cardTarget?.metadata);
+	let typographyTargets = $derived.by(() => {
+		const targets = [...textTargets];
+		for (const card of cardTargets) {
+			for (const child of cardChildren(card, editorState.doc)) {
+				if (child.type === 'text' || child.type === 'markdown') targets.push(child);
+			}
+		}
+		return targets;
+	});
 	let imageTargets = $derived(
 		selectedShapes.filter(
 			(shape): shape is Extract<ShapeRecord, { type: 'image' }> => shape.type === 'image'
@@ -210,10 +225,10 @@
 		getNumericState(strokeOpacityTargets.map((shape) => shape.strokeOpacity ?? 1))
 	);
 	let fontSizeState = $derived(
-		getNumericState(textTargets.map((shape) => shape.props.fontSize))
+		getNumericState(typographyTargets.map((shape) => shape.props.fontSize))
 	);
 	let fontFamilyState = $derived(
-		getTextState(textTargets.map((shape) => shape.props.fontFamily))
+		getTextState(typographyTargets.map((shape) => shape.props.fontFamily))
 	);
 	let agentEditableState = $derived(
 		getBooleanState(selectedShapes.map((shape) => shape.agentEditable !== false))
@@ -439,12 +454,26 @@
 	}
 
 	function applyTypography(field: TypographyField, value: number | string) {
-		updateSelectedShapes(
-			field === 'fontSize' ? 'Set font size' : 'Set font family',
-			(shape) => {
-				if (shape.type !== 'text' && shape.type !== 'markdown') return shape;
-				return { ...shape, props: { ...shape.props, [field]: value } } as ShapeRecord;
-			}
+		const state = store.getState();
+		const targetIds = new Set(typographyTargets.map((shape) => shape.id));
+		if (targetIds.size === 0) return;
+		const before = EditorState.clone(state);
+		const shapes = { ...state.doc.shapes };
+		for (const shapeId of targetIds) {
+			const shape = shapes[shapeId];
+			if (shape?.type !== 'text' && shape?.type !== 'markdown') continue;
+			shapes[shapeId] = {
+				...shape,
+				props: { ...shape.props, [field]: value }
+			} as ShapeRecord;
+		}
+		store.executeCommand(
+			new SnapshotCommand(
+				field === 'fontSize' ? 'Set font size' : 'Set font family',
+				'doc',
+				before,
+				{ ...state, doc: { ...state.doc, shapes } }
+			)
 		);
 	}
 
@@ -1210,7 +1239,7 @@
 				</Dialog>
 			{/if}
 
-			{#if textTargets.length > 0}
+			{#if typographyTargets.length > 0}
 				<section
 					class="selection-controls__section"
 					aria-labelledby="selection-type-label">
@@ -1218,12 +1247,28 @@
 					<div class="selection-controls__controls selection-controls__typography">
 						<label class="selection-controls__field">
 							<span>Font</span>
-							<input
-								type="text"
+							<select
 								value={fontFamilyState.mixed ? '' : fontFamilyState.value}
-								placeholder={fontFamilyState.mixed ? 'Mixed' : 'Font family'}
 								onchange={handleFontFamilyChange}
-								aria-label="Font family" />
+								aria-label="Font family">
+								{#if fontFamilyState.mixed}
+									<option value="" disabled>Mixed</option>
+								{:else if !EDITOR_FONT_GROUPS.some( (group) => group.fonts.some((font) => font.family === fontFamilyState.value) )}
+									<option value={fontFamilyState.value}
+										>{fontFamilyState.value}</option>
+								{/if}
+								{#each EDITOR_FONT_GROUPS as group}
+									<optgroup label={group.label}>
+										{#each group.fonts as font}
+											<option
+												value={font.family}
+												style:font-family={font.family}>
+												{font.label}
+											</option>
+										{/each}
+									</optgroup>
+								{/each}
+							</select>
 						</label>
 						<label class="selection-controls__field selection-controls__field--small">
 							<span>Size</span>
@@ -1374,8 +1419,8 @@
 		left: 50%;
 		z-index: 95;
 		display: grid;
-		width: min(72rem, calc(100vw - 2rem));
-		max-width: calc(100vw - 2rem);
+		width: min(81rem, calc(100vw - 9rem));
+		max-width: calc(100vw - 9rem);
 		border: 1px solid color-mix(in srgb, var(--ink-border) 68%, transparent);
 		border-radius: var(--ink-radius-panel-small);
 		color: var(--ink-text);

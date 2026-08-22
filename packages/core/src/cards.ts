@@ -66,7 +66,7 @@ export function createCardShapes(
 	const title = ShapeRecord.createText(pageId, x + 16, y + 16, {
 		text: fields.title,
 		fontSize: 18,
-		fontFamily: 'sans-serif',
+		fontFamily: 'Instrument Sans Variable',
 		color: '#0f172a',
 		w: 288
 	});
@@ -75,7 +75,7 @@ export function createCardShapes(
 		w: 288,
 		h: 140,
 		fontSize: 14,
-		fontFamily: 'sans-serif',
+		fontFamily: 'Instrument Sans Variable',
 		color: '#334155',
 		bg: 'transparent',
 		border: 'transparent'

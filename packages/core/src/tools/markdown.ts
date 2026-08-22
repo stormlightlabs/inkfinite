@@ -40,7 +40,7 @@ export class MarkdownTool implements Tool {
       w: 300,
       h: 200,
       fontSize: 16,
-      fontFamily: "Inter",
+      fontFamily: "Instrument Sans Variable",
       color: "#1f2933",
     }, shapeId);
 

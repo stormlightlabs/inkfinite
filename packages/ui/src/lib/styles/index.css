@@ -1,5 +1,14 @@
+@import '@fontsource-variable/atkinson-hyperlegible-next/wght.css';
+@import '@fontsource-variable/azeret-mono/wght.css';
+@import '@fontsource-variable/fraunces/wght.css';
+@import '@fontsource-variable/geist-mono/wght.css';
+@import '@fontsource-variable/google-sans/wght.css';
 @import '@fontsource-variable/ibm-plex-sans/wght.css';
+@import '@fontsource-variable/instrument-sans/wght.css';
+@import '@fontsource-variable/jetbrains-mono/wght.css';
+@import '@fontsource-variable/newsreader/wght.css';
 @import '@fontsource-variable/playpen-sans/wght.css';
+@import '@fontsource-variable/source-serif-4/wght.css';
 @import './tokens.css';
 @import './reset.css';
 @import './base.css';

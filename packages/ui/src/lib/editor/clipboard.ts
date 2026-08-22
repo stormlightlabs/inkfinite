@@ -267,13 +267,13 @@ export function pasteText(
 				md: text,
 				w: 320,
 				fontSize: 16,
-				fontFamily: 'sans-serif',
+				fontFamily: 'Instrument Sans Variable',
 				color: '#1e1e1e'
 			})
 		: ShapeRecord.createText(pageId, point.x, point.y, {
 				text,
 				fontSize: 20,
-				fontFamily: 'sans-serif',
+				fontFamily: 'Instrument Sans Variable',
 				color: '#1e1e1e',
 				w: Math.min(480, Math.max(120, text.split('\n')[0]?.length * 10 || 120))
 			});
