@@ -113,6 +113,44 @@ fn transaction(engine: &mut TransactionEngine, actor: &str, id: &str, operations
 }
 
 #[test]
+fn conversion_changes_kind_without_losing_style_or_metadata() {
+    let mut engine = engine();
+    let shape_id = ShapeId::from("shape:a");
+    let before = engine.snapshot().unwrap().document.shapes[&shape_id].clone();
+    let transaction = transaction(
+        &mut engine,
+        "actor:local",
+        "transaction:convert",
+        vec![Operation::ConvertShape {
+            shape_id: shape_id.clone(),
+            kind: crate::ELLIPSE_KIND.into(),
+            properties: ShapeProperties::from([
+                ("width".into(), json!(20.0)),
+                ("height".into(), json!(12.0)),
+                ("fill".into(), json!("#fff")),
+            ]),
+            style: None,
+            expected_version: Some(before.version),
+        }],
+    );
+
+    engine.commit(transaction).unwrap();
+    let converted = engine.snapshot().unwrap().document.shapes[&shape_id].clone();
+    assert_eq!(converted.kind.as_str(), crate::ELLIPSE_KIND);
+    assert_eq!(converted.metadata, before.metadata);
+    assert_eq!(converted.style, before.style);
+    assert_eq!(converted.parent, before.parent);
+    assert_eq!(converted.transform, before.transform);
+
+    engine.undo(&ActorId::from("actor:local")).unwrap();
+    let restored = engine.snapshot().unwrap().document.shapes[&shape_id].clone();
+    assert_eq!(restored.kind, before.kind);
+    assert_eq!(restored.properties, before.properties);
+    assert_eq!(restored.metadata, before.metadata);
+    assert_eq!(restored.style, before.style);
+}
+
+#[test]
 fn geometry_is_normalized_and_bounded_at_the_commit_boundary() {
     let mut engine = engine();
     let path_id = ShapeId::from("shape:path");

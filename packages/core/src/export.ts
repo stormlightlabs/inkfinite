@@ -1,11 +1,9 @@
 import {
-  arrowPath,
+  arrowPathForShape,
   computePolylineLength,
   getPointAtDistance,
   localToWorld,
-  resolveArrowEndpoints,
   shapeBounds,
-  worldToLocal,
 } from "./geom";
 import type { Box2 } from "./math";
 import { Box2 as Box2Ops } from "./math";
@@ -231,11 +229,9 @@ function lineToSVG(shape: LineShape, transform: string): string {
 }
 
 function arrowToSVG(shape: ArrowShape, transform: string, state: EditorState): string {
-  const resolved = resolveArrowEndpoints(state, shape.id);
-  if (!resolved || shape.props.points.length < 2) return "";
-  const endpoints = [worldToLocal(resolved.a, shape), ...shape.props.points.slice(1, -1), worldToLocal(resolved.b, shape)];
+  const points = arrowPathForShape(state, shape);
+  if (points.length < 2) return "";
   const routing = shape.props.routing?.automatic ? "orthogonal" : shape.props.routing?.kind ?? "straight";
-  const points = arrowPath(endpoints, routing);
   const stroke = escapeXML(shape.props.style.stroke);
   const width = svgNumber(shape.props.style.width);
   const last = points.at(-1)!;
@@ -249,7 +245,7 @@ function arrowToSVG(shape: ArrowShape, transform: string, state: EditorState): s
     return `<path d="M ${svgNumber(at.x)} ${svgNumber(at.y)} L ${svgNumber(left.x)} ${svgNumber(left.y)} M ${svgNumber(at.x)} ${svgNumber(at.y)} L ${svgNumber(right.x)} ${svgNumber(right.y)}" fill="none" stroke="${stroke}" stroke-width="${width}"/>`;
   };
   const pathData = routing === "curved"
-    ? curvedPathData(endpoints)
+    ? curvedPathData(points)
     : points.map((point, index) => `${index === 0 ? "M" : "L"} ${svgNumber(point.x)} ${svgNumber(point.y)}`).join(" ");
   const elements = routing === "straight"
     ? points.slice(1).map((point, index) => `<line x1="${svgNumber(points[index].x)}" y1="${svgNumber(points[index].y)}" x2="${svgNumber(point.x)}" y2="${svgNumber(point.y)}" fill="none" stroke="${stroke}" stroke-width="${width}"/>`)
@@ -367,11 +363,9 @@ function escapeXML(string_: string): string {
 
 function exportBounds(state: EditorState, shape: ShapeRecord): Box2 {
   if (shape.type !== "arrow") return shapeBounds(shape);
-  const resolved = resolveArrowEndpoints(state, shape.id);
-  if (!resolved || shape.props.points.length < 2) return shapeBounds(shape);
-  const endpoints = [worldToLocal(resolved.a, shape), ...shape.props.points.slice(1, -1), worldToLocal(resolved.b, shape)];
-  const routing = shape.props.routing?.automatic ? "orthogonal" : shape.props.routing?.kind ?? "straight";
-  return Box2Ops.fromPoints(arrowPath(endpoints, routing).map((point) => localToWorld(shape, point)));
+  const points = arrowPathForShape(state, shape);
+  if (points.length < 2) return shapeBounds(shape);
+  return Box2Ops.fromPoints(points.map((point) => localToWorld(shape, point)));
 }
 
 function getExportSelection(state: EditorState): ShapeRecord[] {

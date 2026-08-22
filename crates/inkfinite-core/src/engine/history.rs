@@ -31,6 +31,7 @@ pub fn refresh_inverse_preconditions(operations: &mut [Operation], document: &Do
                 *expected_version = document.layers.get(layer_id).map(|record| record.version);
             }
             Operation::PatchShape { shape_id, expected_version, .. }
+            | Operation::ConvertShape { shape_id, expected_version, .. }
             | Operation::ReparentShape { shape_id, expected_version, .. }
             | Operation::DeleteShape { shape_id, expected_version } => {
                 *expected_version = document.shapes.get(shape_id).map(|record| record.version);
@@ -78,6 +79,7 @@ pub fn capture_expected_records(operations: &[Operation], document: &Document) -
                 }
             }
             Operation::PatchShape { shape_id, .. }
+            | Operation::ConvertShape { shape_id, .. }
             | Operation::ReparentShape { shape_id, .. }
             | Operation::DeleteShape { shape_id, .. } => {
                 if let Some(record) = document.shapes.get(shape_id) {
@@ -182,6 +184,23 @@ pub fn prepare_compensation(entry: &HistoryEntry, current: &Document) -> Result<
                     .get(shape_id)
                     .ok_or_else(|| history_conflict(format!("shape {shape_id} was removed concurrently")))?;
                 merge_shape_compensation(patch, expected, current)?;
+                *expected_version = None;
+            }
+            Operation::ConvertShape { shape_id, style, expected_version, .. } => {
+                let expected =
+                    entry.expected.shapes.get(shape_id).ok_or_else(|| {
+                        history_conflict(format!("shape {shape_id} no longer has the expected state"))
+                    })?;
+                let current = current
+                    .shapes
+                    .get(shape_id)
+                    .ok_or_else(|| history_conflict(format!("shape {shape_id} was removed concurrently")))?;
+                if current.kind != expected.kind
+                    || current.properties != expected.properties
+                    || (style.is_some() && current.style != expected.style)
+                {
+                    return Err(history_conflict(format!("shape {shape_id} changed since conversion")));
+                }
                 *expected_version = None;
             }
             Operation::ReparentShape { shape_id, parent, expected_version, .. } => {

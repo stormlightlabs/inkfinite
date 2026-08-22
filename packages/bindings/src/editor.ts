@@ -447,6 +447,25 @@ export type EditorPatch =
 			anchor: SiblingAnchor<ShapeId> | null;
 	  }
 	| {
+			type: 'convert_shape';
+			/**
+			 * Shape to convert.
+			 */
+			shape_id: ShapeId;
+			/**
+			 * Replacement registry kind.
+			 */
+			kind: ShapeKind;
+			/**
+			 * Replacement editor properties.
+			 */
+			properties: ShapeProperties;
+			/**
+			 * Optional replacement visual style.
+			 */
+			style: ShapeStyle | null;
+	  }
+	| {
 			type: 'path_topology';
 			/**
 			 * Path shape to edit.

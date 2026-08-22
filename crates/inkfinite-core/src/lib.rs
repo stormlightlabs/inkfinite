@@ -10,6 +10,7 @@ pub mod ipc;
 pub mod path;
 pub mod proto;
 pub mod render;
+pub mod routing;
 pub mod session;
 pub mod svg_import;
 pub mod svg_transaction;

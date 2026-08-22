@@ -11,8 +11,8 @@ use super::hierarchy::{
 use super::validation::ensure_binding_endpoints;
 use super::{
     AssetId, AssetPatch, BTreeMap, BTreeSet, Document, EngineError, LayerContentsDisposition, LayerId, LayerPatch,
-    LayoutAxis, Operation, PageId, RecordVersion, ShapeAlignment, ShapeId, ShapeParent, ShapePatch, SiblingAnchor,
-    normalize_shape_properties,
+    LayoutAxis, Operation, PageId, RecordVersion, ShapeAlignment, ShapeId, ShapeParent, ShapePatch, ShapeProperties,
+    SiblingAnchor, normalize_shape_properties,
 };
 
 #[allow(clippy::too_many_lines)]
@@ -95,6 +95,9 @@ pub fn apply_operation(document: &mut Document, operation: &Operation) -> Result
         }
         Operation::PatchShape { shape_id, patch, expected_version } => {
             patch_shape(document, shape_id, patch, *expected_version)
+        }
+        Operation::ConvertShape { shape_id, kind, properties, style, expected_version } => {
+            convert_shape(document, shape_id, kind, properties, *style, *expected_version)
         }
         Operation::ReparentShape { shape_id, parent, anchor, expected_version } => {
             reparent_shape(document, shape_id, parent, anchor, *expected_version)
@@ -224,6 +227,35 @@ pub fn patch_shape(
         patch: inverse,
         expected_version: Some(shape.version),
     }])
+}
+
+pub fn convert_shape(
+    document: &mut Document, shape_id: &ShapeId, kind: &str, properties: &ShapeProperties,
+    style: Option<crate::ShapeStyle>, expected: Option<RecordVersion>,
+) -> Result<Vec<Operation>, EngineError> {
+    let normalized_properties = normalize_shape_properties(kind, properties)
+        .map_err(|error| EngineError::Schema(format!("shape {shape_id}: {error}")))?;
+    let shape = shape_mut(document, shape_id, expected)?;
+    if shape.kind.as_str() == crate::CONTAINER_KIND || kind == crate::CONTAINER_KIND {
+        return Err(EngineError::Schema("container shapes cannot be converted".into()));
+    }
+    let mut inverse = Operation::ConvertShape {
+        shape_id: shape_id.clone(),
+        kind: shape.kind.to_string(),
+        properties: shape.properties.clone(),
+        style: style.map(|_| shape.style),
+        expected_version: None,
+    };
+    shape.kind = kind.into();
+    shape.properties = normalized_properties;
+    if let Some(value) = style {
+        shape.style = value;
+    }
+    shape.version = next_version(shape.version)?;
+    if let Operation::ConvertShape { expected_version, .. } = &mut inverse {
+        *expected_version = Some(shape.version);
+    }
+    Ok(vec![inverse])
 }
 
 pub fn patch_asset(

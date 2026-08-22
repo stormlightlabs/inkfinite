@@ -314,6 +314,7 @@ pub fn asset_is_referenced(document: &Document, asset_id: &AssetId) -> bool {
 pub fn operation_shape_ids(operation: &Operation) -> Vec<ShapeId> {
     match operation {
         Operation::PatchShape { shape_id, .. }
+        | Operation::ConvertShape { shape_id, .. }
         | Operation::ReparentShape { shape_id, .. }
         | Operation::DeleteShape { shape_id, .. } => vec![shape_id.clone()],
         Operation::CreateBinding { binding } => vec![binding.source_shape_id.clone(), binding.target_shape_id.clone()],

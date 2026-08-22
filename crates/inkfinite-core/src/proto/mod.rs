@@ -220,6 +220,23 @@ pub enum Operation {
         /// Optional optimistic record version.
         expected_version: Option<RecordVersion>,
     },
+    /// Change a shape's registry kind and kind-specific properties.
+    ///
+    /// Transform, common style, semantic metadata, hierarchy, and stable ID
+    /// remain attached to the existing shape record.
+    ConvertShape {
+        /// Shape to convert.
+        shape_id: ShapeId,
+        /// Replacement registry kind.
+        kind: String,
+        /// Replacement kind-specific properties.
+        #[ts(type = "ShapeProperties")]
+        properties: ShapeProperties,
+        /// Optional replacement common style.
+        style: Option<ShapeStyle>,
+        /// Optional optimistic record version.
+        expected_version: Option<RecordVersion>,
+    },
     /// Delete a shape and its owned descendants.
     DeleteShape {
         /// Shape to delete.

@@ -1265,6 +1265,14 @@ fn operation_preview(
             vec![RecordId::Shape(shape_id.clone())],
             vec![shape_id.clone()],
         ),
+        Operation::ConvertShape { shape_id, kind, .. } => (
+            format!(
+                "Convert {} to {kind}",
+                shape_description_from_documents(shape_id, before, after)
+            ),
+            vec![RecordId::Shape(shape_id.clone())],
+            vec![shape_id.clone()],
+        ),
         Operation::ReparentShape { shape_id, .. } => (
             format!("Move {}", shape_description_from_documents(shape_id, before, after)),
             vec![RecordId::Shape(shape_id.clone())],

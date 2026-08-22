@@ -578,7 +578,17 @@ function shapePatch(
 	afterDocument: Document,
 	skipDeletedLayerParent: boolean,
 	skipProperties: boolean
-): Extract<EditorPatch, { type: 'shape' }> | null {
+): EditorPatch | null {
+	if (before.type !== after.type) {
+		const styleChanged = JSON.stringify(shapeStyle(before)) !== JSON.stringify(shapeStyle(after));
+		return {
+			type: 'convert_shape',
+			shape_id: after.id,
+			kind: after.type,
+			properties: cloneProperties(after.props),
+			style: styleChanged ? shapeStyle(after) : null
+		};
+	}
 	const parentBefore = shapeParent(before, beforeDocument);
 	const parentAfter = shapeParent(after, afterDocument);
 	let transformChanged =

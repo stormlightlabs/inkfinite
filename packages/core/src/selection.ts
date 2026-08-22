@@ -7,6 +7,40 @@ export type DuplicateConnectOffset = { x: number; y: number };
 
 type DuplicateResult = { state: EditorState; mapping: Map<string, string>; roots: string[] };
 
+/** Shape kinds supported by the selection conversion command. */
+export type SelectionConversionTarget = 'rect' | 'ellipse';
+
+/**
+ * Converts selected drawable shapes to a rectangle or ellipse in one editor
+ * state update. Common shape fields and transforms stay on the existing
+ * record; persistence turns the type change into one Rust conversion
+ * transaction.
+ */
+export function convertSelectedShapes(state: EditorState, target: SelectionConversionTarget): EditorState {
+	if (state.ui.selectionIds.length === 0) return state;
+	const hasBinding = (shapeId: string) =>
+		Object.values(state.doc.bindings).some(
+			(binding) => binding.fromShapeId === shapeId || binding.toShapeId === shapeId
+		);
+	const shapes = { ...state.doc.shapes };
+	let changed = false;
+	for (const shapeId of state.ui.selectionIds) {
+		const shape = state.doc.shapes[shapeId];
+		if (
+			!shape ||
+			(shape.type !== 'rect' && shape.type !== 'ellipse') ||
+			shape.type === target ||
+			hasBinding(shape.id)
+		)
+			continue;
+		const { w, h, fill, stroke } = shape.props;
+		const props = target === 'rect' ? { w, h, fill, stroke, radius: 0 } : { w, h, fill, stroke };
+		shapes[shape.id] = { ...shape, type: target, props } as ShapeRecordType;
+		changed = true;
+	}
+	return changed ? { ...state, doc: { ...state.doc, shapes } } : state;
+}
+
 /**
  * Duplicate the selected roots and their descendants.
  *

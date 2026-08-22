@@ -11,6 +11,7 @@ use crate::engine::geometry::{
     Affine, bounds_from_points, intersects, stroke_outline as canonical_stroke_outline, union, world_transform,
 };
 use crate::proto::Bounds;
+use crate::routing::obstacle_aware_orthogonal_route;
 use crate::{
     AssetId, AssetSource, BindingAnchor, BuiltinShapeKind, Document, DocumentSnapshot, LayerId, PageId, PathFillRule,
     PathGeometry, PathSegment, PathSubpath, ShapeId, ShapeRecord, Vec2,
@@ -355,7 +356,36 @@ impl Renderer<'_> {
             if routing.automatic { "orthogonal" } else { routing.kind.as_str() }
         });
         if routing_kind == "orthogonal" {
-            points = orthogonal(points[0], points[points.len() - 1]);
+            let excluded_targets: BTreeSet<_> = self
+                .document
+                .bindings
+                .values()
+                .filter(|binding| binding.source_shape_id == shape.id)
+                .map(|binding| binding.target_shape_id.clone())
+                .collect();
+            let obstacles: Vec<_> = self
+                .document
+                .shapes
+                .values()
+                .filter(|candidate| {
+                    candidate.id != shape.id
+                        && !excluded_targets.contains(&candidate.id)
+                        && !matches!(
+                            BuiltinShapeKind::parse(candidate.kind.as_str()),
+                            Some(BuiltinShapeKind::Arrow | BuiltinShapeKind::Line | BuiltinShapeKind::Container)
+                        )
+                })
+                .filter_map(|candidate| render_shape_world_bounds(self.document, candidate).ok())
+                .collect();
+            let world_route = obstacle_aware_orthogonal_route(
+                matrix.point(points[0]),
+                matrix.point(points[points.len() - 1]),
+                &obstacles,
+                12.0,
+            );
+            if let Some(inverse) = inverse {
+                points = world_route.into_iter().map(|point| inverse.point(point)).collect();
+            }
         } else if routing_kind == "curved" {
             points = curved(points.as_slice());
         }
@@ -919,14 +949,6 @@ fn binding_point(bounds: Bounds, anchor: BindingAnchor, arrow_width: f64) -> Vec
             point
         }
     }
-}
-
-fn orthogonal(start: Vec2, end: Vec2) -> Vec<Vec2> {
-    if (end.x - start.x).abs() < 0.1 || (end.y - start.y).abs() < 0.1 {
-        return vec![start, end];
-    }
-    let middle = start.x + (end.x - start.x) / 2.0;
-    vec![start, Vec2 { x: middle, y: start.y }, Vec2 { x: middle, y: end.y }, end]
 }
 
 fn curved(points: &[Vec2]) -> Vec<Vec2> {

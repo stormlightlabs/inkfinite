@@ -486,6 +486,18 @@
 				disabled: selected.length === 0
 			},
 			{
+				id: 'convert-to-rect',
+				label: SELECTION_COMMAND_LABELS['convert-to-rect'],
+				icon: 'rectangle',
+				disabled: selected.length === 0
+			},
+			{
+				id: 'convert-to-ellipse',
+				label: SELECTION_COMMAND_LABELS['convert-to-ellipse'],
+				icon: 'ellipse',
+				disabled: selected.length === 0
+			},
+			{
 				id: 'group',
 				label: SELECTION_COMMAND_LABELS.group,
 				icon: 'layers',

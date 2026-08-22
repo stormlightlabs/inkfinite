@@ -219,6 +219,19 @@ pub enum EditorPatch {
         /// Replacement sibling placement.
         anchor: Option<SiblingAnchor<ShapeId>>,
     },
+    /// Convert one shape while retaining its identity, hierarchy, transform,
+    /// semantic metadata, and common style.
+    ConvertShape {
+        /// Shape to convert.
+        shape_id: ShapeId,
+        /// Replacement registry kind.
+        kind: ShapeKind,
+        /// Replacement editor properties.
+        #[ts(type = "ShapeProperties")]
+        properties: ShapeProperties,
+        /// Optional replacement visual style.
+        style: Option<ShapeStyle>,
+    },
     /// Apply canonical topology operations to one native path.
     PathTopology {
         /// Path shape to edit.
@@ -554,6 +567,19 @@ pub fn reconcile_editor_patches(
                     &created_layers,
                     &mut operations,
                 )?;
+            }
+            EditorPatch::ConvertShape { shape_id, kind, properties, style } => {
+                let shape = document
+                    .shapes
+                    .get(&shape_id)
+                    .ok_or_else(|| EditorReconciliationError::UnknownShape(shape_id.clone()))?;
+                operations.push(Operation::ConvertShape {
+                    shape_id,
+                    kind: kind.to_string(),
+                    properties: native_properties(&properties),
+                    style,
+                    expected_version: Some(shape.version),
+                });
             }
             EditorPatch::PathTopology { shape_id, operations: topology } => {
                 reconcile_path_topology(document, shape_id, &topology, &mut operations)?;

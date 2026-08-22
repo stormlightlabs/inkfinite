@@ -39,9 +39,11 @@ Inkfinite supports duplicate-and-drag and duplicate-and-connect, selection
 cycling for overlapping and nested objects, snapping and guides, keyboard nudging,
 fit-to-drawing and fit-to-selection, grouping, nested selection, connector
 labels and endpoint reassignment, and text and Markdown editing. A searchable
-command palette exposes the selection and viewport actions. The remaining
-interaction work is quick shape conversion and obstacle-aware connector
-routing.
+command palette exposes the selection and viewport actions. Connector routing
+now uses deterministic obstacle-aware orthogonal paths in Rust and in TypeScript
+previews. Rectangle and ellipse conversion is a native transaction exposed
+through selection commands, preserving shared style, metadata, hierarchy,
+transform, and identity.
 
 ### Stronger content primitives
 

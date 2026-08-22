@@ -20,7 +20,7 @@ import type {
 	TextShape
 } from './model';
 import type { EditorState } from './reactivity';
-import { getInteractiveShapesOnCurrentPage } from './reactivity';
+import { getInteractiveShapesOnCurrentPage, getShapesOnCurrentPage } from './reactivity';
 
 const strokeOutlineCache = new WeakMap<StrokeShape, Vec2[]>();
 
@@ -723,20 +723,7 @@ function hitTestShape(state: EditorState, shape: ShapeRecord, worldPoint: Vec2, 
 		case 'line':
 			return pointNearLine(worldPoint, shape, tolerance);
 		case 'arrow': {
-			const resolved = resolveArrowEndpoints(state, shape.id);
-			const points = resolved
-				? arrowPath(
-						[
-							worldToLocal(resolved.a, shape),
-							...shape.props.points.slice(1, -1),
-							worldToLocal(resolved.b, shape)
-						],
-						shape.props.routing?.automatic ? 'orthogonal' : (shape.props.routing?.kind ?? 'straight')
-					)
-				: arrowPath(
-						shape.props.points,
-						shape.props.routing?.automatic ? 'orthogonal' : (shape.props.routing?.kind ?? 'straight')
-					);
+			const points = arrowPathForShape(state, shape);
 			const localPoint = worldToLocal(worldPoint, shape);
 			return points.some(
 				(point, index) => index > 0 && pointNearSegment(localPoint, points[index - 1], point, tolerance)
@@ -889,6 +876,213 @@ export function computeOrthogonalPath(start: Vec2, end: Vec2): Vec2[] {
 	return [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
 }
 
+type RouteObstacle = { minX: number; maxX: number; minY: number; maxY: number };
+type RouteState = { cost: number; previous: number | null; node: number; direction: number };
+const ROUTE_EPSILON = 1e-9;
+const ROUTE_TURN_PENALTY = 12;
+
+/**
+ * Compute a deterministic orthogonal route around axis-aligned obstacles.
+ *
+ * This is the browser preview counterpart to `inkfinite_core::routing`; keep
+ * its candidate grid, tie-breaking, and padding rules in sync with Rust.
+ */
+export function computeObstacleAwareOrthogonalPath(
+	start: Vec2,
+	end: Vec2,
+	obstacles: readonly Box2[],
+	padding = 12
+): Vec2[] {
+	if (Math.abs(start.x - end.x) <= ROUTE_EPSILON && Math.abs(start.y - end.y) <= ROUTE_EPSILON) {
+		return [start, end];
+	}
+	const expanded = obstacles
+		.map((obstacle) => ({
+			minX: Math.min(obstacle.min.x, obstacle.max.x) - Math.max(0, padding),
+			maxX: Math.max(obstacle.min.x, obstacle.max.x) + Math.max(0, padding),
+			minY: Math.min(obstacle.min.y, obstacle.max.y) - Math.max(0, padding),
+			maxY: Math.max(obstacle.min.y, obstacle.max.y) + Math.max(0, padding)
+		}))
+		.filter(
+			(obstacle) => obstacle.maxX - obstacle.minX > ROUTE_EPSILON || obstacle.maxY - obstacle.minY > ROUTE_EPSILON
+		);
+	const fallback = computeOrthogonalPath(start, end);
+	if (expanded.length === 0 || routeIsClear(fallback, expanded)) return fallback;
+
+	const xValues = uniqueSorted([start.x, end.x, ...expanded.flatMap((obstacle) => [obstacle.minX, obstacle.maxX])]);
+	const yValues = uniqueSorted([start.y, end.y, ...expanded.flatMap((obstacle) => [obstacle.minY, obstacle.maxY])]);
+	const nodes: Vec2[] = [];
+	for (const x of xValues) {
+		for (const y of yValues) {
+			const point = { x, y };
+			if (!routePointInside(point, expanded)) nodes.push(point);
+		}
+	}
+	const startIndex = ensureRouteNode(nodes, start);
+	const endIndex = ensureRouteNode(nodes, end);
+	const states: RouteState[] = Array.from({ length: nodes.length * 3 }, () => ({
+		cost: Number.POSITIVE_INFINITY,
+		previous: null,
+		node: 0,
+		direction: 2
+	}));
+	states[startIndex * 3 + 2] = { cost: 0, previous: null, node: startIndex, direction: 2 };
+	const settled = new Set<number>();
+
+	while (true) {
+		let current = -1;
+		for (let index = 0; index < states.length; index += 1) {
+			const candidate = states[index];
+			if (settled.has(index) || !Number.isFinite(candidate.cost)) continue;
+			if (
+				current < 0 ||
+				candidate.cost < states[current].cost - ROUTE_EPSILON ||
+				(Math.abs(candidate.cost - states[current].cost) <= ROUTE_EPSILON &&
+					(candidate.node < states[current].node ||
+						(candidate.node === states[current].node && candidate.direction < states[current].direction)))
+			) {
+				current = index;
+			}
+		}
+		if (current < 0) break;
+		settled.add(current);
+		const currentNode = states[current].node;
+		if (currentNode === endIndex) return simplifyRoute(reconstructRoute(states, nodes, current));
+		for (let nextNode = 0; nextNode < nodes.length; nextNode += 1) {
+			if (nextNode === currentNode || !routeAxisAligned(nodes[currentNode], nodes[nextNode])) continue;
+			if (!routeSegmentIsClear(nodes[currentNode], nodes[nextNode], expanded)) continue;
+			const direction = Math.abs(nodes[nextNode].x - nodes[currentNode].x) > ROUTE_EPSILON ? 0 : 1;
+			const nextState = nextNode * 3 + direction;
+			const distance =
+				Math.abs(nodes[nextNode].x - nodes[currentNode].x) + Math.abs(nodes[nextNode].y - nodes[currentNode].y);
+			const turn =
+				states[current].direction < 2 && states[current].direction !== direction ? ROUTE_TURN_PENALTY : 0;
+			const cost = states[current].cost + distance + turn;
+			const existing = states[nextState];
+			if (
+				cost < existing.cost - ROUTE_EPSILON ||
+				(Math.abs(cost - existing.cost) <= ROUTE_EPSILON &&
+					current < (existing.previous ?? Number.POSITIVE_INFINITY))
+			) {
+				states[nextState] = { cost, previous: current, node: nextNode, direction };
+			}
+		}
+	}
+	return fallback;
+}
+
+/** Resolve an arrow's rendered path, including automatic obstacle routing. */
+export function arrowPathForShape(state: EditorState, shape: ArrowShape): Vec2[] {
+	const resolved = resolveArrowEndpoints(state, shape.id);
+	if (!resolved) return [];
+	const endpoints = [
+		worldToLocal(resolved.a, shape),
+		...shape.props.points.slice(1, -1),
+		worldToLocal(resolved.b, shape)
+	];
+	const routing = shape.props.routing?.automatic ? 'orthogonal' : (shape.props.routing?.kind ?? 'straight');
+	if (routing !== 'orthogonal') return arrowPath(endpoints, routing);
+	const boundTargets = new Set(
+		Object.values(state.doc.bindings)
+			.filter((binding) => binding.fromShapeId === shape.id)
+			.map((binding) => binding.toShapeId)
+	);
+	const obstacles = getShapesOnCurrentPage(state)
+		.filter(
+			(candidate) =>
+				candidate.id !== shape.id &&
+				candidate.type !== 'arrow' &&
+				candidate.type !== 'line' &&
+				candidate.type !== 'container' &&
+				!boundTargets.has(candidate.id)
+		)
+		.map(shapeBounds);
+	const worldPath = computeObstacleAwareOrthogonalPath(resolved.a, resolved.b, obstacles);
+	return worldPath.map((point) => worldToLocal(point, shape));
+}
+
+function uniqueSorted(values: number[]): number[] {
+	return values
+		.sort((left, right) => left - right)
+		.filter((value, index, all) => index === 0 || Math.abs(value - all[index - 1]!) > ROUTE_EPSILON);
+}
+
+function ensureRouteNode(nodes: Vec2[], point: Vec2): number {
+	const index = nodes.findIndex(
+		(candidate) =>
+			Math.abs(candidate.x - point.x) <= ROUTE_EPSILON && Math.abs(candidate.y - point.y) <= ROUTE_EPSILON
+	);
+	if (index >= 0) return index;
+	nodes.push({ ...point });
+	return nodes.length - 1;
+}
+
+function routePointInside(point: Vec2, obstacles: readonly RouteObstacle[]): boolean {
+	return obstacles.some(
+		(obstacle) =>
+			point.x > obstacle.minX + ROUTE_EPSILON &&
+			point.x < obstacle.maxX - ROUTE_EPSILON &&
+			point.y > obstacle.minY + ROUTE_EPSILON &&
+			point.y < obstacle.maxY - ROUTE_EPSILON
+	);
+}
+
+function routeAxisAligned(left: Vec2, right: Vec2): boolean {
+	return Math.abs(left.x - right.x) <= ROUTE_EPSILON || Math.abs(left.y - right.y) <= ROUTE_EPSILON;
+}
+
+function routeSegmentIsClear(start: Vec2, end: Vec2, obstacles: readonly RouteObstacle[]): boolean {
+	if (!routeAxisAligned(start, end)) return false;
+	return obstacles.every((obstacle) => {
+		if (Math.abs(start.y - end.y) <= ROUTE_EPSILON) {
+			const yInside = start.y > obstacle.minY + ROUTE_EPSILON && start.y < obstacle.maxY - ROUTE_EPSILON;
+			return !yInside || !routeIntervalsOverlap(start.x, end.x, obstacle.minX, obstacle.maxX);
+		}
+		const xInside = start.x > obstacle.minX + ROUTE_EPSILON && start.x < obstacle.maxX - ROUTE_EPSILON;
+		return !xInside || !routeIntervalsOverlap(start.y, end.y, obstacle.minY, obstacle.maxY);
+	});
+}
+
+function routeIntervalsOverlap(firstStart: number, firstEnd: number, secondStart: number, secondEnd: number): boolean {
+	return (
+		Math.min(firstStart, firstEnd) < secondEnd - ROUTE_EPSILON &&
+		Math.max(firstStart, firstEnd) > secondStart + ROUTE_EPSILON
+	);
+}
+
+function routeIsClear(path: readonly Vec2[], obstacles: readonly RouteObstacle[]): boolean {
+	return path.slice(1).every((point, index) => routeSegmentIsClear(path[index]!, point, obstacles));
+}
+
+function reconstructRoute(states: readonly RouteState[], nodes: readonly Vec2[], current: number): Vec2[] {
+	const path: Vec2[] = [];
+	let cursor: number | null = current;
+	while (cursor !== null) {
+		path.push(nodes[states[cursor]!.node]!);
+		cursor = states[cursor]!.previous;
+	}
+	return path.reverse();
+}
+
+function simplifyRoute(path: readonly Vec2[]): Vec2[] {
+	const result: Vec2[] = [];
+	for (const point of path) {
+		const previous = result.at(-1);
+		if (
+			previous &&
+			Math.abs(previous.x - point.x) <= ROUTE_EPSILON &&
+			Math.abs(previous.y - point.y) <= ROUTE_EPSILON
+		)
+			continue;
+		if (result.length >= 2) {
+			const before = result.at(-2)!;
+			if (routeAxisAligned(before, point) && routeAxisAligned(point, previous!)) result.pop();
+		}
+		result.push({ ...point });
+	}
+	return result;
+}
+
 /** Return a sampled quadratic path through arrow bend points. */
 export function computeCurvedPath(points: readonly Vec2[], samplesPerCurve = 12): Vec2[] {
 	if (points.length < 3) return points.map((point) => ({ ...point }));
@@ -923,9 +1117,13 @@ export function computeCurvedPath(points: readonly Vec2[], samplesPerCurve = 12)
 }
 
 /** Resolve the local polyline used to draw an arrow. */
-export function arrowPath(points: readonly Vec2[], routing: 'straight' | 'curved' | 'orthogonal' = 'straight'): Vec2[] {
+export function arrowPath(
+	points: readonly Vec2[],
+	routing: 'straight' | 'curved' | 'orthogonal' = 'straight',
+	obstacles: readonly Box2[] = []
+): Vec2[] {
 	if (points.length < 2) return points.map((point) => ({ ...point }));
-	if (routing === 'orthogonal') return computeOrthogonalPath(points[0], points.at(-1)!);
+	if (routing === 'orthogonal') return computeObstacleAwareOrthogonalPath(points[0], points.at(-1)!, obstacles);
 	if (routing === 'curved') return computeCurvedPath(points);
 	return points.map((point) => ({ ...point }));
 }

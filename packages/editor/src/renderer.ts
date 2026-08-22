@@ -17,7 +17,7 @@ import type {
 	SnapGuide
 } from '@inkfinite/core';
 import {
-	arrowPath,
+	arrowPathForShape,
 	computePolylineLength,
 	getPointAtDistance,
 	getLayersOnCurrentPage,
@@ -742,17 +742,8 @@ function drawArrow(context: CanvasRenderingContext2D, state: EditorState, shape:
 	const style = shape.props.style;
 	const shapeAlpha = context.globalAlpha;
 
-	const resolved = resolveArrowEndpoints(state, shape.id);
-	if (!resolved) return;
-
-	const a = worldToLocal(resolved.a, shape);
-	const b = worldToLocal(resolved.b, shape);
-
-	const endpoints = [a, ...shape.props.points.slice(1, -1), b];
-	const points = arrowPath(
-		endpoints,
-		shape.props.routing?.automatic ? 'orthogonal' : (shape.props.routing?.kind ?? 'straight')
-	);
+	const points = arrowPathForShape(state, shape);
+	if (points.length < 2) return;
 
 	context.beginPath();
 	context.moveTo(points[0].x, points[0].y);

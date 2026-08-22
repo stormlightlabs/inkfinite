@@ -69,9 +69,26 @@ describe('compiled document engine worker', () => {
 		expect(state.editor_projection.shapes['shape:rect']).toBeDefined();
 		expect(state.can_undo).toBe(true);
 
-		expect(
-			(await worker.undoDocument()).snapshot.document.shapes['shape:rect']
-		).toBeUndefined();
+		state = await worker.applyEditorPatches({
+			...request,
+			transaction_id: 'transaction:convert',
+			description: 'Convert rectangle',
+			patches: [
+				{
+					type: 'convert_shape',
+					shape_id: 'shape:rect',
+					kind: 'ellipse',
+					properties: { w: 20, h: 10, fill: '#ff0000' },
+					style: null
+				}
+			]
+		});
+		expect(state.snapshot.document.shapes['shape:rect']?.kind).toBe('ellipse');
+		expect(state.snapshot.document.shapes['shape:rect']?.style.opacity).toBe(1);
+
+		expect((await worker.undoDocument()).snapshot.document.shapes['shape:rect']?.kind).toBe(
+			'rect'
+		);
 		state = await worker.redoDocument();
 		expect(state.snapshot.document.shapes['shape:rect']).toBeDefined();
 

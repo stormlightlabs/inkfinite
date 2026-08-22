@@ -378,6 +378,19 @@
 			},
 			{ type: 'separator' },
 			{
+				id: 'convert-to-rect',
+				label: SELECTION_COMMAND_LABELS['convert-to-rect'],
+				icon: 'rectangle',
+				disabled: selectionCount === 0
+			},
+			{
+				id: 'convert-to-ellipse',
+				label: SELECTION_COMMAND_LABELS['convert-to-ellipse'],
+				icon: 'ellipse',
+				disabled: selectionCount === 0
+			},
+			{ type: 'separator' },
+			{
 				id: 'forward',
 				label: SELECTION_COMMAND_LABELS.forward,
 				icon: 'arrow-up',

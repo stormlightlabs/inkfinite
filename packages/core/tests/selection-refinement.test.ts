@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Action, Modifiers, PointerButtons } from '../src/actions';
-import { duplicateAndConnectSelection } from '../src/selection';
+import { convertSelectedShapes, duplicateAndConnectSelection } from '../src/selection';
 import { PageRecord, ShapeRecord } from '../src/model';
 import { EditorState } from '../src/reactivity';
 import { RectTool, SelectTool } from '../src/tools';
@@ -197,6 +197,46 @@ describe('selection and movement refinements', () => {
 				expect.objectContaining({ fromShapeId: arrow.id, toShapeId: copiedId, handle: 'end' })
 			])
 		);
+	});
+
+	it('converts a selection while preserving its common shape fields', () => {
+		const state = selectionState();
+		const next = convertSelectedShapes(state, 'ellipse');
+		const shape = next.doc.shapes['shape:one'];
+		expect(shape.type).toBe('ellipse');
+		expect(shape).toMatchObject({ x: 0, y: 0, rot: 0 });
+		if (shape.type !== 'ellipse') throw new Error('expected ellipse');
+		expect(shape.props).toEqual({ w: 40, h: 30, fill: '', stroke: '' });
+	});
+
+	it('does not convert shapes that participate in a connector binding', () => {
+		const state = selectionState() as EditorState;
+		const arrow = ShapeRecord.createArrow(
+			state.doc.pages['page:selection']!.id,
+			0,
+			0,
+			{
+				points: [
+					{ x: 0, y: 0 },
+					{ x: 100, y: 0 }
+				],
+				start: { kind: 'free' },
+				end: { kind: 'free' },
+				style: { stroke: '#000', width: 2 }
+			},
+			'shape:arrow'
+		);
+		state.doc.shapes[arrow.id] = arrow;
+		state.doc.bindings['binding:one'] = {
+			id: 'binding:one',
+			type: 'arrow-end',
+			fromShapeId: arrow.id,
+			toShapeId: 'shape:one',
+			handle: 'end',
+			anchor: { kind: 'center' }
+		};
+		const next = convertSelectedShapes(state, 'ellipse');
+		expect(next.doc.shapes['shape:one']?.type).toBe('rect');
 	});
 
 	it('uses Shift and Alt for square centered rectangle creation', () => {

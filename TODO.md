@@ -35,11 +35,11 @@ across mouse, touch, and keyboard input.
 
 ### Connectors and conversion
 
-- [ ] Implement deterministic obstacle-aware connector routing in Rust and use
+- [x] Implement deterministic obstacle-aware connector routing in Rust and use
       it for TypeScript interaction previews
-- [ ] Implement shape conversion as a Rust transaction and expose it through
+- [x] Implement shape conversion as a Rust transaction and expose it through
       TypeScript selection commands without losing shared style or metadata
-- [ ] Cover duplicate-and-connect, selection cycling, command execution, and
+- [x] Cover duplicate-and-connect, selection cycling, command execution, and
       automatic routing with Playwright integration tests
 
 ## Stronger content primitives

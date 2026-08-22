@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computePolylineLength, getPointAtDistance } from "../src/geom";
+import {
+  computeObstacleAwareOrthogonalPath,
+  computePolylineLength,
+  getPointAtDistance,
+} from "../src/geom";
 import type { ArrowShape } from "../src/model";
 
 describe("Arrow label placement under zoom/pan", () => {
@@ -120,6 +124,29 @@ describe("Arrow label placement under zoom/pan", () => {
     const labelPos = getPointAtDistance(points, clampedDistance);
     expect(labelPos.x).toBe(100);
     expect(labelPos.y).toBe(0);
+  });
+});
+
+describe("Obstacle-aware arrow routing", () => {
+  it("detours around a blocking obstacle deterministically", () => {
+    const obstacle = { min: { x: 75, y: 25 }, max: { x: 125, y: 75 } };
+    const first = computeObstacleAwareOrthogonalPath(
+      { x: 0, y: 50 },
+      { x: 200, y: 50 },
+      [obstacle],
+      10,
+    );
+    const second = computeObstacleAwareOrthogonalPath(
+      { x: 0, y: 50 },
+      { x: 200, y: 50 },
+      [obstacle],
+      10,
+    );
+
+    expect(first).toEqual(second);
+    expect(first.length).toBeGreaterThan(2);
+    expect(first.every((point, index) => index === 0 || point.x === first[index - 1].x || point.y === first[index - 1].y)).toBe(true);
+    expect(first.some((point) => point.y <= 15 || point.y >= 85)).toBe(true);
   });
 });
 

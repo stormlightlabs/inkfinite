@@ -64,6 +64,40 @@ describe('toCanonicalDocumentSnapshot', () => {
 		});
 	});
 
+	it('turns a shape kind change into a native conversion patch', () => {
+		const page = PageRecord.create('Page 1', 'page:one');
+		const rect = ShapeRecord.createRect(
+			page.id,
+			10,
+			20,
+			{ w: 40, h: 20, fill: 'red', stroke: 'none', radius: 4 },
+			'shape:rect'
+		);
+		page.shapeIds.push(rect.id);
+		const before: Document = { pages: { [page.id]: page }, shapes: { [rect.id]: rect }, bindings: {} };
+		const after: Document = {
+			...before,
+			shapes: { [rect.id]: { ...rect, type: 'ellipse', props: { w: 40, h: 20, fill: 'red', stroke: 'none' } } }
+		};
+
+		const request = createEditorReconciliationRequest(before, after, {
+			actor_id: 'browser',
+			origin: 'human',
+			transaction_id: 'transaction:convert',
+			description: 'Convert rectangle',
+			timestamp: 1
+		});
+
+		expect(request.patches).toEqual([
+			expect.objectContaining({
+				type: 'convert_shape',
+				shape_id: rect.id,
+				kind: 'ellipse',
+				properties: { w: 40, h: 20, fill: 'red', stroke: 'none' }
+			})
+		]);
+	});
+
 	it('routes topology edits as canonical path patches', () => {
 		const page = PageRecord.create('Page 1', 'page:one');
 		const props: PathProps = {

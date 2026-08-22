@@ -291,6 +291,29 @@ export type Operation =
 			expected_version: RecordVersion | null;
 	  }
 	| {
+			type: 'convert_shape';
+			/**
+			 * Shape to convert.
+			 */
+			shape_id: ShapeId;
+			/**
+			 * Replacement registry kind.
+			 */
+			kind: string;
+			/**
+			 * Replacement kind-specific properties.
+			 */
+			properties: ShapeProperties;
+			/**
+			 * Optional replacement common style.
+			 */
+			style: ShapeStyle | null;
+			/**
+			 * Optional optimistic record version.
+			 */
+			expected_version: RecordVersion | null;
+	  }
+	| {
 			type: 'delete_shape';
 			/**
 			 * Shape to delete.

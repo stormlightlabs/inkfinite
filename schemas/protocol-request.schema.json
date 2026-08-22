@@ -869,6 +869,57 @@
           "type": "object"
         },
         {
+          "description": "Change a shape's registry kind and kind-specific properties.\n\nTransform, common style, semantic metadata, hierarchy, and stable ID\nremain attached to the existing shape record.",
+          "properties": {
+            "expected_version": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/RecordVersion"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional optimistic record version."
+            },
+            "kind": {
+              "description": "Replacement registry kind.",
+              "type": "string"
+            },
+            "properties": {
+              "additionalProperties": true,
+              "description": "Replacement kind-specific properties.",
+              "type": "object"
+            },
+            "shape_id": {
+              "$ref": "#/$defs/ShapeId",
+              "description": "Shape to convert."
+            },
+            "style": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ShapeStyle"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional replacement common style."
+            },
+            "type": {
+              "const": "convert_shape",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "shape_id",
+            "kind",
+            "properties"
+          ],
+          "type": "object"
+        },
+        {
           "description": "Delete a shape and its owned descendants.",
           "properties": {
             "expected_version": {

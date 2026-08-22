@@ -8,6 +8,8 @@ import {
 	setShapesLocked,
 	SnapshotCommand,
 	ungroupShapes,
+	convertSelectedShapes,
+	type SelectionConversionTarget,
 	type EditorState,
 	type ShapeAlignment,
 	type Store
@@ -27,7 +29,8 @@ export type SelectionCommand =
 	| 'lock'
 	| 'unlock'
 	| 'agent-editable'
-	| 'agent-readonly';
+	| 'agent-readonly'
+	| `convert-to-${SelectionConversionTarget}`;
 
 /** User-facing names used for history entries and command menus. */
 export const SELECTION_COMMAND_LABELS: Record<SelectionCommand, string> = {
@@ -48,7 +51,9 @@ export const SELECTION_COMMAND_LABELS: Record<SelectionCommand, string> = {
 	lock: 'Lock',
 	unlock: 'Unlock',
 	'agent-editable': 'Allow Agent Edits',
-	'agent-readonly': 'Prevent Agent Edits'
+	'agent-readonly': 'Prevent Agent Edits',
+	'convert-to-rect': 'Convert to Rectangle',
+	'convert-to-ellipse': 'Convert to Ellipse'
 };
 
 /** Applies one selection command without adding a history entry. */
@@ -75,6 +80,10 @@ export function applySelectionCommand(state: EditorState, command: SelectionComm
 			return setShapesAgentEditable(state, ids, true);
 		case 'agent-readonly':
 			return setShapesAgentEditable(state, ids, false);
+		case 'convert-to-rect':
+			return convertSelectedShapes(state, 'rect');
+		case 'convert-to-ellipse':
+			return convertSelectedShapes(state, 'ellipse');
 		case 'distribute-horizontal':
 			return distributeShapes(state, ids, 'horizontal');
 		case 'distribute-vertical':
@@ -158,6 +167,20 @@ export function getCommandPaletteEntries(
 			keywords: 'copy connector arrow'
 		},
 		...alignmentEntries,
+		{
+			id: 'convert-to-rect',
+			label: SELECTION_COMMAND_LABELS['convert-to-rect'],
+			group: 'Selection',
+			disabled: selectedCount === 0,
+			keywords: 'shape convert rectangle'
+		},
+		{
+			id: 'convert-to-ellipse',
+			label: SELECTION_COMMAND_LABELS['convert-to-ellipse'],
+			group: 'Selection',
+			disabled: selectedCount === 0,
+			keywords: 'shape convert ellipse oval'
+		},
 		{
 			id: 'group',
 			label: SELECTION_COMMAND_LABELS.group,
