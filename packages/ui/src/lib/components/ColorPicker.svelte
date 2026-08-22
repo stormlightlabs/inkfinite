@@ -11,6 +11,8 @@
 		recentColors?: readonly string[];
 		/** Prevents opening and changing the color. */
 		disabled?: boolean;
+		/** Indicates that the selected shapes do not share one color. */
+		mixed?: boolean;
 		/** Horizontal alignment of the palette below the trigger. */
 		align?: 'start' | 'end';
 	}
@@ -32,6 +34,7 @@
 		onchange,
 		recentColors = [],
 		disabled = false,
+		mixed = false,
 		align = 'start'
 	}: ColorPickerProps = $props();
 
@@ -44,6 +47,7 @@
 	let hexError = $state(false);
 	let recent = $state<string[]>([]);
 	let restoreFocus = false;
+	let panelPosition = $state({ left: 8, top: 8 });
 
 	let pickerId = $derived(`color-picker-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`);
 	let currentColor = $derived(normalizeHex(value) ?? value);
@@ -81,10 +85,26 @@
 
 		const panel = panelEl;
 		const picker = pickerEl;
-		if (!panel || !picker || typeof document === 'undefined') return;
+		const trigger = triggerEl;
+		if (!panel || !picker || !trigger || typeof document === 'undefined') return;
 		const pickerElement = picker;
 
 		queueMicrotask(() => {
+			const triggerBounds = trigger.getBoundingClientRect();
+			const panelBounds = panel.getBoundingClientRect();
+			const gutter = 8;
+			const preferredTop = triggerBounds.bottom + gutter;
+			const top =
+				preferredTop + panelBounds.height <= window.innerHeight - gutter
+					? preferredTop
+					: Math.max(gutter, triggerBounds.top - panelBounds.height - gutter);
+			const preferredLeft =
+				align === 'end' ? triggerBounds.right - panelBounds.width : triggerBounds.left;
+			const left = Math.max(
+				gutter,
+				Math.min(preferredLeft, window.innerWidth - panelBounds.width - gutter)
+			);
+			panelPosition = { left, top };
 			const selectedOption = panel.querySelector<HTMLElement>('[aria-pressed="true"]');
 			(selectedOption ?? panel).focus();
 		});
@@ -182,16 +202,17 @@
 <div class="color-picker" bind:this={pickerEl}>
 	<button
 		class="color-picker__trigger"
+		class:color-picker__trigger--mixed={mixed}
 		bind:this={triggerEl}
 		type="button"
 		{disabled}
-		style:background={currentColor}
-		aria-label={label}
+		style:background={mixed ? undefined : currentColor}
+		aria-label={mixed ? `${label}, mixed values` : label}
 		aria-haspopup="dialog"
 		aria-expanded={isOpen}
-		title={label}
+		title={mixed ? `${label}, mixed values` : label}
 		onclick={togglePicker}>
-		<span class="color-picker__sr-only">{label}</span>
+		<span class="color-picker__sr-only">{mixed ? `${label}, mixed values` : label}</span>
 	</button>
 
 	{#if isOpen}
@@ -199,6 +220,8 @@
 			class="color-picker__panel"
 			class:color-picker__panel--end={align === 'end'}
 			bind:this={panelEl}
+			style:left={`${panelPosition.left}px`}
+			style:top={`${panelPosition.top}px`}
 			role="dialog"
 			tabindex="-1"
 			aria-label={label}>
@@ -330,6 +353,16 @@
 			box-shadow var(--ink-duration-fast) var(--ink-ease-out);
 	}
 
+	.color-picker__trigger--mixed {
+		background: repeating-linear-gradient(
+			-45deg,
+			var(--ink-surface-hover) 0,
+			var(--ink-surface-hover) 5px,
+			var(--ink-border-strong) 5px,
+			var(--ink-border-strong) 7px
+		);
+	}
+
 	.color-picker__trigger:hover:not(:disabled) {
 		translate: -1px -1px;
 		box-shadow: calc(var(--ink-shadow-offset) + 1px) calc(var(--ink-shadow-offset) + 1px) 0
@@ -355,9 +388,9 @@
 	}
 
 	.color-picker__panel {
-		position: absolute;
-		top: calc(100% + var(--ink-space-2));
-		left: 0;
+		position: fixed;
+		top: 8px;
+		left: 8px;
 		z-index: 10;
 		width: min(15rem, calc(100vw - 1rem));
 		padding: var(--ink-space-3);

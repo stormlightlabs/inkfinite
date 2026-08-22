@@ -39,18 +39,18 @@ selection-specific controls.
 
 Expose only controls that apply to the active tool or current selection.
 
-- [ ] Define contextual controls from shape capabilities rather than one shared
+- [x] Define contextual controls from shape capabilities rather than one shared
       selection panel
-- [ ] Show fill, stroke, opacity, and shape-specific controls only when
+- [x] Show fill, stroke, opacity, and shape-specific controls only when
       applicable
-- [ ] Give arrows a focused stroke, endpoint, and connection control surface
-- [ ] Give text and Markdown selections focused typography controls
-- [ ] Give multi-selection a focused align, distribute, group, and arrange
+- [x] Give arrows a focused stroke, endpoint, and connection control surface
+- [x] Give text and Markdown selections focused typography controls
+- [x] Give multi-selection a focused align, distribute, group, and arrange
       surface
-- [ ] Preserve mixed-value states when selected shapes do not share a property
-- [ ] Keep contextual controls keyboard accessible and return focus correctly
+- [x] Preserve mixed-value states when selected shapes do not share a property
+- [x] Keep contextual controls keyboard accessible and return focus correctly
       when popovers close
-- [ ] Add interaction tests for contextual controls across representative
+- [x] Add interaction tests for contextual controls across representative
       selection types
 
 ### Theme and component consistency

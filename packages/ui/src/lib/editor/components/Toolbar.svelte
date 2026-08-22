@@ -1,43 +1,16 @@
 <script lang="ts">
 	import type {
-		ArrowShape,
 		EditorState as EditorStateType,
-		EllipseShape,
 		InterchangeFormat,
-		ImageShape,
-		LineShape,
-		MarkdownShape,
-		PathShape,
-		RectShape,
-		ShapeRecord,
 		Store,
-		StrokeShape,
-		TextShape,
 		ToolId
 	} from '@inkfinite/core';
-	import {
-		EditorState,
-		exportToSVG,
-		exportViewportToPNG,
-		getSelectedShapes,
-		SnapshotCommand
-	} from '@inkfinite/core';
+	import { exportToSVG, exportViewportToPNG } from '@inkfinite/core';
 	import { fade } from 'svelte/transition';
-	import {
-		BrushPopover,
-		ColorPicker,
-		ContextMenu,
-		Icon,
-		type ContextMenuEntry
-	} from '../../index';
-	import {
-		executeSelectionCommand,
-		SELECTION_COMMAND_LABELS,
-		type SelectionCommand
-	} from '../commands';
-	import { DEFAULT_FILL_COLOR, DEFAULT_STROKE_COLOR, TOOLS } from '../constants';
+	import { BrushPopover, ContextMenu, Icon, type ContextMenuEntry } from '../../index';
+	import { TOOLS } from '../constants';
 	import type { BrushSettings, BrushStore } from '../status';
-	import ArrowPopover from './ArrowPopover.svelte';
+	import SelectionControls from './SelectionControls.svelte';
 
 	type Props = {
 		currentTool: ToolId;
@@ -79,20 +52,7 @@
 	let importMenuOpen = $state(false);
 	let importMenuPoint = $state({ x: 0, y: 0 });
 	let importButtonEl = $state<HTMLButtonElement | null>(null);
-	let layoutMenuOpen = $state(false);
-	let layoutMenuPoint = $state({ x: 0, y: 0 });
-	let layoutButtonEl = $state<HTMLButtonElement | null>(null);
-	let fillColorValue = $state(DEFAULT_FILL_COLOR);
-	let strokeColorValue = $state(DEFAULT_STROKE_COLOR);
-	let fillOpacityValue = $state(1);
-	let strokeOpacityValue = $state(1);
-	let fillDisabled = $state(true);
-	let strokeDisabled = $state(true);
-	let agentEditableValue = $state(true);
 	let brush = $derived<BrushSettings>(brushStore.get());
-	let hasArrowSelection = $derived(
-		getSelectedShapes(editorState).some((s) => s.type === 'arrow')
-	);
 
 	$effect(() => {
 		editorState = store.getState();
@@ -108,65 +68,6 @@
 		});
 		return () => unsubscribeBrush();
 	});
-
-	$effect(() => {
-		const selection = getSelectedShapes(editorState);
-		const fillable = selection.filter(shapeSupportsFill);
-		const strokable = selection.filter(shapeSupportsStroke);
-		const fillOpacityTargets = selection.filter(shapeSupportsFillOpacity);
-		const strokeOpacityTargets = selection.filter(shapeSupportsStrokeOpacity);
-		fillDisabled = fillable.length === 0;
-		strokeDisabled = strokable.length === 0;
-		if (fillable.length > 0) {
-			const shared = getSharedColor(fillable, (shape) =>
-				shape.type === 'text'
-					? shape.props.color
-					: 'fill' in shape.props
-						? shape.props.fill
-						: null
-			);
-			if (shared) {
-				fillColorValue = shared;
-			}
-		}
-		if (strokable.length > 0) {
-			const shared = getSharedColor(strokable, (shape) =>
-				shape.type === 'arrow' ? shape.props.style.stroke : (shape.props.stroke ?? null)
-			);
-			if (shared) {
-				strokeColorValue = shared;
-			}
-		}
-		fillOpacityValue = getSharedOpacity(fillOpacityTargets, (shape) => shape.fillOpacity) ?? 1;
-		strokeOpacityValue =
-			getSharedOpacity(strokeOpacityTargets, (shape) =>
-				shape.type === 'stroke'
-					? (shape.strokeOpacity ?? shape.props.style.opacity)
-					: shape.strokeOpacity
-			) ?? 1;
-		agentEditableValue = selection.every((shape) => shape.agentEditable !== false);
-	});
-
-	let showColorControls = $derived(
-		getSelectedShapes(editorState).some(
-			(s) =>
-				shapeSupportsFill(s) ||
-				shapeSupportsStroke(s) ||
-				shapeSupportsFillOpacity(s) ||
-				shapeSupportsStrokeOpacity(s)
-		)
-	);
-	let selectedShapes = $derived(getSelectedShapes(editorState));
-	let selectionCount = $derived(selectedShapes.length);
-	let hasGroupedSelection = $derived(
-		selectedShapes.some((shape) => Boolean(shape.groupId) || shape.type === 'container')
-	);
-	let allSelectedLocked = $derived(
-		selectionCount > 0 && selectedShapes.every((shape) => shape.locked)
-	);
-	let showContextControls = $derived(
-		currentTool !== 'pen' && (selectionCount > 0 || hasArrowSelection)
-	);
 
 	let position = $state({ x: 12, y: 88 });
 	let orientation = $state<'vertical' | 'horizontal'>('vertical');
@@ -273,126 +174,6 @@
 		onToolChange(toolId);
 	}
 
-	function toggleLayoutMenu() {
-		if (!layoutButtonEl) return;
-		if (layoutMenuOpen) {
-			layoutMenuOpen = false;
-			return;
-		}
-		const bounds = layoutButtonEl.getBoundingClientRect();
-		layoutMenuPoint = { x: bounds.left, y: bounds.bottom + 8 };
-		layoutMenuOpen = true;
-	}
-
-	function getLayoutMenuItems(): ContextMenuEntry[] {
-		const items: ContextMenuEntry[] = [];
-		const enoughForAlignment = selectionCount >= 2;
-		const enoughForDistribution = selectionCount >= 3;
-		if (enoughForAlignment) {
-			items.push(
-				...(
-					[
-						'align-left',
-						'align-center',
-						'align-right',
-						'align-top',
-						'align-middle',
-						'align-bottom'
-					] as SelectionCommand[]
-				).map((id) => ({
-					id,
-					label: SELECTION_COMMAND_LABELS[id],
-					icon: 'select' as const,
-					disabled: !enoughForAlignment
-				}))
-			);
-			items.push({ type: 'separator' });
-		}
-		items.push(
-			{
-				id: 'distribute-horizontal',
-				label: SELECTION_COMMAND_LABELS['distribute-horizontal'],
-				icon: 'arrow-right',
-				disabled: !enoughForDistribution
-			},
-			{
-				id: 'distribute-vertical',
-				label: SELECTION_COMMAND_LABELS['distribute-vertical'],
-				icon: 'arrow-down',
-				disabled: !enoughForDistribution
-			},
-			{ type: 'separator' },
-			{
-				id: 'group',
-				label: SELECTION_COMMAND_LABELS.group,
-				icon: 'layers',
-				disabled: selectionCount < 2
-			},
-			{
-				id: 'ungroup',
-				label: SELECTION_COMMAND_LABELS.ungroup,
-				icon: 'layers',
-				disabled: !hasGroupedSelection
-			},
-			{ type: 'separator' },
-			{
-				id: 'forward',
-				label: SELECTION_COMMAND_LABELS.forward,
-				icon: 'arrow-up',
-				shortcut: '⌘/Ctrl ]'
-			},
-			{
-				id: 'backward',
-				label: SELECTION_COMMAND_LABELS.backward,
-				icon: 'arrow-down',
-				shortcut: '⌘/Ctrl ['
-			},
-			{
-				id: 'front',
-				label: SELECTION_COMMAND_LABELS.front,
-				icon: 'arrow-up',
-				shortcut: '⇧⌘/Ctrl ]'
-			},
-			{
-				id: 'back',
-				label: SELECTION_COMMAND_LABELS.back,
-				icon: 'arrow-down',
-				shortcut: '⇧⌘/Ctrl ['
-			},
-			{ type: 'separator' },
-			{
-				id: allSelectedLocked ? 'unlock' : 'lock',
-				label: allSelectedLocked
-					? SELECTION_COMMAND_LABELS.unlock
-					: SELECTION_COMMAND_LABELS.lock,
-				icon: allSelectedLocked ? 'lock-open' : 'lock',
-				shortcut: '⇧⌘/Ctrl L'
-			}
-		);
-		if (showAgentControl) {
-			items.push(
-				{ type: 'separator' },
-				{
-					id: 'agent-editable',
-					label: SELECTION_COMMAND_LABELS['agent-editable'],
-					icon: 'terminal'
-				},
-				{
-					id: 'agent-readonly',
-					label: SELECTION_COMMAND_LABELS['agent-readonly'],
-					icon: 'lock-open'
-				}
-			);
-		}
-		return items;
-	}
-
-	function handleLayoutMenuAction(id: string) {
-		if (id in SELECTION_COMMAND_LABELS) {
-			executeSelectionCommand(store, id as SelectionCommand);
-		}
-	}
-
 	async function exportPNGViewport() {
 		if (!canvas) {
 			console.error('Canvas not available for export');
@@ -488,251 +269,8 @@
 		downloadBlob(blob, filename);
 	}
 
-	function shapeSupportsFill(
-		shape: ShapeRecord
-	): shape is RectShape | EllipseShape | TextShape | PathShape {
-		return (
-			shape.type === 'rect' ||
-			shape.type === 'ellipse' ||
-			shape.type === 'text' ||
-			shape.type === 'path'
-		);
-	}
-
-	function shapeSupportsStroke(
-		shape: ShapeRecord
-	): shape is RectShape | EllipseShape | LineShape | ArrowShape | PathShape {
-		return (
-			shape.type === 'rect' ||
-			shape.type === 'ellipse' ||
-			shape.type === 'line' ||
-			shape.type === 'arrow' ||
-			shape.type === 'path'
-		);
-	}
-
-	function shapeSupportsFillOpacity(
-		shape: ShapeRecord
-	): shape is RectShape | EllipseShape | TextShape | MarkdownShape | PathShape | ImageShape {
-		return (
-			shape.type === 'rect' ||
-			shape.type === 'ellipse' ||
-			shape.type === 'text' ||
-			shape.type === 'markdown' ||
-			shape.type === 'path' ||
-			shape.type === 'image'
-		);
-	}
-
-	function shapeSupportsStrokeOpacity(
-		shape: ShapeRecord
-	): shape is
-		| RectShape
-		| EllipseShape
-		| LineShape
-		| ArrowShape
-		| StrokeShape
-		| MarkdownShape
-		| PathShape {
-		return (
-			shape.type === 'rect' ||
-			shape.type === 'ellipse' ||
-			shape.type === 'line' ||
-			shape.type === 'arrow' ||
-			shape.type === 'stroke' ||
-			shape.type === 'markdown' ||
-			shape.type === 'path'
-		);
-	}
-
-	function getSharedColor<T extends ShapeRecord>(
-		shapes: T[],
-		extract: (shape: T) => string | null | undefined
-	): string | null {
-		if (shapes.length === 0) {
-			return null;
-		}
-		const first = extract(shapes[0]);
-		if (!first) {
-			return null;
-		}
-		for (let index = 1; index < shapes.length; index++) {
-			if (extract(shapes[index]) !== first) {
-				return null;
-			}
-		}
-		return first;
-	}
-
-	function getSharedOpacity<T extends ShapeRecord>(
-		shapes: T[],
-		extract: (shape: T) => number | undefined
-	): number | null {
-		if (shapes.length === 0) return null;
-		const first = extract(shapes[0]) ?? 1;
-		return shapes.every((shape) => (extract(shape) ?? 1) === first) ? first : null;
-	}
-
-	function applyFillColor(color: string) {
-		const state = store.getState();
-		const targets = getSelectedShapes(state).filter(shapeSupportsFill);
-		if (targets.length === 0) {
-			return;
-		}
-		const before = EditorState.clone(state);
-		const newShapes = { ...state.doc.shapes };
-		for (const shape of targets) {
-			// FIXME: make this a switch..case
-			if (shape.type === 'text') {
-				const updated: TextShape = { ...shape, props: { ...shape.props, color } };
-				newShapes[shape.id] = updated;
-			} else if (shape.type === 'rect') {
-				const updated: RectShape = { ...shape, props: { ...shape.props, fill: color } };
-				newShapes[shape.id] = updated;
-			} else if (shape.type === 'ellipse') {
-				const updated: EllipseShape = { ...shape, props: { ...shape.props, fill: color } };
-				newShapes[shape.id] = updated;
-			} else if (shape.type === 'path') {
-				const updated: PathShape = { ...shape, props: { ...shape.props, fill: color } };
-				newShapes[shape.id] = updated;
-			}
-		}
-		const after = { ...state, doc: { ...state.doc, shapes: newShapes } };
-		const command = new SnapshotCommand(
-			'Set fill color',
-			'doc',
-			before,
-			EditorState.clone(after)
-		);
-		store.executeCommand(command);
-	}
-
-	function applyStrokeColor(color: string) {
-		const state = store.getState();
-		const targets = getSelectedShapes(state).filter(shapeSupportsStroke);
-		if (targets.length === 0) {
-			return;
-		}
-		const before = EditorState.clone(state);
-		const newShapes = { ...state.doc.shapes };
-		for (const shape of targets) {
-			switch (shape.type) {
-				case 'rect': {
-					const updated: RectShape = {
-						...shape,
-						props: { ...shape.props, stroke: color }
-					};
-					newShapes[shape.id] = updated;
-					break;
-				}
-				case 'ellipse': {
-					const updated: EllipseShape = {
-						...shape,
-						props: { ...shape.props, stroke: color }
-					};
-					newShapes[shape.id] = updated;
-					break;
-				}
-				case 'line': {
-					const updated: LineShape = {
-						...shape,
-						props: { ...shape.props, stroke: color }
-					};
-					newShapes[shape.id] = updated;
-					break;
-				}
-				case 'arrow': {
-					const updated: ArrowShape = {
-						...shape,
-						props: { ...shape.props, style: { ...shape.props.style, stroke: color } }
-					};
-					newShapes[shape.id] = updated;
-					break;
-				}
-				case 'path': {
-					const updated: PathShape = {
-						...shape,
-						props: { ...shape.props, stroke: color }
-					};
-					newShapes[shape.id] = updated;
-					break;
-				}
-			}
-		}
-		const after = { ...state, doc: { ...state.doc, shapes: newShapes } };
-		const command = new SnapshotCommand(
-			'Set stroke color',
-			'doc',
-			before,
-			EditorState.clone(after)
-		);
-		store.executeCommand(command);
-	}
-
-	function handleFillChange(color: string) {
-		fillColorValue = color;
-		applyFillColor(color);
-	}
-
-	function handleStrokeChange(color: string) {
-		strokeColorValue = color;
-		applyStrokeColor(color);
-	}
-
-	function applyOpacity(field: 'fillOpacity' | 'strokeOpacity', value: number) {
-		const state = store.getState();
-		const targets = getSelectedShapes(state).filter(
-			field === 'fillOpacity' ? shapeSupportsFillOpacity : shapeSupportsStrokeOpacity
-		);
-		if (targets.length === 0) return;
-		const opacity = Math.min(1, Math.max(0, value));
-		const before = EditorState.clone(state);
-		const shapes = { ...state.doc.shapes };
-		for (const shape of targets) {
-			shapes[shape.id] = { ...shape, [field]: opacity } as ShapeRecord;
-		}
-		const after = { ...state, doc: { ...state.doc, shapes } };
-		store.executeCommand(
-			new SnapshotCommand(
-				field === 'fillOpacity' ? 'Set fill opacity' : 'Set stroke opacity',
-				'doc',
-				before,
-				EditorState.clone(after)
-			)
-		);
-	}
-
-	function handleOpacityChange(event: Event, field: 'fillOpacity' | 'strokeOpacity') {
-		const value = (event.currentTarget as HTMLInputElement).valueAsNumber;
-		if (!Number.isFinite(value)) return;
-		if (field === 'fillOpacity') fillOpacityValue = value;
-		else strokeOpacityValue = value;
-		applyOpacity(field, value);
-	}
-
 	function handleBrushChange(newBrush: BrushSettings) {
 		brushStore.set(newBrush);
-	}
-
-	function handleAgentEditableChange(event: Event) {
-		const state = store.getState();
-		const targets = getSelectedShapes(state);
-		if (targets.length === 0) return;
-		const agentEditable = (event.currentTarget as HTMLInputElement).checked;
-		const before = EditorState.clone(state);
-		const shapes = { ...state.doc.shapes };
-		for (const shape of targets) {
-			shapes[shape.id] = { ...shape, agentEditable } as ShapeRecord;
-		}
-		const after = { ...state, doc: { ...state.doc, shapes } };
-		store.executeCommand(
-			new SnapshotCommand(
-				agentEditable ? 'Allow Agent Edits' : 'Prevent Agent Edits',
-				'doc',
-				before,
-				EditorState.clone(after)
-			)
-		);
 	}
 </script>
 
@@ -895,115 +433,7 @@
 		</div>
 	</div>
 
-	{#if showContextControls}
-		<div
-			class="toolbar__context-panel selection-controls"
-			class:selection-controls--horizontal={orientation === 'horizontal'}
-			role="toolbar"
-			aria-label="Selection controls"
-			data-agent-occlusion
-			transition:fade={{ duration: 150 }}>
-			<div class="selection-controls__heading">
-				<span>Selection</span>
-				<span class="selection-controls__count">{selectionCount}</span>
-			</div>
-			<div class="selection-controls__body">
-				{#if showColorControls}
-					<div class="toolbar__colors" aria-label="Color controls">
-						{#if getSelectedShapes(editorState).some(shapeSupportsFill)}
-							<div class="toolbar__color-control">
-								<span>Fill</span>
-								<ColorPicker
-									label="Fill color"
-									value={fillColorValue}
-									disabled={fillDisabled}
-									align="end"
-									onchange={handleFillChange} />
-							</div>
-						{/if}
-						{#if getSelectedShapes(editorState).some(shapeSupportsStroke)}
-							<div class="toolbar__color-control">
-								<span>Stroke</span>
-								<ColorPicker
-									label="Stroke color"
-									value={strokeColorValue}
-									disabled={strokeDisabled}
-									align="end"
-									onchange={handleStrokeChange} />
-							</div>
-						{/if}
-						{#if getSelectedShapes(editorState).some(shapeSupportsFillOpacity)}
-							<label class="toolbar__opacity-control">
-								<span>Fill opacity</span>
-								<input
-									type="range"
-									min="0"
-									max="1"
-									step="0.05"
-									value={fillOpacityValue}
-									onchange={(event) => handleOpacityChange(event, 'fillOpacity')}
-									aria-label="Fill opacity"
-									aria-valuetext={`${Math.round(fillOpacityValue * 100)}%`} />
-								<output>{Math.round(fillOpacityValue * 100)}%</output>
-							</label>
-						{/if}
-						{#if getSelectedShapes(editorState).some(shapeSupportsStrokeOpacity)}
-							<label class="toolbar__opacity-control">
-								<span>Stroke opacity</span>
-								<input
-									type="range"
-									min="0"
-									max="1"
-									step="0.05"
-									value={strokeOpacityValue}
-									onchange={(event) =>
-										handleOpacityChange(event, 'strokeOpacity')}
-									aria-label="Stroke opacity"
-									aria-valuetext={`${Math.round(strokeOpacityValue * 100)}%`} />
-								<output>{Math.round(strokeOpacityValue * 100)}%</output>
-							</label>
-						{/if}
-					</div>
-				{/if}
-				{#if hasArrowSelection}
-					<ArrowPopover {store} />
-				{/if}
-				{#if showAgentControl}
-					<label
-						class="toolbar__agent-control"
-						title="Allow agents to edit the selection">
-						<input
-							type="checkbox"
-							checked={agentEditableValue}
-							onchange={handleAgentEditableChange}
-							aria-label="Agent editable" />
-						<span>Agents</span>
-					</label>
-				{/if}
-				<button
-					class="toolbar__layout-button"
-					bind:this={layoutButtonEl}
-					type="button"
-					onpointerdown={(event) => event.stopPropagation()}
-					onclick={toggleLayoutMenu}
-					aria-label="Layout and selection commands"
-					aria-haspopup="menu"
-					aria-expanded={layoutMenuOpen}>
-					<Icon name="settings" size={16} />
-					<span>Arrange</span>
-				</button>
-			</div>
-		</div>
-		<ContextMenu
-			items={getLayoutMenuItems()}
-			label="Layout and selection commands"
-			open={layoutMenuOpen}
-			returnFocus={layoutButtonEl}
-			x={layoutMenuPoint.x}
-			y={layoutMenuPoint.y}
-			onOpenChange={(value) => (layoutMenuOpen = value)}
-			onSelect={handleLayoutMenuAction} />
-	{/if}
+	<SelectionControls {currentTool} {store} {orientation} {showAgentControl} />
 </div>
 
 <style>
@@ -1240,7 +670,6 @@
 	}
 
 	.toolbar__tool-button:active,
-	.toolbar__layout-button:active,
 	.application-chrome__button:active {
 		transform: scale(0.96);
 	}
@@ -1287,154 +716,6 @@
 			0 10px 26px color-mix(in srgb, var(--ink-shadow-color) 25%, transparent),
 			0 2px 7px color-mix(in srgb, var(--ink-shadow-color) 18%, transparent);
 		backdrop-filter: blur(14px);
-	}
-
-	.toolbar__context-panel {
-		position: fixed;
-		top: 5.25rem;
-		left: 50%;
-		z-index: 95;
-		display: grid;
-		grid-template-columns: auto minmax(0, 1fr);
-		align-items: center;
-		gap: var(--ink-space-3);
-		width: min(56rem, calc(100vw - 12rem));
-		max-width: calc(100vw - 2rem);
-		padding: var(--ink-space-2) var(--ink-space-3);
-		border: 1px solid color-mix(in srgb, var(--ink-border) 64%, transparent);
-		border-radius: var(--ink-radius-panel-small);
-		color: var(--ink-text);
-		background: color-mix(in srgb, var(--ink-surface-raised) 96%, transparent);
-		box-shadow:
-			0 0 0 1px color-mix(in srgb, var(--ink-border) 18%, transparent),
-			0 10px 26px color-mix(in srgb, var(--ink-shadow-color) 24%, transparent),
-			0 2px 6px color-mix(in srgb, var(--ink-shadow-color) 18%, transparent);
-		translate: -50% 0;
-		backdrop-filter: blur(14px);
-	}
-
-	.selection-controls--horizontal {
-		top: 11rem;
-	}
-
-	.selection-controls__heading {
-		display: grid;
-		gap: 2px;
-		padding-inline-end: var(--ink-space-3);
-		border-inline-end: 1px solid color-mix(in srgb, var(--ink-border) 58%, transparent);
-		color: var(--ink-heading);
-		font: 650 var(--ink-type-xs) / 1.1 var(--ink-font-body);
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-	}
-
-	.selection-controls__count {
-		color: var(--ink-text-muted);
-		font-size: 0.6875rem;
-		font-variant-numeric: tabular-nums;
-		letter-spacing: 0;
-		text-align: center;
-	}
-
-	.selection-controls__body {
-		display: flex;
-		min-width: 0;
-		align-items: center;
-		gap: var(--ink-space-3);
-	}
-
-	.toolbar__colors {
-		display: flex;
-		align-items: center;
-		gap: var(--ink-space-3);
-	}
-
-	.toolbar__color-control {
-		display: inline-flex;
-		align-items: center;
-		gap: var(--ink-space-2);
-		color: var(--ink-text-muted);
-		font: 650 var(--ink-type-xs) / 1 var(--ink-font-body);
-		white-space: nowrap;
-	}
-
-	.toolbar__opacity-control {
-		display: grid;
-		grid-template-columns: auto minmax(4rem, 7rem) 2.75rem;
-		align-items: center;
-		gap: var(--ink-space-2);
-		color: var(--ink-text-muted);
-		font: 650 var(--ink-type-xs) / 1 var(--ink-font-body);
-		white-space: nowrap;
-	}
-
-	.toolbar__opacity-control input {
-		width: 100%;
-		accent-color: var(--ink-accent);
-	}
-
-	.toolbar__opacity-control output {
-		color: var(--ink-text);
-		font-variant-numeric: tabular-nums;
-		text-align: right;
-	}
-
-	.toolbar__agent-control {
-		display: inline-flex;
-		min-height: var(--ink-control-height);
-		align-items: center;
-		gap: var(--ink-space-1);
-		padding-inline: var(--ink-space-1);
-		border-radius: var(--ink-radius-wobbly-small);
-		color: var(--ink-text-muted);
-		font: 650 var(--ink-type-xs) / 1 var(--ink-font-body);
-		white-space: nowrap;
-		cursor: pointer;
-	}
-
-	.toolbar__agent-control:hover {
-		color: var(--ink-text);
-	}
-
-	.toolbar__agent-control:focus-within {
-		outline: 3px solid var(--ink-focus);
-		outline-offset: 1px;
-	}
-
-	.toolbar__agent-control input {
-		width: 0.875rem;
-		height: 0.875rem;
-		margin: 0;
-		accent-color: var(--ink-accent);
-	}
-
-	.toolbar__layout-button {
-		display: inline-flex;
-		min-height: var(--ink-control-height);
-		align-items: center;
-		justify-content: center;
-		gap: var(--ink-space-1);
-		padding: 0 var(--ink-space-3);
-		border: 1px solid var(--ink-border);
-		border-radius: var(--ink-radius-wobbly-small);
-		color: var(--ink-text);
-		background: var(--ink-canvas);
-		font: 650 var(--ink-type-xs) / 1 var(--ink-font-body);
-		white-space: nowrap;
-		cursor: pointer;
-		transition-property: color, background-color, border-color, transform;
-		transition-duration: var(--ink-duration-fast);
-		transition-timing-function: var(--ink-ease-out);
-	}
-
-	.toolbar__layout-button:hover {
-		border-color: var(--ink-accent);
-		background: var(--ink-surface-hover);
-	}
-
-	.toolbar__layout-button:focus-visible {
-		outline: 3px solid var(--ink-focus);
-		outline-offset: 2px;
 	}
 
 	.toolbar__export {
@@ -1490,15 +771,6 @@
 			right: auto;
 			width: min(30rem, calc(100vw - 1.5rem));
 		}
-
-		.toolbar__context-panel {
-			left: 50%;
-			width: min(44rem, calc(100vw - 12rem));
-		}
-
-		.selection-controls__body {
-			flex-wrap: wrap;
-		}
 	}
 
 	@media (max-width: 760px) {
@@ -1544,41 +816,6 @@
 			display: none;
 		}
 
-		.toolbar__context-panel {
-			top: 11rem;
-			left: 0.75rem;
-			right: 0.75rem;
-			width: auto;
-			max-width: none;
-			max-height: calc(100vh - 11rem);
-			overflow: auto;
-			translate: 0 0;
-		}
-
-		.selection-controls__heading {
-			align-self: start;
-		}
-
-		.selection-controls__body {
-			align-items: stretch;
-			flex-direction: column;
-		}
-
-		.toolbar__colors {
-			display: grid;
-			grid-template-columns: repeat(2, minmax(0, 1fr));
-		}
-
-		.toolbar__color-control,
-		.toolbar__opacity-control {
-			grid-template-columns: auto minmax(0, 1fr) auto;
-			min-width: 0;
-		}
-
-		.toolbar__opacity-control {
-			display: grid;
-		}
-
 		.toolbar__pen-context {
 			position: fixed;
 			top: 11rem;
@@ -1617,7 +854,6 @@
 		.toolbar,
 		.toolbar__drag-handle,
 		.toolbar__tool-button,
-		.toolbar__layout-button,
 		.toolbar__menu-item {
 			transition: none;
 		}
