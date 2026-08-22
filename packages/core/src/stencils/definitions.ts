@@ -36,6 +36,10 @@ function text(at: Vec2, x: number, y: number, value: string, width: number, font
 	});
 }
 
+function reference(at: Vec2, referenceType: 'url' | 'file' | 'page', value: string, label: string) {
+	return ShapeRecord.createReference(PLACEHOLDER_PAGE_ID, at.x, at.y, { w: 280, h: 72, referenceType, value, label });
+}
+
 function stencil(
 	id: string,
 	name: string,
@@ -122,6 +126,22 @@ const BUILTIN_STENCILS: readonly StencilDefinition[] = [
 		['link', 'continuation', 'circle'],
 		'<svg viewBox="0 0 60 60"><circle cx="30" cy="30" r="27" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
 		(at) => [ellipse(at, 56, 56)]
+	),
+	stencil(
+		'content:url-reference',
+		'URL Reference',
+		'Content',
+		['url', 'link', 'reference'],
+		'<svg viewBox="0 0 120 32"><rect x="2" y="2" width="116" height="28" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><text x="10" y="21" fill="currentColor" font-size="11">URL reference</text></svg>',
+		(at) => [reference(at, 'url', 'https://example.com', 'Open URL')]
+	),
+	stencil(
+		'content:file-reference',
+		'File Reference',
+		'Content',
+		['file', 'path', 'reference'],
+		'<svg viewBox="0 0 120 32"><rect x="2" y="2" width="116" height="28" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><text x="10" y="21" fill="currentColor" font-size="11">File reference</text></svg>',
+		(at) => [reference(at, 'file', 'path/to/file', 'Open file')]
 	),
 	stencil(
 		'ui:card',

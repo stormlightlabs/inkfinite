@@ -46,12 +46,12 @@ describe('card content', () => {
 });
 
 describe('built-in stencils', () => {
-	it('registers the curated flowchart, UI, and developer diagram sets once', () => {
+	it('registers the curated stencil sets once', () => {
 		stencils.registerBuiltinStencils();
 		stencils.registerBuiltinStencils();
 		expect(stencils.registry.getAll().map(({ id }) => id)).toEqual(stencils.BUILTIN_STENCIL_IDS);
 		expect(new Set(stencils.registry.getAll().map(({ category }) => category))).toEqual(
-			new Set(['Flowchart', 'UI', 'Diagrams', 'Etc'])
+			new Set(['Flowchart', 'UI', 'Diagrams', 'Content', 'Etc'])
 		);
 		for (const definition of stencils.registry.getAll()) {
 			expect(definition.spawn({ x: 0, y: 0 }).length, definition.id).toBeGreaterThan(0);

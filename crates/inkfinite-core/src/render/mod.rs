@@ -258,16 +258,67 @@ impl Renderer<'_> {
                 if let Some(asset) = self.document.assets.get(&props.asset_id)
                     && let AssetSource::Embedded { bytes } = &asset.source
                 {
+                    let mask_id = format!("inkfinite-image-mask-{}", shape.id.as_str().replace(':', "-"));
+                    if let Some(mask) = &props.mask {
+                        writeln!(
+                            output,
+                            "      <defs><clipPath id=\"{mask_id}\">{}</clipPath></defs>",
+                            image_mask_path(mask, props.width, props.height)
+                        )
+                        .expect("writing to a String cannot fail");
+                    }
+                    let clip = props
+                        .mask
+                        .as_ref()
+                        .map_or(String::new(), |_| format!(" clip-path=\"url(#{mask_id})\""));
+                    let image = if let Some(crop) = props.crop {
+                        format!(
+                            "<svg x=\"0\" y=\"0\" width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" preserveAspectRatio=\"none\"{clip}><image width=\"1\" height=\"1\" href=\"data:{};base64,{}\"/></svg>",
+                            number(props.width),
+                            number(props.height),
+                            number(crop.left),
+                            number(crop.top),
+                            number(1.0 - crop.left - crop.right),
+                            number(1.0 - crop.top - crop.bottom),
+                            escape_xml(&asset.media_type),
+                            base64(bytes)
+                        )
+                    } else {
+                        format!(
+                            "<image width=\"{}\" height=\"{}\" href=\"data:{};base64,{}\" preserveAspectRatio=\"none\"{clip}/>",
+                            number(props.width),
+                            number(props.height),
+                            escape_xml(&asset.media_type),
+                            base64(bytes)
+                        )
+                    };
                     writeln!(
                         output,
-                        "      <image transform=\"{transform}\" width=\"{}\" height=\"{}\" opacity=\"{fill_opacity}\" href=\"data:{};base64,{}\" preserveAspectRatio=\"none\"/>",
-                        number(props.width),
-                        number(props.height),
-                        escape_xml(&asset.media_type),
-                        base64(bytes)
+                        "      <g transform=\"{transform}\" opacity=\"{fill_opacity}\">{image}</g>"
                     )
                     .expect("writing to a String cannot fail");
+                    if let Some(caption) = props.caption.filter(|caption| !caption.is_empty()) {
+                        writeln!(
+                            output,
+                            "      <text transform=\"{transform}\" x=\"8\" y=\"{}\" font-family=\"sans-serif\" font-size=\"12\" fill=\"#ffffff\" stroke=\"#000000\" stroke-opacity=\"0.35\">{}</text>",
+                            number((props.height - 18.0).max(12.0)), escape_xml(&caption)
+                        ).expect("writing to a String cannot fail");
+                    }
                 }
+            }
+            Some(BuiltinShapeKind::Reference) => {
+                let props: ReferenceProps = properties(shape)?;
+                let label = props.label.as_deref().unwrap_or(&props.value);
+                let accent = match props.reference_type.as_str() {
+                    "url" => "#2563eb",
+                    "file" => "#16a34a",
+                    _ => "#7c3aed",
+                };
+                writeln!(
+                    output,
+                    "      <rect transform=\"{transform}\" width=\"{}\" height=\"{}\" rx=\"8\" fill=\"#f8fafc\" stroke=\"{accent}\" stroke-width=\"2\"/><text transform=\"{transform}\" x=\"12\" y=\"20\" font-family=\"sans-serif\" font-size=\"12\" font-weight=\"600\" fill=\"{accent}\">{}</text><text transform=\"{transform}\" x=\"12\" y=\"40\" font-family=\"sans-serif\" font-size=\"13\" fill=\"#1f2937\">{}</text>",
+                    number(props.width), number(props.height), escape_xml(label), escape_xml(&props.value)
+                ).expect("writing to a String cannot fail");
             }
             Some(BuiltinShapeKind::Stroke) => {
                 let props: StrokePaintProperties = properties(shape)?;
@@ -644,6 +695,22 @@ struct MarkdownProps {
     border: Option<String>,
 }
 
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ImageCrop {
+    top: f64,
+    right: f64,
+    bottom: f64,
+    left: f64,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ImageMask {
+    kind: String,
+    radius: Option<f64>,
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ImageProps {
@@ -653,6 +720,25 @@ struct ImageProps {
     height: f64,
     #[serde(alias = "asset_id")]
     asset_id: AssetId,
+    #[serde(default)]
+    crop: Option<ImageCrop>,
+    #[serde(default)]
+    caption: Option<String>,
+    #[serde(default)]
+    mask: Option<ImageMask>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReferenceProps {
+    #[serde(alias = "w")]
+    width: f64,
+    #[serde(alias = "h")]
+    height: f64,
+    #[serde(alias = "reference_type")]
+    reference_type: String,
+    value: String,
+    label: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -848,6 +934,10 @@ fn shape_local_bounds(shape: &ShapeRecord) -> Result<Bounds, SvgRenderError> {
             let props: ImageProps = properties(shape)?;
             Bounds { x: 0.0, y: 0.0, width: props.width, height: props.height }
         }
+        Some(BuiltinShapeKind::Reference) => {
+            let props: ReferenceProps = properties(shape)?;
+            Bounds { x: 0.0, y: 0.0, width: props.width, height: props.height }
+        }
         Some(BuiltinShapeKind::Stroke) => canonical_stroke_outline(&shape.properties).map_or_else(
             |message| {
                 Err(SvgRenderError::InvalidShapeProperties {
@@ -876,6 +966,25 @@ fn shape_local_bounds(shape: &ShapeRecord) -> Result<Bounds, SvgRenderError> {
         None => Bounds { x: 0.0, y: 0.0, width: 0.0, height: 0.0 },
     };
     Ok(bounds)
+}
+
+fn image_mask_path(mask: &ImageMask, width: f64, height: f64) -> String {
+    match mask.kind.as_str() {
+        "ellipse" => format!(
+            "<ellipse cx=\"{}\" cy=\"{}\" rx=\"{}\" ry=\"{}\"/>",
+            number(width / 2.0),
+            number(height / 2.0),
+            number(width / 2.0),
+            number(height / 2.0)
+        ),
+        "rounded" => format!(
+            "<rect width=\"{}\" height=\"{}\" rx=\"{}\"/>",
+            number(width),
+            number(height),
+            number(mask.radius.unwrap_or(16.0).min(width / 2.0).min(height / 2.0).max(0.0))
+        ),
+        _ => format!("<rect width=\"{}\" height=\"{}\"/>", number(width), number(height)),
+    }
 }
 
 fn path_data(geometry: &PathGeometry) -> String {

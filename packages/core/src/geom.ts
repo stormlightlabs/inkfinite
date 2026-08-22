@@ -69,6 +69,7 @@ export function localShapeBounds(shape: ShapeRecord): Box2 {
 		case 'markdown':
 			return Box2Ops.create(0, 0, shape.props.w, shape.props.h ?? shape.props.fontSize * 10);
 		case 'image':
+		case 'reference':
 			return Box2Ops.create(0, 0, shape.props.w, shape.props.h);
 		case 'stroke':
 			return boundsFromOutline(shape.props.points.length >= 2 ? getStrokeOutline(shape) : []);
@@ -738,6 +739,7 @@ function hitTestShape(state: EditorState, shape: ShapeRecord, worldPoint: Vec2, 
 		case 'path':
 			return hitTestPath(worldPoint, shape, tolerance);
 		case 'container':
+		case 'reference':
 			return Box2Ops.containsPoint(shapeBounds(shape), worldPoint);
 	}
 	return false;

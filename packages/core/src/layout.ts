@@ -27,6 +27,38 @@ export function alignShapes(state: EditorState, shapeIds: readonly string[], ali
 	return translateSelectedRoots(state, shapes, deltas);
 }
 
+/** Places at least two selected shapes into a deterministic grid. */
+export function gridShapes(state: EditorState, shapeIds: readonly string[], gap = 24): EditorState {
+	const shapes = selectedShapes(state, shapeIds);
+	if (shapes.length < 2) return state;
+	const columns = Math.max(1, Math.ceil(Math.sqrt(shapes.length)));
+	const items = shapes
+		.map((shape) => ({ shape, bounds: shapeBounds(shape) }))
+		.sort(
+			(left, right) =>
+				left.bounds.min.y - right.bounds.min.y ||
+				left.bounds.min.x - right.bounds.min.x ||
+				left.shape.id.localeCompare(right.shape.id)
+		);
+	const cellWidth = Math.max(...items.map(({ bounds }) => Box2.width(bounds)));
+	const cellHeight = Math.max(...items.map(({ bounds }) => Box2.height(bounds)));
+	const origin = items.reduce(
+		(current, item) => ({ x: Math.min(current.x, item.bounds.min.x), y: Math.min(current.y, item.bounds.min.y) }),
+		{ x: Number.POSITIVE_INFINITY, y: Number.POSITIVE_INFINITY }
+	);
+	const deltas = new Map<string, Vec2>();
+	for (const [index, item] of items.entries()) {
+		const column = index % columns;
+		const row = Math.floor(index / columns);
+		const target = {
+			x: origin.x + column * (cellWidth + Math.max(0, gap)),
+			y: origin.y + row * (cellHeight + Math.max(0, gap))
+		};
+		deltas.set(item.shape.id, { x: target.x - item.bounds.min.x, y: target.y - item.bounds.min.y });
+	}
+	return translateSelectedRoots(state, shapes, deltas);
+}
+
 /** Distributes at least three selected shapes with equal gaps on one axis. */
 export function distributeShapes(state: EditorState, shapeIds: readonly string[], axis: LayoutAxis): EditorState {
 	const shapes = selectedShapes(state, shapeIds);

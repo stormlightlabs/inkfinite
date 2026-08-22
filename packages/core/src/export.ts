@@ -183,12 +183,25 @@ function shapeToSVG(shape: ShapeRecord, state: EditorState): string | null {
     case "image": {
       const asset = state.doc.assets?.[shape.props.assetId];
       if (!asset) return null;
-      const crop = shape.props.crop;
-      const preserve = crop
-        ? ` preserveAspectRatio="none" viewBox="${crop.left ?? 0} ${crop.top ?? 0} ${1 - (crop.left ?? 0) - (crop.right ?? 0)} ${1 - (crop.top ?? 0) - (crop.bottom ?? 0)}"`
-        : '';
+      const { w, h, crop, mask, caption } = shape.props;
       const encoded = encodeBase64(asset.bytes);
-      return `<image transform="${transform}" width="${shape.props.w}" height="${shape.props.h}" opacity="${shape.opacity ?? 1}" href="data:${escapeXML(asset.mediaType)};base64,${encoded}"${preserve}/>`;
+      const maskId = `inkfinite-image-mask-${shape.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+      const maskMarkup = mask
+        ? `<defs><clipPath id="${maskId}">${mask.kind === 'ellipse' ? `<ellipse cx="${w / 2}" cy="${h / 2}" rx="${w / 2}" ry="${h / 2}"/>` : `<rect width="${w}" height="${h}" rx="${mask.kind === 'rounded' ? Math.min(mask.radius ?? 16, w / 2, h / 2) : 0}"/>`}</clipPath></defs>`
+        : '';
+      const clip = mask ? ` clip-path="url(#${maskId})"` : '';
+      const image = crop
+        ? `<svg x="0" y="0" width="${w}" height="${h}" viewBox="${crop.left} ${crop.top} ${1 - crop.left - crop.right} ${1 - crop.top - crop.bottom}" preserveAspectRatio="none"${clip}><image width="1" height="1" href="data:${escapeXML(asset.mediaType)};base64,${encoded}"/></svg>`
+        : `<image width="${w}" height="${h}" href="data:${escapeXML(asset.mediaType)};base64,${encoded}" preserveAspectRatio="none"${clip}/>`;
+      const captionMarkup = caption?.trim()
+        ? `<text x="8" y="${Math.max(12, h - 6)}" font-family="sans-serif" font-size="12" fill="#ffffff" stroke="#000000" stroke-opacity="0.35">${escapeXML(caption)}</text>`
+        : '';
+      return `<g transform="${transform}" opacity="${shape.opacity ?? 1}">${maskMarkup}${image}${captionMarkup}</g>`;
+    }
+    case "reference": {
+      const { w, h, referenceType, value, label } = shape.props;
+      const accent = referenceType === 'url' ? '#2563eb' : referenceType === 'file' ? '#16a34a' : '#7c3aed';
+      return `<g transform="${transform}" opacity="${shape.opacity ?? 1}"><rect width="${w}" height="${h}" rx="8" fill="#f8fafc" stroke="${accent}" stroke-width="2"/><text x="12" y="20" font-family="sans-serif" font-size="12" font-weight="600" fill="${accent}">${referenceType.toUpperCase()}</text><text x="12" y="42" font-family="sans-serif" font-size="13" fill="#1f2937">${escapeXML(label || value)}</text></g>`;
     }
     case "markdown": {
       return markdownToSVG(shape, transform);

@@ -202,6 +202,7 @@
     "path",
     "markdown",
     "image",
+    "reference",
     "container"
   ],
   "path_geometry": {

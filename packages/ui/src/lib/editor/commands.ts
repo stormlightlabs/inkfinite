@@ -1,6 +1,7 @@
 import {
 	alignShapes,
 	distributeShapes,
+	gridShapes,
 	groupShapes,
 	reorderShapes,
 	reorderShapesToEdge,
@@ -20,6 +21,7 @@ export type SelectionCommand =
 	| `align-${ShapeAlignment}`
 	| 'distribute-horizontal'
 	| 'distribute-vertical'
+	| 'arrange-grid'
 	| 'group'
 	| 'ungroup'
 	| 'forward'
@@ -42,6 +44,7 @@ export const SELECTION_COMMAND_LABELS: Record<SelectionCommand, string> = {
 	'align-bottom': 'Align Bottom',
 	'distribute-horizontal': 'Distribute Horizontally',
 	'distribute-vertical': 'Distribute Vertically',
+	'arrange-grid': 'Arrange in Grid',
 	group: 'Group',
 	ungroup: 'Ungroup',
 	forward: 'Bring Forward',
@@ -88,6 +91,8 @@ export function applySelectionCommand(state: EditorState, command: SelectionComm
 			return distributeShapes(state, ids, 'horizontal');
 		case 'distribute-vertical':
 			return distributeShapes(state, ids, 'vertical');
+		case 'arrange-grid':
+			return gridShapes(state, ids);
 		default:
 			return alignShapes(state, ids, command.slice('align-'.length) as ShapeAlignment);
 	}
@@ -133,7 +138,8 @@ export function getCommandPaletteEntries(
 			'align-middle',
 			'align-bottom',
 			'distribute-horizontal',
-			'distribute-vertical'
+			'distribute-vertical',
+			'arrange-grid'
 		] as SelectionCommand[]
 	).map((id) => ({
 		id,

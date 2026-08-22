@@ -157,6 +157,9 @@ export type ArrowProps = {
 
 export type TextProps = { text: string; fontSize: number; fontFamily: string; color: string; w?: number };
 
+/** Shape used to clip an image while it is rendered. */
+export type ImageMask = { kind: 'rectangle' | 'ellipse' | 'rounded'; radius?: number };
+
 /** Embedded image geometry and the asset it displays. */
 export type ImageProps = {
 	w: number;
@@ -164,6 +167,19 @@ export type ImageProps = {
 	assetId: string;
 	/** Normalized crop inset on each edge, in the range 0..1. */
 	crop?: { top: number; right: number; bottom: number; left: number };
+	/** Optional caption rendered over the lower edge of the image. */
+	caption?: string;
+	/** Optional non-destructive display mask. */
+	mask?: ImageMask;
+};
+
+/** A native link to a web URL, file, or page in the current document. */
+export type ReferenceProps = {
+	w: number;
+	h: number;
+	referenceType: 'url' | 'file' | 'page';
+	value: string;
+	label?: string;
 };
 
 /** Native frame dimensions and title used for hierarchy selection and overlays. */
@@ -255,6 +271,7 @@ export type ShapeType =
 	| 'path'
 	| 'markdown'
 	| 'image'
+	| 'reference'
 	| 'container';
 
 /** Full projected transform shared with the Rust editor projection. */
@@ -291,6 +308,7 @@ export type LineShape = BaseShape & { type: 'line'; props: LineProps };
 export type ArrowShape = BaseShape & { type: 'arrow'; props: ArrowProps };
 export type TextShape = BaseShape & { type: 'text'; props: TextProps };
 export type ImageShape = BaseShape & { type: 'image'; props: ImageProps };
+export type ReferenceShape = BaseShape & { type: 'reference'; props: ReferenceProps };
 export type StrokeShape = BaseShape & { type: 'stroke'; props: StrokeProps };
 export type PathShape = BaseShape & { type: 'path'; props: PathProps };
 export type MarkdownShape = BaseShape & { type: 'markdown'; props: MarkdownProps };
@@ -303,6 +321,7 @@ export type ShapeRecord =
 	| ArrowShape
 	| TextShape
 	| ImageShape
+	| ReferenceShape
 	| StrokeShape
 	| PathShape
 	| MarkdownShape
@@ -347,6 +366,11 @@ export const ShapeRecord = {
 	/** Create an image backed by an embedded document asset. */
 	createImage(pageId: string, x: number, y: number, properties: ImageProps, id?: string): ImageShape {
 		return { id: id ?? createId('shape'), type: 'image', pageId, x, y, rot: 0, props: properties };
+	},
+
+	/** Create a URL, file, or page reference card. */
+	createReference(pageId: string, x: number, y: number, properties: ReferenceProps, id?: string): ReferenceShape {
+		return { id: id ?? createId('shape'), type: 'reference', pageId, x, y, rot: 0, props: properties };
 	},
 
 	/**
@@ -424,8 +448,15 @@ export const ShapeRecord = {
 			return {
 				...shape,
 				...(metadata ? { metadata } : {}),
-				props: { ...shape.props, crop: shape.props.crop ? { ...shape.props.crop } : undefined }
+				props: {
+					...shape.props,
+					crop: shape.props.crop ? { ...shape.props.crop } : undefined,
+					mask: shape.props.mask ? { ...shape.props.mask } : undefined
+				}
 			};
+		}
+		if (shape.type === 'reference') {
+			return { ...shape, ...(metadata ? { metadata } : {}), props: { ...shape.props } };
 		}
 		if (shape.type === 'path') {
 			return {
@@ -757,6 +788,42 @@ export function validateDoc(document: Document): ValidationResult {
 							errors.push(`Image shape '${shapeId}' has invalid ${edge} crop`);
 						}
 					}
+					if (
+						shape.props.crop.left + shape.props.crop.right >= 1 ||
+						shape.props.crop.top + shape.props.crop.bottom >= 1
+					) {
+						errors.push(`Image shape '${shapeId}' crop leaves no source area`);
+					}
+				}
+				if (shape.props.mask) {
+					if (!['rectangle', 'ellipse', 'rounded'].includes(shape.props.mask.kind)) {
+						errors.push(`Image shape '${shapeId}' has an invalid mask`);
+					}
+					if (shape.props.mask.kind !== 'rounded' && shape.props.mask.radius !== undefined) {
+						errors.push(`Image shape '${shapeId}' has a radius on a non-rounded mask`);
+					}
+					if (
+						shape.props.mask.radius !== undefined &&
+						(shape.props.mask.radius < 0 ||
+							shape.props.mask.radius > Math.min(shape.props.w, shape.props.h) / 2)
+					) {
+						errors.push(`Image shape '${shapeId}' has an invalid mask radius`);
+					}
+				}
+				break;
+			}
+			case 'reference': {
+				if (shape.props.w < 0 || shape.props.h < 0 || !shape.props.value.trim()) {
+					errors.push(`Reference shape '${shapeId}' has invalid dimensions or value`);
+				}
+				if (!['url', 'file', 'page'].includes(shape.props.referenceType)) {
+					errors.push(`Reference shape '${shapeId}' has an invalid type`);
+				}
+				if (shape.props.referenceType === 'url' && !/^https?:\/\//i.test(shape.props.value)) {
+					errors.push(`Reference shape '${shapeId}' URL must use http:// or https://`);
+				}
+				if (shape.props.referenceType === 'page' && !document.pages[shape.props.value]) {
+					errors.push(`Reference shape '${shapeId}' points to missing page '${shape.props.value}'`);
 				}
 				break;
 			}

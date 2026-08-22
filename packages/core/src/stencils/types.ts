@@ -1,7 +1,7 @@
 import { Vec2 } from "../math";
 import { ShapeRecord } from "../model";
 
-export type StencilCategory = "Flowchart" | "Diagrams" | "UI" | "Etc";
+export type StencilCategory = "Flowchart" | "Diagrams" | "UI" | "Content" | "Etc";
 
 export interface Stencil {
   id: string;

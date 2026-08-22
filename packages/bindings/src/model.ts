@@ -570,6 +570,78 @@ export type AssetSource =
 	  };
 
 /**
+ * The semantic target represented by a reference shape.
+ */
+export type ReferenceKind = 'url' | 'file' | 'page';
+
+/**
+ * Native reference content properties.
+ */
+export type ReferenceProperties = {
+	/**
+	 * Width of the reference card.
+	 */
+	width: number;
+	/**
+	 * Height of the reference card.
+	 */
+	height: number;
+	/**
+	 * Reference target kind.
+	 */
+	referenceType: ReferenceKind;
+	/**
+	 * URL, path, or page ID represented by the shape.
+	 */
+	value: string;
+	/**
+	 * Optional display label.
+	 */
+	label: string | null;
+};
+
+/**
+ * Normalized image crop insets.
+ */
+export type ImageCrop = {
+	/**
+	 * Top inset as a fraction of the source image.
+	 */
+	top: number;
+	/**
+	 * Right inset as a fraction of the source image.
+	 */
+	right: number;
+	/**
+	 * Bottom inset as a fraction of the source image.
+	 */
+	bottom: number;
+	/**
+	 * Left inset as a fraction of the source image.
+	 */
+	left: number;
+};
+
+/**
+ * Shape used to clip an image during rendering.
+ */
+export type ImageMaskKind = 'rectangle' | 'ellipse' | 'rounded';
+
+/**
+ * Native image mask properties.
+ */
+export type ImageMask = {
+	/**
+	 * Mask shape.
+	 */
+	kind: ImageMaskKind;
+	/**
+	 * Rounded-corner radius for a rounded mask.
+	 */
+	radius: number | null;
+};
+
+/**
  * Image, font, or other binary asset.
  */
 export type AssetRecord = {

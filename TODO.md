@@ -56,15 +56,15 @@ across mouse, touch, and keyboard input.
 
 ### Images, assets, and rich content
 
-- [ ] Add image caption and mask properties, validation, and export in Rust,
+- [x] Add image caption and mask properties, validation, and export in Rust,
       with reusable-asset and editing controls in TypeScript
-- [ ] Add TypeScript color sampling controls for image selections; use the
+- [x] Add TypeScript color sampling controls for image selections; use the
       shared grid layout operation for arrangement
-- [ ] Add native URL, file, and page-reference content with TypeScript editor
+- [x] Add native URL, file, and page-reference content with TypeScript editor
       rendering and controls where practical
-- [ ] Verify new card, frame, and asset behavior through save/reopen, undo/redo,
+- [x] Verify new card, frame, and asset behavior through save/reopen, undo/redo,
       merge, inspection, and export
-- [ ] Add end-to-end coverage for the new card, frame, and asset workflows
+- [x] Add end-to-end coverage for the new card, frame, and asset workflows
 
 ## Semantic objects and relationships
 

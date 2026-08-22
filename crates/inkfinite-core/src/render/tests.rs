@@ -3,10 +3,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    ActorId, BindingAnchor, BindingId, BindingKind, BindingRecord, ChangeHash, ContainerLayout, Document, DocumentId,
-    DocumentSnapshot, FormatId, INKFINITE_FORMAT_ID, INKFINITE_FORMAT_VERSION, LayerId, LayerRecord, Opacity, Origin,
-    PageId, PageRecord, Provenance, RecordVersion, SemanticMetadata, ShapeId, ShapeKind, ShapeParent, ShapeProperties,
-    ShapeRecord, ShapeStyle, Timestamp, Transform, Vec2,
+    ActorId, AssetId, AssetRecord, AssetSource, BindingAnchor, BindingId, BindingKind, BindingRecord, ChangeHash,
+    ContainerLayout, Document, DocumentId, DocumentSnapshot, FormatId, INKFINITE_FORMAT_ID, INKFINITE_FORMAT_VERSION,
+    LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord, Provenance, RecordVersion, SemanticMetadata, ShapeId,
+    ShapeKind, ShapeParent, ShapeProperties, ShapeRecord, ShapeStyle, Timestamp, Transform, Vec2,
 };
 
 use super::*;
@@ -520,6 +520,80 @@ fn metadata() -> SemanticMetadata {
             source: None,
         },
     }
+}
+
+#[test]
+fn renders_image_masks_captions_and_reference_cards() {
+    let mut snapshot = fixture_snapshot();
+    let page_id = PageId::from("page:ordering");
+    let layer_id = LayerId::from("layer:page:ordering:default");
+    let image_id = ShapeId::from("shape:image-rich");
+    let reference_id = ShapeId::from("shape:reference");
+    snapshot
+        .document
+        .layers
+        .get_mut(&layer_id)
+        .unwrap()
+        .shape_ids
+        .extend([image_id.clone(), reference_id.clone()]);
+    snapshot.document.shapes.insert(
+        image_id,
+        shape(
+            "shape:image-rich",
+            "image",
+            ShapeParent::Layer(layer_id.clone()),
+            320.0,
+            40.0,
+            0.0,
+            props([
+                ("w", serde_json::json!(160)),
+                ("h", serde_json::json!(100)),
+                ("assetId", serde_json::json!("asset:image")),
+                ("caption", serde_json::json!("A caption")),
+                ("mask", serde_json::json!({ "kind": "ellipse" })),
+            ]),
+            Vec::new(),
+        ),
+    );
+    snapshot.document.shapes.insert(
+        reference_id,
+        shape(
+            "shape:reference",
+            "reference",
+            ShapeParent::Layer(layer_id),
+            520.0,
+            40.0,
+            0.0,
+            props([
+                ("w", serde_json::json!(240)),
+                ("h", serde_json::json!(72)),
+                ("referenceType", serde_json::json!("url")),
+                ("value", serde_json::json!("https://example.com")),
+                ("label", serde_json::json!("Example")),
+            ]),
+            Vec::new(),
+        ),
+    );
+    snapshot.document.assets.insert(
+        AssetId::from("asset:image"),
+        AssetRecord {
+            id: AssetId::from("asset:image"),
+            name: "image.png".into(),
+            media_type: "image/png".into(),
+            digest: "sha256:image".into(),
+            source: AssetSource::Embedded { bytes: vec![137, 80, 78, 71] },
+            provenance: metadata().provenance,
+            version: RecordVersion(1),
+        },
+    );
+    let rendered = render_svg(
+        &snapshot,
+        &SvgRenderOptions { page_id: Some(page_id), ..Default::default() },
+    )
+    .unwrap();
+    assert!(rendered.svg.contains("inkfinite-image-mask-shape-image-rich"));
+    assert!(rendered.svg.contains("A caption"));
+    assert!(rendered.svg.contains("https://example.com"));
 }
 
 #[test]

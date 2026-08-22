@@ -18,6 +18,7 @@
 	} from '../commands';
 	import { DEFAULT_FILL_COLOR, DEFAULT_STROKE_COLOR } from '../constants';
 	import ArrowPopover from './ArrowPopover.svelte';
+	import { sampleImageColors, type SampledImageColor } from '../image-sampling';
 
 	type Props = {
 		currentTool: ToolId;
@@ -47,6 +48,9 @@
 	let layoutMenuPoint = $state({ x: 0, y: 0 });
 	let layoutMenuReturnFocus = $state<HTMLButtonElement | null>(null);
 	let agentInputEl = $state<HTMLInputElement | null>(null);
+	let sampledColors = $state<SampledImageColor[]>([]);
+	let samplingColors = $state(false);
+	let sampledColorMessage = $state<string | null>(null);
 
 	$effect(() => {
 		const unsubscribe = store.subscribe((state) => {
@@ -78,6 +82,20 @@
 	);
 	let cardTarget = $derived(cardTargets.length === 1 ? cardTargets[0] : undefined);
 	let cardMetadata = $derived(cardTarget?.metadata);
+	let imageTargets = $derived(
+		selectedShapes.filter(
+			(shape): shape is Extract<ShapeRecord, { type: 'image' }> => shape.type === 'image'
+		)
+	);
+	let imageTarget = $derived(imageTargets.length === 1 ? imageTargets[0] : undefined);
+	let imageAsset = $derived(
+		imageTarget ? editorState.doc.assets?.[imageTarget.props.assetId] : undefined
+	);
+	let referenceTarget = $derived(
+		selectionCount === 1 && selectedShapes[0]?.type === 'reference'
+			? selectedShapes[0]
+			: undefined
+	);
 	let frameTarget = $derived(
 		selectionCount === 1 && selectedShapes[0]?.type === 'container'
 			? selectedShapes[0]
@@ -130,6 +148,12 @@
 		if (!agentInputEl) return;
 		agentInputEl.checked = agentEditableState.value;
 		agentInputEl.indeterminate = agentEditableState.mixed;
+	});
+
+	$effect(() => {
+		imageTarget?.id;
+		sampledColors = [];
+		sampledColorMessage = null;
 	});
 
 	function getSharedValue<T>(values: T[]): T | null {
@@ -378,6 +402,45 @@
 		);
 	}
 
+	function updateImageFields(
+		label: string,
+		fields: Partial<Extract<ShapeRecord, { type: 'image' }>['props']>
+	) {
+		updateSelectedShapes(label, (shape) =>
+			shape.type === 'image' ? { ...shape, props: { ...shape.props, ...fields } } : shape
+		);
+	}
+
+	async function sampleSelectedImage() {
+		if (!imageAsset || samplingColors) return;
+		samplingColors = true;
+		sampledColorMessage = null;
+		try {
+			sampledColors = await sampleImageColors(imageAsset.mediaType, imageAsset.bytes);
+			if (sampledColors.length === 0) sampledColorMessage = 'No colors were found.';
+		} catch (error) {
+			sampledColorMessage =
+				error instanceof Error ? error.message : 'The image could not be sampled.';
+		} finally {
+			samplingColors = false;
+		}
+	}
+
+	async function copySampledColor(color: string) {
+		if (typeof navigator !== 'undefined' && navigator.clipboard) {
+			await navigator.clipboard.writeText(color);
+			sampledColorMessage = `${color} copied`;
+		}
+	}
+
+	function updateReferenceFields(
+		fields: Partial<Extract<ShapeRecord, { type: 'reference' }>['props']>
+	) {
+		updateSelectedShapes('Update reference', (shape) =>
+			shape.type === 'reference' ? { ...shape, props: { ...shape.props, ...fields } } : shape
+		);
+	}
+
 	function handleCardTextChange(
 		event: Event,
 		field: 'title' | 'body' | 'role' | 'source' | 'link'
@@ -453,6 +516,12 @@
 				label: SELECTION_COMMAND_LABELS['distribute-vertical'],
 				icon: 'arrow-down',
 				disabled: selectionCount < 3
+			},
+			{
+				id: 'arrange-grid',
+				label: SELECTION_COMMAND_LABELS['arrange-grid'],
+				icon: 'grid-dots',
+				disabled: selectionCount < 2
 			},
 			{ type: 'separator' },
 			{
@@ -629,6 +698,170 @@
 										: `${Math.round(opacityState.value * 100)}%`}</output>
 							</label>
 						{/if}
+					</div>
+				</section>
+			{/if}
+
+			{#if imageTarget}
+				<section
+					class="selection-controls__section selection-controls__section--image"
+					aria-labelledby="selection-image-label">
+					<h2 id="selection-image-label">Image</h2>
+					<div class="selection-controls__image-fields">
+						<label class="selection-controls__field selection-controls__field--wide">
+							<span>Asset</span>
+							<select
+								value={imageTarget.props.assetId}
+								onchange={(event) =>
+									updateImageFields('Reuse image asset', {
+										assetId: (event.currentTarget as HTMLSelectElement).value
+									})}
+								aria-label="Image asset">
+								{#each Object.values(editorState.doc.assets ?? {}).filter( (asset) => asset.mediaType.startsWith('image/') ) as asset}
+									<option value={asset.id}>{asset.name}</option>
+								{/each}
+							</select>
+						</label>
+						<label class="selection-controls__field selection-controls__field--wide">
+							<span>Caption</span>
+							<input
+								type="text"
+								value={imageTarget.props.caption ?? ''}
+								onchange={(event) =>
+									updateImageFields('Set image caption', {
+										caption:
+											(event.currentTarget as HTMLInputElement).value ||
+											undefined
+									})}
+								aria-label="Image caption" />
+						</label>
+						<label class="selection-controls__field">
+							<span>Mask</span>
+							<select
+								value={imageTarget.props.mask?.kind ?? 'rectangle'}
+								onchange={(event) => {
+									const kind = (event.currentTarget as HTMLSelectElement)
+										.value as 'rectangle' | 'ellipse' | 'rounded';
+									updateImageFields('Set image mask', {
+										mask: kind === 'rectangle' ? undefined : { kind }
+									});
+								}}
+								aria-label="Image mask">
+								<option value="rectangle">Rectangle</option>
+								<option value="ellipse">Ellipse</option>
+								<option value="rounded">Rounded</option>
+							</select>
+						</label>
+						{#if imageTarget.props.mask?.kind === 'rounded'}
+							<label
+								class="selection-controls__field selection-controls__field--small">
+								<span>Radius</span>
+								<input
+									type="number"
+									min="0"
+									max={Math.min(imageTarget.props.w, imageTarget.props.h) / 2}
+									value={imageTarget.props.mask.radius ?? 16}
+									onchange={(event) =>
+										updateImageFields('Set image mask radius', {
+											mask: {
+												kind: 'rounded',
+												radius: Math.max(
+													0,
+													(event.currentTarget as HTMLInputElement)
+														.valueAsNumber || 0
+												)
+											}
+										})}
+									aria-label="Image mask radius" />
+							</label>
+						{/if}
+					</div>
+					<div class="selection-controls__image-sampling">
+						<button
+							class="selection-controls__action"
+							type="button"
+							disabled={samplingColors || !imageAsset}
+							onclick={() => void sampleSelectedImage()}>
+							<span>{samplingColors ? 'Sampling…' : 'Sample colors'}</span>
+						</button>
+						{#each sampledColors as sampled}
+							<button
+								class="selection-controls__sample"
+								type="button"
+								style={`--sample-color: ${sampled.color}`}
+								title={`Copy ${sampled.color}`}
+								aria-label={`Copy sampled color ${sampled.color}`}
+								onclick={() => void copySampledColor(sampled.color)}></button>
+						{/each}
+						{#if sampledColorMessage}<small>{sampledColorMessage}</small>{/if}
+					</div>
+				</section>
+			{/if}
+
+			{#if referenceTarget}
+				<section
+					class="selection-controls__section"
+					aria-labelledby="selection-reference-label">
+					<h2 id="selection-reference-label">Reference</h2>
+					<div class="selection-controls__card-fields">
+						<label class="selection-controls__field">
+							<span>Type</span>
+							<select
+								value={referenceTarget.props.referenceType}
+								onchange={(event) =>
+									updateReferenceFields({
+										referenceType: (event.currentTarget as HTMLSelectElement)
+											.value as 'url' | 'file' | 'page'
+									})}
+								aria-label="Reference type">
+								<option value="url">URL</option>
+								<option value="file">File</option>
+								<option value="page">Page</option>
+							</select>
+						</label>
+						{#if referenceTarget.props.referenceType === 'page'}
+							<label
+								class="selection-controls__field selection-controls__field--wide">
+								<span>Target page</span>
+								<select
+									value={referenceTarget.props.value}
+									onchange={(event) =>
+										updateReferenceFields({
+											value: (event.currentTarget as HTMLSelectElement).value
+										})}
+									aria-label="Reference target">
+									{#each Object.values(editorState.doc.pages) as page}
+										<option value={page.id}>{page.name}</option>
+									{/each}
+								</select>
+							</label>
+						{:else}
+							<label
+								class="selection-controls__field selection-controls__field--wide">
+								<span>Target</span>
+								<input
+									type="text"
+									value={referenceTarget.props.value}
+									onchange={(event) =>
+										updateReferenceFields({
+											value: (event.currentTarget as HTMLInputElement).value
+										})}
+									aria-label="Reference target" />
+							</label>
+						{/if}
+						<label class="selection-controls__field selection-controls__field--wide">
+							<span>Label</span>
+							<input
+								type="text"
+								value={referenceTarget.props.label ?? ''}
+								onchange={(event) =>
+									updateReferenceFields({
+										label:
+											(event.currentTarget as HTMLInputElement).value ||
+											undefined
+									})}
+								aria-label="Reference label" />
+						</label>
 					</div>
 				</section>
 			{/if}
@@ -963,8 +1196,47 @@
 		text-align: right;
 	}
 
-	.selection-controls__section--card {
+	.selection-controls__section--card,
+	.selection-controls__section--image {
 		min-width: 24rem;
+	}
+
+	.selection-controls__image-fields {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(9rem, 1fr));
+		gap: var(--ink-space-2);
+	}
+
+	.selection-controls__image-fields .selection-controls__field--wide {
+		grid-column: 1 / -1;
+	}
+
+	.selection-controls__image-sampling {
+		display: flex;
+		min-height: var(--ink-control-height);
+		align-items: center;
+		gap: var(--ink-space-1);
+		flex-wrap: wrap;
+	}
+
+	.selection-controls__image-sampling small {
+		color: var(--ink-text-muted);
+		font: 600 var(--ink-type-xs) / 1 var(--ink-font-body);
+	}
+
+	.selection-controls__sample {
+		width: 1.5rem;
+		height: 1.5rem;
+		border: 2px solid var(--ink-canvas);
+		border-radius: 50%;
+		background: var(--sample-color);
+		box-shadow: 0 0 0 1px var(--ink-border);
+		cursor: pointer;
+	}
+
+	.selection-controls__sample:focus-visible {
+		outline: 3px solid var(--ink-focus);
+		outline-offset: 2px;
 	}
 
 	.selection-controls__card-fields {
@@ -981,7 +1253,8 @@
 		width: 100%;
 	}
 
-	.selection-controls__field input {
+	.selection-controls__field input,
+	.selection-controls__field select {
 		box-sizing: border-box;
 		width: 9rem;
 		height: var(--ink-control-height);
@@ -995,6 +1268,15 @@
 
 	.selection-controls__field--small input {
 		width: 4.5rem;
+	}
+
+	.selection-controls__field select {
+		padding: 0 var(--ink-space-2);
+		border: 1px solid var(--ink-border);
+		border-radius: var(--ink-radius-control-small);
+		color: var(--ink-text);
+		background: var(--ink-canvas);
+		font: 600 var(--ink-type-xs) / 1 var(--ink-font-body);
 	}
 
 	.selection-controls__field input::placeholder {
@@ -1019,6 +1301,7 @@
 	}
 
 	.selection-controls__field input:focus-visible,
+	.selection-controls__field select:focus-visible,
 	.selection-controls__field textarea:focus-visible {
 		outline: 3px solid var(--ink-focus);
 		outline-offset: 2px;

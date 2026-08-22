@@ -211,6 +211,11 @@ fn model_bindings() -> String {
     append_declaration::<BindingAnchor>(&mut output, &config);
     append_declaration::<BindingRecord>(&mut output, &config);
     append_declaration::<AssetSource>(&mut output, &config);
+    append_declaration::<ReferenceKind>(&mut output, &config);
+    append_declaration::<ReferenceProperties>(&mut output, &config);
+    append_declaration::<ImageCrop>(&mut output, &config);
+    append_declaration::<ImageMaskKind>(&mut output, &config);
+    append_declaration::<ImageMask>(&mut output, &config);
     append_declaration::<AssetRecord>(&mut output, &config);
     append_declaration::<Document>(&mut output, &config);
     append_declaration::<DocumentSnapshot>(&mut output, &config);

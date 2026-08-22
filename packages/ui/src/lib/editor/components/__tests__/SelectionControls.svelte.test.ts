@@ -183,6 +183,76 @@ describe('SelectionControls', () => {
 		expect(fitted).toBe(true);
 	});
 
+	it('edits image content, reuses assets, and exposes references', async () => {
+		const page = PageRecord.create('Test page', 'page:test');
+		const image = ShapeRecord.createImage(
+			page.id,
+			0,
+			0,
+			{ w: 160, h: 100, assetId: 'asset:image', caption: 'Original' },
+			'image'
+		);
+		const reference = ShapeRecord.createReference(
+			page.id,
+			200,
+			0,
+			{
+				w: 280,
+				h: 72,
+				referenceType: 'url',
+				value: 'https://example.com',
+				label: 'Example'
+			},
+			'reference'
+		);
+		const store = createSelectionStore([image]);
+		store.getState().doc.assets = {
+			'asset:image': {
+				id: 'asset:image',
+				name: 'Image',
+				mediaType: 'image/png',
+				digest: 'sha256:image',
+				bytes: [0]
+			},
+			'asset:other': {
+				id: 'asset:other',
+				name: 'Other',
+				mediaType: 'image/png',
+				digest: 'sha256:other',
+				bytes: [1]
+			}
+		};
+		const screen = render(SelectionControls, {
+			currentTool: 'select',
+			orientation: 'vertical',
+			store
+		});
+
+		await expect.element(screen.getByRole('heading', { name: 'Image' })).toBeInTheDocument();
+		await screen.getByRole('textbox', { name: 'Image caption' }).fill('Updated');
+		await screen
+			.getByRole('textbox', { name: 'Image caption' })
+			.element()
+			.dispatchEvent(new Event('change', { bubbles: true }));
+		await screen.getByRole('combobox', { name: 'Image asset' }).selectOptions('asset:other');
+		const updatedImage = store.getState().doc.shapes.image;
+		if (updatedImage.type !== 'image') throw new Error('Expected image selection');
+		expect(updatedImage.props.caption).toBe('Updated');
+		expect(updatedImage.props.assetId).toBe('asset:other');
+
+		store.setState((state) => ({
+			...state,
+			ui: { ...state.ui, selectionIds: [reference.id] },
+			doc: { ...state.doc, shapes: { ...state.doc.shapes, [reference.id]: reference } }
+		}));
+		await expect
+			.element(screen.getByRole('heading', { name: 'Reference' }))
+			.toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('textbox', { name: 'Reference target' }))
+			.toHaveValue('https://example.com');
+	});
+
 	it('keeps agent controls opt-in for desktop callers', async () => {
 		const page = PageRecord.create('Test page', 'page:test');
 		const rect = ShapeRecord.createRect(

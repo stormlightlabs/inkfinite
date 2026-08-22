@@ -599,6 +599,14 @@ function editorProperties(properties: ShapeProperties): ShapeProperties {
 		result.h = result.height;
 		delete result.height;
 	}
+	if ('asset_id' in result && !('assetId' in result)) {
+		result.assetId = result.asset_id;
+		delete result.asset_id;
+	}
+	if ('reference_type' in result && !('referenceType' in result)) {
+		result.referenceType = result.reference_type;
+		delete result.reference_type;
+	}
 	return result;
 }
 

@@ -54,6 +54,32 @@ pub fn validate_document(document: &Document) -> Result<(), EngineError> {
     }
     for shape in document.shapes.values() {
         validate_shape_schema(shape)?;
+        if shape.kind.as_str() == crate::IMAGE_KIND {
+            let asset_id = shape
+                .properties
+                .get("assetId")
+                .or_else(|| shape.properties.get("asset_id"))
+                .and_then(|value| value.as_str())
+                .ok_or_else(|| EngineError::Schema(format!("image shape {} has no asset ID", shape.id)))?;
+            if !document.assets.contains_key(&crate::AssetId::from(asset_id)) {
+                return Err(EngineError::Invariant(format!(
+                    "image shape {} references missing asset {}",
+                    shape.id, asset_id
+                )));
+            }
+        }
+        if shape.kind.as_str() == crate::REFERENCE_KIND
+            && let Ok(reference) = crate::reference_properties_from_properties(&shape.properties)
+            && matches!(reference.reference_type, crate::ReferenceKind::Page)
+            && !document
+                .pages
+                .contains_key(&crate::PageId::from(reference.value.clone()))
+        {
+            return Err(EngineError::Schema(format!(
+                "reference shape {} points to missing page {}",
+                shape.id, reference.value
+            )));
+        }
         for child_id in &shape.child_ids {
             validate_child(
                 document,

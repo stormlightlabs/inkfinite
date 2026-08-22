@@ -525,6 +525,26 @@ function excalidrawElement(
 			height = shape.props.h;
 			specific = { type: 'image', fileId: null, status: 'saved', scale: [1, 1] };
 			break;
+		case 'reference':
+			width = shape.props.w;
+			height = shape.props.h;
+			specific = {
+				type: 'text',
+				strokeColor: '#1f2937',
+				backgroundColor: '#f8fafc',
+				fontSize: 13,
+				fontFamily: 2,
+				text: shape.props.label || shape.props.value,
+				originalText: shape.props.label || shape.props.value,
+				textAlign: 'left',
+				verticalAlign: 'top',
+				lineHeight: 1.25,
+				containerId: null,
+				boundElements: null,
+				autoResize: false
+			};
+			warnings.add('excalidraw-reference', 'Reference cards were exported as text.');
+			break;
 		case 'container':
 			width = shape.props.w ?? 0;
 			height = shape.props.h ?? 0;

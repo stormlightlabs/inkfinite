@@ -61,13 +61,15 @@ pub enum BuiltinShapeKind {
     Markdown,
     /// Embedded raster image shape.
     Image,
+    /// URL, file, or page reference content.
+    Reference,
     /// Container shape.
     Container,
 }
 
 impl BuiltinShapeKind {
     /// Built-in kinds in their stable serialized order.
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::Rectangle,
         Self::Ellipse,
         Self::Line,
@@ -77,6 +79,7 @@ impl BuiltinShapeKind {
         Self::Path,
         Self::Markdown,
         Self::Image,
+        Self::Reference,
         Self::Container,
     ];
 
@@ -93,6 +96,7 @@ impl BuiltinShapeKind {
             Self::Path => "path",
             Self::Markdown => "markdown",
             Self::Image => "image",
+            Self::Reference => "reference",
             Self::Container => "container",
         }
     }
@@ -110,6 +114,7 @@ impl BuiltinShapeKind {
             b"path" => Some(Self::Path),
             b"markdown" => Some(Self::Markdown),
             b"image" => Some(Self::Image),
+            b"reference" => Some(Self::Reference),
             b"container" => Some(Self::Container),
             _ => None,
         }
@@ -140,6 +145,8 @@ pub const PATH_KIND: &str = BuiltinShapeKind::Path.as_str();
 pub const MARKDOWN_KIND: &str = BuiltinShapeKind::Markdown.as_str();
 /// Built-in embedded image shape kind.
 pub const IMAGE_KIND: &str = BuiltinShapeKind::Image.as_str();
+/// Built-in URL, file, or page reference shape kind.
+pub const REFERENCE_KIND: &str = BuiltinShapeKind::Reference.as_str();
 /// Built-in container shape kind.
 pub const CONTAINER_KIND: &str = BuiltinShapeKind::Container.as_str();
 
@@ -154,6 +161,7 @@ pub const BUILTIN_SHAPE_KINDS: &[&str] = &[
     PATH_KIND,
     MARKDOWN_KIND,
     IMAGE_KIND,
+    REFERENCE_KIND,
     CONTAINER_KIND,
 ];
 
@@ -201,6 +209,77 @@ pub(crate) struct StrokeProperties {
     pub(crate) points: Vec<Vec<f64>>,
     pub(crate) style: StrokeStyleProperties,
     pub(crate) brush: StrokeBrushProperties,
+}
+
+/// The semantic target represented by a reference shape.
+#[derive(Clone, Copy, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(rename_all = "snake_case")]
+pub enum ReferenceKind {
+    /// A web URL.
+    Url,
+    /// A local or workspace file path.
+    File,
+    /// Another page in the same document.
+    Page,
+}
+
+/// Native reference content properties.
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ReferenceProperties {
+    /// Width of the reference card.
+    #[serde(alias = "w")]
+    pub width: f64,
+    /// Height of the reference card.
+    #[serde(alias = "h")]
+    pub height: f64,
+    /// Reference target kind.
+    #[serde(alias = "reference_type")]
+    pub reference_type: ReferenceKind,
+    /// URL, path, or page ID represented by the shape.
+    pub value: String,
+    /// Optional display label.
+    #[serde(default)]
+    pub label: Option<String>,
+}
+
+/// Normalized image crop insets.
+#[derive(Clone, Copy, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageCrop {
+    /// Top inset as a fraction of the source image.
+    pub top: f64,
+    /// Right inset as a fraction of the source image.
+    pub right: f64,
+    /// Bottom inset as a fraction of the source image.
+    pub bottom: f64,
+    /// Left inset as a fraction of the source image.
+    pub left: f64,
+}
+
+/// Shape used to clip an image during rendering.
+#[derive(Clone, Copy, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(rename_all = "snake_case")]
+pub enum ImageMaskKind {
+    /// No additional curvature.
+    Rectangle,
+    /// Elliptical image mask.
+    Ellipse,
+    /// Rounded rectangle image mask.
+    Rounded,
+}
+
+/// Native image mask properties.
+#[derive(Clone, Copy, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageMask {
+    /// Mask shape.
+    pub kind: ImageMaskKind,
+    /// Rounded-corner radius for a rounded mask.
+    #[serde(default)]
+    pub radius: Option<f64>,
 }
 
 /// Storage form for asset contents.
@@ -255,6 +334,12 @@ pub enum ShapePropertyError {
     /// Freehand properties do not decode or fail committed stroke validation.
     #[error("shape kind {kind} has invalid stroke geometry: {message}")]
     InvalidStroke { kind: String, message: String },
+    /// Image properties do not decode or fail image validation.
+    #[error("shape kind {kind} has invalid image properties: {message}")]
+    InvalidImage { kind: String, message: String },
+    /// Reference properties do not decode or fail reference validation.
+    #[error("shape kind {kind} has invalid reference properties: {message}")]
+    InvalidReference { kind: String, message: String },
 }
 
 /// Anchor used to place an item in an ordered child list without numeric indexes.
@@ -989,6 +1074,12 @@ pub fn validate_shape_properties(kind: &str, properties: &ShapeProperties) -> Re
     } else if kind == STROKE_KIND {
         validate_stroke_properties(properties)
             .map_err(|message| ShapePropertyError::InvalidStroke { kind: kind.to_owned(), message })?;
+    } else if kind == IMAGE_KIND {
+        validate_image_properties(properties)
+            .map_err(|message| ShapePropertyError::InvalidImage { kind: kind.to_owned(), message })?;
+    } else if kind == REFERENCE_KIND {
+        validate_reference_properties(properties)
+            .map_err(|message| ShapePropertyError::InvalidReference { kind: kind.to_owned(), message })?;
     }
     Ok(())
 }
@@ -1052,6 +1143,92 @@ pub fn normalize_shape_properties(
         );
     }
     Ok(normalized)
+}
+
+fn validate_image_properties(properties: &ShapeProperties) -> Result<(), String> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct ImageProperties {
+        #[serde(alias = "w")]
+        width: f64,
+        #[serde(alias = "h")]
+        height: f64,
+        #[serde(alias = "asset_id")]
+        asset_id: String,
+        #[serde(default)]
+        crop: Option<ImageCrop>,
+        #[serde(default)]
+        mask: Option<ImageMask>,
+        #[serde(default)]
+        caption: Option<String>,
+    }
+
+    let image: ImageProperties = serde_json::from_value(Value::Object(properties.clone().into_iter().collect()))
+        .map_err(|error| format!("image properties could not be decoded: {error}"))?;
+    if !image.width.is_finite() || image.width < 0.0 || !image.height.is_finite() || image.height < 0.0 {
+        return Err("image dimensions must be finite and non-negative".into());
+    }
+    if image.asset_id.trim().is_empty() {
+        return Err("image asset_id must not be empty".into());
+    }
+    if let Some(crop) = image.crop {
+        let edges = [crop.top, crop.right, crop.bottom, crop.left];
+        if !edges
+            .into_iter()
+            .all(|value| value.is_finite() && (0.0..=1.0).contains(&value))
+        {
+            return Err("image crop insets must be finite and between 0 and 1".into());
+        }
+        if crop.left + crop.right >= 1.0 || crop.top + crop.bottom >= 1.0 {
+            return Err("image crop must leave a positive source area".into());
+        }
+    }
+    if let Some(mask) = image.mask {
+        if let Some(radius) = mask.radius
+            && (!radius.is_finite() || radius < 0.0 || radius > image.width.min(image.height) / 2.0)
+        {
+            return Err("image mask radius must be finite and within the image bounds".into());
+        }
+        if !matches!(mask.kind, ImageMaskKind::Rounded) && mask.radius.is_some() {
+            return Err("only rounded image masks may specify a radius".into());
+        }
+    }
+    let _ = image.caption;
+    Ok(())
+}
+
+fn validate_reference_properties(properties: &ShapeProperties) -> Result<(), String> {
+    let reference: ReferenceProperties =
+        serde_json::from_value(Value::Object(properties.clone().into_iter().collect()))
+            .map_err(|error| format!("reference properties could not be decoded: {error}"))?;
+    if !reference.width.is_finite() || reference.width < 0.0 || !reference.height.is_finite() || reference.height < 0.0
+    {
+        return Err("reference dimensions must be finite and non-negative".into());
+    }
+    if reference.value.trim().is_empty() {
+        return Err("reference value must not be empty".into());
+    }
+    if matches!(reference.reference_type, ReferenceKind::Url)
+        && !(reference.value.starts_with("http://") || reference.value.starts_with("https://"))
+    {
+        return Err("URL references must use http:// or https://".into());
+    }
+    Ok(())
+}
+
+/// Decodes a reference shape's properties.
+///
+/// # Errors
+///
+/// Returns [`ShapePropertyError`] when the reference properties are malformed.
+pub fn reference_properties_from_properties(
+    properties: &ShapeProperties,
+) -> Result<ReferenceProperties, ShapePropertyError> {
+    validate_reference_properties(properties)
+        .map_err(|message| ShapePropertyError::InvalidReference { kind: REFERENCE_KIND.into(), message })?;
+    serde_json::from_value(Value::Object(properties.clone().into_iter().collect())).map_err(|error| {
+        ShapePropertyError::InvalidReference { kind: REFERENCE_KIND.into(), message: error.to_string() }
+    })
 }
 
 fn validate_stroke_properties(properties: &ShapeProperties) -> Result<(), String> {
@@ -1127,6 +1304,51 @@ mod tests {
     }
 
     #[test]
+    fn image_and_reference_properties_validate_content_rules() {
+        let valid_image = BTreeMap::from([
+            ("w".into(), Value::from(320.0)),
+            ("h".into(), Value::from(200.0)),
+            ("assetId".into(), Value::from("asset:image")),
+            (
+                "crop".into(),
+                serde_json::json!({ "top": 0.1, "right": 0.1, "bottom": 0.1, "left": 0.1 }),
+            ),
+            ("mask".into(), serde_json::json!({ "kind": "rounded", "radius": 12.0 })),
+        ]);
+        assert!(validate_shape_properties(IMAGE_KIND, &valid_image).is_ok());
+        let invalid_crop = BTreeMap::from([
+            ("w".into(), Value::from(100.0)),
+            ("h".into(), Value::from(100.0)),
+            ("assetId".into(), Value::from("asset:image")),
+            (
+                "crop".into(),
+                serde_json::json!({ "top": 0.0, "right": 0.6, "bottom": 0.0, "left": 0.6 }),
+            ),
+        ]);
+        assert!(matches!(
+            validate_shape_properties(IMAGE_KIND, &invalid_crop),
+            Err(ShapePropertyError::InvalidImage { .. })
+        ));
+        let valid_reference = BTreeMap::from([
+            ("w".into(), Value::from(280.0)),
+            ("h".into(), Value::from(72.0)),
+            ("referenceType".into(), Value::from("url")),
+            ("value".into(), Value::from("https://example.com")),
+        ]);
+        assert!(validate_shape_properties(REFERENCE_KIND, &valid_reference).is_ok());
+        let invalid_reference = BTreeMap::from([
+            ("w".into(), Value::from(280.0)),
+            ("h".into(), Value::from(72.0)),
+            ("referenceType".into(), Value::from("url")),
+            ("value".into(), Value::from("file://not-a-url")),
+        ]);
+        assert!(matches!(
+            validate_shape_properties(REFERENCE_KIND, &invalid_reference),
+            Err(ShapePropertyError::InvalidReference { .. })
+        ));
+    }
+
+    #[test]
     fn builtin_registry_validates_shared_dimension_properties() {
         assert_eq!(
             builtin_shape_kinds(),
@@ -1140,6 +1362,7 @@ mod tests {
                 PATH_KIND,
                 MARKDOWN_KIND,
                 IMAGE_KIND,
+                REFERENCE_KIND,
                 CONTAINER_KIND,
             ]
         );

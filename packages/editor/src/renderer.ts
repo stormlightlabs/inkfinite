@@ -548,6 +548,10 @@ function drawShape(
 			drawImage(context, state, shape, onImageLoaded);
 			break;
 		}
+		case 'reference': {
+			drawReference(context, shape);
+			break;
+		}
 		case 'stroke': {
 			drawStroke(context, shape);
 			break;
@@ -573,7 +577,7 @@ function drawImage(
 	onImageLoaded?: () => void
 ) {
 	const asset = state.doc.assets?.[shape.props.assetId];
-	const { w, h, crop } = shape.props;
+	const { w, h, crop, mask, caption } = shape.props;
 	context.globalAlpha *= shape.fillOpacity ?? 1;
 	if (!asset) {
 		context.fillStyle = '#e5e7eb';
@@ -602,7 +606,46 @@ function drawImage(
 	const sourceY = image.naturalHeight * top;
 	const sourceWidth = image.naturalWidth * Math.max(0.001, 1 - left - right);
 	const sourceHeight = image.naturalHeight * Math.max(0.001, 1 - top - bottom);
+	context.save();
+	if (mask?.kind === 'ellipse') {
+		context.beginPath();
+		context.ellipse(w / 2, h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+		context.clip();
+	} else if (mask?.kind === 'rounded') {
+		const radius = Math.min(mask.radius ?? 16, w / 2, h / 2);
+		context.beginPath();
+		context.roundRect(0, 0, w, h, radius);
+		context.clip();
+	}
 	context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, w, h);
+	context.restore();
+	if (caption?.trim()) {
+		const captionHeight = Math.min(24, h);
+		context.fillStyle = 'rgba(0, 0, 0, 0.58)';
+		context.fillRect(0, h - captionHeight, w, captionHeight);
+		context.fillStyle = '#ffffff';
+		context.font = '12px sans-serif';
+		context.textBaseline = 'middle';
+		context.fillText(caption, 8, h - captionHeight / 2, Math.max(0, w - 16));
+	}
+}
+
+function drawReference(context: CanvasRenderingContext2D, shape: Extract<ShapeRecord, { type: 'reference' }>) {
+	const { w, h, referenceType, value, label } = shape.props;
+	const accent = referenceType === 'url' ? '#2563eb' : referenceType === 'file' ? '#16a34a' : '#7c3aed';
+	context.fillStyle = '#f8fafc';
+	context.strokeStyle = accent;
+	context.lineWidth = 2;
+	context.beginPath();
+	context.roundRect(0, 0, w, h, 8);
+	context.fill();
+	context.stroke();
+	context.fillStyle = accent;
+	context.font = '600 12px sans-serif';
+	context.fillText(referenceType.toUpperCase(), 12, 20);
+	context.fillStyle = '#1f2937';
+	context.font = '13px sans-serif';
+	context.fillText(label || value, 12, 42, Math.max(0, w - 24));
 }
 
 function bytesToBase64(bytes: number[]): string {
@@ -1340,7 +1383,8 @@ function drawSelection(
 					context.strokeRect(0, 0, w, h ?? fontSize * 10);
 					break;
 				}
-				case 'container': {
+				case 'container':
+				case 'reference': {
 					const bounds = localShapeBounds(shape);
 					context.strokeRect(
 						bounds.min.x,
