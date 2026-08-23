@@ -57,15 +57,15 @@ and rendered output where visual fidelity matters.
 
 ### Corpus and harnesses
 
-- [ ] Build shared 100, 1,000, 5,000, and 10,000-shape fixtures for flat,
+- [x] Build shared 100, 1,000, 5,000, and 10,000-shape fixtures for flat,
       vector-heavy, deeply nested, imported-SVG, connection-heavy, and
       semantic/binding-heavy documents
-- [ ] Replace the stale Node capture with a traversal-only benchmark against
+- [x] Replace the stale Node capture with a traversal-only benchmark against
       the current editor renderer; keep its no-op canvas scope explicit
-- [ ] Add Criterion benchmarks for document load/save/materialization,
+- [x] Add Criterion benchmarks for document load/save/materialization,
       transactions, queries, SVG, layout, and renderer algorithms
-- [ ] Add a profiling Cargo profile with release optimizations and debug symbols
-- [ ] Record reference hardware, tool versions, fixture seeds, warmups, and
+- [x] Add a profiling Cargo profile with release optimizations and debug symbols
+- [x] Record reference hardware, tool versions, fixture seeds, warmups, and
       sampling methodology
 
 ### Native and process measurements

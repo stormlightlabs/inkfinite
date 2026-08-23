@@ -1,0 +1,48 @@
+{
+	"schemaVersion": 1,
+	"seed": 439041101,
+	"sizes": [100, 1000, 5000, 10000],
+	"warmups": 3,
+	"samples": 10,
+	"viewport": { "width": 1280, "height": 720 },
+	"camera": { "x": 3200, "y": 3200, "zoom": 1 },
+	"profiles": [
+		{
+			"id": "flat",
+			"description": "Root-level rectangles with no relationships or semantic metadata.",
+			"kind": "rect"
+		},
+		{
+			"id": "vector-heavy",
+			"description": "Native paths with multiple line and cubic segments.",
+			"kind": "path",
+			"segments": 8
+		},
+		{
+			"id": "deeply-nested",
+			"description": "A chain of containers with descendants at every depth.",
+			"kind": "rect",
+			"nestingDepth": 32
+		},
+		{
+			"id": "imported-svg",
+			"description": "Path records shaped like the supported native output of an imported SVG.",
+			"kind": "path",
+			"segments": 12,
+			"source": "fixtures/svg-import/icons/simple-github.svg"
+		},
+		{
+			"id": "connection-heavy",
+			"description": "Alternating nodes and arrows with two endpoint bindings per arrow.",
+			"kind": "arrow",
+			"bindings": "arrow-end"
+		},
+		{
+			"id": "semantic-binding-heavy",
+			"description": "Named, tagged shapes linked by semantic relationships.",
+			"kind": "rect",
+			"metadata": true,
+			"bindings": "relation"
+		}
+	]
+}

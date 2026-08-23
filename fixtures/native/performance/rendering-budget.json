@@ -1,13 +1,32 @@
 {
-	"schemaVersion": 1,
-	"capturedAt": "2026-07-19T04:39:48.218Z",
+	"schemaVersion": 2,
+	"capturedAt": "2026-08-23T17:26:18.186Z",
 	"fixture": {
-		"path": "fixtures/native/performance/large-board.json",
+		"path": "fixtures/native/performance/corpus.json",
 		"seed": 439041101,
-		"documentShapeCount": 10000,
-		"visibleShapeCount": 252,
-		"viewport": { "width": 1280, "height": 720 },
-		"camera": { "x": 3200, "y": 3200, "zoom": 1 }
+		"profiles": [
+			"flat",
+			"vector-heavy",
+			"deeply-nested",
+			"imported-svg",
+			"connection-heavy",
+			"semantic-binding-heavy"
+		],
+		"sizes": [
+			100,
+			1000,
+			5000,
+			10000
+		],
+		"viewport": {
+			"width": 1280,
+			"height": 720
+		},
+		"camera": {
+			"x": 3200,
+			"y": 3200,
+			"zoom": 1
+		}
 	},
 	"hardware": {
 		"platform": "darwin",
@@ -16,37 +35,642 @@
 		"logicalCpuCount": 8,
 		"cpuSpeedMHz": 2400,
 		"totalMemoryBytes": 8589934592,
-		"freeMemoryBytesAtCapture": 114540544
+		"freeMemoryBytesAtCapture": 80314368
 	},
 	"runtime": {
-		"node": "v26.5.0",
-		"v8": "14.6.202.34-node.24",
+		"node": "v26.7.0",
+		"v8": "14.6.202.34-node.28",
 		"rustc": "rustc 1.89.0 (29483883e 2025-08-04)",
 		"cargo": "cargo 1.89.0 (c24e10642 2025-06-23)",
 		"typescript": "Version 5.9.3",
-		"vitest": "vitest/4.0.16 darwin-arm64 node-v26.5.0",
-		"tauri": "tauri-cli 2.9.6"
+		"playwright": "unavailable"
 	},
-	"budgets": { "frameTimeMillisecondsMedian": 8, "hitTestTimeMillisecondsMedian": 1 },
-	"passed": { "frame": true, "hitTest": true },
-	"strategy": {
-		"renderer": "Canvas 2D with viewport culling, dirty-frame batching, and bounded layout caches",
-		"hitTesting": "Reverse draw-order linear scan; no spatial index",
-		"overlayLayers": "Single canvas; the measured frame cost does not justify a second durable-scene bitmap"
+	"sampling": {
+		"warmups": 3,
+		"samples": 10,
+		"statistic": "median of post-warmup samples",
+		"clock": "node:perf_hooks performance.now()",
+		"method": "one scheduled production editor renderer frame per sample"
 	},
-	"measurements": {
-		"frameTimeMillisecondsMedian": 1.2308750000000828,
-		"hitTestTimeMillisecondsMedian": 0.4495441054687499,
-		"hitTestSampleCount": 256,
-		"memoryRssBeforeOpenBytes": 68730880,
-		"memoryRssAfterOpenBytes": 103743488,
-		"memoryRssDeltaBytes": 35012608,
-		"openTimeMillisecondsMedian": 19.266333000000003,
-		"saveTimeMillisecondsMedian": 10.190124999999966
+	"scope": {
+		"renderer": "packages/editor/src/renderer.ts createRenderer",
+		"canvas": "no-op CanvasRenderingContext2D harness",
+		"measured": [
+			"scene traversal",
+			"viewport culling",
+			"geometry dispatch",
+			"renderer cache work"
+		],
+		"excluded": [
+			"browser rasterization",
+			"paint",
+			"text shaping",
+			"compositing",
+			"GPU work",
+			"browser GC",
+			"real frame timing"
+		]
 	},
-	"notes": [
-		"The native performance fixture is generated deterministically from the native document model.",
-		"Timing uses the production Canvas 2D renderer with a no-op context to isolate JavaScript traversal cost.",
-		"The budget remains explicit so release verification can fail when either interaction measure regresses."
+	"measurements": [
+		{
+			"profile": "flat",
+			"shapeCount": 100,
+			"shapeRecords": 100,
+			"bindingRecords": 0,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 0.07483299999999815,
+				"minimum": 0.04579199999999872,
+				"maximum": 0.21008400000000194,
+				"all": [
+					0.14529100000000028,
+					0.09895800000000321,
+					0.09008399999999739,
+					0.07483299999999815,
+					0.06537500000000307,
+					0.21008400000000194,
+					0.05595800000000395,
+					0.04579199999999872,
+					0.04841599999999602,
+					0.05362500000000381
+				]
+			}
+		},
+		{
+			"profile": "flat",
+			"shapeCount": 1000,
+			"shapeRecords": 1000,
+			"bindingRecords": 0,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 0.4710409999999996,
+				"minimum": 0.3773340000000047,
+				"maximum": 1.3897079999999988,
+				"all": [
+					1.3897079999999988,
+					0.696583000000004,
+					0.5739580000000046,
+					0.5730420000000009,
+					0.40204199999999446,
+					0.4710409999999996,
+					0.40041700000000446,
+					0.3959999999999866,
+					0.4410829999999919,
+					0.3773340000000047
+				]
+			}
+		},
+		{
+			"profile": "flat",
+			"shapeCount": 5000,
+			"shapeRecords": 5000,
+			"bindingRecords": 0,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 1.5407499999999885,
+				"minimum": 1.0959580000000102,
+				"maximum": 2.787582999999998,
+				"all": [
+					1.7096670000000103,
+					1.5407499999999885,
+					2.0788749999999965,
+					2.787582999999998,
+					1.754125000000002,
+					1.3959590000000048,
+					1.0959580000000102,
+					1.1658330000000063,
+					1.1549579999999935,
+					1.3130419999999958
+				]
+			}
+		},
+		{
+			"profile": "flat",
+			"shapeCount": 10000,
+			"shapeRecords": 10000,
+			"bindingRecords": 0,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 2.530875000000009,
+				"minimum": 2.3070419999999956,
+				"maximum": 3.383375000000001,
+				"all": [
+					3.012875000000008,
+					2.4571669999999983,
+					3.288499999999999,
+					2.457041000000004,
+					2.370915999999994,
+					2.3070419999999956,
+					3.383375000000001,
+					2.3355410000000063,
+					3.1077499999999816,
+					2.530875000000009
+				]
+			}
+		},
+		{
+			"profile": "vector-heavy",
+			"shapeCount": 100,
+			"shapeRecords": 100,
+			"bindingRecords": 0,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 0.155666999999994,
+				"minimum": 0.13254200000000083,
+				"maximum": 0.2953329999999994,
+				"all": [
+					0.2953329999999994,
+					0.1571249999999793,
+					0.13720800000001532,
+					0.13254200000000083,
+					0.14733400000000074,
+					0.1443749999999966,
+					0.155666999999994,
+					0.13958299999998758,
+					0.270040999999992,
+					0.17954199999999787
+				]
+			}
+		},
+		{
+			"profile": "vector-heavy",
+			"shapeCount": 1000,
+			"shapeRecords": 1000,
+			"bindingRecords": 0,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 2.5957919999999604,
+				"minimum": 1.2684169999999995,
+				"maximum": 3.414707999999962,
+				"all": [
+					1.871625000000023,
+					3.1852499999999964,
+					2.7138750000000016,
+					1.985791000000006,
+					1.2684169999999995,
+					1.767499999999984,
+					1.542250000000024,
+					3.414707999999962,
+					2.899249999999995,
+					2.5957919999999604
+				]
+			}
+		},
+		{
+			"profile": "vector-heavy",
+			"shapeCount": 5000,
+			"shapeRecords": 5000,
+			"bindingRecords": 0,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 11.519667000000027,
+				"minimum": 8.853375000000028,
+				"maximum": 41.36429199999998,
+				"all": [
+					10.968042000000025,
+					10.239000000000033,
+					9.003708999999958,
+					8.853375000000028,
+					41.36429199999998,
+					11.668416999999977,
+					12.177542000000074,
+					11.891707999999994,
+					11.11083300000007,
+					11.519667000000027
+				]
+			}
+		},
+		{
+			"profile": "vector-heavy",
+			"shapeCount": 10000,
+			"shapeRecords": 10000,
+			"bindingRecords": 0,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 11.900833999999918,
+				"minimum": 9.886416000000054,
+				"maximum": 25.89666699999998,
+				"all": [
+					13.023209000000065,
+					10.426666999999952,
+					25.89666699999998,
+					10.98904200000004,
+					11.900833999999918,
+					18.18654200000003,
+					13.261499999999955,
+					9.886416000000054,
+					11.384667000000036,
+					10.02516700000001
+				]
+			}
+		},
+		{
+			"profile": "deeply-nested",
+			"shapeCount": 100,
+			"shapeRecords": 100,
+			"bindingRecords": 0,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 0.05004199999996217,
+				"minimum": 0.039667000000008557,
+				"maximum": 0.06883400000003803,
+				"all": [
+					0.06883400000003803,
+					0.06608299999993505,
+					0.054791000000022905,
+					0.05237499999998363,
+					0.05004199999996217,
+					0.04200000000003001,
+					0.04062499999997726,
+					0.04254200000002584,
+					0.04008299999998144,
+					0.039667000000008557
+				]
+			}
+		},
+		{
+			"profile": "deeply-nested",
+			"shapeCount": 1000,
+			"shapeRecords": 1000,
+			"bindingRecords": 0,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 0.4067499999999882,
+				"minimum": 0.3820420000000695,
+				"maximum": 0.7018749999999727,
+				"all": [
+					0.4071249999999509,
+					0.4053749999999354,
+					0.44124999999996817,
+					0.4067499999999882,
+					0.40600000000006276,
+					0.3904579999999669,
+					0.3843330000000833,
+					0.3820420000000695,
+					0.7018749999999727,
+					0.42441599999995105
+				]
+			}
+		},
+		{
+			"profile": "deeply-nested",
+			"shapeCount": 5000,
+			"shapeRecords": 5000,
+			"bindingRecords": 0,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 1.3455410000000256,
+				"minimum": 1.1275420000000622,
+				"maximum": 2.184582999999975,
+				"all": [
+					1.2814590000000408,
+					2.092624999999998,
+					1.2752919999999222,
+					1.3455410000000256,
+					1.5551249999999754,
+					2.184582999999975,
+					1.2555419999999913,
+					1.1275420000000622,
+					1.1427500000000919,
+					1.4080000000000155
+				]
+			}
+		},
+		{
+			"profile": "deeply-nested",
+			"shapeCount": 10000,
+			"shapeRecords": 10000,
+			"bindingRecords": 0,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 7.873707999999851,
+				"minimum": 3.413332999999966,
+				"maximum": 39.79379199999994,
+				"all": [
+					7.262250000000108,
+					8.73350000000005,
+					3.413332999999966,
+					39.79379199999994,
+					33.1261659999999,
+					4.725750000000062,
+					6.121375000000171,
+					6.937040999999908,
+					9.059875000000147,
+					7.873707999999851
+				]
+			}
+		},
+		{
+			"profile": "imported-svg",
+			"shapeCount": 100,
+			"shapeRecords": 100,
+			"bindingRecords": 0,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 0.16112500000008367,
+				"minimum": 0.11445800000001327,
+				"maximum": 3.421957999999904,
+				"all": [
+					0.11445800000001327,
+					0.1150000000000091,
+					0.15437500000007276,
+					0.16112500000008367,
+					0.14274999999997817,
+					3.421957999999904,
+					0.5822080000000369,
+					0.39599999999995816,
+					0.43095900000002985,
+					0.12329199999999219
+				]
+			}
+		},
+		{
+			"profile": "imported-svg",
+			"shapeCount": 1000,
+			"shapeRecords": 1000,
+			"bindingRecords": 0,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 1.5141249999999218,
+				"minimum": 1.2622499999999945,
+				"maximum": 4.898333000000093,
+				"all": [
+					3.5871250000000146,
+					1.2690000000000055,
+					1.2835829999999078,
+					1.5141249999999218,
+					1.2622499999999945,
+					1.4616249999999127,
+					1.5791249999999764,
+					4.898333000000093,
+					1.2634169999998903,
+					1.643624999999929
+				]
+			}
+		},
+		{
+			"profile": "imported-svg",
+			"shapeCount": 5000,
+			"shapeRecords": 5000,
+			"bindingRecords": 0,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 14.549540999999863,
+				"minimum": 7.786415999999917,
+				"maximum": 32.640666999999894,
+				"all": [
+					7.786415999999917,
+					9.512042000000065,
+					32.640666999999894,
+					30.02466699999991,
+					13.361458000000084,
+					10.117500000000064,
+					10.72566699999993,
+					14.549540999999863,
+					17.998374999999896,
+					17.432583000000022
+				]
+			}
+		},
+		{
+			"profile": "imported-svg",
+			"shapeCount": 10000,
+			"shapeRecords": 10000,
+			"bindingRecords": 0,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 13.894790999999941,
+				"minimum": 12.947916999999961,
+				"maximum": 17.507750000000215,
+				"all": [
+					17.507750000000215,
+					14.981250000000045,
+					13.030875000000151,
+					14.542207999999846,
+					13.59637500000008,
+					13.20879100000002,
+					13.894790999999941,
+					13.970833999999968,
+					12.947916999999961,
+					13.001666999999998
+				]
+			}
+		},
+		{
+			"profile": "connection-heavy",
+			"shapeCount": 100,
+			"shapeRecords": 100,
+			"bindingRecords": 100,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 0.5046250000000327,
+				"minimum": 0.482665999999881,
+				"maximum": 0.7162500000001728,
+				"all": [
+					0.4996249999999236,
+					0.510665999999901,
+					0.7162500000001728,
+					0.502666999999974,
+					0.5046250000000327,
+					0.505292000000054,
+					0.482665999999881,
+					0.5222499999999854,
+					0.4965830000001006,
+					0.49641700000006495
+				]
+			}
+		},
+		{
+			"profile": "connection-heavy",
+			"shapeCount": 1000,
+			"shapeRecords": 1000,
+			"bindingRecords": 1000,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 51.53566699999965,
+				"minimum": 50.146999999999935,
+				"maximum": 65.431333,
+				"all": [
+					58.53962499999989,
+					52.19666599999982,
+					51.53566699999965,
+					50.814916999999696,
+					50.146999999999935,
+					65.431333,
+					54.56779199999983,
+					51.42083300000013,
+					50.36591700000008,
+					51.08375000000024
+				]
+			}
+		},
+		{
+			"profile": "connection-heavy",
+			"shapeCount": 5000,
+			"shapeRecords": 5000,
+			"bindingRecords": 5000,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 1898.9341249999998,
+				"minimum": 1878.3632079999988,
+				"maximum": 1978.3835419999996,
+				"all": [
+					1887.1561250000013,
+					1878.3632079999988,
+					1887.6532079999997,
+					1901.7447089999987,
+					1892.536250000001,
+					1898.9341249999998,
+					1978.3835419999996,
+					1907.0577090000006,
+					1891.6248750000013,
+					1905.6670000000013
+				]
+			}
+		},
+		{
+			"profile": "connection-heavy",
+			"shapeCount": 10000,
+			"shapeRecords": 10000,
+			"bindingRecords": 10000,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 9357.034042000014,
+				"minimum": 8653.417750000022,
+				"maximum": 10658.512417000005,
+				"all": [
+					10658.512417000005,
+					9025.642749999999,
+					9657.200541999991,
+					9013.608833000006,
+					8721.961874999994,
+					9387.579582999999,
+					9357.034042000014,
+					8653.417750000022,
+					9025.031166,
+					9464.91533399999
+				]
+			}
+		},
+		{
+			"profile": "semantic-binding-heavy",
+			"shapeCount": 100,
+			"shapeRecords": 100,
+			"bindingRecords": 99,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 0.07337499997811392,
+				"minimum": 0.06466599999112077,
+				"maximum": 0.1367080000054557,
+				"all": [
+					0.07958399999188259,
+					0.07337499997811392,
+					0.07083300000522286,
+					0.06816699999035336,
+					0.06466599999112077,
+					0.06504200000199489,
+					0.07533299998613074,
+					0.0664579999865964,
+					0.07616699999198318,
+					0.1367080000054557
+				]
+			}
+		},
+		{
+			"profile": "semantic-binding-heavy",
+			"shapeCount": 1000,
+			"shapeRecords": 1000,
+			"bindingRecords": 999,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 0.666709000011906,
+				"minimum": 0.5212919999903534,
+				"maximum": 2.975124999997206,
+				"all": [
+					0.8293330000014976,
+					0.8073750000039581,
+					0.666709000011906,
+					0.6133750000153668,
+					0.619834000011906,
+					2.975124999997206,
+					2.1048330000194255,
+					0.5212919999903534,
+					0.5325000000011642,
+					0.5946669999975711
+				]
+			}
+		},
+		{
+			"profile": "semantic-binding-heavy",
+			"shapeCount": 5000,
+			"shapeRecords": 5000,
+			"bindingRecords": 4999,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 1.5224589999997988,
+				"minimum": 1.3627080000005662,
+				"maximum": 2.593542000016896,
+				"all": [
+					1.4587499999906868,
+					1.5034579999919515,
+					1.7298749999899883,
+					1.8725830000184942,
+					1.4759580000245478,
+					1.8196250000037253,
+					1.5224589999997988,
+					2.593542000016896,
+					1.476290999999037,
+					1.3627080000005662
+				]
+			}
+		},
+		{
+			"profile": "semantic-binding-heavy",
+			"shapeCount": 10000,
+			"shapeRecords": 10000,
+			"bindingRecords": 9999,
+			"warmups": 3,
+			"samples": 10,
+			"milliseconds": {
+				"median": 5.172999999980675,
+				"minimum": 4.03125,
+				"maximum": 44.953999999997905,
+				"all": [
+					4.901125000003958,
+					5.431375000014668,
+					4.496791000012308,
+					5.172999999980675,
+					4.5150830000056885,
+					5.586582999996608,
+					4.682957999990322,
+					4.03125,
+					6.724207999999635,
+					44.953999999997905
+				]
+			}
+		}
 	]
 }

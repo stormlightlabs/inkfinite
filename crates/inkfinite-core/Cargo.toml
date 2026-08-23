@@ -25,7 +25,12 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["net"] }
 
 [dev-dependencies]
+criterion.workspace = true
 proptest = "1.7"
+
+[[bench]]
+name = "performance"
+harness = false
 
 [lints]
 workspace = true

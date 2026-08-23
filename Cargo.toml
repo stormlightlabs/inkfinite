@@ -37,6 +37,14 @@ svgtypes = "0.16.1"
 tokio = { version = "1.48", default-features = false, features = ["io-util", "macros", "rt", "sync"] }
 ts-rs = { version = "12.0.1", features = ["no-serde-warnings", "serde-json-impl"] }
 thiserror = "2.0"
+criterion = { version = "0.7", features = ["html_reports"] }
+
+[profile.profiling]
+inherits = "release"
+debug = true
+debug-assertions = false
+overflow-checks = false
+strip = "none"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
