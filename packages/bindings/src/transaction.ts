@@ -802,6 +802,49 @@ export type ProposalOperationPreview = {
 };
 
 /**
+ * Visual classification for one record-level proposal change.
+ */
+export type ProposalChangeKind = 'added' | 'modified' | 'moved' | 'removed';
+
+/**
+ * Before/after data for one record affected by a proposal.
+ */
+export type ProposalObjectPreview = {
+	/**
+	 * Record identified by this preview.
+	 */
+	record_id: RecordId;
+	/**
+	 * Visual classification used by review clients.
+	 */
+	change: ProposalChangeKind;
+	/**
+	 * Complete record before the proposal, when it existed.
+	 */
+	before: QueryRecord | null;
+	/**
+	 * Complete record after the proposal, when it exists.
+	 */
+	after: QueryRecord | null;
+	/**
+	 * World-space shape bounds before the proposal, when applicable.
+	 */
+	before_bounds: Bounds | null;
+	/**
+	 * World-space shape bounds after the proposal, when applicable.
+	 */
+	after_bounds: Bounds | null;
+	/**
+	 * Transaction operation positions that directly name this record.
+	 */
+	operation_positions: Array<number>;
+	/**
+	 * Changed record fields, including nested metadata and relationship fields.
+	 */
+	changed_fields: Array<string>;
+};
+
+/**
  * Validated transaction held for explicit user review.
  */
 export type Proposal = {
@@ -825,6 +868,10 @@ export type Proposal = {
 	 * Human-readable, independently selectable operation previews.
 	 */
 	operation_previews: Array<ProposalOperationPreview>;
+	/**
+	 * Record-level before/after data used to render the proposal on the canvas.
+	 */
+	object_previews: Array<ProposalObjectPreview>;
 	/**
 	 * Validation or repair warnings shown before acceptance.
 	 */

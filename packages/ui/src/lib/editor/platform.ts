@@ -14,6 +14,18 @@ import type { StatusStore } from './status';
 /** Runtime selected by an application composition root. */
 export type EditorPlatform = 'web' | 'desktop';
 
+/** Record-level before/after data produced by Rust for a live proposal. */
+export type ProposalObjectPreview = {
+	record_id: { kind: string; id: string };
+	change: 'added' | 'modified' | 'moved' | 'removed';
+	before: { kind: string; record: Record<string, unknown> } | null;
+	after: { kind: string; record: Record<string, unknown> } | null;
+	before_bounds: { x: number; y: number; width: number; height: number } | null;
+	after_bounds: { x: number; y: number; width: number; height: number } | null;
+	operation_positions: number[];
+	changed_fields: string[];
+};
+
 /** Small, renderer-facing projection of a Rust live proposal. */
 export type LiveProposal = {
 	id: string;
@@ -33,6 +45,7 @@ export type LiveProposal = {
 		record_ids: readonly unknown[];
 		bounds: Array<{ x: number; y: number; width: number; height: number }>;
 	}>;
+	object_previews?: ProposalObjectPreview[];
 	warnings: Array<{ code: string; message: string }>;
 	expires_at: number;
 };

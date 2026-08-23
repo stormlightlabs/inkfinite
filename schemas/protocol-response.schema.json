@@ -1677,6 +1677,13 @@
           "$ref": "#/$defs/ProposalId",
           "description": "Stable proposal identifier."
         },
+        "object_previews": {
+          "description": "Record-level before/after data used to render the proposal on the canvas.",
+          "items": {
+            "$ref": "#/$defs/ProposalObjectPreview"
+          },
+          "type": "array"
+        },
         "operation_previews": {
           "description": "Human-readable, independently selectable operation previews.",
           "items": {
@@ -1706,14 +1713,120 @@
         "preview",
         "affected_regions",
         "operation_previews",
+        "object_previews",
         "warnings",
         "expires_at"
       ],
       "type": "object"
     },
+    "ProposalChangeKind": {
+      "description": "Visual classification for one record-level proposal change.",
+      "oneOf": [
+        {
+          "const": "added",
+          "description": "A record exists only after the proposal.",
+          "type": "string"
+        },
+        {
+          "const": "modified",
+          "description": "A record exists before and after with non-positional changes.",
+          "type": "string"
+        },
+        {
+          "const": "moved",
+          "description": "A shape's transform or parent changes between snapshots.",
+          "type": "string"
+        },
+        {
+          "const": "removed",
+          "description": "A record exists only before the proposal.",
+          "type": "string"
+        }
+      ]
+    },
     "ProposalId": {
       "description": "Stable identifier for a transaction proposal awaiting user review.",
       "type": "string"
+    },
+    "ProposalObjectPreview": {
+      "description": "Before/after data for one record affected by a proposal.",
+      "properties": {
+        "after": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QueryRecord"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Complete record after the proposal, when it exists."
+        },
+        "after_bounds": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Bounds"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "World-space shape bounds after the proposal, when applicable."
+        },
+        "before": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QueryRecord"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Complete record before the proposal, when it existed."
+        },
+        "before_bounds": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Bounds"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "World-space shape bounds before the proposal, when applicable."
+        },
+        "change": {
+          "$ref": "#/$defs/ProposalChangeKind",
+          "description": "Visual classification used by review clients."
+        },
+        "changed_fields": {
+          "description": "Changed record fields, including nested metadata and relationship fields.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "operation_positions": {
+          "description": "Transaction operation positions that directly name this record.",
+          "items": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "record_id": {
+          "$ref": "#/$defs/RecordId",
+          "description": "Record identified by this preview."
+        }
+      },
+      "required": [
+        "record_id",
+        "change",
+        "operation_positions",
+        "changed_fields"
+      ],
+      "type": "object"
     },
     "ProposalOperationPreview": {
       "description": "Review metadata for one operation in a proposal.",

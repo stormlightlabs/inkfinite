@@ -119,11 +119,11 @@ before committing them.
 
 ### Richer canvas preview
 
-- [ ] Derive object-specific modification, removal, and move previews in Rust
+- [x] Derive object-specific modification, removal, and move previews in Rust
       and render them in the TypeScript canvas
-- [ ] Include relationship and metadata changes in Rust preview data and the
+- [x] Include relationship and metadata changes in Rust preview data and the
       TypeScript review UI
-- [ ] Define distinct visual tokens for proposed additions, modifications, and
+- [x] Define distinct visual tokens for proposed additions, modifications, and
       removals
 
 ### End-to-end review

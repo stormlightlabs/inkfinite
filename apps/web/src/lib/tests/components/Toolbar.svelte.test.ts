@@ -1,10 +1,10 @@
-import { Store } from '@inkfinite/core';
+import { Store, type ToolId } from '@inkfinite/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render } from 'vitest-browser-svelte';
 import Toolbar from '$editor/components/Toolbar.svelte';
 import { createBrushStore } from '$editor/status';
 
-function renderToolbar(currentTool = 'select') {
+function renderToolbar(currentTool: ToolId = 'select') {
 	const onToolChange = vi.fn();
 	const result = render(Toolbar, {
 		currentTool,

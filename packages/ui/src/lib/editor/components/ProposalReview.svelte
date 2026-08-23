@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { LiveProposal } from '../platform';
+	import type { LiveProposal, ProposalObjectPreview } from '../platform';
 
 	let {
 		proposal,
@@ -66,6 +66,54 @@
 		if (bounds.length === 0) return 'No shape geometry';
 		return bounds.map((box) => `${box.x},${box.y} ${box.width}×${box.height}`).join(' → ');
 	}
+
+	function previewRecord(preview: ProposalObjectPreview) {
+		return (preview.change === 'removed' ? preview.before : preview.after)?.record ?? null;
+	}
+
+	function recordValue(preview: ProposalObjectPreview, key: string): string | null {
+		const record = previewRecord(preview);
+		const value = record?.[key];
+		return typeof value === 'string' && value.length > 0 ? value : null;
+	}
+
+	function objectLabel(preview: ProposalObjectPreview): string {
+		const record = previewRecord(preview);
+		if (preview.record_id.kind === 'binding') {
+			const relation = recordValue(preview, 'relation_type');
+			return relation ? `Relationship · ${relation}` : 'Relationship';
+		}
+		const metadata = record?.metadata;
+		if (typeof metadata === 'object' && metadata !== null) {
+			const fields = metadata as Record<string, unknown>;
+			if (typeof fields.name === 'string' && fields.name) return fields.name;
+			if (typeof fields.role === 'string' && fields.role) return fields.role;
+		}
+		return `${preview.record_id.kind} · ${preview.record_id.id}`;
+	}
+
+	function relationshipLabel(preview: ProposalObjectPreview): string | null {
+		if (preview.record_id.kind !== 'binding') return null;
+		const source = recordValue(preview, 'source_shape_id');
+		const target = recordValue(preview, 'target_shape_id');
+		if (!source || !target) return null;
+		return `${source} → ${target}`;
+	}
+
+	function changeLabel(change: ProposalObjectPreview['change']): string {
+		return change === 'added'
+			? 'Added'
+			: change === 'removed'
+				? 'Removed'
+				: change === 'moved'
+					? 'Moved'
+					: 'Modified';
+	}
+
+	function changeFields(preview: ProposalObjectPreview): string {
+		if (preview.changed_fields.length === 0) return 'No field details';
+		return preview.changed_fields.join(', ');
+	}
 </script>
 
 {#if proposal}
@@ -80,15 +128,40 @@
 		</div>
 
 		<p class="summary">
-			Ghost shapes preview proposed creations. Outlined regions mark other affected geometry.
+			The canvas separates additions, edits, moves, removals, and relationship changes before
+			you commit them.
 		</p>
 
 		<div class="change-grid" aria-label="Proposal changes">
-			<div><strong>{proposal.preview.created.length}</strong><span>created</span></div>
+			<div><strong>{proposal.preview.created.length}</strong><span>added</span></div>
 			<div><strong>{proposal.preview.changed.length}</strong><span>changed</span></div>
-			<div><strong>{proposal.preview.deleted.length}</strong><span>deleted</span></div>
+			<div><strong>{proposal.preview.deleted.length}</strong><span>removed</span></div>
 			<div><strong>{proposal.affected_regions.length}</strong><span>regions</span></div>
 		</div>
+
+		{#if proposal.object_previews && proposal.object_previews.length > 0}
+			<section class="object-changes" aria-label="Object changes">
+				<h3>Object changes</h3>
+				<div class="object-change-list">
+					{#each proposal.object_previews as preview (preview.record_id.id)}
+						<article class={`object-change object-change--${preview.change}`}>
+							<span class="change-badge">{changeLabel(preview.change)}</span>
+							<div class="object-change__content">
+								<strong>{objectLabel(preview)}</strong>
+								<small>{preview.record_id.id}</small>
+								{#if relationshipLabel(preview)}
+									<small class="relationship-detail"
+										>{relationshipLabel(preview)}</small>
+								{/if}
+								{#if preview.changed_fields.length > 0}
+									<small>Changed: {changeFields(preview)}</small>
+								{/if}
+							</div>
+						</article>
+					{/each}
+				</div>
+			</section>
+		{/if}
 
 		{#if operationCount() > 1}
 			<fieldset class="operations">
@@ -159,7 +232,9 @@
 	}
 
 	.proposal-panel {
+		max-height: min(42rem, calc(100% - 2rem));
 		padding: 1rem;
+		overflow: auto;
 	}
 
 	.proposal-message {
@@ -238,6 +313,87 @@
 		color: color-mix(in srgb, var(--ink-text) 62%, transparent);
 		font-size: 0.65rem;
 		text-transform: uppercase;
+	}
+
+	.object-changes {
+		margin: 0 0 0.85rem;
+	}
+
+	.object-changes h3 {
+		margin: 0 0 0.4rem;
+		color: color-mix(in srgb, var(--ink-text) 66%, transparent);
+		font-size: 0.7rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+
+	.object-change-list {
+		display: grid;
+		gap: 0.35rem;
+		max-height: 12rem;
+		overflow: auto;
+	}
+
+	.object-change {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.5rem;
+		padding: 0.5rem;
+		border-left: 3px solid var(--change-color);
+		border-radius: var(--ink-radius-control-small);
+		background: color-mix(in srgb, var(--change-color) 9%, var(--ink-surface));
+	}
+
+	.object-change--added {
+		--change-color: var(--ink-accent);
+	}
+
+	.object-change--modified,
+	.object-change--moved {
+		--change-color: var(--ink-warning);
+	}
+
+	.object-change--removed {
+		--change-color: var(--ink-danger);
+	}
+
+	.change-badge {
+		flex: 0 0 auto;
+		padding: 0.18rem 0.3rem;
+		border-radius: 999px;
+		color: var(--change-color);
+		background: color-mix(in srgb, var(--change-color) 15%, transparent);
+		font-size: 0.62rem;
+		font-weight: 800;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+	}
+
+	.object-change__content {
+		display: grid;
+		min-width: 0;
+		gap: 0.12rem;
+	}
+
+	.object-change__content strong,
+	.object-change__content small {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.object-change__content strong {
+		font-size: 0.75rem;
+	}
+
+	.object-change__content small {
+		color: color-mix(in srgb, var(--ink-text) 58%, transparent);
+		font-size: 0.65rem;
+	}
+
+	.object-change__content .relationship-detail {
+		color: var(--change-color);
 	}
 
 	.operations {

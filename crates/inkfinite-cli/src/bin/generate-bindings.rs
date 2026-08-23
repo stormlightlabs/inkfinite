@@ -259,6 +259,8 @@ fn transaction_bindings() -> String {
     append_declaration::<SaveResult>(&mut output, &config);
     append_declaration::<ProposalId>(&mut output, &config);
     append_clean_declaration::<ProposalOperationPreview>(&mut output, &config);
+    append_declaration::<ProposalChangeKind>(&mut output, &config);
+    append_clean_declaration::<ProposalObjectPreview>(&mut output, &config);
     append_clean_declaration::<Proposal>(&mut output, &config);
     output
 }

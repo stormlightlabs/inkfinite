@@ -246,6 +246,7 @@ describe('Tauri desktop session command boundary', () => {
 				},
 				preview: { created: [], changed: [], deleted: [] },
 				operation_previews: [],
+				object_previews: [],
 				affected_regions: [],
 				warnings: [],
 				expires_at: 2_000

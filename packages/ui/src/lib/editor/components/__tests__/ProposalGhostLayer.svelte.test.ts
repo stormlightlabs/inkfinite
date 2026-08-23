@@ -48,6 +48,73 @@ describe('ProposalGhostLayer', () => {
 			.not.toBeInTheDocument();
 	});
 
+	it('renders moved objects with before and after geometry', async () => {
+		const proposal = proposalWith({ type: 'patch_shape', shape_id: 'shape:moved' });
+		proposal.object_previews = [
+			{
+				record_id: { kind: 'shape', id: 'shape:moved' },
+				change: 'moved',
+				before: {
+					kind: 'shape',
+					record: { kind: 'rect', properties: { width: 30, height: 40, fill: '#f00' } }
+				},
+				after: {
+					kind: 'shape',
+					record: { kind: 'rect', properties: { width: 30, height: 40, fill: '#0f0' } }
+				},
+				before_bounds: { x: 10, y: 20, width: 30, height: 40 },
+				after_bounds: { x: 100, y: 120, width: 30, height: 40 },
+				operation_positions: [0],
+				changed_fields: ['transform.translation']
+			}
+		];
+		const screen = render(ProposalGhostLayer, {
+			proposal,
+			camera: Camera.create(0, 0, 2),
+			viewport: { width: 800, height: 600 }
+		});
+
+		await expect
+			.element(screen.getByTestId('proposal-object-preview').first())
+			.toHaveAttribute('data-change', 'moved');
+		expect(screen.getByTestId('proposal-object-preview').all()).toHaveLength(2);
+		await expect
+			.element(screen.getByTestId('proposal-object-preview').last())
+			.toHaveAttribute('data-side', 'after');
+	});
+
+	it('renders relationship previews with their change state', async () => {
+		const proposal = proposalWith({ type: 'create_binding' });
+		proposal.object_previews = [
+			{
+				record_id: { kind: 'binding', id: 'binding:relation' },
+				change: 'added',
+				before: null,
+				after: {
+					kind: 'binding',
+					record: {
+						source_shape_id: 'shape:a',
+						target_shape_id: 'shape:b',
+						relation_type: 'depends_on'
+					}
+				},
+				before_bounds: null,
+				after_bounds: { x: 10, y: 20, width: 80, height: 40 },
+				operation_positions: [0],
+				changed_fields: []
+			}
+		];
+		const screen = render(ProposalGhostLayer, {
+			proposal,
+			camera: Camera.create(0, 0, 2),
+			viewport: { width: 800, height: 600 }
+		});
+
+		await expect
+			.element(screen.getByTestId('proposal-relationship-preview'))
+			.toHaveAttribute('data-change', 'added');
+	});
+
 	it('keeps an affected-region outline for operations it cannot materialize', async () => {
 		const screen = render(ProposalGhostLayer, {
 			proposal: proposalWith({ type: 'patch_shape', shape_id: 'shape:existing' }),

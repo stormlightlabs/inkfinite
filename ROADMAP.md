@@ -140,16 +140,18 @@ transaction boundary rather than introducing engine-specific document concepts.
 
 ### Agent proposal review
 
-Inkfinite already stores proposals against known heads, summarizes operations,
-shows created-shape ghosts and affected regions, supports partial acceptance or
-rejection, and clears stale proposals. The next review work should replace
-generic region outlines with object-specific previews for modifications,
-removals, moves, relationships, and metadata.
+Inkfinite stores proposals against known heads, summarizes operations, and
+supports partial acceptance or rejection while clearing stale proposals. The
+review surface now receives Rust-owned before/after records for every affected
+object, including shapes, bindings, layers, pages, and assets. The canvas uses
+those records and world bounds to preview additions, modifications, moves, and
+removals; relationships are shown as labeled proposal connectors.
 
-Additions, modifications, and removals need distinct visual treatment while
-remaining separate from ordinary selection. MCP may create proposals when
-local policy allows it, while the desktop app remains the place for visual
-review.
+The review panel lists object-level changes and changed metadata or relationship
+fields alongside the operation summary. Additions, modifications, moves, and
+removals use separate visual tokens and remain separate from ordinary
+selection. MCP may create proposals when local policy allows it, while the
+desktop app remains the place for visual review.
 
 ### Richer interoperability and embeds
 

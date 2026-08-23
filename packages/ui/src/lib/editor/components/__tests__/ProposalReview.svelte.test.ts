@@ -19,7 +19,36 @@ const proposal: LiveProposal = {
 		}
 	],
 	warnings: [],
-	expires_at: Date.now() + 60_000
+	expires_at: Date.now() + 60_000,
+	object_previews: [
+		{
+			record_id: { kind: 'shape', id: 'shape:changed' },
+			change: 'modified',
+			before: { kind: 'shape', record: { metadata: { name: 'Old service' } } },
+			after: { kind: 'shape', record: { metadata: { name: 'Service' } } },
+			before_bounds: { x: 10, y: 20, width: 80, height: 40 },
+			after_bounds: { x: 30, y: 40, width: 80, height: 40 },
+			operation_positions: [1],
+			changed_fields: ['metadata.name']
+		},
+		{
+			record_id: { kind: 'binding', id: 'binding:depends' },
+			change: 'added',
+			before: null,
+			after: {
+				kind: 'binding',
+				record: {
+					source_shape_id: 'shape:changed',
+					target_shape_id: 'shape:new',
+					relation_type: 'depends_on'
+				}
+			},
+			before_bounds: null,
+			after_bounds: { x: 10, y: 20, width: 80, height: 40 },
+			operation_positions: [1],
+			changed_fields: []
+		}
+	]
 };
 
 const handlers = () => ({
@@ -36,11 +65,14 @@ describe('ProposalReview', () => {
 			.element(screen.getByRole('complementary', { name: 'Agent review' }))
 			.toBeInTheDocument();
 		await expect.element(screen.getByText('proposal:1')).toBeInTheDocument();
-		await expect.element(screen.getByText('created')).toBeInTheDocument();
+		await expect.element(screen.getByText('added', { exact: true })).toBeInTheDocument();
 		await expect
 			.element(screen.getByText('Update shape:service (architecture.service)'))
 			.toBeInTheDocument();
 		await expect.element(screen.getByText('10,20 80×40')).toBeInTheDocument();
+		await expect.element(screen.getByText('Object changes')).toBeInTheDocument();
+		await expect.element(screen.getByText('Changed: metadata.name')).toBeInTheDocument();
+		await expect.element(screen.getByText('shape:changed → shape:new')).toBeInTheDocument();
 
 		await screen.getByRole('checkbox', { name: 'Select operation 2' }).click();
 		await screen.getByRole('button', { name: 'Accept selected' }).click();

@@ -20,8 +20,9 @@ use crate::engine::geometry::world_shape_bounds;
 use crate::engine::{EngineError, SyncApplyResult, validate_document};
 use crate::file::{DocumentFile, FileError};
 use crate::proto::{
-    Bounds, CameraState, CommitResult, DocumentPath, Operation, Proposal, ProposalId, ProposalOperationPreview, Query,
-    QueryResult, RecordId, SaveResult, SessionId, TransactionDraft, TransactionId, Warning,
+    Bounds, CameraState, CommitResult, DocumentPath, Operation, Proposal, ProposalChangeKind, ProposalId,
+    ProposalObjectPreview, ProposalOperationPreview, Query, QueryRecord, QueryResult, RecordId, SaveResult, SessionId,
+    TransactionDraft, TransactionId, Warning,
 };
 use crate::render::{SvgRenderError, SvgRenderOptions, render_svg};
 use crate::svg_import::import_svg;
@@ -1204,16 +1205,177 @@ fn create_proposal(
         .iter()
         .enumerate()
         .map(|(position, operation)| operation_preview(position, operation, &before, &preview.document))
-        .collect();
+        .collect::<Vec<_>>();
+    let object_previews = object_previews(&preview.patch, &before, &preview.document, &operation_previews);
     Ok(Proposal {
         id,
         transaction,
         preview: preview.patch,
         affected_regions: preview.affected_regions,
         operation_previews,
+        object_previews,
         warnings: Vec::<Warning>::new(),
         expires_at: expires_at.unwrap_or_else(|| timestamp_after(PROPOSAL_TTL)),
     })
+}
+
+fn object_previews(
+    patch: &crate::proto::DocumentPatch, before: &Document, after: &Document,
+    operation_previews: &[ProposalOperationPreview],
+) -> Vec<ProposalObjectPreview> {
+    patch
+        .created
+        .iter()
+        .map(|record_id| proposal_object_preview(record_id, before, after, operation_previews))
+        .chain(
+            patch
+                .changed
+                .iter()
+                .map(|record_id| proposal_object_preview(record_id, before, after, operation_previews)),
+        )
+        .chain(
+            patch
+                .deleted
+                .iter()
+                .map(|record_id| proposal_object_preview(record_id, before, after, operation_previews)),
+        )
+        .collect()
+}
+
+fn proposal_object_preview(
+    record_id: &RecordId, before: &Document, after: &Document, operation_previews: &[ProposalOperationPreview],
+) -> ProposalObjectPreview {
+    let before_record = query_record(before, record_id);
+    let after_record = query_record(after, record_id);
+    let change = match (&before_record, &after_record) {
+        (None, Some(_)) => ProposalChangeKind::Added,
+        (Some(_), None) => ProposalChangeKind::Removed,
+        (Some(_), Some(_)) if is_shape_moved(record_id, before, after) => ProposalChangeKind::Moved,
+        (Some(_), Some(_)) => ProposalChangeKind::Modified,
+        (None, None) => ProposalChangeKind::Modified,
+    };
+    let before_bounds = record_bounds(before, record_id);
+    let after_bounds = record_bounds(after, record_id);
+    let operation_positions = operation_previews
+        .iter()
+        .filter(|preview| preview.record_ids.iter().any(|id| id == record_id))
+        .map(|preview| preview.position)
+        .collect();
+    let changed_fields = changed_record_fields(&before_record, &after_record);
+
+    ProposalObjectPreview {
+        record_id: record_id.clone(),
+        change,
+        before: before_record,
+        after: after_record,
+        before_bounds,
+        after_bounds,
+        operation_positions,
+        changed_fields,
+    }
+}
+
+fn query_record(document: &Document, record_id: &RecordId) -> Option<QueryRecord> {
+    match record_id {
+        RecordId::Page(id) => document
+            .pages
+            .get(id)
+            .cloned()
+            .map(|record| QueryRecord::Page(Box::new(record))),
+        RecordId::Layer(id) => document
+            .layers
+            .get(id)
+            .cloned()
+            .map(|record| QueryRecord::Layer(Box::new(record))),
+        RecordId::Shape(id) => document
+            .shapes
+            .get(id)
+            .cloned()
+            .map(|record| QueryRecord::Shape(Box::new(record))),
+        RecordId::Binding(id) => document
+            .bindings
+            .get(id)
+            .cloned()
+            .map(|record| QueryRecord::Binding(Box::new(record))),
+        RecordId::Asset(id) => document
+            .assets
+            .get(id)
+            .cloned()
+            .map(|record| QueryRecord::Asset(Box::new(record))),
+    }
+}
+
+fn record_bounds(document: &Document, record_id: &RecordId) -> Option<Bounds> {
+    match record_id {
+        RecordId::Shape(shape_id) => document
+            .shapes
+            .contains_key(shape_id)
+            .then(|| world_shape_bounds(document, shape_id)),
+        RecordId::Binding(binding_id) => {
+            let binding = document.bindings.get(binding_id)?;
+            let source = document
+                .shapes
+                .contains_key(&binding.source_shape_id)
+                .then(|| world_shape_bounds(document, &binding.source_shape_id))?;
+            let target = document
+                .shapes
+                .contains_key(&binding.target_shape_id)
+                .then(|| world_shape_bounds(document, &binding.target_shape_id))?;
+            Some(union_bounds(source, target))
+        }
+        RecordId::Page(_) | RecordId::Layer(_) | RecordId::Asset(_) => None,
+    }
+}
+
+fn union_bounds(left: Bounds, right: Bounds) -> Bounds {
+    let min_x = left.x.min(right.x);
+    let min_y = left.y.min(right.y);
+    let max_x = (left.x + left.width).max(right.x + right.width);
+    let max_y = (left.y + left.height).max(right.y + right.height);
+    Bounds { x: min_x, y: min_y, width: max_x - min_x, height: max_y - min_y }
+}
+
+fn is_shape_moved(record_id: &RecordId, before: &Document, after: &Document) -> bool {
+    let RecordId::Shape(shape_id) = record_id else { return false };
+    let (Some(before_shape), Some(after_shape)) = (before.shapes.get(shape_id), after.shapes.get(shape_id)) else {
+        return false;
+    };
+    before_shape.transform != after_shape.transform || before_shape.parent != after_shape.parent
+}
+
+fn changed_record_fields(before: &Option<QueryRecord>, after: &Option<QueryRecord>) -> Vec<String> {
+    let before = before.as_ref().and_then(query_record_value);
+    let after = after.as_ref().and_then(query_record_value);
+    let mut fields = BTreeSet::new();
+    collect_changed_fields(before.as_ref(), after.as_ref(), String::new(), &mut fields);
+    fields.into_iter().filter(|field| field != "version").collect()
+}
+
+fn query_record_value(record: &QueryRecord) -> Option<serde_json::Value> {
+    serde_json::to_value(record)
+        .ok()
+        .and_then(|value| value.get("record").cloned())
+}
+
+fn collect_changed_fields(
+    before: Option<&serde_json::Value>, after: Option<&serde_json::Value>, path: String, fields: &mut BTreeSet<String>,
+) {
+    match (before, after) {
+        (Some(serde_json::Value::Object(before)), Some(serde_json::Value::Object(after))) => {
+            let keys = before.keys().chain(after.keys()).collect::<BTreeSet<_>>();
+            for key in keys {
+                let child_path = if path.is_empty() { key.clone() } else { format!("{path}.{key}") };
+                collect_changed_fields(before.get(key), after.get(key), child_path, fields);
+            }
+        }
+        (Some(before), Some(after)) if before == after => {}
+        (Some(_), Some(_)) | (Some(_), None) | (None, Some(_)) => {
+            if !path.is_empty() {
+                fields.insert(path);
+            }
+        }
+        (None, None) => {}
+    }
 }
 
 fn operation_preview(
@@ -1501,6 +1663,32 @@ mod tests {
         assert_eq!(preview.label, format!("Rename page {page_id}"));
         assert_eq!(preview.record_ids, vec![RecordId::Page(page_id)]);
         assert!(preview.bounds.is_empty());
+    }
+
+    #[test]
+    fn object_previews_include_before_after_records_and_changed_fields() {
+        let document_id = DocumentId::from("document:object-preview");
+        let before = blank_document(&document_id, Some("Overview"));
+        let page_id = before.page_ids[0].clone();
+        let mut after = before.clone();
+        after.pages.get_mut(&page_id).unwrap().name = "System".into();
+        let operation =
+            Operation::RenamePage { page_id: page_id.clone(), name: "System".into(), expected_version: None };
+        let operation_previews = vec![operation_preview(0, &operation, &before, &after)];
+        let patch = crate::proto::DocumentPatch {
+            created: Vec::new(),
+            changed: vec![RecordId::Page(page_id.clone())],
+            deleted: Vec::new(),
+        };
+
+        let previews = object_previews(&patch, &before, &after, &operation_previews);
+        assert_eq!(previews.len(), 1);
+        assert_eq!(previews[0].record_id, RecordId::Page(page_id));
+        assert_eq!(previews[0].change, ProposalChangeKind::Modified);
+        assert!(previews[0].before.is_some());
+        assert!(previews[0].after.is_some());
+        assert_eq!(previews[0].operation_positions, vec![0]);
+        assert_eq!(previews[0].changed_fields, vec!["name"]);
     }
 
     #[test]

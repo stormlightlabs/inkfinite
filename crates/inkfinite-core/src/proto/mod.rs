@@ -16,7 +16,7 @@ use ts_rs::TS;
 pub const PROTOCOL_ID: &str = "inkfinite.protocol";
 
 /// Current transport-independent protocol version.
-pub const PROTOCOL_VERSION: u32 = 7;
+pub const PROTOCOL_VERSION: u32 = 8;
 
 /// Stable identifier for a transaction.
 #[derive(Clone, Debug, Eq, Hash, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS)]
@@ -532,10 +532,47 @@ pub struct Proposal {
     pub affected_regions: Vec<AffectedRegion>,
     /// Human-readable, independently selectable operation previews.
     pub operation_previews: Vec<ProposalOperationPreview>,
+    /// Record-level before/after data used to render the proposal on the canvas.
+    pub object_previews: Vec<ProposalObjectPreview>,
     /// Validation or repair warnings shown before acceptance.
     pub warnings: Vec<Warning>,
     /// Wall-clock expiry retained for clients and diagnostics.
     pub expires_at: Timestamp,
+}
+
+/// Visual classification for one record-level proposal change.
+#[derive(Clone, Copy, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum ProposalChangeKind {
+    /// A record exists only after the proposal.
+    Added,
+    /// A record exists before and after with non-positional changes.
+    Modified,
+    /// A shape's transform or parent changes between snapshots.
+    Moved,
+    /// A record exists only before the proposal.
+    Removed,
+}
+
+/// Before/after data for one record affected by a proposal.
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+pub struct ProposalObjectPreview {
+    /// Record identified by this preview.
+    pub record_id: RecordId,
+    /// Visual classification used by review clients.
+    pub change: ProposalChangeKind,
+    /// Complete record before the proposal, when it existed.
+    pub before: Option<QueryRecord>,
+    /// Complete record after the proposal, when it exists.
+    pub after: Option<QueryRecord>,
+    /// World-space shape bounds before the proposal, when applicable.
+    pub before_bounds: Option<Bounds>,
+    /// World-space shape bounds after the proposal, when applicable.
+    pub after_bounds: Option<Bounds>,
+    /// Transaction operation positions that directly name this record.
+    pub operation_positions: Vec<u32>,
+    /// Changed record fields, including nested metadata and relationship fields.
+    pub changed_fields: Vec<String>,
 }
 
 /// Review metadata for one operation in a proposal.
