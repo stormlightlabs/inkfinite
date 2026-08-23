@@ -1,29 +1,19 @@
 ---
-title: Web editor
-description: Run the Inkfinite web editor and understand its browser storage.
-section: Applications
-group: Applications
-order: 5
+title: Web
+description: Use the browser editor and understand where it stores boards.
+section: Platforms
+group: Platforms
+order: 9
 ---
 
 The web editor provides the full canvas interface without access to native `.inkfinite` files.
-See [Canvas editor](/docs/applications/editor/) for tools, gestures, clipboard formats, layers, and
-shortcuts.
+See the [Editor guide](/docs/guide/editor/) for tools, gestures, selection, and styling.
 
 ## Open the editor
 
-The hosted editor lives at [`/app`](/app). To run it from source:
-
-```sh
-pnpm install
-rustup target add wasm32-unknown-unknown
-cargo install wasm-bindgen-cli --version 0.2.126 --locked
-pnpm wasm:build
-pnpm dev:web
-```
-
-Open the local URL printed by Vite and add `/app` to its path. The site root contains this
-documentation.
+The hosted editor lives at [`/app`](/app). It loads the Rust document engine through WebAssembly
+and stores boards for the current site in the browser. To run your own build, follow
+[Building from source](/docs/development/building-from-source/).
 
 ## Storage and backups
 

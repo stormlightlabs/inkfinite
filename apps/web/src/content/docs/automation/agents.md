@@ -1,9 +1,9 @@
 ---
 title: Agent workflows
 description: 'Safe, reviewable Inkfinite document changes for coding agents.'
-section: Reference
-group: Reference
-order: 9
+section: Automation
+group: Automation
+order: 12
 ---
 
 Use Inkfinite's command-line tools to inspect, validate, and change documents.
@@ -32,7 +32,7 @@ MCP interface when model-controlled changes require authorization or review.
 
 Shape and layer locks apply to every CLI transaction. Do not work around a lock by editing a child
 or bypassing the CLI. The direct CLI does not enforce `agent_editable` or hide records in invisible
-layers; permissioned integrations can use that metadata as part of their own policy.
+layers. Permissioned integrations can use that metadata as part of their own policy.
 
 Raw `app apply` validates and commits a prepared transaction.
 

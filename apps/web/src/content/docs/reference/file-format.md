@@ -3,7 +3,7 @@ title: File format
 description: 'Inkfinite native files, document contract, safe writes, editable canvas interchange, compatibility limits, and lossless exports.'
 section: Reference
 group: Reference
-order: 8
+order: 17
 ---
 
 Inkfinite uses `.inkfinite` as its native document format. The editor can also import and export Excalidraw and Obsidian Canvas files when you need to move editable content between applications.
@@ -28,21 +28,21 @@ pub struct DocumentSnapshot {
 }
 ```
 
-The `format` field is `"inkfinite.document"` and `format_version` is currently `2`. The document contains normalized pages, layers, shapes, bindings, and assets. Binding records may include a `relation_type` alongside their source and target shape IDs. Pages own ordered layers; layers own ordered root shapes; containers own their ordered child shapes. Container child order drives frame presentation and SVG export. Card fields are stored in the container's semantic metadata while title and body remain ordinary text and Markdown children. IDs remain stable across saves and replicas.
+The `format` field is `"inkfinite.document"` and `format_version` is currently `2`. The document contains normalized pages, layers, shapes, bindings, and assets. Binding records may include a `relation_type` alongside their source and target shape IDs. Pages own ordered layers. Layers own ordered root shapes. Containers own their ordered child shapes. Container child order drives frame presentation and SVG export. Card fields are stored in the container's semantic metadata while title and body remain ordinary text and Markdown children. IDs remain stable across saves and replicas.
 
-Text and Markdown shapes store their CSS font family as a string. Card titles and bodies use the font families on their text and Markdown child shapes, so changing a card's font does not require a document format migration. The web and desktop editors load their bundled fonts at runtime; a headless renderer needs the requested family supplied as a font asset or an available font family and otherwise reports a fallback warning.
+Text and Markdown shapes store their CSS font family as a string. Card titles and bodies use the font families on their text and Markdown child shapes, so changing a card's font does not require a document format migration. The web and desktop editors load their bundled fonts at runtime. A headless renderer needs the requested family supplied as a font asset or an available font family and otherwise reports a fallback warning.
 
 The CLI can print a deterministic JSON projection for inspection and CI. That projection is not a second file format and cannot replace the Automerge history or causal heads stored in the canonical file.
 
 ## Safe writes
 
-`DocumentFile` holds an advisory sidecar lock for the canonical path. Every transaction is validated before it is committed. A save writes a temporary same-directory replacement, flushes and syncs it, and then replaces the canonical file. An interrupted replacement leaves bounded recovery data that can be validated and saved as a new canonical baseline.
+`DocumentFile` holds an advisory sidecar lock for the canonical path. Every transaction is validated before it is committed. A save writes a temporary same-directory replacement, flushes and syncs it, and then replaces the canonical file. An interrupted replacement leaves recovery data that can be validated and saved as a new canonical baseline.
 
 Invalid bytes, stale heads, missing references, and invalid record properties are rejected before the canonical file is changed. Recovery uses the same document validation and persistence path as a normal save.
 
 ## Versioning
 
-`format_version` and protocol version fields are explicit so future releases can reject unsupported data safely. They describe the current serialized contract; they do not select between document models or file flows.
+`format_version` and protocol version fields are explicit so future releases can reject unsupported data safely. They describe the current serialized contract. They do not select between document models or file flows.
 
 ## Editable interchange
 
@@ -59,7 +59,7 @@ Inkfinite reads and writes Excalidraw v2 scene JSON. The converter handles recta
 | Excalidraw content               | Inkfinite result                                     |
 | -------------------------------- | ---------------------------------------------------- |
 | Rectangle, ellipse, text         | Matching editable shape                              |
-| Line or arrow                    | Matching line or arrow; extra line vertices are lost |
+| Line or arrow                    | Matching line or arrow. Extra line vertices are lost |
 | Bound arrow and label            | Arrow bindings and label                             |
 | Freedraw                         | Freehand stroke                                      |
 | Group or frame                   | Flat Inkfinite group                                 |
@@ -80,7 +80,7 @@ Inkfinite implements the JSON Canvas 1.0 structure used by Obsidian `.canvas` fi
 | Text node           | Markdown card                                       |
 | File node           | Markdown wiki link                                  |
 | Link node           | Markdown link                                       |
-| Group node          | Flat Inkfinite group; label and background are lost |
+| Group node          | Flat Inkfinite group. Label and background are lost |
 | Edge between nodes  | Bound Inkfinite arrow                               |
 
 JSON Canvas does not represent general drawing primitives, freehand strokes, layers, rotation, or free-floating arrows. When exporting, Inkfinite writes text and Markdown as cards, bound arrows as edges, and groups around supported cards. Other drawing shapes are omitted and listed in the conversion notes. Rotated cards use their axis-aligned bounds.

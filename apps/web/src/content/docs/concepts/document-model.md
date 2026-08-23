@@ -1,9 +1,9 @@
 ---
-title: Documents
+title: Document model
 description: 'Pages, layers, shapes, bindings, and persistence in Inkfinite documents.'
 section: Concepts
 group: Concepts
-order: 3
+order: 13
 ---
 
 An Inkfinite document stores canvas content and the history needed to merge edits from different

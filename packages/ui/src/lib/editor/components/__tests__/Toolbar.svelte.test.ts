@@ -28,6 +28,22 @@ function createSelectedRectStore() {
 }
 
 describe('Editor Toolbar', () => {
+	it('links to the documentation and Stormlight Labs from the application bar', async () => {
+		const screen = render(Toolbar, {
+			currentTool: 'select',
+			onToolChange: vi.fn(),
+			store: new Store(),
+			brushStore: createBrushStore()
+		});
+
+		await expect
+			.element(screen.getByRole('link', { name: 'Open documentation' }))
+			.toHaveAttribute('href', 'https://ink.stormlightlabs.org/docs/');
+		await expect
+			.element(screen.getByRole('link', { name: 'by Stormlight Labs', includeHidden: true }))
+			.toHaveAttribute('href', 'https://stormlightlabs.org');
+	});
+
 	it('selects tools through accessible controls', async () => {
 		const onToolChange = vi.fn();
 		const screen = render(Toolbar, {

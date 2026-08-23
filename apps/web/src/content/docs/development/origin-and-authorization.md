@@ -1,9 +1,9 @@
 ---
 title: Origin and authorization
 description: How transaction provenance differs from document locks and integration permissions.
-section: Internals
-group: Internals
-order: 13
+section: Development
+group: Development
+order: 22
 ---
 
 Inkfinite records the source of each transaction separately from the rules that decide whether an
@@ -26,7 +26,7 @@ from `origin: agent` to `origin: human` must never give the caller more capabili
 ## Validation and authorization
 
 The transaction engine applies document correctness rules to every origin. These include schema
-validation, causal-head and record-version checks, atomic commit, durable document validation, and
+validation, causal-head and record-version checks, atomic commit, document validation, and
 ordinary shape and layer locks.
 
 Authorization belongs at an interface that can identify the caller and its granted permissions.

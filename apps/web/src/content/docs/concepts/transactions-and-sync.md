@@ -3,7 +3,7 @@ title: Transactions and sync
 description: 'How Inkfinite validates edits, records history, and merges peer changes.'
 section: Concepts
 group: Concepts
-order: 4
+order: 14
 ---
 
 Inkfinite groups related operations into transactions, validates them against the current document,
@@ -23,12 +23,20 @@ file. Permissioned integrations can apply caller policy before submitting a vali
 
 ## Undo and redo
 
-The editor records transactions in its history. Undo applies the inverse of an accepted local edit;
-redo reapplies an edit that was undone. Because history belongs to the document model, both the web
+The editor records transactions in its history. Undo applies the inverse of an accepted local edit.
+Redo reapplies an edit that was undone. Because history belongs to the document model, both the web
 and desktop editors use the same behavior.
 
 An edit may become impossible to undo after later changes remove or replace the records it depended
 on. Inkfinite reports the conflict instead of reconstructing an uncertain result.
+
+## Proposal review
+
+A desktop session can hold an agent transaction as a proposal against known document heads. The
+review panel lists affected objects, metadata, and relationships, while the canvas previews added,
+changed, moved, and removed content. Reviewers can accept all or part of a proposal or reject it.
+Accepting and rejecting both clear the preview. Stale proposals must be refreshed against the
+current document before acceptance.
 
 ## Synchronization
 
@@ -41,4 +49,4 @@ heads, query the affected records again, and rebuild the intended change from cu
 
 The current local file and desktop proposal workflows provide this concurrency model without
 claiming a hosted synchronization service. A live desktop proposal can also become stale while it
-waits for review; review the refreshed preview before accepting it.
+waits for review. Review the refreshed preview before accepting it.

@@ -44,6 +44,8 @@
 		font-size: 0.82rem;
 		font-weight: 650;
 		text-decoration: none;
+		white-space: nowrap;
+		flex: 0 0 auto;
 	}
 
 	.copy-markdown:hover {

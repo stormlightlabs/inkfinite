@@ -17,13 +17,24 @@
   paint, retained source assets, and opaque fallback content for unsupported visuals.
 - Native path geometry, rendering, hit testing, compound fills, and shared Rust/TypeScript fixtures.
 - Hierarchical vector editing with nested selection, world-space transforms, reparenting, direct
-  anchor and handle editing, and path topology operations.
+  anchor and handle editing, path topology operations, selection cycling, duplicate-and-connect,
+  shape conversion, and a searchable command palette.
 - Selection refinement with object, equal-gap, handle, and grid snapping guides, modifier-aware
   movement and drawing constraints, Alt-drag duplication, hover feedback, transformed handles,
   edge scrolling, zoom-to-selection, and persisted grid preferences.
+- Deterministic align, distribute, stack, grid, tidy, tree, flow, and radial layout operations,
+  with locked anchors and preserved connector and relationship references.
+- Editable cards, ordered presentation frames, reusable image assets with captions, masks, color
+  sampling, and native URL, file, and page references.
+- Semantic names, roles, tags, descriptions, sources, structured metadata, and typed relationships
+  across the model, editor, CLI, conversion, layout, inspection, merge, and export paths.
 - Titled frames with child containment, move-with-contents behavior, nested selection, frame export,
-  binding-aware arrows, curved and elbow routing, bend controls, labels, automatic endpoint updates,
-  and binding-preserving copy and persistence.
+  binding-aware arrows, curved, elbow, and obstacle-aware routing, bend controls, labels, automatic
+  endpoint updates, and binding-preserving copy and persistence.
+- Visual agent proposal review with object and relationship previews, partial acceptance, rejection,
+  stale-head handling, and distinct added, changed, moved, and removed states.
+- A responsive, keyboard-accessible board browser with sorting, storage and save details, workspace
+  switching, duplication, guarded board changes, actionable errors, and user-focused inspection.
 - Excalidraw and Obsidian Canvas import/export, offline peer sync, and a bundled agent skill with
   file, proposal, and stale-head examples.
 

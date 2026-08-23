@@ -309,10 +309,26 @@
 						d="M9.75 20.85c1.78-.7 1.39-2.63.49-3.85c-.89-1.25-2.12-2.11-3.36-2.94A9.8 9.8 0 0 1 4.54 12c-.28-.33-.85-.94-.27-1.06c.59-.12 1.61.46 2.13.68c.91.38 1.81.82 2.65 1.34l1.01-1.7C8.5 10.23 6.5 9.32 4.64 9.05c-1.06-.16-2.18.06-2.54 1.21c-.32.99.19 1.99.77 2.77c1.37 1.83 3.5 2.71 5.09 4.29c.34.33.75.72.95 1.18c.21.44.16.47-.31.47c-1.24 0-2.79-.97-3.8-1.61l-1.01 1.7c1.53.94 4.09 2.41 5.96 1.79m9.21-13.52L13.29 13H11v-2.29l5.67-5.68zm3.4-.78c-.01.3-.32.61-.64.92L19.2 10l-.87-.87l2.6-2.59l-.59-.59l-.67.67l-2.29-2.29l2.15-2.15c.24-.24.63-.24.86 0l1.43 1.43c.24.22.24.62 0 .86c-.21.21-.41.41-.41.61c-.02.2.18.42.38.59c.29.3.58.58.57.88" />
 				</svg>
 			</div>
-			<div class="toolbar__name">Inkfinite</div>
+			<div class="toolbar__brand-copy">
+				<div class="toolbar__name">Inkfinite</div>
+				<a
+					class="toolbar__byline"
+					href="https://stormlightlabs.org"
+					target="_blank"
+					rel="noreferrer">by Stormlight Labs</a>
+			</div>
 		</div>
 
 		<div class="application-chrome__actions">
+			<a
+				class="application-chrome__button"
+				href="https://ink.stormlightlabs.org/docs/"
+				target="_blank"
+				rel="noreferrer"
+				aria-label="Open documentation">
+				<Icon name="book-open" size={17} />
+				<span class="application-chrome__label">Docs</span>
+			</a>
 			{#if onStencilsClick}
 				<button
 					class="application-chrome__button"
@@ -540,10 +556,27 @@
 		height: 2rem;
 	}
 
+	.toolbar__brand-copy {
+		display: grid;
+		gap: 0.15rem;
+	}
+
 	.toolbar__name {
 		color: var(--ink-heading);
 		font: 650 var(--ink-type-lg) / 1 var(--ink-font-display);
 		letter-spacing: -0.025em;
+	}
+
+	.toolbar__byline {
+		color: var(--ink-text-muted);
+		font: 550 var(--ink-type-xs) / 1 var(--ink-font-body);
+		text-decoration: none;
+	}
+
+	.toolbar__byline:hover {
+		color: var(--ink-text);
+		text-decoration: underline;
+		text-underline-offset: 0.15rem;
 	}
 
 	.application-chrome__actions {
@@ -564,6 +597,7 @@
 		color: var(--ink-text);
 		background: var(--ink-canvas);
 		font: 650 var(--ink-type-sm) / 1 var(--ink-font-body);
+		text-decoration: none;
 		cursor: pointer;
 		transition-property: color, background-color, border-color, transform;
 		transition-duration: var(--ink-duration-fast);
@@ -886,7 +920,7 @@
 	}
 
 	@media (max-width: 480px) {
-		.toolbar__name {
+		.toolbar__brand-copy {
 			display: none;
 		}
 

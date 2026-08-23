@@ -2,11 +2,13 @@ import type { Component } from 'svelte';
 
 /** Sidebar sections used to organize the documentation. */
 export const docSections = [
-	'Get started',
+	'Start here',
+	'Guide',
+	'Platforms',
+	'Automation',
 	'Concepts',
-	'Applications',
 	'Reference',
-	'Internals'
+	'Development'
 ] as const;
 
 export type DocSection = (typeof docSections)[number];

@@ -1,9 +1,9 @@
 ---
 title: Native path geometry
 description: 'The path representation used by SVG interoperability and vector editing.'
-section: Internals
-group: Internals
-order: 11
+section: Development
+group: Development
+order: 21
 ---
 
 Inkfinite stores arbitrary vector geometry as native `path` shapes. SVG import and vector
@@ -95,10 +95,10 @@ compare preview results with the canonical Rust operation for curve splitting, t
 and nested transforms.
 
 Direct selection uses Alt-click on a rendered segment to add an anchor. Delete removes selected
-anchors; Q and C convert their incoming segments to quadratic and cubic curves, L converts them
+anchors. Q and C convert their incoming segments to quadratic and cubic curves, L converts them
 to lines, O opens selected subpaths, Z closes them, and B breaks selected cubic handles. J joins
 two selected endpoints from separate open subpaths, or joins cubic handles for another selection.
-These commands remain editor interactions; the resulting topology operations are committed through
+These commands remain editor interactions. The resulting topology operations are committed through
 the Rust reconciliation API.
 
 A completed gesture submits one operation in one transaction through the Rust document session. Rust

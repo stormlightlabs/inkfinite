@@ -383,7 +383,7 @@ export function exportExcalidraw(snapshot: BoardExport, requestedPageId?: string
 	const scene = {
 		type: 'excalidraw',
 		version: 2,
-		source: 'https://inkfinite.app',
+		source: 'https://ink.stormlightlabs.org',
 		elements,
 		appState: { gridSize: null, viewBackgroundColor: '#ffffff' },
 		files

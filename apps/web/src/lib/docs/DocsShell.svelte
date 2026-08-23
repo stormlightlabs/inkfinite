@@ -112,8 +112,10 @@
 	}
 
 	.doc-description {
+		min-width: 0;
 		max-width: 42rem;
 		margin: 1rem 0 0;
+		flex: 1 1 auto;
 		color: var(--docs-text-muted);
 		font-size: 1.12rem;
 		line-height: 1.55;

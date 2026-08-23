@@ -1,9 +1,9 @@
 ---
 title: Testing
 description: 'How Inkfinite tests document behavior, editor workflows, and visual changes.'
-section: Internals
-group: Internals
-order: 13
+section: Development
+group: Development
+order: 23
 ---
 
 Inkfinite keeps fast correctness checks close to the code they protect. Rust and

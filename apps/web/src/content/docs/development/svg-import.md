@@ -1,9 +1,9 @@
 ---
 title: SVG import
 description: 'How static SVG content is parsed into Inkfinite native shapes and assets.'
-section: Internals
-group: Internals
-order: 12
+section: Development
+group: Development
+order: 20
 ---
 
 Inkfinite parses the supported static SVG subset in Rust and maps it to native
@@ -65,7 +65,7 @@ Negative coordinates are valid, and negative dimensions are rejected.
 ## Path normalization
 
 SVG path data is normalized to the native path representation described in the
-[native path geometry guide](/docs/internals/native-path-geometry/):
+[native path geometry guide](/docs/development/native-path-geometry/):
 
 - relative and absolute move, line, horizontal, and vertical commands become
   move and line segments
@@ -144,8 +144,8 @@ Rust document session parses the bytes, builds the shared SVG transaction, commi
 one history entry, and returns the new canonical snapshot and editor projection.
 The browser caches that projection with the canonical IndexedDB bytes and uses it
 to hydrate the editor. File selection, drag-and-drop, and pasted markup use this
-path. The web build runs `scripts/build-wasm.mjs` before Vite packages the worker;
-it requires the matching `wasm-bindgen` CLI. The CLI accepts
+path. The web build runs `scripts/build-wasm.mjs` before Vite packages the worker.
+It requires the matching `wasm-bindgen` CLI. The CLI accepts
 `inkfinite import svg FILE --input ARTWORK.svg` and can validate the transaction
 with `--dry-run` before saving.
 
@@ -160,7 +160,7 @@ input data for provenance and future re-import, not executable document content.
 
 `@inkfinite/wasm` exposes the Rust document session, importer, and deterministic
 SVG renderer. The browser loads the generated module once inside the shared worker.
-Import requests transfer their byte buffer to the session; render requests send one
+Import requests transfer their byte buffer to the session. Render requests send one
 canonical snapshot and one render-options object across the worker boundary. Rust
 response envelopes and renderer options use the generated types in
 `@inkfinite/bindings/wasm`.

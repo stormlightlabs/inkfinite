@@ -1,7 +1,7 @@
 ---
 title: Introduction
 description: 'Learn what Inkfinite is, where documents live, and which guide to read next.'
-section: Get started
+section: Start here
 group: Start here
 order: 1
 ---
@@ -11,9 +11,9 @@ the browser and as a desktop app, with the same editor and document model in bot
 
 ## What you can make
 
-Use shapes, arrows, text, Markdown, freehand strokes, layers, and stencils to sketch an idea or
-build a structured diagram. The canvas supports direct manipulation, undo and redo, grouping,
-reordering, panning, and zooming.
+Use shapes, arrows, text, Markdown, cards, images, freehand strokes, layers, and stencils to sketch
+an idea or build a structured diagram. Inkfinite also supports graph layout, native vector path
+editing, and SVG, Excalidraw, and Obsidian Canvas interchange.
 
 ## Where documents live
 
@@ -27,15 +27,15 @@ command-line tools use file locks, atomic replacement, and recovery data to prot
 ## Ways to work
 
 - Open the [web editor](/app) for a browser-based canvas, or read its
-  [storage guide](/docs/applications/web/).
-- Use the [desktop editor](/docs/applications/desktop/) for native files and desktop menus.
-- Use the [command-line interface](/docs/reference/cli/) to inspect, edit, validate, or render a
+  [storage guide](/docs/platforms/web/).
+- Use the [desktop editor](/docs/platforms/desktop/) for native files and desktop menus.
+- Use the [command-line interface](/docs/automation/cli/) to inspect, edit, validate, or render a
   document from a script.
-- Use [agent workflows](/docs/reference/agents/) to inspect, validate, and apply scripted document changes.
+- Use [agent workflows](/docs/automation/agents/) to inspect, validate, and apply scripted document changes.
 
 ## Where to go next
 
-Follow [Getting started](/docs/getting-started/) to run an editor and create a document.
+Follow the [Quickstart](/docs/quickstart/) to create and export a board.
 
-Read [Documents](/docs/concepts/documents/) for the data model or
-[Transactions and Sync](/docs/concepts/transactions-and-sync/) for editing, history, and convergence.
+Read [Document model](/docs/concepts/document-model/) for the data model or
+[Transactions and sync](/docs/concepts/transactions-and-sync/) for editing, history, and convergence.

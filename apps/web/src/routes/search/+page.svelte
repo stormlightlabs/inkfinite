@@ -22,7 +22,7 @@
 				Search uses the local Pagefind index in the production build. Use the documentation
 				navigation to browse these static pages when JavaScript is disabled.
 			</p>
-			<a class="primary-action" href={resolve('/docs/getting-started/')}>
+			<a class="primary-action" href={resolve('/docs/quickstart/')}>
 				Start with getting started
 			</a>
 		</div>

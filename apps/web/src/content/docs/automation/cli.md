@@ -1,9 +1,9 @@
 ---
-title: Command-line interface
-description: Use the Inkfinite CLI with saved files and live desktop sessions.
-section: Reference
-group: Reference
-order: 7
+title: CLI
+description: Inspect, query, change, validate, and render files and live desktop sessions.
+section: Automation
+group: Automation
+order: 11
 ---
 
 Inspect, change, validate, and render Inkfinite documents from a terminal.
@@ -113,18 +113,18 @@ inkfinite import svg architecture.inkfinite \
 ```
 
 `layout` supports `align`, `distribute`, `stack`, `grid`, `tidy`, and `graph`. Select
-shapes with repeated `--shape` flags or one `--role` selector; stack accepts
+shapes with repeated `--shape` flags or one `--role` selector. Stack accepts
 `--axis` and `--gap`, grid accepts `--columns`, `--column-gap`, and
 `--row-gap`, tidy accepts `--gap`, and graph accepts `--algorithm flow|tree|radial`,
 `--direction top-to-bottom|left-to-right`, `--node-gap`, and `--rank-gap`.
 Graph edges come from selected-to-selected relation bindings or the two endpoints
-of a selected connector; proximity and unselected endpoints are ignored.
+of a selected connector. Proximity and unselected endpoints are ignored.
 
 `import svg` creates the retained source asset, native group containers, and
 supported shapes in one validated transaction. Use `--page` or `--layer` to
-choose a target; otherwise the first page and layer receive the import.
+choose a target. Otherwise the first page and layer receive the import.
 
-File commands never prompt. Close the desktop editor before changing its file; a lock or stale-head
+File commands never prompt. Close the desktop editor before changing its file. A lock or stale-head
 error is a signal to inspect current state, not a reason to overwrite the file.
 
 To hand the edit to another process without changing the document, add

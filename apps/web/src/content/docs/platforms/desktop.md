@@ -1,27 +1,15 @@
 ---
-title: Desktop editor
-description: Build the Inkfinite desktop app and work safely with native files.
-section: Applications
-group: Applications
-order: 6
+title: Desktop
+description: Work with native files, drafts, workspaces, and live local CLI sessions.
+section: Platforms
+group: Platforms
+order: 10
 ---
 
 The desktop editor combines the shared canvas interface with native file handling and authenticated
-local CLI access. See [Canvas editor](/docs/applications/editor/) for tools, gestures, clipboard
-formats, layers, and shortcuts.
-
-## Run locally
-
-Install Node.js 18 or newer, pnpm, Rust 1.89, and the
-[Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) for your operating system. From
-the repository root, run:
-
-```sh
-pnpm install
-pnpm tauri dev
-```
-
-This starts the web frontend and native Tauri shell in development mode.
+local CLI access. See the [Editor guide](/docs/guide/editor/) for tools, gestures, selection, and
+styling. To run the desktop app from a checkout, follow
+[Building from source](/docs/development/building-from-source/).
 
 ## Document sessions
 
@@ -43,5 +31,5 @@ the view, or focus the window.
 Structured live mutations commit immediately after causal-head, record-version, validation, and
 lock checks. Reviewed model access belongs to the permissioned MCP interface. CLI discovery and
 authentication remain local to the current user account. See
-[Agent workflows](/docs/reference/agents/) and
-[Command-line interface](/docs/reference/cli/) for commands.
+[Agent workflows](/docs/automation/agents/) and
+[Command-line interface](/docs/automation/cli/) for commands.

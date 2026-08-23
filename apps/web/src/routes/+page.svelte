@@ -11,13 +11,13 @@
 
 	const docs = getDocs();
 	const landingDocSlugs = [
-		'introduction',
-		'getting-started',
-		'concepts/documents',
-		'concepts/transactions-and-sync',
-		'reference/cli',
-		'reference/agents',
-		'reference/file-format'
+		'quickstart',
+		'guide/editor',
+		'guide/import-and-export',
+		'platforms/desktop',
+		'automation/cli',
+		'automation/agents',
+		'development/architecture'
 	] as const;
 	const landingDocs = landingDocSlugs
 		.map((slug) => docs.find((doc) => doc.slug === slug))
@@ -58,7 +58,7 @@
 					<nav class="quiet-links" aria-label="Project links">
 						<a href="https://github.com/stormlightlabs/inkfinite">GitHub</a>
 						<span aria-hidden="true">·</span>
-						<a href={resolve('/docs/getting-started/')}>Documentation</a>
+						<a href={resolve('/docs/quickstart/')}>Documentation</a>
 					</nav>
 				</div>
 
@@ -202,7 +202,7 @@
 						content, and export it again through one validated Rust pipeline.
 					</p>
 					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-					<a href={resolveDocsPath('/docs/internals/svg-import/')}>
+					<a href={resolveDocsPath('/docs/development/svg-import/')}>
 						How SVG import works <Icon name="arrow-right" size={16} />
 					</a>
 				</div>
@@ -248,7 +248,7 @@
 						them, inspect them, or change them outside the editor.
 					</p>
 					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-					<a href={resolveDocsPath('/docs/concepts/documents/')}>
+					<a href={resolveDocsPath('/docs/concepts/document-model/')}>
 						Explore the document model <Icon name="arrow-right" size={16} />
 					</a>
 				</div>

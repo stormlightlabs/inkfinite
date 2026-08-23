@@ -9,14 +9,14 @@
 	let { docs, currentSlug = '' }: { docs: Doc[]; currentSlug?: string } = $props();
 
 	const primaryLinks = [
-		{ label: 'Start', href: '/docs/getting-started/', slug: 'getting-started' },
-		{ label: 'Concepts', href: '/docs/concepts/documents/', slug: 'concepts' },
-		{ label: 'Reference', href: '/docs/reference/cli/', slug: 'reference' }
+		{ label: 'Start', href: '/docs/quickstart/', slug: 'quickstart' },
+		{ label: 'Guide', href: '/docs/guide/editor/', slug: 'guide' },
+		{ label: 'Automation', href: '/docs/automation/cli/', slug: 'automation' }
 	] as const;
 	const githubUrl = 'https://github.com/stormlightlabs/inkfinite';
 
 	function isCurrent(slug: string): boolean {
-		if (slug === 'getting-started' && currentSlug === 'introduction') return true;
+		if (slug === 'quickstart' && currentSlug === 'introduction') return true;
 		return currentSlug === slug || currentSlug.startsWith(`${slug}/`);
 	}
 

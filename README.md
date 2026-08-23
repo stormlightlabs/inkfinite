@@ -57,18 +57,19 @@ cargo build -p inkfinite-cli --bin inkfinite
 cargo xtask dist
 ```
 
-See the [CLI documentation](apps/web/src/content/docs/reference/cli.md) for
+See the [CLI documentation](apps/web/src/content/docs/automation/cli.md) for
 installation paths and shell completion setup.
 
 ## Documentation
 
-- [Getting started](apps/web/src/content/docs/getting-started.md)
-- [Web editor](apps/web/src/content/docs/applications/web.md)
-- [Desktop editor](apps/web/src/content/docs/applications/desktop.md)
-- [Command-line interface](apps/web/src/content/docs/reference/cli.md)
-- [Agent workflows](apps/web/src/content/docs/reference/agents.md)
-- [File format](apps/web/src/content/docs/reference/file-format.md)
-- [Internals and repository map](apps/web/src/content/docs/internals.md)
+- [Quickstart](apps/web/src/content/docs/quickstart.md)
+- [Editor guide](apps/web/src/content/docs/guide/editor.md)
+- [Import and export](apps/web/src/content/docs/guide/import-and-export.md)
+- [Web platform](apps/web/src/content/docs/platforms/web.md)
+- [Desktop platform](apps/web/src/content/docs/platforms/desktop.md)
+- [CLI](apps/web/src/content/docs/automation/cli.md)
+- [Agent workflows](apps/web/src/content/docs/automation/agents.md)
+- [Architecture](apps/web/src/content/docs/development/architecture.md)
 
 ## Credits
 
