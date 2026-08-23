@@ -62,12 +62,20 @@ export, and repurpose, not substitutes for missing editor behavior.
 
 ### Performance profiling
 
-Build a repeatable fixture corpus and measure document, CRDT, renderer,
-vector-editing, SVG, CLI, IPC, and MCP workloads on recorded reference
-hardware. Set regression budgets from those results.
+Performance characterization is part of the initial web release path. Replace
+July 2026 prototype results with repeatable measurements across shared fixture
+sizes and representative document structures.
 
-Add indexes, caches, incremental materialization, or alternate rendering only
-when a representative benchmark identifies the cost they address.
+Use Criterion for native algorithms, `samply` for confirmed Rust hotspots,
+`hyperfine` and coarse `tracing` spans for complete CLI, IPC, and MCP paths,
+and Playwright with Chrome DevTools Protocol for actual browser frames and
+memory. Keep the no-op Canvas harness only as a renderer traversal benchmark;
+it does not measure rasterization, compositing, text, GPU work, or browser GC.
+
+Set regression budgets from the refreshed native, process, and browser results.
+Add indexes, caches, incremental materialization, alternate rendering, or
+specialized allocation tooling only when a representative measurement
+identifies the cost it addresses.
 
 ## Later
 

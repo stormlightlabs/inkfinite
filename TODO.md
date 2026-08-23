@@ -55,29 +55,54 @@ and rendered output where visual fidelity matters.
 
 ## Performance profiling
 
-### Corpus and method
+### Corpus and harnesses
 
-- [ ] Build executable small, medium, large, and 10,000-shape fixtures
-- [ ] Add vector-heavy, deeply nested, imported-SVG, and connection-heavy
-      fixtures
-- [ ] Record reference hardware and benchmark methodology
+- [ ] Build shared 100, 1,000, 5,000, and 10,000-shape fixtures for flat,
+      vector-heavy, deeply nested, imported-SVG, connection-heavy, and
+      semantic/binding-heavy documents
+- [ ] Replace the stale Node capture with a traversal-only benchmark against
+      the current editor renderer; keep its no-op canvas scope explicit
+- [ ] Add Criterion benchmarks for document load/save/materialization,
+      transactions, queries, SVG, layout, and renderer algorithms
+- [ ] Add a profiling Cargo profile with release optimizations and debug symbols
+- [ ] Record reference hardware, tool versions, fixture seeds, warmups, and
+      sampling methodology
 
-### Measure
+### Native and process measurements
 
-- [ ] Profile open, save, Automerge load, and materialization
-- [ ] Profile validation, commit, undo/redo, merge, queries, and memory
-- [ ] Profile Canvas frames, culling, hit testing, nested transforms, and path
-      rendering
-- [ ] Profile selection overlays and vector-edit previews
-- [ ] Profile SVG parse/import/export and common CLI operations
-- [ ] Profile local IPC and MCP startup, queries, and mutations
+- [ ] Benchmark validation, commit, undo/redo, merge, query, layout, and SVG
+      operations across fixture sizes
+- [ ] Use `samply` to attribute native CPU hotspots identified by benchmarks
+- [ ] Use `hyperfine` to measure complete CLI inspect, query, validate, render,
+      and mutate commands plus MCP startup
+- [ ] Add coarse `tracing` spans for document, IPC, and MCP operations so
+      end-to-end latency can be attributed without instrumenting hot geometry
+      loops
 
-### Optimize from evidence
+### Browser measurements
 
-- [ ] Record baselines, dominant costs, and regression budgets
+- [ ] Add Playwright and CDP workloads for load, pan, zoom, box selection,
+      single- and multi-object drag, vector editing, connected-shape movement,
+      and nested selection
+- [ ] Capture real Chrome frame, paint, raster, compositor, long-task, GC, and
+      memory data instead of treating the no-op canvas benchmark as browser
+      rendering performance
+- [ ] Measure JS-to-WASM document operations and projection/store updates with
+      browser performance marks
+- [ ] Test heap retention after opening a 10,000-shape board, sustained editing,
+      and replacing the active document
+- [ ] Save compact summaries and diagnostic traces for representative browser
+      workloads without enabling full Playwright tracing during measurement
+
+### Baselines and optimization
+
+- [ ] Refresh the July 2026 baseline and set regression budgets from current
+      native, process, and browser measurements
+- [ ] Record dominant costs and use Criterion deltas, Chrome traces, and
+      `samply` profiles to investigate regressions
 - [ ] Evaluate spatial indexes, path/render caches, incremental materialization,
-      or alternate renderers only when a measured bottleneck supports the
-      change
+      alternate renderers, or allocation profilers only when a measured
+      bottleneck supports the change
 
 ## Backlog
 
