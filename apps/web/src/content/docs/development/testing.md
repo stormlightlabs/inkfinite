@@ -17,6 +17,18 @@ Run the complete unit and integration suite from the repository root:
 pnpm test
 ```
 
+## Component states
+
+Storybook stories in `packages/ui/src/` cover shared controls and complete editor states in light and
+dark themes. Include hover, pressed, selected, disabled, busy, and focus-visible states when they
+apply to a component. Menus and popovers should also show dismissal, focus restoration, and
+viewport-edge placement.
+
+```sh
+pnpm dev:ui
+pnpm --filter @inkfinite/ui storybook:build
+```
+
 ## Editor end-to-end tests
 
 `apps/web/e2e/` contains behavioral and visual Playwright tests. The shared

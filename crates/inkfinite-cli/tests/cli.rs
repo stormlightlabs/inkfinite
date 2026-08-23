@@ -916,6 +916,8 @@ fn live_commands_read_shared_records_from_the_authenticated_local_server() {
                     AppRequest::Context { .. }
                     | AppRequest::Render { .. }
                     | AppRequest::Ui { .. }
+                    | AppRequest::Propose { .. }
+                    | AppRequest::ProposalStatus { .. }
                     | AppRequest::Apply { .. } => {
                         panic!("proposal requests are outside this IPC fixture")
                     }

@@ -9,14 +9,18 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+mod policy;
+
+pub use policy::{HiddenLayerPolicy, McpDocumentPolicy, McpPermissions, McpPolicy, POLICY_ENV};
+
 use inkfinite_core::engine::{EngineError, TransactionEngine};
 use inkfinite_core::file::{DocumentFile, FileError};
 use inkfinite_core::ipc::{self, AppRequest, AppResponse, IpcError};
 use inkfinite_core::proto::{
-    AffectedRegion, Bounds, CommitResult, DocumentPatch, Operation, ProtocolError, Query, QueryResult, RecordId,
-    TransactionDraft, TransactionId, Warning,
+    AffectedRegion, Bounds, CommitResult, DocumentPatch, Operation, Proposal, ProposalId, ProtocolError, Query,
+    QueryResult, RecordId, TransactionDraft, TransactionId, Warning,
 };
-use inkfinite_core::session::{SessionStatus, SyncState};
+use inkfinite_core::session::{ProposalStatus, SessionStatus, SyncState};
 use inkfinite_core::svg_import::import_svg as parse_svg;
 use inkfinite_core::svg_transaction::{SvgImportTransactionOptions, build_svg_import_transaction};
 use inkfinite_core::{ActorId, BUILTIN_SHAPE_KINDS, ChangeHash, DocumentSnapshot, LayerId, Origin, PageId, Timestamp};
@@ -131,6 +135,32 @@ pub struct ImportSvgParams {
     /// Validate and return the patch without changing the document.
     #[serde(default)]
     pub dry_run: bool,
+}
+
+/// Parameters for submitting a transaction to desktop review.
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema)]
+pub struct ProposalParams {
+    /// Open desktop session to use. Proposals are unavailable for standalone files.
+    #[serde(flatten)]
+    pub target: DocumentTarget,
+    /// Causal heads inspected by the caller. The current heads are used when omitted.
+    pub base_heads: Option<Vec<ChangeHash>>,
+    /// Stable transaction identifier. One is derived from the current heads when omitted.
+    pub transaction_id: Option<String>,
+    /// Human-readable review description.
+    pub description: Option<String>,
+    /// Ordered core operations to preview and submit for review.
+    pub operations: Vec<Operation>,
+}
+
+/// Parameters for polling a desktop proposal's review state.
+#[derive(Clone, Debug, Deserialize, JsonSchema)]
+pub struct ProposalStatusParams {
+    /// Open desktop session that owns the proposal.
+    #[serde(flatten)]
+    pub target: DocumentTarget,
+    /// Proposal identifier returned by `inkfinite_propose`.
+    pub proposal_id: String,
 }
 
 /// Result returned by every MCP mutation, including dry runs.
@@ -275,6 +305,10 @@ pub struct CapabilityMetadata {
     pub description: String,
     /// Transport supported by this process.
     pub transport: String,
+    /// Default scopes advertised by this process.
+    pub default_policy: McpDocumentPolicy,
+    /// Environment variable used to configure source-specific policies.
+    pub policy_source: String,
     /// Inkfinite document format identifier.
     pub document_format: String,
     /// Inkfinite document format version.
@@ -295,6 +329,7 @@ pub struct CapabilityMetadata {
 #[derive(Clone, Debug, Default)]
 pub struct InkfiniteMcp {
     accessible_paths: BTreeSet<PathBuf>,
+    policy: McpPolicy,
 }
 
 enum MutationDestination {
@@ -314,29 +349,53 @@ struct ResolvedMutation {
     destination: MutationDestination,
     snapshot: DocumentSnapshot,
     actor_id: ActorId,
+    policy: McpDocumentPolicy,
 }
 
 impl InkfiniteMcp {
     /// Creates a server with the supplied file paths as its file access allowlist.
     #[must_use]
     pub fn new(paths: impl IntoIterator<Item = PathBuf>) -> Self {
-        Self { accessible_paths: paths.into_iter().map(|path| normalize_path(&path)).collect() }
+        Self::new_with_policy(paths, McpPolicy::default())
     }
 
-    /// Creates a server from [`DOCUMENTS_ENV`].
+    /// Creates a server with an explicit file allowlist and access policy.
+    #[must_use]
+    pub fn new_with_policy(paths: impl IntoIterator<Item = PathBuf>, policy: McpPolicy) -> Self {
+        Self {
+            accessible_paths: paths.into_iter().map(|path| normalize_path(&path)).collect(),
+            policy: policy.normalize_document_paths(),
+        }
+    }
+
+    /// Creates a server from [`DOCUMENTS_ENV`] and [`POLICY_ENV`].
     #[must_use]
     pub fn from_environment() -> Self {
         let paths = std::env::var_os(DOCUMENTS_ENV)
             .into_iter()
             .flat_map(|value| std::env::split_paths(&value).collect::<Vec<_>>())
             .collect::<Vec<_>>();
-        Self::new(paths)
+        Self::new_with_policy(paths, McpPolicy::from_environment())
     }
 
     /// Returns the configured file allowlist in stable path order.
     #[must_use]
     pub fn accessible_paths(&self) -> Vec<PathBuf> {
         self.accessible_paths.iter().cloned().collect()
+    }
+
+    /// Returns capability metadata with this server's default policy.
+    #[must_use]
+    pub fn capability_metadata(&self) -> CapabilityMetadata {
+        let mut metadata = Self::capabilities();
+        metadata.default_policy = self.policy.default.clone();
+        metadata
+    }
+
+    /// Returns the policy used by this server.
+    #[must_use]
+    pub fn policy(&self) -> &McpPolicy {
+        &self.policy
     }
 
     /// Returns the metadata advertised by the capability tool and server instructions.
@@ -346,6 +405,8 @@ impl InkfiniteMcp {
             server: SERVER_NAME.into(),
             description: SERVER_DESCRIPTION.into(),
             transport: "stdio".into(),
+            default_policy: McpDocumentPolicy::default(),
+            policy_source: format!("{POLICY_ENV} (JSON)"),
             document_format: inkfinite_core::INKFINITE_FORMAT_ID.into(),
             document_format_version: inkfinite_core::INKFINITE_FORMAT_VERSION,
             protocol: inkfinite_core::proto::PROTOCOL_ID.into(),
@@ -358,9 +419,11 @@ impl InkfiniteMcp {
                 "inkfinite_query_records".into(),
                 "inkfinite_mutate".into(),
                 "inkfinite_import_svg".into(),
+                "inkfinite_propose".into(),
+                "inkfinite_proposal_status".into(),
             ],
             source_policy: format!(
-                "Open desktop sessions are discovered through authenticated local IPC; standalone files must be listed in {DOCUMENTS_ENV} or supplied as server command-line paths."
+                "Open desktop sessions are discovered through authenticated local IPC; standalone files must be listed in {DOCUMENTS_ENV} or supplied as server command-line paths. Read-only access is the default; scopes, hidden-layer visibility, and agent_editable enforcement are configured through {POLICY_ENV}. Desktop review accepts or rejects proposals."
             ),
         }
     }
@@ -389,8 +452,9 @@ impl InkfiniteMcp {
             Ok(response) => match response.result {
                 Ok(AppResponse::Snapshot(snapshot)) => Ok(snapshot_inspection(
                     &snapshot,
-                    InspectionSource::Session { session_id },
+                    InspectionSource::Session { session_id: session_id.clone() },
                     path,
+                    self.session_policy(&session_id).hidden_layers,
                 )),
                 Ok(_) => Err(internal_error("desktop returned an unexpected inspection response")),
                 Err(error) => Err(protocol_mcp_error(error)),
@@ -404,11 +468,19 @@ impl InkfiniteMcp {
         if self.accessible_paths.contains(&path) {
             Ok(path)
         } else {
-            Err(McpError::invalid_params(
-                format!("file is not in the {DOCUMENTS_ENV} allowlist"),
-                Some(serde_json::json!({ "path": raw_path })),
+            Err(authorization_error(
+                "file is not in the configured MCP document allowlist",
+                Some(serde_json::json!({ "permission": "read", "path": raw_path })),
             ))
         }
+    }
+
+    fn session_policy(&self, session_id: &str) -> McpDocumentPolicy {
+        self.policy.for_session(session_id)
+    }
+
+    fn document_policy(&self, path: &Path) -> McpDocumentPolicy {
+        self.policy.for_document(path)
     }
 
     fn file_engine(&self, raw_path: &str) -> Result<(PathBuf, TransactionEngine), McpError> {
@@ -477,6 +549,7 @@ impl InkfiniteMcp {
             destination: MutationDestination::Session(status.session_id.0.clone()),
             snapshot: status.snapshot,
             actor_id: status.actor_id,
+            policy: self.session_policy(session_id),
         })
     }
 
@@ -486,7 +559,13 @@ impl InkfiniteMcp {
         let mut snapshot_file = file;
         let snapshot = snapshot_file.snapshot().map_err(|error| file_mutation_error(&error))?;
         let actor_id = snapshot_file.actor_id().clone();
-        Ok(ResolvedMutation { destination: MutationDestination::File(Box::new(snapshot_file)), snapshot, actor_id })
+        let policy = self.document_policy(&path);
+        Ok(ResolvedMutation {
+            destination: MutationDestination::File(Box::new(snapshot_file)),
+            snapshot,
+            actor_id,
+            policy,
+        })
     }
 
     async fn session_context(&self, session_id: &str) -> Result<inkfinite_core::session::SessionContext, McpError> {
@@ -503,22 +582,33 @@ impl InkfiniteMcp {
     }
 
     fn build_transaction(resolved: &ResolvedMutation, params: &MutationParams) -> Result<TransactionDraft, McpError> {
-        validate_mutation_limits(&params.operations, params.description.as_deref())?;
-        let base_heads = params
-            .base_heads
-            .clone()
-            .unwrap_or_else(|| resolved.snapshot.heads.clone());
-        let transaction_id = params.transaction_id.clone().unwrap_or_else(|| {
+        Self::build_transaction_parts(
+            resolved,
+            params.base_heads.clone(),
+            params.transaction_id.clone(),
+            params.description.clone(),
+            params.operations.clone(),
+            "MCP mutation",
+        )
+    }
+
+    fn build_transaction_parts(
+        resolved: &ResolvedMutation, base_heads: Option<Vec<ChangeHash>>, transaction_id: Option<String>,
+        description: Option<String>, operations: Vec<Operation>, default_description: &str,
+    ) -> Result<TransactionDraft, McpError> {
+        validate_mutation_limits(&operations, description.as_deref())?;
+        let base_heads = base_heads.unwrap_or_else(|| resolved.snapshot.heads.clone());
+        let transaction_id = transaction_id.unwrap_or_else(|| {
             let heads = base_heads.iter().map(ToString::to_string).collect::<Vec<_>>().join(".");
-            format!("transaction:mcp:{heads}:{}", params.operations.len())
+            format!("transaction:mcp:{heads}:{}", operations.len())
         });
         Ok(TransactionDraft {
             id: TransactionId(transaction_id),
             actor_id: resolved.actor_id.clone(),
             origin: Origin::Agent,
             base_heads,
-            description: params.description.clone().unwrap_or_else(|| "MCP mutation".into()),
-            operations: params.operations.clone(),
+            description: description.unwrap_or_else(|| default_description.into()),
+            operations,
             timestamp: Timestamp(0),
         })
     }
@@ -678,6 +768,12 @@ impl InkfiniteMcp {
             &transaction.transaction.operations,
             Some(&transaction.transaction.description),
         )?;
+        policy::authorize_operations(
+            &resolved.snapshot,
+            &transaction.transaction.operations,
+            &resolved.policy,
+        )
+        .map_err(|violation| policy_violation_error(&violation))?;
         let shape_ids = transaction.shape_ids;
         let asset_ids = transaction.asset_ids;
         let omitted_image_count = transaction.omitted_image_count;
@@ -692,16 +788,127 @@ impl InkfiniteMcp {
         Ok(result)
     }
 
+    async fn propose_document(&self, params: ProposalParams) -> Result<Proposal, McpError> {
+        let resolved = self.resolve_mutation_target(&params.target).await?;
+        if !resolved.policy.permissions.propose {
+            return Err(authorization_error(
+                "proposal submission is not granted for this source",
+                Some(serde_json::json!({ "permission": "propose" })),
+            ));
+        }
+        policy::authorize_operations(&resolved.snapshot, &params.operations, &resolved.policy)
+            .map_err(|violation| policy_violation_error(&violation))?;
+        let transaction = Self::build_transaction_parts(
+            &resolved,
+            params.base_heads,
+            params.transaction_id,
+            params.description,
+            params.operations,
+            "MCP proposal",
+        )?;
+        let MutationDestination::Session(session_id) = resolved.destination else {
+            return Err(authorization_error(
+                "desktop review is available only for open sessions",
+                Some(serde_json::json!({ "code": "proposal_requires_session" })),
+            ));
+        };
+        let response = ipc::send(AppRequest::Propose {
+            session_id: Some(inkfinite_core::proto::SessionId(session_id)),
+            transaction,
+        })
+        .await
+        .map_err(|error| ipc_mcp_error(&error))?;
+        match response.result {
+            Ok(AppResponse::Proposed(proposal)) => Ok(proposal),
+            Ok(_) => Err(internal_error("desktop returned an unexpected proposal response")),
+            Err(error) => Err(mutation_protocol_error(error)),
+        }
+    }
+
+    async fn read_proposal_status(&self, params: ProposalStatusParams) -> Result<ProposalStatus, McpError> {
+        validate_target(&params.target)?;
+        if params.proposal_id.trim().is_empty() {
+            return Err(McpError::invalid_params("proposal_id must not be empty", None));
+        }
+        if params.target.path.is_some() {
+            return Err(authorization_error(
+                "proposal review is available only for open sessions",
+                Some(serde_json::json!({ "code": "proposal_requires_session" })),
+            ));
+        }
+        let session_id = if let Some(session_id) = &params.target.session_id {
+            session_id.clone()
+        } else {
+            let statuses = self.session_statuses().await?;
+            if statuses.len() == 1 {
+                statuses[0].session_id.0.clone()
+            } else {
+                return Err(McpError::invalid_params(
+                    if statuses.is_empty() {
+                        "no open desktop session is available for proposal review"
+                    } else {
+                        "session_id is required because multiple desktop sessions are open"
+                    },
+                    Some(serde_json::json!({ "code": "session_selection_required" })),
+                ));
+            }
+        };
+        let policy = self.session_policy(&session_id);
+        ensure_read(&policy)?;
+        if !policy.permissions.propose {
+            return Err(authorization_error(
+                "proposal review is not granted for this source",
+                Some(serde_json::json!({ "permission": "propose" })),
+            ));
+        }
+        let response = ipc::send(AppRequest::ProposalStatus {
+            session_id: Some(inkfinite_core::proto::SessionId(session_id)),
+            proposal_id: ProposalId(params.proposal_id),
+        })
+        .await
+        .map_err(|error| ipc_mcp_error(&error))?;
+        match response.result {
+            Ok(AppResponse::ProposalStatus(status)) => Ok(status),
+            Ok(_) => Err(internal_error(
+                "desktop returned an unexpected proposal status response",
+            )),
+            Err(error) => Err(mutation_protocol_error(error)),
+        }
+    }
+
     async fn query_target(&self, target: &DocumentTarget, query: Query) -> Result<QueryResult, McpError> {
         validate_target(target)?;
+        let limit = query.limit;
+        let query = Query { limit: None, ..query };
         if let Some(session_id) = &target.session_id {
-            return query_session(Some(session_id), query).await;
+            let policy = self.session_policy(session_id);
+            ensure_read(&policy)?;
+            let snapshot = session_snapshot(session_id).await?;
+            let result = query_session(Some(session_id), query).await?;
+            return Ok(policy::filter_query_result(
+                result,
+                &snapshot,
+                policy.hidden_layers,
+                limit,
+            ));
         }
         if let Some(path) = &target.path {
-            let (_, mut engine) = self.file_engine(path)?;
-            return engine
+            let path = self.file_path(path)?;
+            let policy = self.document_policy(&path);
+            ensure_read(&policy)?;
+            let (_, mut engine) = self.file_engine(&path.to_string_lossy())?;
+            let snapshot = engine
+                .snapshot()
+                .map_err(|error| internal_error(format!("could not query document: {error}")))?;
+            let result = engine
                 .query(&query)
-                .map_err(|error| internal_error(format!("could not query document: {error}")));
+                .map_err(|error| internal_error(format!("could not query document: {error}")))?;
+            return Ok(policy::filter_query_result(
+                result,
+                &snapshot,
+                policy.hidden_layers,
+                limit,
+            ));
         }
 
         let statuses = match self.session_statuses().await {
@@ -710,17 +917,37 @@ impl InkfiniteMcp {
             Err(error) => return Err(error),
         };
         if statuses.len() == 1 {
-            return query_session(Some(&statuses[0].session_id.0), query).await;
+            let session_id = &statuses[0].session_id.0;
+            let policy = self.session_policy(session_id);
+            ensure_read(&policy)?;
+            let result = query_session(Some(session_id), query).await?;
+            return Ok(policy::filter_query_result(
+                result,
+                &statuses[0].snapshot,
+                policy.hidden_layers,
+                limit,
+            ));
         }
         if statuses.is_empty()
             && self.accessible_paths.len() == 1
             && let Some(path) = self.accessible_paths.iter().next()
         {
+            let policy = self.document_policy(path);
+            ensure_read(&policy)?;
             let raw_path = path.to_string_lossy();
             let (_, mut engine) = self.file_engine(&raw_path)?;
-            return engine
+            let snapshot = engine
+                .snapshot()
+                .map_err(|error| internal_error(format!("could not query document: {error}")))?;
+            let result = engine
                 .query(&query)
-                .map_err(|error| internal_error(format!("could not query document: {error}")));
+                .map_err(|error| internal_error(format!("could not query document: {error}")))?;
+            return Ok(policy::filter_query_result(
+                result,
+                &snapshot,
+                policy.hidden_layers,
+                limit,
+            ));
         }
         Err(McpError::invalid_params(
             if statuses.is_empty() {
@@ -735,14 +962,23 @@ impl InkfiniteMcp {
     async fn inspect_target(&self, target: &DocumentTarget) -> Result<DocumentInspection, McpError> {
         validate_target(target)?;
         if let Some(session_id) = &target.session_id {
+            ensure_read(&self.session_policy(session_id))?;
             return self.session_inspection(session_id.clone()).await;
         }
         if let Some(path) = &target.path {
-            let (path, mut engine) = self.file_engine(path)?;
+            let path = self.file_path(path)?;
+            let policy = self.document_policy(&path);
+            ensure_read(&policy)?;
+            let (path, mut engine) = self.file_engine(&path.to_string_lossy())?;
             let snapshot = engine
                 .snapshot()
                 .map_err(|error| internal_error(format!("could not inspect configured Inkfinite file: {error}")))?;
-            return Ok(snapshot_inspection(&snapshot, InspectionSource::File, Some(path)));
+            return Ok(snapshot_inspection(
+                &snapshot,
+                InspectionSource::File,
+                Some(path),
+                policy.hidden_layers,
+            ));
         }
 
         let statuses = match self.session_statuses().await {
@@ -751,17 +987,25 @@ impl InkfiniteMcp {
             Err(error) => return Err(error),
         };
         if statuses.len() == 1 {
+            ensure_read(&self.session_policy(&statuses[0].session_id.0))?;
             return self.session_inspection(statuses[0].session_id.0.clone()).await;
         }
         if statuses.is_empty()
             && self.accessible_paths.len() == 1
             && let Some(path) = self.accessible_paths.iter().next()
         {
+            let policy = self.document_policy(path);
+            ensure_read(&policy)?;
             let (path, mut engine) = self.file_engine(&path.to_string_lossy())?;
             let snapshot = engine
                 .snapshot()
                 .map_err(|error| internal_error(format!("could not inspect configured Inkfinite file: {error}")))?;
-            return Ok(snapshot_inspection(&snapshot, InspectionSource::File, Some(path)));
+            return Ok(snapshot_inspection(
+                &snapshot,
+                InspectionSource::File,
+                Some(path),
+                policy.hidden_layers,
+            ));
         }
         Err(McpError::invalid_params(
             if statuses.is_empty() {
@@ -782,16 +1026,22 @@ impl InkfiniteMcp {
             .iter()
             .map(|status| normalize_path(Path::new(&status.path.0)))
             .collect();
-        let sessions = statuses.into_iter().map(session_discovery).collect();
+        let sessions = statuses
+            .into_iter()
+            .filter(|status| self.session_policy(&status.session_id.0).permissions.read)
+            .map(session_discovery)
+            .collect();
         let files = self
             .accessible_paths
             .iter()
             .filter(|path| !open_paths.contains(*path))
+            .filter(|path| self.document_policy(path).permissions.read)
             .filter_map(|path| {
                 let raw_path = path.to_string_lossy();
                 let (_, mut engine) = self.file_engine(&raw_path).ok()?;
                 let snapshot = engine.snapshot().ok()?;
-                Some(file_discovery(path, &snapshot))
+                let hidden_layers = self.document_policy(path).hidden_layers;
+                Some(file_discovery(path, &snapshot, hidden_layers))
             })
             .collect();
         DocumentDiscovery { desktop_available, sessions, files }
@@ -806,7 +1056,7 @@ impl InkfiniteMcp {
         description = "Describe Inkfinite MCP capabilities and source access policy"
     )]
     pub fn capabilities_tool(&self) -> Json<CapabilityMetadata> {
-        Json(Self::capabilities())
+        Json(self.capability_metadata())
     }
 
     /// Lists open desktop sessions.
@@ -819,6 +1069,7 @@ impl InkfiniteMcp {
             .session_statuses()
             .await?
             .into_iter()
+            .filter(|status| self.session_policy(&status.session_id.0).permissions.read)
             .map(session_discovery)
             .collect();
         Ok(Json(sessions))
@@ -880,6 +1131,8 @@ impl InkfiniteMcp {
         &self, Parameters(params): Parameters<MutationParams>,
     ) -> Result<Json<MutationResult>, McpError> {
         let resolved = self.resolve_mutation_target(&params.target).await?;
+        policy::authorize_operations(&resolved.snapshot, &params.operations, &resolved.policy)
+            .map_err(|violation| policy_violation_error(&violation))?;
         let transaction = Self::build_transaction(&resolved, &params)?;
         Ok(Json(
             self.execute_mutation(resolved, transaction, params.dry_run).await?,
@@ -895,6 +1148,26 @@ impl InkfiniteMcp {
         &self, Parameters(params): Parameters<ImportSvgParams>,
     ) -> Result<Json<MutationResult>, McpError> {
         Ok(Json(self.import_svg_mutation(params).await?))
+    }
+
+    /// Validates and submits a transaction to the open desktop session for human review.
+    #[tool(
+        name = "inkfinite_propose",
+        description = "Submit a validated Inkfinite transaction for desktop review without changing the document"
+    )]
+    pub async fn propose(&self, Parameters(params): Parameters<ProposalParams>) -> Result<Json<Proposal>, McpError> {
+        Ok(Json(self.propose_document(params).await?))
+    }
+
+    /// Polls the review state of a proposal created for an open desktop session.
+    #[tool(
+        name = "inkfinite_proposal_status",
+        description = "Read the current or completed desktop review state for an Inkfinite proposal"
+    )]
+    pub async fn proposal_status(
+        &self, Parameters(params): Parameters<ProposalStatusParams>,
+    ) -> Result<Json<ProposalStatus>, McpError> {
+        Ok(Json(self.read_proposal_status(params).await?))
     }
 }
 
@@ -922,6 +1195,55 @@ pub async fn run_stdio(server: InkfiniteMcp) -> Result<(), rmcp::RmcpError> {
     let service = server.serve(rmcp::transport::stdio()).await?;
     service.waiting().await?;
     Ok(())
+}
+
+fn ensure_read(policy: &McpDocumentPolicy) -> Result<(), McpError> {
+    if policy.permissions.read {
+        Ok(())
+    } else {
+        Err(authorization_error(
+            "read access is not granted for this source",
+            Some(serde_json::json!({ "permission": "read" })),
+        ))
+    }
+}
+
+fn policy_violation_error(violation: &policy::PolicyViolation) -> McpError {
+    authorization_error(
+        format!(
+            "{} is not authorized for {}: {}",
+            violation.operation, violation.permission, violation.reason
+        ),
+        Some(serde_json::json!({
+            "permission": violation.permission,
+            "operation": violation.operation,
+            "record_id": violation.record_id,
+        })),
+    )
+}
+
+fn authorization_error(message: impl Into<String>, details: Option<serde_json::Value>) -> McpError {
+    let details = match details {
+        Some(serde_json::Value::Object(mut details)) => {
+            details.insert("code".into(), serde_json::Value::String("authorization_denied".into()));
+            serde_json::Value::Object(details)
+        }
+        Some(details) => serde_json::json!({ "code": "authorization_denied", "details": details }),
+        None => serde_json::json!({ "code": "authorization_denied" }),
+    };
+    McpError::invalid_params(message.into(), Some(details))
+}
+
+async fn session_snapshot(session_id: &str) -> Result<DocumentSnapshot, McpError> {
+    let response =
+        ipc::send(AppRequest::Inspect { session_id: Some(inkfinite_core::proto::SessionId(session_id.to_owned())) })
+            .await
+            .map_err(|error| ipc_mcp_error(&error))?;
+    match response.result {
+        Ok(AppResponse::Snapshot(snapshot)) => Ok(snapshot),
+        Ok(_) => Err(internal_error("desktop returned an unexpected snapshot response")),
+        Err(error) => Err(protocol_mcp_error(error)),
+    }
 }
 
 fn validate_target(target: &DocumentTarget) -> Result<(), McpError> {
@@ -955,7 +1277,7 @@ async fn query_session(session_id: Option<&str>, query: Query) -> Result<QueryRe
 }
 
 fn snapshot_inspection(
-    snapshot: &DocumentSnapshot, source: InspectionSource, path: Option<PathBuf>,
+    snapshot: &DocumentSnapshot, source: InspectionSource, path: Option<PathBuf>, hidden_layers: HiddenLayerPolicy,
 ) -> DocumentInspection {
     let path = path.map_or_else(
         || String::from("desktop session"),
@@ -969,16 +1291,31 @@ fn snapshot_inspection(
         format_version: snapshot.format_version,
         heads: snapshot.heads.iter().map(ToString::to_string).collect(),
         page_ids: snapshot.document.page_ids.iter().map(ToString::to_string).collect(),
-        counts: counts(snapshot),
+        counts: counts(snapshot, hidden_layers),
     }
 }
 
-fn counts(snapshot: &DocumentSnapshot) -> DocumentCounts {
+fn counts(snapshot: &DocumentSnapshot, hidden_layers: HiddenLayerPolicy) -> DocumentCounts {
     DocumentCounts {
         pages: snapshot.document.pages.len(),
-        layers: snapshot.document.layers.len(),
-        shapes: snapshot.document.shapes.len(),
-        bindings: snapshot.document.bindings.len(),
+        layers: snapshot
+            .document
+            .layers
+            .keys()
+            .filter(|id| policy::record_visible(snapshot, &RecordId::Layer((*id).clone()), hidden_layers))
+            .count(),
+        shapes: snapshot
+            .document
+            .shapes
+            .keys()
+            .filter(|id| policy::record_visible(snapshot, &RecordId::Shape((*id).clone()), hidden_layers))
+            .count(),
+        bindings: snapshot
+            .document
+            .bindings
+            .keys()
+            .filter(|id| policy::record_visible(snapshot, &RecordId::Binding((*id).clone()), hidden_layers))
+            .count(),
         assets: snapshot.document.assets.len(),
     }
 }
@@ -999,14 +1336,14 @@ fn session_discovery(status: SessionStatus) -> SessionDiscovery {
     }
 }
 
-fn file_discovery(path: &Path, snapshot: &DocumentSnapshot) -> FileDiscovery {
+fn file_discovery(path: &Path, snapshot: &DocumentSnapshot, hidden_layers: HiddenLayerPolicy) -> FileDiscovery {
     FileDiscovery {
         path: path.to_string_lossy().into_owned(),
         document_id: snapshot.document_id.to_string(),
         format: snapshot.format.to_string(),
         format_version: snapshot.format_version,
         heads: snapshot.heads.iter().map(ToString::to_string).collect(),
-        counts: counts(snapshot),
+        counts: counts(snapshot, hidden_layers),
     }
 }
 
@@ -1104,7 +1441,7 @@ fn engine_error_code(error: &EngineError) -> &'static str {
     match error {
         EngineError::StaleHeads => "stale_heads",
         EngineError::Precondition(_) => "precondition_failed",
-        EngineError::Permission(_) => "permission_denied",
+        EngineError::Permission(_) => "document_locked",
         EngineError::Schema(_) => "validation_error",
         EngineError::Invariant(_) => "validation_error",
         EngineError::Crdt(_) | EngineError::Sync(_) | EngineError::EmptyHistory { .. } => "document_engine_error",
@@ -1244,6 +1581,88 @@ mod tests {
         assert_eq!(error.code, rmcp::model::ErrorCode::INVALID_PARAMS);
     }
 
+    #[tokio::test(flavor = "current_thread")]
+    async fn default_policy_rejects_mutations_with_authorization_error() {
+        let path = blank_file("read-only");
+        let server = InkfiniteMcp::new([path.clone()]);
+        let snapshot = {
+            let (_, mut engine) = server
+                .file_engine(path.to_str().expect("temporary path is UTF-8"))
+                .expect("file should load");
+            engine.snapshot().expect("snapshot should load")
+        };
+        let page_id = snapshot.document.page_ids[0].clone();
+        let result = server
+            .mutate_document(Parameters(MutationParams {
+                target: DocumentTarget { path: Some(path.to_string_lossy().into_owned()), ..DocumentTarget::default() },
+                operations: vec![Operation::RenamePage { page_id, name: "Denied".into(), expected_version: None }],
+                ..MutationParams::default()
+            }))
+            .await;
+        let error = match result {
+            Ok(_) => panic!("the default policy must be read-only"),
+            Err(error) => error,
+        };
+        assert_eq!(
+            error
+                .data
+                .as_ref()
+                .and_then(|data| data.get("code"))
+                .and_then(serde_json::Value::as_str),
+            Some("authorization_denied")
+        );
+        let _ = fs::remove_file(path);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn restricted_write_policy_allows_modify_but_not_delete() {
+        let path = blank_file("restricted-write");
+        let mut policy = McpPolicy::default();
+        policy.default.permissions =
+            McpPermissions { read: true, create: false, modify: true, delete: false, layout: false, propose: false };
+        let server = InkfiniteMcp::new_with_policy([path.clone()], policy);
+        let snapshot = {
+            let (_, mut engine) = server
+                .file_engine(path.to_str().expect("temporary path is UTF-8"))
+                .expect("file should load");
+            engine.snapshot().expect("snapshot should load")
+        };
+        let page_id = snapshot.document.page_ids[0].clone();
+        let committed = server
+            .mutate_document(Parameters(MutationParams {
+                target: DocumentTarget { path: Some(path.to_string_lossy().into_owned()), ..DocumentTarget::default() },
+                operations: vec![Operation::RenamePage {
+                    page_id: page_id.clone(),
+                    name: "Modified".into(),
+                    expected_version: None,
+                }],
+                ..MutationParams::default()
+            }))
+            .await
+            .expect("modify scope should allow page rename");
+        assert!(!committed.0.dry_run);
+        let result = server
+            .mutate_document(Parameters(MutationParams {
+                target: DocumentTarget { path: Some(path.to_string_lossy().into_owned()), ..DocumentTarget::default() },
+                operations: vec![Operation::DeletePage { page_id, expected_version: None }],
+                ..MutationParams::default()
+            }))
+            .await;
+        let error = match result {
+            Ok(_) => panic!("delete scope must remain denied"),
+            Err(error) => error,
+        };
+        assert_eq!(
+            error
+                .data
+                .as_ref()
+                .and_then(|data| data.get("code"))
+                .and_then(serde_json::Value::as_str),
+            Some("authorization_denied")
+        );
+        let _ = fs::remove_file(path);
+    }
+
     #[test]
     fn file_query_uses_core_query_filters() {
         let path = blank_file("query");
@@ -1262,7 +1681,7 @@ mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn file_mutation_supports_preview_and_commit() {
         let path = blank_file("mutation");
-        let server = InkfiniteMcp::new([path.clone()]);
+        let server = InkfiniteMcp::new_with_policy([path.clone()], McpPolicy::all());
         let snapshot = {
             let (_, mut engine) = server
                 .file_engine(path.to_str().expect("temporary path is UTF-8"))
@@ -1346,7 +1765,7 @@ mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn svg_mutation_uses_shared_import_transaction() {
         let path = blank_file("svg");
-        let server = InkfiniteMcp::new([path.clone()]);
+        let server = InkfiniteMcp::new_with_policy([path.clone()], McpPolicy::all());
         let result = server
             .import_svg(Parameters(ImportSvgParams {
                 target: DocumentTarget { path: Some(path.to_string_lossy().into_owned()), ..DocumentTarget::default() },

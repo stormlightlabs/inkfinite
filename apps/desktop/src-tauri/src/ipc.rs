@@ -235,6 +235,8 @@ fn dispatch_request(
         | AppRequest::Query { session_id, .. }
         | AppRequest::Render { session_id, .. }
         | AppRequest::Ui { session_id, .. }
+        | AppRequest::Propose { session_id, .. }
+        | AppRequest::ProposalStatus { session_id, .. }
         | AppRequest::Apply { session_id, .. } => session_id.clone(),
         AppRequest::Status | AppRequest::Focus => None,
     };
@@ -290,8 +292,20 @@ fn dispatch_request(
         | AppResponse::Snapshot(_)
         | AppResponse::QueryResult(_)
         | AppResponse::Rendered(_)
+        | AppResponse::ProposalStatus(_)
         | AppResponse::Focused
         | AppResponse::UiControlled => {}
+        AppResponse::Proposed(proposal) => app
+            .emit(
+                PROPOSAL_EVENT,
+                json!({ "session_id": requested_session, "proposal": proposal }),
+            )
+            .map_err(|error| {
+                protocol_error(
+                    "proposal_notification_failed",
+                    format!("could not notify the desktop frontend: {error}"),
+                )
+            })?,
     }
     Ok(response)
 }

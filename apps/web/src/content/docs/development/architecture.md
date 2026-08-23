@@ -153,8 +153,9 @@ Causal heads and record versions are used for optimistic concurrency. See
 | `apps/web`               | Browser composition root, documentation site, and IndexedDB-backed editor persistence                                     |
 | `apps/desktop`           | Desktop composition root and TypeScript adapter for Tauri-owned native document sessions                                  |
 
-The Rust workspace contains `inkfinite-core`, `inkfinite-cli`, and the Tauri crate. The pnpm
-workspace contains the shared packages plus the web and desktop application roots.
+The Rust workspace contains `inkfinite-core`, `inkfinite-cli`, `inkfinite-mcp`,
+`inkfinite-wasm`, the Tauri crate, and `xtask`. The pnpm workspace contains the shared packages
+plus the web and desktop application roots.
 
 ## Rendering
 
@@ -168,7 +169,7 @@ Headless rendering is separate. `inkfinite-core` renders the canonical document 
 deterministic SVG for CLI output, fixtures, and inspection. This keeps headless output independent
 of the browser renderer.
 
-## Desktop sessions and CLI
+## Desktop sessions, CLI, and MCP
 
 The Tauri backend owns native desktop document sessions. A session contains the Rust-owned document
 state and exposes typed commands for snapshots, commits, undo/redo, saves, queries, validation,
@@ -179,9 +180,14 @@ The CLI calls the same Rust core for closed-file operations. For open desktop do
 authenticated local IPC protocol exposed by the Tauri process rather than racing the desktop file
 writer.
 
+The local `inkfinite-mcp` stdio server also uses the core transaction and query APIs. It discovers
+open sessions through authenticated desktop IPC and opens only the standalone files supplied to the
+process. MCP applies source-specific permissions before core validation and can submit proposals to
+an open desktop session for review.
+
 The Rust protocol supports direct live commits and optional proposals. See
 [Command-line interface](/docs/automation/cli/) and [Agent workflows](/docs/automation/agents/) for
-the supported commands and review flow.
+the supported commands, MCP policy, and review flow.
 
 ## Files and generated contracts
 

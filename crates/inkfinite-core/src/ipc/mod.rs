@@ -19,8 +19,12 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use crate::DocumentSnapshot;
 use crate::engine::EngineError;
 use crate::file::FileError;
-use crate::proto::{Bounds, CameraState, PROTOCOL_ID, PROTOCOL_VERSION, Query, QueryResult, SessionId};
-use crate::session::{LiveSvgPreview, SessionCommit, SessionContext, SessionError, SessionService, SessionStatus};
+use crate::proto::{
+    Bounds, CameraState, PROTOCOL_ID, PROTOCOL_VERSION, Proposal, ProposalId, Query, QueryResult, SessionId,
+};
+use crate::session::{
+    LiveSvgPreview, ProposalStatus, SessionCommit, SessionContext, SessionError, SessionService, SessionStatus,
+};
 use crate::{LayerId, PageId, ShapeId};
 
 pub use crate::engine::{CommitResult, TransactionDraft};
@@ -108,6 +112,20 @@ pub enum AppRequest {
         /// Typed editor state change.
         control: UiControl,
     },
+    /// Validate and hold a transaction for desktop review.
+    Propose {
+        /// Session to change, or the only open session when omitted.
+        session_id: Option<SessionId>,
+        /// Agent transaction to validate and hold.
+        transaction: TransactionDraft,
+    },
+    /// Return the current or retained state of a desktop proposal.
+    ProposalStatus {
+        /// Session that owns the proposal.
+        session_id: Option<SessionId>,
+        /// Proposal to inspect.
+        proposal_id: ProposalId,
+    },
     /// Validate and apply a transaction to an open desktop session.
     Apply {
         /// Session to change, or the only open session when omitted.
@@ -151,6 +169,10 @@ pub enum AppResponse {
     Rendered(Box<LiveSvgPreview>),
     /// A directly authorized transaction was committed.
     Committed(Box<SessionCommit>),
+    /// A transaction was accepted for desktop review.
+    Proposed(Proposal),
+    /// Current or retained state of a desktop proposal.
+    ProposalStatus(ProposalStatus),
     /// The focus notification was emitted.
     Focused,
     /// The desktop accepted a typed UI navigation request.
@@ -413,8 +435,7 @@ pub fn remove_discovery(path: &Path, expected: &DiscoveryRecord) -> Result<(), I
 /// # Errors
 ///
 /// Returns a stable [`ProtocolError`] for unavailable sessions or document
-/// failures. Proposal acceptance and rejection are deliberately unavailable on
-/// this agent-facing transport; those decisions belong to the desktop UI.
+/// failures. Proposal acceptance and rejection remain desktop review actions.
 pub fn dispatch(service: &mut SessionService, request: AppRequest) -> Result<AppResponse, ProtocolError> {
     match request {
         AppRequest::Status => service
@@ -469,6 +490,24 @@ pub fn dispatch(service: &mut SessionService, request: AppRequest) -> Result<App
                 .map_err(|error| session_protocol_error(&error))?;
             validate_ui_control(&status.snapshot, &context, &control)?;
             Ok(AppResponse::UiControlled)
+        }
+        AppRequest::Propose { session_id, transaction } => {
+            let session_id = service
+                .resolve_session_id(session_id.as_ref())
+                .map_err(|error| session_protocol_error(&error))?;
+            service
+                .propose(&session_id, transaction)
+                .map(AppResponse::Proposed)
+                .map_err(|error| session_protocol_error_with_heads(service, &session_id, &error))
+        }
+        AppRequest::ProposalStatus { session_id, proposal_id } => {
+            let session_id = service
+                .resolve_session_id(session_id.as_ref())
+                .map_err(|error| session_protocol_error(&error))?;
+            service
+                .proposal_status(&session_id, &proposal_id)
+                .map(AppResponse::ProposalStatus)
+                .map_err(|error| session_protocol_error(&error))
         }
         AppRequest::Apply { session_id, transaction } => {
             let session_id = service
@@ -941,6 +980,34 @@ mod tests {
             service.status(&opened.session_id).unwrap().snapshot,
             opened.status.snapshot
         );
+        let proposal_transaction = TransactionDraft {
+            id: TransactionId("transaction:ipc-proposal".into()),
+            actor_id: opened.status.actor_id.clone(),
+            origin: Origin::Agent,
+            base_heads: opened.status.snapshot.heads.clone(),
+            description: "proposal through authenticated IPC".into(),
+            operations: vec![Operation::RenamePage {
+                page_id: opened.status.snapshot.document.page_ids[0].clone(),
+                name: "Reviewed proposal".into(),
+                expected_version: None,
+            }],
+            timestamp: Timestamp(2),
+        };
+        let proposed = dispatch(
+            &mut service,
+            AppRequest::Propose { session_id: None, transaction: proposal_transaction },
+        )
+        .unwrap();
+        let proposal_id = match proposed {
+            AppResponse::Proposed(proposal) => proposal.id,
+            other => panic!("expected proposal, got {other:?}"),
+        };
+        let status = dispatch(
+            &mut service,
+            AppRequest::ProposalStatus { session_id: None, proposal_id },
+        )
+        .unwrap();
+        assert!(matches!(status, AppResponse::ProposalStatus(status) if status.proposal.is_some()));
         let page_id = opened.status.snapshot.document.page_ids[0].clone();
         let controlled = dispatch(
             &mut service,

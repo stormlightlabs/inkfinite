@@ -16,7 +16,7 @@ use ts_rs::TS;
 pub const PROTOCOL_ID: &str = "inkfinite.protocol";
 
 /// Current transport-independent protocol version.
-pub const PROTOCOL_VERSION: u32 = 8;
+pub const PROTOCOL_VERSION: u32 = 9;
 
 /// Stable identifier for a transaction.
 #[derive(Clone, Debug, Eq, Hash, JsonSchema, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TS)]

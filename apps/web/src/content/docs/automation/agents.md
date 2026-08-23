@@ -1,6 +1,6 @@
 ---
 title: Agent workflows
-description: 'Safe, reviewable Inkfinite document changes for coding agents.'
+description: 'Inspect and change Inkfinite documents through the CLI or permissioned MCP server.'
 section: Automation
 group: Automation
 order: 12
@@ -34,6 +34,50 @@ Shape and layer locks apply to every CLI transaction. Do not work around a lock 
 or bypassing the CLI. The direct CLI does not enforce `agent_editable` or hide records in invisible
 layers. Permissioned integrations can use that metadata as part of their own policy.
 
+### MCP access
+
+Run `inkfinite-mcp` as a local stdio server. It discovers open desktop sessions through authenticated
+local IPC. Pass standalone files as command arguments, or list them in `INKFINITE_MCP_DOCUMENTS`
+using the platform path separator:
+
+```sh
+inkfinite-mcp board.inkfinite research.inkfinite
+```
+
+The server exposes tools to list sessions and documents, inspect heads and metadata, query records,
+preview or apply ordered mutations, import SVG, and submit desktop proposals. Start with
+`inkfinite_capabilities`, then select a source and inspect its current heads. Use `dry_run: true`
+before a direct mutation. `inkfinite_propose` sends a validated transaction to an open desktop
+session, and `inkfinite_proposal_status` reports the review outcome. Standalone files do not have a
+review store.
+
+The server defaults to read-only access. Set `INKFINITE_MCP_POLICY` to a JSON policy when a model
+needs write access. The default rule and per-session rules use `read`, `create`, `modify`, `delete`,
+`layout`, and `propose` scopes. Per-document rules are keyed by canonical path and per-session rules
+by desktop session ID.
+
+```json
+{
+	"default": {
+		"permissions": {
+			"read": true,
+			"create": true,
+			"modify": true,
+			"delete": false,
+			"layout": true,
+			"propose": true
+		},
+		"hidden_layers": "deny",
+		"require_agent_editable": true
+	}
+}
+```
+
+MCP filters hidden layers unless `hidden_layers` is `allow`, and changes to existing shapes require
+`agent_editable` by default. `inkfinite-core` still checks document, layer, shape, and ancestor locks.
+Policy failures use `authorization_denied`; lock and validation failures retain their document error
+codes. A denied MCP operation is not permission to switch to the direct CLI.
+
 Raw `app apply` validates and commits a prepared transaction.
 
 ## Conflicts
@@ -47,5 +91,5 @@ means the object changed after the agent inspected it.
 
 ## Skill
 
-The repository includes an installable agent skill at `skills/inkfinite`. It documents the safe
-CLI workflow and points agents to the CLI's generated help and schemas for current commands.
+The repository includes an installable agent skill at `.agents/skills/inkfinite`. It covers CLI,
+MCP, and reviewed desktop workflows and points agents to generated help and tool schemas.

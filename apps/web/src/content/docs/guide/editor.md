@@ -39,6 +39,12 @@ The command palette searches selection and viewport commands. The Layers panel c
 order, visibility, locks, names, and opacity. See [Objects and structure](/docs/guide/objects-and-structure/)
 for frames, groups, cards, and metadata.
 
+## Menus and keyboard focus
+
+Toolbar controls and canvas menus show hover, pressed, selected, disabled, busy, and keyboard-focus
+states. Menus and popovers reposition near viewport edges. Press Escape or click outside to close
+them; keyboard focus returns to the control that opened them.
+
 ## Errors and recovery
 
 The editor reports failed saves, imports, exports, and clipboard operations in the interface. A

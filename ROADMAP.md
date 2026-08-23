@@ -30,8 +30,8 @@ and export, undo and redo, CRDT merge, and CLI access. Interchange work should
 favor deterministic native representation where Inkfinite understands the
 content and stable visual fallback where it does not.
 
-See [SVG import](apps/web/src/content/docs/internals/svg-import.md) and
-[native path geometry](apps/web/src/content/docs/internals/native-path-geometry.md).
+See [SVG import](apps/web/src/content/docs/development/svg-import.md) and
+[native path geometry](apps/web/src/content/docs/development/native-path-geometry.md).
 
 ### Richer interoperability and embeds
 
@@ -59,28 +59,6 @@ Once the core workflows are reliable, starter boards can demonstrate system
 design, brainstorming, project planning, moodboards, research maps, and
 wireframes. They should be standard documents that users can inspect, edit,
 export, and repurpose, not substitutes for missing editor behavior.
-
-### Editor polish
-
-The editor separates drawing tools, application actions, contextual selection
-controls, and library insertion. Shared controls now cover interaction states,
-pointer targets, menu and popover behavior, viewport-edge placement, and focus
-restoration. Storybook and end-to-end tests cover the important combinations in
-light and dark themes.
-
-### Permissioned MCP
-
-Add a local stdio MCP server as the policy-aware interface for model-controlled
-access. It calls `inkfinite-core` directly for discovery, queries, transactions,
-semantic relationships, layout, SVG import, and mutation results rather than
-shelling out or creating a second document API. The mutation tool accepts the
-shared ordered operations, returns affected records and causal heads, and can
-preview a transaction without changing the document.
-
-MCP owns read and write scopes, per-document or per-session policy,
-`agent_editable`, hidden-layer visibility, and any optional review workflow.
-Authorization failures remain separate from document validation. Remote
-authentication and network transports are later work.
 
 ### Performance profiling
 

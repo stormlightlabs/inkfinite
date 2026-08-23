@@ -25,6 +25,8 @@
 For affected editor surfaces, run the relevant Playwright visual tests (or add new ones) and
 inspect the baselines in `apps/web/e2e/visual/*-snapshots/` at their full captured size.
 
+`cargo clean` regularly as not to fill up too much space on disk.
+
 ### Code Quality
 
 ```sh

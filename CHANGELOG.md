@@ -33,10 +33,12 @@
   endpoint updates, and binding-preserving copy and persistence.
 - Visual agent proposal review with object and relationship previews, partial acceptance, rejection,
   stale-head handling, and distinct added, changed, moved, and removed states.
+- Permissioned local MCP access to files and desktop sessions, with scoped reads and mutations,
+  dry runs, SVG import, layout, causal heads, and reviewed proposals.
 - A responsive, keyboard-accessible board browser with sorting, storage and save details, workspace
   switching, duplication, guarded board changes, actionable errors, and user-focused inspection.
-- Excalidraw and Obsidian Canvas import/export, offline peer sync, and a bundled agent skill with
-  file, proposal, and stale-head examples.
+- Excalidraw and Obsidian Canvas import/export, offline peer sync, and a bundled CLI and MCP agent
+  skill with file, proposal, and stale-head examples.
 
 ### Changed
 
@@ -44,7 +46,9 @@
   desktop and web.
 - Moved canonical browser document state and committed geometry operations to Rust while retaining
   low-latency interaction previews in TypeScript.
-- Unified the document model and SVG pipeline across desktop, web, WASM, and CLI.
+- Unified the document model and SVG pipeline across desktop, web, WASM, CLI, and MCP.
+- Standardized editor control states, sizing, pointer targets, and viewport-aware menu and popover
+  behavior, with Storybook and end-to-end coverage.
 - Made transaction origin provenance-only in the document engine. CLI queries and mutations can
   access invisible-layer and `agent_editable: false` records while causal checks, validation,
   atomic commit, and ordinary shape and layer locks continue to apply.

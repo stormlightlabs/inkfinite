@@ -67,6 +67,13 @@ check, not as authorization. Proposal size, description length, stale-head handl
 validation, and atomic commit do not depend on origin. Live applies do not require a desktop access
 mode.
 
+The local `inkfinite-mcp` server is the policy-aware integration. It defaults to read-only access,
+selects rules by document path or desktop session ID, applies `read`, `create`, `modify`, `delete`,
+and `layout` scopes, filters hidden layers, and requires `agent_editable` for existing shape changes.
+It reports policy failures as `authorization_denied`. Ordinary document locks remain core errors and
+are never bypassed. MCP can submit an authorized proposal to a live session; desktop review accepts
+or rejects it, and MCP can poll the resulting proposal state.
+
 Committed transactions retain their origin. Causal heads, record versions, schema validation,
 document validation, and atomic commit apply to every caller. Permissioned integrations must check
 caller permissions before passing a transaction to the engine rather than trusting provenance in

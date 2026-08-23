@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::path::Path;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -120,7 +121,7 @@ pub struct SvgImportCommit {
 }
 
 /// Review state exposed to an agent without granting review authority.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProposalReviewState {
     /// The proposal is waiting for a desktop review decision.
@@ -138,7 +139,7 @@ pub enum ProposalReviewState {
 }
 
 /// Pollable proposal state for agent workflows.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
 pub struct ProposalStatus {
     /// Stable proposal identifier.
     pub proposal_id: ProposalId,
