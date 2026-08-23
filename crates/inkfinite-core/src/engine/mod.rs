@@ -104,6 +104,14 @@ impl TransactionEngine {
     /// Returns an error when the initial document violates an invariant or
     /// cannot be encoded by the CRDT adapter.
     pub fn create(document_id: DocumentId, actor_id: ActorId, mut document: Document) -> Result<Self, EngineError> {
+        let _span = tracing::info_span!(
+            "document.create",
+            pages = document.pages.len(),
+            layers = document.layers.len(),
+            shapes = document.shapes.len(),
+            bindings = document.bindings.len(),
+        )
+        .entered();
         for shape in document.shapes.values_mut() {
             shape.properties = normalize_shape_properties(shape.kind.as_str(), &shape.properties)
                 .map_err(|error| EngineError::Schema(format!("shape {}: {error}", shape.id)))?;
@@ -123,6 +131,7 @@ impl TransactionEngine {
     ///
     /// Returns an error when the bytes or materialized document are invalid.
     pub fn load(bytes: &[u8], actor_id: ActorId) -> Result<Self, EngineError> {
+        let _span = tracing::info_span!("document.load", bytes = bytes.len()).entered();
         let mut crdt = AutomergeDocument::load(bytes, actor_id)?;
         validate_document(&crdt.snapshot()?.document)?;
         Ok(Self { crdt, undo: BTreeMap::new(), redo: BTreeMap::new(), history_sequence: 0 })
@@ -134,6 +143,7 @@ impl TransactionEngine {
     ///
     /// Returns an error when the CRDT projection cannot be decoded.
     pub fn snapshot(&mut self) -> Result<DocumentSnapshot, EngineError> {
+        let _span = tracing::info_span!("document.snapshot").entered();
         Ok(self.crdt.snapshot()?)
     }
 
@@ -143,6 +153,7 @@ impl TransactionEngine {
     ///
     /// Returns an error when Automerge cannot serialize the document.
     pub fn save(&mut self) -> Result<Vec<u8>, EngineError> {
+        let _span = tracing::info_span!("document.save").entered();
         Ok(self.crdt.save()?)
     }
 
@@ -169,6 +180,12 @@ impl TransactionEngine {
     /// Returns a typed rejection when schema, heads, preconditions,
     /// permissions, invariants, or CRDT persistence checks fail.
     pub fn commit(&mut self, transaction: TransactionDraft) -> Result<CommitResult, EngineError> {
+        let _span = tracing::info_span!(
+            "document.commit",
+            operations = transaction.operations.len(),
+            history = true,
+        )
+        .entered();
         self.commit_internal(transaction, true)
     }
 
@@ -195,6 +212,7 @@ impl TransactionEngine {
     /// Returns [`EngineError::EmptyHistory`] when the actor has nothing to undo,
     /// or another typed rejection when the compensating transaction is stale.
     pub fn undo(&mut self, actor_id: &ActorId) -> Result<CommitResult, EngineError> {
+        let _span = tracing::info_span!("document.undo").entered();
         let entry = self
             .undo
             .get_mut(actor_id)
@@ -235,6 +253,7 @@ impl TransactionEngine {
     /// Returns [`EngineError::EmptyHistory`] when the actor has nothing to redo,
     /// or another typed rejection when the compensating transaction is stale.
     pub fn redo(&mut self, actor_id: &ActorId) -> Result<CommitResult, EngineError> {
+        let _span = tracing::info_span!("document.redo").entered();
         let entry = self
             .redo
             .get_mut(actor_id)
@@ -276,6 +295,7 @@ impl TransactionEngine {
     /// Returns an error when changes are malformed or the merged candidate
     /// cannot be repaired and validated.
     pub fn merge_changes(&mut self, changes: &[EncodedChange]) -> Result<Vec<Warning>, EngineError> {
+        let _span = tracing::info_span!("document.merge", changes = changes.len()).entered();
         let mut candidate = self.crdt.clone();
         candidate.apply_changes(changes)?;
         let mut snapshot = candidate.snapshot()?;
@@ -374,6 +394,7 @@ impl TransactionEngine {
     ///
     /// Returns an error when the CRDT snapshot cannot be materialized.
     pub fn query(&mut self, query: &Query) -> Result<QueryResult, EngineError> {
+        let _span = tracing::info_span!("document.query").entered();
         let snapshot = self.crdt.snapshot()?;
         Ok(query_document(&snapshot, query))
     }

@@ -20,6 +20,7 @@ svgtypes.workspace = true
 tokio.workspace = true
 ts-rs.workspace = true
 thiserror.workspace = true
+tracing.workspace = true
 
 [target.'cfg(any(unix, windows))'.dependencies]
 tokio = { workspace = true, features = ["net"] }

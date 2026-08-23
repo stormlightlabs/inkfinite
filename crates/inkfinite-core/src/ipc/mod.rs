@@ -137,6 +137,23 @@ pub enum AppRequest {
     Focus,
 }
 
+impl AppRequest {
+    fn operation_name(&self) -> &'static str {
+        match self {
+            Self::Status => "status",
+            Self::Context { .. } => "context",
+            Self::Inspect { .. } => "inspect",
+            Self::Query { .. } => "query",
+            Self::Render { .. } => "render",
+            Self::Ui { .. } => "ui",
+            Self::Propose { .. } => "propose",
+            Self::ProposalStatus { .. } => "proposal_status",
+            Self::Apply { .. } => "apply",
+            Self::Focus => "focus",
+        }
+    }
+}
+
 /// Authenticated, replay-protected request frame.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -437,6 +454,7 @@ pub fn remove_discovery(path: &Path, expected: &DiscoveryRecord) -> Result<(), I
 /// Returns a stable [`ProtocolError`] for unavailable sessions or document
 /// failures. Proposal acceptance and rejection remain desktop review actions.
 pub fn dispatch(service: &mut SessionService, request: AppRequest) -> Result<AppResponse, ProtocolError> {
+    let _span = tracing::info_span!("ipc.dispatch", operation = request.operation_name()).entered();
     match request {
         AppRequest::Status => service
             .statuses()
@@ -676,6 +694,12 @@ pub fn session_protocol_error(error: &SessionError) -> ProtocolError {
 ///
 /// Returns discovery, connection, framing, or response-correlation failures.
 #[cfg(any(unix, windows))]
+#[tracing::instrument(
+    name = "ipc.send",
+    level = "info",
+    skip_all,
+    fields(operation = request.operation_name()),
+)]
 pub async fn send(request: AppRequest) -> Result<ResponseEnvelope, IpcError> {
     let discovery = read_discovery(&discovery_path())?;
     if discovery.endpoint != endpoint_name() {

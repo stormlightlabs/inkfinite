@@ -6,6 +6,7 @@ dist
 coverage
 __screenshots__
 target/
+profiles/
 .vscode
 .agents
 !AGENTS.md

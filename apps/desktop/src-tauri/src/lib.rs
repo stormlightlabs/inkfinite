@@ -4,9 +4,12 @@ mod menu;
 mod session;
 
 use tauri::Manager;
+use tracing_subscriber::fmt::format::FmtSpan;
+use tracing_subscriber::EnvFilter;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    init_tracing();
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_log::Builder::new().level(log::LevelFilter::Debug).build())
         .menu(menu::build)
@@ -70,4 +73,13 @@ pub fn run() {
             }
         }
     });
+}
+
+fn init_tracing() {
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("off"));
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_span_events(FmtSpan::CLOSE)
+        .with_writer(std::io::stderr)
+        .try_init();
 }

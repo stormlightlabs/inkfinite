@@ -7,6 +7,14 @@ use super::{BTreeSet, ContainerLayout, Document, EngineError, ShapeId, ShapePare
 /// Returns [`EngineError::Invariant`] or [`EngineError::Schema`] with the first
 /// invalid ownership, reference, geometry, or layout condition.
 pub fn validate_document(document: &Document) -> Result<(), EngineError> {
+    let _span = tracing::info_span!(
+        "document.validate",
+        pages = document.pages.len(),
+        layers = document.layers.len(),
+        shapes = document.shapes.len(),
+        bindings = document.bindings.len(),
+    )
+    .entered();
     if document.pages.is_empty() || document.page_ids.is_empty() {
         return Err(EngineError::Invariant("document must contain at least one page".into()));
     }

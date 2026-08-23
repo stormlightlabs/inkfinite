@@ -13,6 +13,7 @@ pub use graph_layout::{
 };
 pub mod ipc;
 pub mod path;
+pub mod performance;
 pub mod proto;
 pub mod render;
 pub mod routing;

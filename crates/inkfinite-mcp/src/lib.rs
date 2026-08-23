@@ -1055,6 +1055,7 @@ impl InkfiniteMcp {
         name = "inkfinite_capabilities",
         description = "Describe Inkfinite MCP capabilities and source access policy"
     )]
+    #[tracing::instrument(name = "mcp.capabilities", level = "info", skip_all)]
     pub fn capabilities_tool(&self) -> Json<CapabilityMetadata> {
         Json(self.capability_metadata())
     }
@@ -1064,6 +1065,7 @@ impl InkfiniteMcp {
         name = "inkfinite_list_sessions",
         description = "List open Inkfinite Desktop sessions with paths and causal heads"
     )]
+    #[tracing::instrument(name = "mcp.list_sessions", level = "info", skip_all)]
     pub async fn list_sessions(&self) -> Result<Json<Vec<SessionDiscovery>>, McpError> {
         let sessions = self
             .session_statuses()
@@ -1080,6 +1082,7 @@ impl InkfiniteMcp {
         name = "inkfinite_list_documents",
         description = "Discover open Inkfinite sessions and explicitly configured document files"
     )]
+    #[tracing::instrument(name = "mcp.list_documents", level = "info", skip_all)]
     pub async fn list_documents(&self) -> Json<DocumentDiscovery> {
         Json(self.discover().await)
     }
@@ -1089,6 +1092,7 @@ impl InkfiniteMcp {
         name = "inkfinite_inspect_document",
         description = "Inspect Inkfinite format metadata, record counts, page IDs, and causal heads"
     )]
+    #[tracing::instrument(name = "mcp.inspect_document", level = "info", skip_all)]
     pub async fn inspect_document(
         &self, Parameters(params): Parameters<InspectDocumentParams>,
     ) -> Result<Json<DocumentInspection>, McpError> {
@@ -1100,6 +1104,7 @@ impl InkfiniteMcp {
         name = "inkfinite_query_records",
         description = "Query Inkfinite records by role, kind, parent, bounds, and other shared filters"
     )]
+    #[tracing::instrument(name = "mcp.query_records", level = "info", skip_all)]
     pub async fn query_records(
         &self, Parameters(params): Parameters<QueryRecordsParams>,
     ) -> Result<Json<QueryResult>, McpError> {
@@ -1127,6 +1132,7 @@ impl InkfiniteMcp {
         name = "inkfinite_mutate",
         description = "Create, patch, move, reparent, delete, connect, and lay out Inkfinite records through one validated transaction"
     )]
+    #[tracing::instrument(name = "mcp.mutate_document", level = "info", skip_all)]
     pub async fn mutate_document(
         &self, Parameters(params): Parameters<MutationParams>,
     ) -> Result<Json<MutationResult>, McpError> {
@@ -1144,6 +1150,7 @@ impl InkfiniteMcp {
         name = "inkfinite_import_svg",
         description = "Import SVG markup into the active or selected Inkfinite page and layer using the shared Rust importer"
     )]
+    #[tracing::instrument(name = "mcp.import_svg", level = "info", skip_all)]
     pub async fn import_svg(
         &self, Parameters(params): Parameters<ImportSvgParams>,
     ) -> Result<Json<MutationResult>, McpError> {
@@ -1155,6 +1162,7 @@ impl InkfiniteMcp {
         name = "inkfinite_propose",
         description = "Submit a validated Inkfinite transaction for desktop review without changing the document"
     )]
+    #[tracing::instrument(name = "mcp.propose", level = "info", skip_all)]
     pub async fn propose(&self, Parameters(params): Parameters<ProposalParams>) -> Result<Json<Proposal>, McpError> {
         Ok(Json(self.propose_document(params).await?))
     }
@@ -1164,6 +1172,7 @@ impl InkfiniteMcp {
         name = "inkfinite_proposal_status",
         description = "Read the current or completed desktop review state for an Inkfinite proposal"
     )]
+    #[tracing::instrument(name = "mcp.proposal_status", level = "info", skip_all)]
     pub async fn proposal_status(
         &self, Parameters(params): Parameters<ProposalStatusParams>,
     ) -> Result<Json<ProposalStatus>, McpError> {
@@ -1191,6 +1200,7 @@ impl ServerHandler for InkfiniteMcp {
 /// # Errors
 ///
 /// Returns an MCP initialization, transport, or service task failure.
+#[tracing::instrument(name = "mcp.stdio", level = "info", skip_all)]
 pub async fn run_stdio(server: InkfiniteMcp) -> Result<(), rmcp::RmcpError> {
     let service = server.serve(rmcp::transport::stdio()).await?;
     service.waiting().await?;

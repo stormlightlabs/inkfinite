@@ -4,8 +4,11 @@ use std::io;
 
 use clap::Parser;
 use inkfinite_cli::cli;
+use tracing_subscriber::EnvFilter;
+use tracing_subscriber::fmt::format::FmtSpan;
 
 fn main() {
+    init_tracing();
     let arguments = std::env::args_os().collect::<Vec<_>>();
     let json_output = arguments.iter().any(|argument| argument == "--json");
     let cli = match cli::Cli::try_parse_from(arguments) {
@@ -34,4 +37,13 @@ fn main() {
         }
         std::process::exit(error.exit_code());
     }
+}
+
+fn init_tracing() {
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("off"));
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_span_events(FmtSpan::CLOSE)
+        .with_writer(std::io::stderr)
+        .try_init();
 }

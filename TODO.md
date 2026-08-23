@@ -70,12 +70,12 @@ and rendered output where visual fidelity matters.
 
 ### Native and process measurements
 
-- [ ] Benchmark validation, commit, undo/redo, merge, query, layout, and SVG
+- [x] Benchmark validation, commit, undo/redo, merge, query, layout, and SVG
       operations across fixture sizes
-- [ ] Use `samply` to attribute native CPU hotspots identified by benchmarks
-- [ ] Use `hyperfine` to measure complete CLI inspect, query, validate, render,
+- [x] Use `samply` to attribute native CPU hotspots identified by benchmarks
+- [x] Use `hyperfine` to measure complete CLI inspect, query, validate, render,
       and mutate commands plus MCP startup
-- [ ] Add coarse `tracing` spans for document, IPC, and MCP operations so
+- [x] Add coarse `tracing` spans for document, IPC, and MCP operations so
       end-to-end latency can be attributed without instrumenting hot geometry
       loops
 

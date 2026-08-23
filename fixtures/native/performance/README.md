@@ -26,6 +26,22 @@ Use a Criterion filter to focus on one profile or operation, for example:
 cargo bench -p inkfinite-core --bench performance --profile profiling -- flat/vector-heavy
 ```
 
+The native group includes validation, commit, separate undo and redo, remote
+change merge, semantic queries, layout, SVG import/render, and renderer
+algorithm measurements. Generated SVG imports scale with the 100, 1,000,
+5,000, and 10,000 shape cases.
+
+To capture a confirmed hotspot with `samply`, select a Criterion benchmark and
+write the profiler output to `profiles/`:
+
+```sh
+pnpm performance:profile -- --filter 'transactions/commit/semantic-binding-heavy/100'
+```
+
+The profiling command uses the `profiling` Cargo profile so symbols remain
+available while release optimizations are enabled. Profile only a focused
+benchmark; the full Criterion corpus is too broad for useful attribution.
+
 ## Renderer traversal
 
 Build the current editor package, then capture traversal-only timings:
@@ -45,3 +61,25 @@ DevTools Protocol for those measurements.
 The capture records the seed, fixture profile and size, warmups, samples,
 hardware, Node/tool versions, and the sampling method in
 `rendering-budget.json`.
+
+## Complete process measurements
+
+Install [`hyperfine`](https://github.com/sharkdp/hyperfine), then run:
+
+```sh
+pnpm performance:process
+```
+
+This builds the profiling CLI, MCP server, and fixture emitter, materializes
+the shared corpus, and measures complete CLI `inspect`, `query`, `validate`,
+`render`, and `shape patch` commands for every corpus size in the `flat`
+profile by default. Use `--profile semantic-binding-heavy` or
+`--all-profiles` to cover additional document structures. Mutation samples
+start from a fresh fixture copy. The same run measures MCP startup by
+sending one JSON-RPC `initialize` request and closing stdin. Results include
+hyperfine's individual sample times in `process-budget.json`; the startup
+helper terminates after the first response. Do not compare captures across
+different hardware without recording the new machine details.
+For attribution rather than timing, set `RUST_LOG=inkfinite_core=info`
+(or include `inkfinite_mcp` and run the MCP server) to emit span-close times to
+stderr. Keep tracing disabled for clean latency captures.

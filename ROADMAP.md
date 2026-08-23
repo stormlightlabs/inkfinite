@@ -69,8 +69,11 @@ sizes and representative document structures.
 Use Criterion for native algorithms, `samply` for confirmed Rust hotspots,
 `hyperfine` and coarse `tracing` spans for complete CLI, IPC, and MCP paths,
 and Playwright with Chrome DevTools Protocol for actual browser frames and
-memory. Keep the no-op Canvas harness only as a renderer traversal benchmark;
-it does not measure rasterization, compositing, text, GPU work, or browser GC.
+memory. The native and process harnesses now cover validation, transactions,
+merge, queries, layout, SVG, complete CLI commands, and MCP startup over the
+shared corpus. Keep the no-op Canvas harness only as a renderer traversal
+benchmark; it does not measure rasterization, compositing, text, GPU work, or
+browser GC.
 
 Set regression budgets from the refreshed native, process, and browser results.
 Add indexes, caches, incremental materialization, alternate rendering, or
