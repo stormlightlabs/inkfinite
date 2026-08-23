@@ -1,12 +1,12 @@
 /**
  * File handle for desktop - just the path
  */
-export type FileHandle = { path: string; name: string };
+export type FileHandle = { path: string; name: string; modifiedAt?: number };
 
 /**
  * Directory entry from file system
  */
-export type DirectoryEntry = { path: string; name: string; isDir: boolean };
+export type DirectoryEntry = { path: string; name: string; isDir: boolean; modifiedAt?: number };
 
 /**
  * Desktop-specific operations interface.
@@ -70,6 +70,11 @@ export interface DesktopFileOps {
 	 * Read directory contents (filtered by pattern)
 	 */
 	readDirectory(directory: string, pattern?: string): Promise<DirectoryEntry[]>;
+
+	/**
+	 * Read a file's last modification time when the platform exposes it.
+	 */
+	getFileModifiedAt?(path: string): Promise<number | null>;
 
 	/**
 	 * Rename a file on disk

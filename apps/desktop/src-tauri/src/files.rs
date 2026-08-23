@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::Path;
+use std::time::UNIX_EPOCH;
 use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 
@@ -10,6 +11,7 @@ pub struct FileEntry {
     pub path: String,
     pub name: String,
     pub is_dir: bool,
+    pub modified_at: Option<u64>,
 }
 
 /// UTF-8 contents selected from an external editable canvas file.
@@ -51,7 +53,17 @@ pub fn read_directory(directory: String, pattern: Option<String>) -> Result<Vec<
             }
         }
 
-        results.push(FileEntry { path: entry_path.to_string_lossy().to_string(), name, is_dir: metadata.is_dir() });
+        let modified_at = metadata
+            .modified()
+            .ok()
+            .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+            .map(|duration| duration.as_millis() as u64);
+        results.push(FileEntry {
+            path: entry_path.to_string_lossy().to_string(),
+            name,
+            is_dir: metadata.is_dir(),
+            modified_at,
+        });
     }
 
     // Sort: directories first, then files, alphabetically
@@ -66,6 +78,19 @@ pub fn read_directory(directory: String, pattern: Option<String>) -> Result<Vec<
     });
 
     Ok(results)
+}
+
+/// Return a file's last modification time in Unix milliseconds.
+#[tauri::command]
+pub fn get_file_modified_at(path: String) -> Result<Option<u64>, String> {
+    let metadata = fs::metadata(&path).map_err(|error| format!("Failed to read file metadata: {error}"))?;
+    let modified_at = metadata
+        .modified()
+        .map_err(|error| format!("Failed to read file modification time: {error}"))?
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("File modification time is before Unix epoch: {error}"))?
+        .as_millis() as u64;
+    Ok(Some(modified_at))
 }
 
 /// Rename a file

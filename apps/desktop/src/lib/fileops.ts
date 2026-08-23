@@ -10,7 +10,7 @@ const RECENT_FILES_KEY = 'recentFiles';
 const WORKSPACE_DIR_KEY = 'workspaceDir';
 const MAX_RECENT_FILES = 10;
 
-type FileEntry = { path: string; name: string; is_dir: boolean };
+type FileEntry = { path: string; name: string; is_dir: boolean; modified_at?: number };
 
 /**
  * Create desktop file operations using Tauri APIs
@@ -94,7 +94,16 @@ export function createDesktopFileOps(): DesktopFileOps {
 	async function readDirectory(directory: string, pattern?: string): Promise<DirectoryEntry[]> {
 		const entries = await invoke<FileEntry[]>('read_directory', { directory, pattern: pattern || '*.inkfinite' });
 
-		return entries.map((e) => ({ path: e.path, name: e.name, isDir: e.is_dir }));
+		return entries.map((e) => ({
+			path: e.path,
+			name: e.name,
+			isDir: e.is_dir,
+			...(e.modified_at !== undefined ? { modifiedAt: e.modified_at } : {})
+		}));
+	}
+
+	async function getFileModifiedAt(path: string): Promise<number | null> {
+		return invoke<number | null>('get_file_modified_at', { path });
 	}
 
 	async function renameFile(oldPath: string, newPath: string): Promise<void> {
@@ -117,6 +126,7 @@ export function createDesktopFileOps(): DesktopFileOps {
 		setWorkspaceDir,
 		pickWorkspaceDir,
 		readDirectory,
+		getFileModifiedAt,
 		renameFile,
 		deleteFile
 	};

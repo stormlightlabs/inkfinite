@@ -172,13 +172,13 @@ the canvas editor.
 
 ### Browser and workspace
 
-- [ ] Clarify the active board, storage location, save state, and last-updated
+- [x] Clarify the active board, storage location, save state, and last-updated
       information in the TypeScript board-management UI
-- [ ] Add explicit sort controls and complete keyboard navigation for large
+- [x] Add explicit sort controls and complete keyboard navigation for large
       board lists
-- [ ] Unify browser storage, desktop workspaces, and recent files behind the
+- [x] Unify browser storage, desktop workspaces, and recent files behind the
       same board-management interaction where their capabilities overlap
-- [ ] Make the board browser responsive and accessible on narrow viewports and
+- [x] Make the board browser responsive and accessible on narrow viewports and
       coarse pointers
 
 ### Board actions

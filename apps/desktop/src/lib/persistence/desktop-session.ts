@@ -408,15 +408,19 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 
 	startLiveListeners();
 
-	function setCurrentState(status: SessionStatus, boardName?: string, isDraft = false) {
+	function setCurrentState(status: SessionStatus, boardName?: string, isDraft = false, modifiedAt?: number) {
 		currentStatus = status;
 		currentIsDraft = isDraft;
-		currentFile = { path: status.path, name: fileName(status.path) };
+		currentFile = {
+			path: status.path,
+			name: fileName(status.path),
+			...(modifiedAt !== undefined ? { modifiedAt } : {})
+		};
 		currentBoard = {
 			id: status.snapshot.document_id,
 			name: boardName || fileStem(status.path),
 			createdAt: currentBoard?.createdAt ?? Date.now(),
-			updatedAt: Date.now()
+			updatedAt: modifiedAt ?? currentBoard?.updatedAt ?? Date.now()
 		};
 		currentDoc = status.editor_projection
 			? loadedDocFromProjection(status.editor_projection, status.snapshot)
@@ -430,16 +434,16 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 	function updateStatus(status: SessionStatus) {
 		const previousPath = currentFile?.path;
 		currentStatus = status;
-		currentFile = { path: status.path, name: fileName(status.path) };
+		currentFile = { path: status.path, name: fileName(status.path), modifiedAt: Date.now() };
 		currentDoc = status.editor_projection
 			? loadedDocFromProjection(status.editor_projection, status.snapshot)
 			: loadedDocFromSnapshot(status.snapshot);
-		if (currentBoard && !currentIsDraft) {
+		if (currentBoard && currentFile && !currentIsDraft) {
 			currentBoard = { ...currentBoard, updatedAt: Date.now() };
 			boardFiles.set(currentBoard.id, currentFile);
 		}
 		if (previousPath && previousPath !== status.path) boardFiles.delete(boardIdForPath(previousPath));
-		if (!currentIsDraft) boardFiles.set(boardIdForPath(status.path), currentFile);
+		if (!currentIsDraft && currentFile) boardFiles.set(boardIdForPath(status.path), currentFile);
 	}
 
 	async function closeCurrentSession() {
@@ -470,7 +474,8 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		if (currentStatus?.path === path && currentDoc) return currentDoc;
 
 		const opened = await api.openDocument({ path, actor_id: ACTOR_ID });
-		setCurrentState(opened.status, boardName);
+		const knownHandle = [...boardFiles.values()].find((handle) => handle.path === path);
+		setCurrentState(opened.status, boardName, false, knownHandle?.modifiedAt);
 		const handle = currentFile;
 		if (handle) await fileOps.addRecentFile(handle);
 		return currentDoc!;
@@ -487,26 +492,54 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 	async function listBoards(): Promise<BoardMeta[]> {
 		const workspace = await fileOps.getWorkspaceDir();
 		const handles: FileHandle[] = [];
+		const storage = workspace
+			? { kind: 'workspace' as const, label: 'Workspace', location: workspace }
+			: { kind: 'recent' as const, label: 'Recent files' };
 		if (workspace) {
 			const entries = await listDocumentEntries(fileOps, workspace);
 			for (const entry of entries) {
-				if (!entry.isDir) handles.push({ path: entry.path, name: entry.name });
+				if (!entry.isDir) {
+					handles.push({
+						path: entry.path,
+						name: entry.name,
+						...(entry.modifiedAt !== undefined ? { modifiedAt: entry.modifiedAt } : {})
+					});
+				}
 			}
 		} else {
 			handles.push(...(await fileOps.getRecentFiles()));
 		}
 
-		const boards = handles.map((handle) => {
-			const id = boardIdForPath(handle.path);
-			boardFiles.set(id, handle);
-			return { id, name: fileStem(handle.name), createdAt: 0, updatedAt: 0 } satisfies BoardMeta;
-		});
+		const boards = await Promise.all(
+			handles.map(async (handle) => {
+				let modifiedAt = handle.modifiedAt;
+				if (modifiedAt === undefined && fileOps.getFileModifiedAt) {
+					try {
+						modifiedAt = (await fileOps.getFileModifiedAt(handle.path)) ?? undefined;
+					} catch {
+						modifiedAt = undefined;
+					}
+				}
+				const id = boardIdForPath(handle.path);
+				const board = {
+					id,
+					name: fileStem(handle.name),
+					createdAt: 0,
+					updatedAt: modifiedAt ?? 0,
+					storage
+				} satisfies BoardMeta;
+				boardFiles.set(id, { ...handle, ...(modifiedAt !== undefined ? { modifiedAt } : {}) });
+				return board;
+			})
+		);
+		boards.sort((left, right) => right.updatedAt - left.updatedAt || left.name.localeCompare(right.name));
 		if (currentBoard && !currentIsDraft) {
+			const current = { ...currentBoard, storage };
 			const currentIndex = boards.findIndex((board) => boardFiles.get(board.id)?.path === currentFile?.path);
 			if (currentIndex >= 0) {
-				boards[currentIndex] = currentBoard;
-			} else if (!boards.some((board) => board.id === currentBoard?.id)) {
-				boards.unshift(currentBoard);
+				boards[currentIndex] = current;
+			} else if (!boards.some((board) => board.id === current.id)) {
+				boards.unshift(current);
 			}
 		}
 		return boards;

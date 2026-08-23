@@ -396,7 +396,7 @@ function createFakeFileOps() {
 	let openPath: string | null = null;
 	let savePath: string | null = null;
 	let saveDialogCount = 0;
-	let entries: Array<{ path: string; name: string; isDir: boolean }> = [];
+	let entries: Array<{ path: string; name: string; isDir: boolean; modifiedAt?: number }> = [];
 
 	const ops: DesktopFileOps = {
 		async showOpenDialog() {
@@ -584,7 +584,7 @@ describe('Rust-backed desktop session repository', () => {
 	it('lists native document paths without reading document bytes in the frontend', async () => {
 		fileOps.setWorkspace('/workspace');
 		fileOps.setEntries([
-			{ path: '/workspace/alpha.inkfinite', name: 'alpha.inkfinite', isDir: false },
+			{ path: '/workspace/alpha.inkfinite', name: 'alpha.inkfinite', isDir: false, modifiedAt: 1234 },
 			{ path: '/workspace/assets', name: 'assets', isDir: true }
 		]);
 		const repo = createDesktopSessionRepo(fileOps.ops, { api: session.api });
@@ -593,6 +593,10 @@ describe('Rust-backed desktop session repository', () => {
 
 		expect(boards.map((board) => board.name)).toEqual(['alpha']);
 		expect(boards.every((board) => board.id.startsWith('path:'))).toBe(true);
+		expect(boards[0]).toMatchObject({
+			updatedAt: 1234,
+			storage: { kind: 'workspace', location: '/workspace' }
+		});
 	});
 
 	it('persists the app-managed draft across renderer sessions without adding it to recent files', async () => {

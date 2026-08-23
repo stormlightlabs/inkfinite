@@ -225,6 +225,7 @@
 	}
 
 	let platformKind = $derived(c.platform());
+	let activeBoardId = $derived(c.activeBoardId());
 	let editorState = $state(c.store.getState());
 	$effect(() => {
 		const unsubscribe = c.store.subscribe((state) => (editorState = state));
@@ -980,7 +981,10 @@
 			fetchInspectorData={platformKind === 'web'
 				? c.fileBrowser.fetchInspectorData
 				: undefined}
-			desktopRepo={c.desktop.repo} />
+			desktopRepo={c.desktop.repo}
+			{activeBoardId}
+			persistence={persistenceStatusStore}
+			draft={c.desktop.isDraft} />
 	{/if}
 	<StencilPalette
 		bind:open={c.stencilPaletteOpen}

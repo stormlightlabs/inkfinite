@@ -47,6 +47,7 @@ pub fn run() {
             session::sync_receive,
             session::close,
             files::read_directory,
+            files::get_file_modified_at,
             files::pick_open_document,
             files::pick_save_document,
             files::pick_interchange_document,

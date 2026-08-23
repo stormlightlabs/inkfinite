@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
 import { createFileBrowserFixture } from '../../../../test/editor-fixtures';
+import { createStatusStore } from '../../status';
 import FileBrowser from '../FileBrowser.svelte';
 
 describe('FileBrowser', () => {
@@ -29,5 +30,38 @@ describe('FileBrowser', () => {
 		expect(repo.createBoard).toHaveBeenCalledWith('New map');
 		expect(repo.openBoard).toHaveBeenCalledWith('board:new');
 		expect(onClose).toHaveBeenCalledOnce();
+	});
+
+	it('shows the active board storage and save state', async () => {
+		const { vm } = createFileBrowserFixture();
+		const persistence = createStatusStore({
+			backend: 'indexeddb',
+			state: 'saving',
+			pendingWrites: 1
+		});
+		const screen = render(FileBrowser, {
+			vm,
+			open: true,
+			activeBoardId: 'board:two',
+			persistence
+		});
+
+		await expect.element(screen.getByText('Active board')).toBeInTheDocument();
+		await expect.element(screen.getByText('This browser')).toBeInTheDocument();
+		await expect.element(screen.getByText('Saving…')).toBeInTheDocument();
+	});
+
+	it('moves focus through boards with arrow keys', async () => {
+		const { vm } = createFileBrowserFixture();
+		const screen = render(FileBrowser, { vm, open: true });
+		const first = screen.getByRole('button', { name: 'Open Second board' });
+
+		first.element().focus();
+		first
+			.element()
+			.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		expect(document.activeElement?.getAttribute('aria-label')).toBe('Open First board');
 	});
 });

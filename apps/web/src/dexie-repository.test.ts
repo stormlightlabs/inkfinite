@@ -42,7 +42,12 @@ describe('DocRepo (Dexie)', () => {
 		const repo = createDexieDocRepo(db);
 		const boardId = await repo.createBoard('Seeded');
 		const loaded = await repo.loadDoc(boardId);
+		const listed = await repo.listBoards();
 
+		expect(listed[0]).toMatchObject({
+			id: boardId,
+			storage: { kind: 'browser', label: 'This browser', location: 'IndexedDB' }
+		});
 		expect(Object.keys(loaded.pages)).toHaveLength(1);
 		expect(loaded.order.pageIds).toHaveLength(1);
 		expect(loaded.order.shapeOrder?.[loaded.order.pageIds[0]!]).toEqual([]);

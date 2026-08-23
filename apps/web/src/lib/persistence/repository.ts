@@ -64,6 +64,7 @@ const PAGE_ORDER_META_PREFIX = 'page-order:';
 const SHAPE_ORDER_META_PREFIX = 'shape-order:';
 const LAYERS_META_PREFIX = 'layers:';
 const ASSETS_META_PREFIX = 'assets:';
+const BROWSER_STORAGE = { kind: 'browser', label: 'This browser', location: 'IndexedDB' } as const;
 
 const pageOrderKey = (boardId: string) => `${PAGE_ORDER_META_PREFIX}${boardId}`;
 
@@ -90,7 +91,8 @@ export function createDexieDocRepo(
 	const canonical = () => database.table<CanonicalRow>('canonical');
 
 	async function listBoards(): Promise<BoardMeta[]> {
-		return boards().orderBy('updatedAt').reverse().toArray();
+		const rows = await boards().orderBy('updatedAt').reverse().toArray();
+		return rows.map((board) => ({ ...board, storage: board.storage ?? BROWSER_STORAGE }));
 	}
 
 	async function createBoard(name: string): Promise<string> {
@@ -102,9 +104,10 @@ export function createDexieDocRepo(
 		await database.transaction('rw', boards(), pages(), meta(), async () => {
 			await boards().add({
 				id: boardId,
-				name: name || DEFAULT_BOARD_NAME,
+				name: name.trim() || DEFAULT_BOARD_NAME,
 				createdAt: timestamp,
-				updatedAt: timestamp
+				updatedAt: timestamp,
+				storage: BROWSER_STORAGE
 			});
 			await pages().add(pageRow);
 			await meta().put({ key: pageOrderKey(boardId), value: [page.id] });
@@ -357,7 +360,8 @@ export function createDexieDocRepo(
 			id: boardId,
 			name: snapshot.board.name || DEFAULT_BOARD_NAME,
 			createdAt: snapshot.board.createdAt ?? timestamp,
-			updatedAt: timestamp
+			updatedAt: timestamp,
+			storage: BROWSER_STORAGE
 		};
 
 		await database.transaction(

@@ -1155,6 +1155,7 @@ export function createCanvasController(
 
 	return {
 		platform: () => platform,
+		activeBoardId: () => activeBoardId,
 		desktop,
 		fileBrowser,
 		tools: toolController,

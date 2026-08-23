@@ -185,15 +185,18 @@ export, and repurpose, not substitutes for missing editor behavior.
 
 ### Board management
 
-The board browser already creates, searches, opens, renames, inspects, and
-deletes boards, and desktop builds expose workspaces and recent files. The next
-pass should make the active board, storage location, save state, ordering, and
-failures apparent, add duplication, and protect switches when pending changes
-cannot be flushed.
+The board browser creates, searches, opens, renames, inspects, and deletes
+boards. It now identifies the active board, storage location, save state, and
+last update, offers name/date sorting, and supports keyboard movement through
+large lists. Browser storage, desktop workspaces, and recent files use the same
+board-management interaction, with file timestamps supplied by desktop storage
+when available.
 
-The interface must also work well with large collections, keyboards, narrow
-viewports, and coarse pointers. User-facing board details should remain easy to
-scan while file, schema, and document diagnostics stay available when needed.
+The browser is responsive and accessible on narrow viewports and coarse
+pointers. The next pass should add duplication, surface board-action failures,
+and protect switches when pending changes cannot be flushed. User-facing board
+details should stay easy to scan while file, schema, and document diagnostics
+remain available when needed.
 
 ### Editor polish
 

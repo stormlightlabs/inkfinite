@@ -1,8 +1,15 @@
 <script lang="ts">
 	import { Button, Icon, Sheet } from '../../index';
 	import type { DesktopDocumentRepo } from '../platform';
-	import type { BoardInspectorData, BoardMeta, FileBrowserViewModel } from '@inkfinite/core';
+	import type {
+		BoardInspectorData,
+		BoardMeta,
+		FileBrowserSort,
+		FileBrowserViewModel,
+		PersistenceStatus
+	} from '@inkfinite/core';
 	import { BoardStatsOps, FileBrowserVM } from '@inkfinite/core';
+	import type { StatusStore } from '../status';
 	import type { Snippet } from 'svelte';
 
 	type Props = {
@@ -13,6 +20,9 @@
 		onClose?: () => void;
 		children?: Snippet;
 		desktopRepo?: DesktopDocumentRepo | null;
+		activeBoardId?: string | null;
+		persistence?: StatusStore;
+		draft?: boolean;
 	};
 
 	let {
@@ -22,7 +32,10 @@
 		open = $bindable(false),
 		onClose: handleClose,
 		children: _children,
-		desktopRepo = null
+		desktopRepo = null,
+		activeBoardId = null,
+		persistence,
+		draft = false
 	}: Props = $props();
 
 	let searchQuery = $derived(vm.query);
@@ -37,14 +50,50 @@
 	let editingBoardName = $state('');
 
 	let workspaceDir = $state<string | null>(null);
+	let currentFilePath = $state<string | null>(null);
+	let workspaceBusy = $state(false);
+	let workspaceError = $state<string | null>(null);
+	let persistenceSnapshot = $state<PersistenceStatus | null>(null);
 
 	$effect(() => {
-		if (desktopRepo && open) {
-			desktopRepo.getWorkspaceDir().then((dir) => {
-				workspaceDir = dir;
-			});
+		const currentPersistence = persistence;
+		if (!currentPersistence) {
+			persistenceSnapshot = null;
+			return;
 		}
+		persistenceSnapshot = currentPersistence.get();
+		return currentPersistence.subscribe((status) => (persistenceSnapshot = status));
 	});
+
+	$effect(() => {
+		const repo = desktopRepo;
+		if (!repo || !open) {
+			if (!repo) {
+				workspaceDir = null;
+				currentFilePath = null;
+			}
+			return;
+		}
+		let cancelled = false;
+		void Promise.all([
+			repo.getWorkspaceDir(),
+			Promise.resolve(repo.getCurrentFile()?.path ?? null)
+		])
+			.then(([dir, path]) => {
+				if (!cancelled) {
+					workspaceDir = dir;
+					currentFilePath = path;
+				}
+			})
+			.catch((error) => {
+				if (!cancelled) workspaceError = describeError(error);
+			});
+		return () => {
+			cancelled = true;
+		};
+	});
+
+	let activeBoard = $derived(vm.boards.find((board) => board.id === activeBoardId) ?? null);
 
 	function applySearchQuery(nextQuery: string) {
 		searchQuery = nextQuery;
@@ -60,6 +109,46 @@
 
 	function handleSearchChange() {
 		applySearchQuery(searchQuery);
+	}
+
+	function applySort(value: string) {
+		const sort = value as FileBrowserSort;
+		if (!['updated-desc', 'created-desc', 'name-asc', 'name-desc'].includes(sort)) return;
+		const updated = FileBrowserVM.setSort(vm, sort);
+		vm = updated;
+		onUpdate?.(updated);
+	}
+
+	function selectBoard(boardId: string) {
+		vm = FileBrowserVM.select(vm, boardId);
+	}
+
+	function focusBoard(index: number) {
+		const board = vm.filteredBoards[index];
+		if (!board) return;
+		selectBoard(board.id);
+		const target = [...document.querySelectorAll<HTMLButtonElement>('[data-board-id]')].find(
+			(element) => element.dataset.boardId === board.id
+		);
+		target?.focus();
+	}
+
+	function handleBoardKeydown(event: KeyboardEvent, boardId: string) {
+		const index = vm.filteredBoards.findIndex((board) => board.id === boardId);
+		if (index < 0) return;
+		if (event.key === 'ArrowDown') {
+			event.preventDefault();
+			focusBoard(Math.min(index + 1, vm.filteredBoards.length - 1));
+		} else if (event.key === 'ArrowUp') {
+			event.preventDefault();
+			focusBoard(Math.max(index - 1, 0));
+		} else if (event.key === 'Home') {
+			event.preventDefault();
+			focusBoard(0);
+		} else if (event.key === 'End') {
+			event.preventDefault();
+			focusBoard(vm.filteredBoards.length - 1);
+		}
 	}
 
 	function closeBrowser() {
@@ -141,7 +230,37 @@
 	}
 
 	function formatTimestamp(timestamp: number): string {
-		return new Date(timestamp).toLocaleString();
+		return timestamp > 0 ? new Date(timestamp).toLocaleString() : 'Not available';
+	}
+
+	function formatSaveState(): string {
+		const status = persistenceSnapshot;
+		if (!status) return draft ? 'Draft' : 'Saved';
+		if (status.state === 'error')
+			return status.errorMsg ? `Error: ${status.errorMsg}` : 'Error';
+		if (status.state === 'saving' || (status.pendingWrites ?? 0) > 0)
+			return draft ? 'Saving draft…' : 'Saving…';
+		return draft ? 'Draft saved' : 'Saved';
+	}
+
+	function formatLastSaved(): string {
+		return persistenceSnapshot?.lastSavedAt
+			? formatTimestamp(persistenceSnapshot.lastSavedAt)
+			: 'Not available';
+	}
+
+	function storageLabel(): string {
+		if (activeBoard?.storage?.label) return activeBoard.storage.label;
+		if (desktopRepo) return workspaceDir ? 'Workspace' : 'Recent files';
+		return 'This browser';
+	}
+
+	function storageLocation(): string {
+		return currentFilePath || activeBoard?.storage?.location || workspaceDir || 'IndexedDB';
+	}
+
+	function describeError(error: unknown): string {
+		return error instanceof Error ? error.message : String(error);
 	}
 
 	function startRename(board: BoardMeta) {
@@ -155,26 +274,35 @@
 	}
 
 	async function handlePickWorkspace() {
-		if (!desktopRepo) return;
+		if (!desktopRepo || workspaceBusy) return;
+		workspaceBusy = true;
+		workspaceError = null;
 		try {
 			const dir = await desktopRepo.pickWorkspaceDir();
 			if (dir) {
 				workspaceDir = dir;
+				currentFilePath = desktopRepo.getCurrentFile()?.path ?? null;
 				onUpdate?.(vm);
 			}
 		} catch (error) {
-			console.error('Failed to pick workspace:', error);
+			workspaceError = describeError(error);
+		} finally {
+			workspaceBusy = false;
 		}
 	}
 
 	async function handleClearWorkspace() {
-		if (!desktopRepo) return;
+		if (!desktopRepo || workspaceBusy) return;
+		workspaceBusy = true;
+		workspaceError = null;
 		try {
 			await desktopRepo.setWorkspaceDir(null);
 			workspaceDir = null;
 			onUpdate?.(vm);
 		} catch (error) {
-			console.error('Failed to clear workspace:', error);
+			workspaceError = describeError(error);
+		} finally {
+			workspaceBusy = false;
 		}
 	}
 </script>
@@ -184,7 +312,6 @@
 	<div class="filebrowser">
 		<div class="filebrowser__header">
 			<div class="filebrowser__title-row">
-				<h2 class="filebrowser__title">Boards</h2>
 				<button
 					class="filebrowser__close"
 					type="button"
@@ -192,8 +319,10 @@
 					aria-label="Close board browser">
 					<Icon name="close" size={20} color="var(--ink-danger)" />
 				</button>
+				<h2 class="filebrowser__title">Boards</h2>
 			</div>
 			<button
+				type="button"
 				class="filebrowser__action filebrowser__action--create"
 				onclick={() => (isCreating = true)}
 				aria-label="Create new board">
@@ -201,37 +330,83 @@
 			</button>
 		</div>
 
+		<div class="filebrowser__summary" aria-label="Current board status">
+			<div class="filebrowser__summary-heading">
+				<span class="filebrowser__summary-label">Active board</span>
+				<strong
+					>{draft
+						? 'Untitled draft'
+						: (activeBoard?.name ?? 'No board selected')}</strong>
+			</div>
+			<dl class="filebrowser__summary-grid">
+				<div>
+					<dt>Storage</dt>
+					<dd>{storageLabel()}</dd>
+				</div>
+				<div>
+					<dt>Save state</dt>
+					<dd
+						class:filebrowser__summary-value--error={persistenceSnapshot?.state ===
+							'error'}>
+						{formatSaveState()}
+					</dd>
+				</div>
+				<div>
+					<dt>Location</dt>
+					<dd title={storageLocation()}>{storageLocation()}</dd>
+				</div>
+				<div>
+					<dt>Last updated</dt>
+					<dd>
+						{activeBoard ? formatTimestamp(activeBoard.updatedAt) : formatLastSaved()}
+					</dd>
+				</div>
+			</dl>
+		</div>
+
 		{#if desktopRepo}
-			<div class="filebrowser__workspace">
+			<div class="filebrowser__workspace" aria-label="Board storage">
+				<div class="filebrowser__workspace-modes" role="group" aria-label="Board source">
+					<button
+						type="button"
+						class:is-active={Boolean(workspaceDir)}
+						class="filebrowser__workspace-mode"
+						onclick={handlePickWorkspace}
+						disabled={workspaceBusy}
+						aria-pressed={Boolean(workspaceDir)}>
+						<Icon name="folder" size={16} />
+						Workspace
+					</button>
+					<button
+						type="button"
+						class:is-active={!workspaceDir}
+						class="filebrowser__workspace-mode"
+						onclick={handleClearWorkspace}
+						disabled={workspaceBusy}
+						aria-pressed={!workspaceDir}>
+						Recent files
+					</button>
+				</div>
 				{#if workspaceDir}
 					<div class="filebrowser__workspace-info">
-						<Icon name="folder" size={16} />
 						<span class="filebrowser__workspace-path" title={workspaceDir}>
-							{workspaceDir.split('/').pop() || workspaceDir}
+							{workspaceDir.split(/[\\/]/).pop() || workspaceDir}
 						</span>
 						<button
+							type="button"
 							class="filebrowser__workspace-change"
 							onclick={handlePickWorkspace}
+							disabled={workspaceBusy}
 							aria-label="Change workspace">
 							Change
 						</button>
-						<button
-							class="filebrowser__workspace-clear"
-							onclick={handleClearWorkspace}
-							aria-label="Clear workspace">
-							×
-						</button>
 					</div>
 				{:else}
-					<button
-						class="filebrowser__workspace-pick"
-						onclick={handlePickWorkspace}
-						aria-label="Pick workspace folder">
-						<Icon name="folder" size={16} />
-						Pick Workspace Folder
-					</button>
-					<div class="filebrowser__workspace-hint">Recent files mode</div>
+					<div class="filebrowser__workspace-hint">Showing boards opened recently.</div>
 				{/if}
+				{#if workspaceError}<p class="filebrowser__workspace-error" role="alert">
+						{workspaceError}
+					</p>{/if}
 			</div>
 		{/if}
 
@@ -244,6 +419,19 @@
 				oninput={handleSearchInput}
 				onchange={handleSearchChange}
 				aria-label="Search boards" />
+			<label class="filebrowser__sort">
+				<span>Sort by</span>
+				<select
+					aria-label="Sort boards"
+					value={vm.sort}
+					onchange={(event) =>
+						applySort((event.currentTarget as HTMLSelectElement).value)}>
+					<option value="updated-desc">Last updated</option>
+					<option value="created-desc">Date created</option>
+					<option value="name-asc">Name A–Z</option>
+					<option value="name-desc">Name Z–A</option>
+				</select>
+			</label>
 		</div>
 
 		{#if isCreating}
@@ -277,14 +465,20 @@
 			</div>
 		{/if}
 
-		<div class="filebrowser__list">
+		<div class="filebrowser__list" role="list" aria-label="Boards">
 			{#if vm.filteredBoards.length === 0}
 				<div class="filebrowser__empty">
 					{vm.query ? 'No boards match your search' : 'No boards yet'}
 				</div>
 			{:else}
 				{#each vm.filteredBoards as board (board.id)}
-					<div class="filebrowser__board">
+					<div
+						class="filebrowser__board"
+						class:filebrowser__board--selected={vm.selectedId === board.id}
+						class:filebrowser__board--active={activeBoardId === board.id}
+						role="listitem"
+						aria-label={board.name}
+						data-board-row={board.id}>
 						{#if editingBoardId === board.id}
 							<div class="filebrowser__edit-form">
 								<input
@@ -307,42 +501,50 @@
 								</div>
 							</div>
 						{:else}
-							<!-- svelte-ignore a11y_click_events_have_key_events -->
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<div
+							<button
+								type="button"
 								class="filebrowser__board-info"
-								onclick={() => handleOpenBoard(board.id)}>
-								<div class="filebrowser__board-name">{board.name}</div>
-								<div class="filebrowser__board-meta">
+								data-board-id={board.id}
+								id={board.id}
+								tabindex={vm.selectedId === board.id ? 0 : -1}
+								onfocus={() => selectBoard(board.id)}
+								onkeydown={(event) => handleBoardKeydown(event, board.id)}
+								onclick={() => {
+									selectBoard(board.id);
+									void handleOpenBoard(board.id);
+								}}
+								aria-label={`Open ${board.name}`}>
+								<span class="filebrowser__board-name">{board.name}</span>
+								<span class="filebrowser__board-meta">
+									{#if activeBoardId === board.id}<span
+											class="filebrowser__board-badge">Open</span
+										>{/if}
 									Updated: {formatTimestamp(board.updatedAt)}
-								</div>
-							</div>
+								</span>
+							</button>
 							<div class="filebrowser__board-actions">
 								<button
+									type="button"
 									class="filebrowser__board-action"
-									onclick={(e) => {
-										e.stopPropagation();
-										handleInspectBoard(board);
-									}}
-									aria-label="Inspect board">
+									onclick={() => handleInspectBoard(board)}
+									aria-label="Inspect board"
+									title={`Inspect ${board.name}`}>
 									<Icon name="info-circle" size={16} />
 								</button>
 								<button
+									type="button"
 									class="filebrowser__board-action"
-									onclick={(e) => {
-										e.stopPropagation();
-										startRename(board);
-									}}
-									aria-label="Rename board">
+									onclick={() => startRename(board)}
+									aria-label="Rename board"
+									title={`Rename ${board.name}`}>
 									<Icon name="pencil" size={16} />
 								</button>
 								<button
+									type="button"
 									class="filebrowser__board-action"
-									onclick={(e) => {
-										e.stopPropagation();
-										handleDeleteBoard(board.id);
-									}}
-									aria-label="Delete board">
+									onclick={() => handleDeleteBoard(board.id)}
+									aria-label="Delete board"
+									title={`Delete ${board.name}`}>
 									<Icon name="trash" size={16} />
 								</button>
 							</div>
@@ -428,7 +630,8 @@
 <style>
 	:global(.filebrowser-sheet) {
 		padding: 0;
-		width: min(520px, 90vw);
+		width: min(520px, 100vw);
+		max-width: 100vw;
 	}
 
 	.filebrowser {
@@ -460,6 +663,62 @@
 		font-weight: 650;
 	}
 
+	.filebrowser__summary {
+		padding: var(--ink-space-3) var(--ink-space-4);
+		border-bottom: var(--ink-line-width) solid var(--filebrowser-divider);
+		background: var(--ink-surface);
+	}
+
+	.filebrowser__summary-heading {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: var(--ink-space-3);
+		min-width: 0;
+	}
+
+	.filebrowser__summary-heading strong {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.filebrowser__summary-label,
+	.filebrowser__summary-grid dt {
+		color: var(--ink-text-muted);
+		font-size: var(--ink-type-xs);
+		font-weight: 650;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+	}
+
+	.filebrowser__summary-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: var(--ink-space-2) var(--ink-space-4);
+		margin: var(--ink-space-3) 0 0;
+	}
+
+	.filebrowser__summary-grid div {
+		min-width: 0;
+	}
+
+	.filebrowser__summary-grid dt,
+	.filebrowser__summary-grid dd {
+		margin: 0;
+	}
+
+	.filebrowser__summary-grid dd {
+		overflow: hidden;
+		color: var(--ink-text);
+		font-size: var(--ink-type-sm);
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.filebrowser__summary-value--error {
+		color: var(--ink-danger) !important;
+	}
 	.filebrowser__close {
 		background: none;
 		border: 1px solid transparent;
@@ -501,6 +760,42 @@
 		background-color: var(--ink-surface);
 	}
 
+	.filebrowser__workspace-modes {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: var(--ink-space-1);
+		padding: var(--ink-space-1);
+		border: var(--ink-line-width) solid var(--ink-border);
+		border-radius: var(--ink-radius-control-small);
+		background: var(--ink-canvas);
+	}
+
+	.filebrowser__workspace-mode {
+		display: inline-flex;
+		min-height: var(--ink-control-height-sm);
+		align-items: center;
+		justify-content: center;
+		gap: var(--ink-space-1);
+		padding: 0 var(--ink-space-2);
+		border: 0;
+		border-radius: var(--ink-radius-control-small);
+		color: var(--ink-text-muted);
+		background: transparent;
+		cursor: pointer;
+		font: inherit;
+		font-size: var(--ink-type-xs);
+	}
+
+	.filebrowser__workspace-mode:hover:not(:disabled),
+	.filebrowser__workspace-mode.is-active {
+		color: var(--ink-text);
+		background: var(--ink-surface-hover);
+	}
+
+	.filebrowser__workspace-mode.is-active {
+		box-shadow: inset 0 0 0 var(--ink-line-width) var(--ink-accent);
+	}
+
 	.filebrowser__workspace-info {
 		display: flex;
 		align-items: center;
@@ -517,51 +812,40 @@
 		color: var(--ink-text);
 	}
 
-	.filebrowser__workspace-change,
-	.filebrowser__workspace-clear {
+	.filebrowser__workspace-change {
 		min-height: var(--ink-control-height-sm);
 		padding: 0 var(--ink-space-2);
 		background-color: transparent;
 		border: var(--ink-line-width) solid var(--ink-border);
 		border-radius: var(--ink-radius-control-small);
 		cursor: pointer;
-		font-size: 0.75rem;
+		font-size: var(--ink-type-xs);
 		color: var(--ink-text);
 	}
 
-	.filebrowser__workspace-change:hover,
-	.filebrowser__workspace-clear:hover {
+	.filebrowser__workspace-change:hover {
 		background-color: var(--ink-surface-hover);
 	}
 
-	.filebrowser__workspace-pick {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		width: 100%;
-		min-height: var(--ink-control-height);
-		padding: 0 var(--ink-space-2);
-		background-color: var(--ink-accent);
-		color: var(--ink-on-accent);
-		border: var(--ink-line-width) solid var(--ink-accent);
-		border-radius: var(--ink-radius-control);
-		cursor: pointer;
-		font-size: 0.875rem;
-	}
-
-	.filebrowser__workspace-pick:hover {
-		background-color: var(--ink-accent-hover);
-	}
-
 	.filebrowser__workspace-hint {
-		margin-top: 0.5rem;
-		font-size: 0.75rem;
+		margin-top: var(--ink-space-2);
+		font-size: var(--ink-type-xs);
 		color: var(--ink-text-muted);
 		text-align: center;
 	}
 
+	.filebrowser__workspace-error {
+		margin: var(--ink-space-2) 0 0;
+		color: var(--ink-danger);
+		font-size: var(--ink-type-xs);
+	}
+
 	.filebrowser__search {
-		padding: 0.5rem 1rem;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: end;
+		gap: var(--ink-space-2);
+		padding: var(--ink-space-2) var(--ink-space-4);
 		border-bottom: 1px solid var(--filebrowser-divider);
 	}
 
@@ -578,6 +862,32 @@
 
 	.filebrowser__search-input:focus-visible {
 		border-color: var(--ink-accent);
+		outline: var(--ink-line-width-strong) solid var(--ink-focus);
+		outline-offset: 2px;
+	}
+
+	.filebrowser__sort {
+		display: grid;
+		gap: 0.25rem;
+		color: var(--ink-text-muted);
+		font-size: var(--ink-type-xs);
+		font-weight: 650;
+	}
+
+	.filebrowser__sort select {
+		min-height: var(--ink-control-height);
+		max-width: 9.5rem;
+		padding: 0 var(--ink-space-2);
+		border: var(--ink-line-width) solid var(--ink-border);
+		border-radius: var(--ink-radius-control-small);
+		background: var(--ink-surface-raised);
+		color: var(--ink-text);
+		font: inherit;
+	}
+
+	.filebrowser__sort select:focus-visible,
+	.filebrowser__workspace-mode:focus-visible,
+	.filebrowser__workspace-change:focus-visible {
 		outline: var(--ink-line-width-strong) solid var(--ink-focus);
 		outline-offset: 2px;
 	}
@@ -653,48 +963,92 @@
 	.filebrowser__board {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		padding: 0.75rem 1rem;
+		gap: var(--ink-space-2);
+		padding: var(--ink-space-2) var(--ink-space-4);
 		border-bottom: 1px solid var(--filebrowser-divider);
-		cursor: pointer;
-		transition: background-color 0.15s;
+		transition: background-color var(--ink-duration-fast) var(--ink-ease-out);
 	}
 
-	.filebrowser__board:hover {
+	.filebrowser__board:hover,
+	.filebrowser__board--selected {
 		background-color: color-mix(in srgb, var(--ink-surface-hover) 72%, transparent);
 	}
 
+	.filebrowser__board--active {
+		box-shadow: inset 3px 0 0 var(--ink-accent);
+	}
+
 	.filebrowser__board-info {
+		display: grid;
 		flex: 1;
+		min-width: 0;
+		gap: 0.25rem;
+		padding: var(--ink-space-2) 0;
+		border: 0;
+		background: transparent;
+		color: inherit;
+		cursor: pointer;
+		font: inherit;
+		text-align: left;
+	}
+
+	.filebrowser__board-info:focus-visible {
+		outline: var(--ink-line-width-strong) solid var(--ink-focus);
+		outline-offset: 2px;
 	}
 
 	.filebrowser__board-name {
-		font-weight: 500;
-		margin-bottom: 0.25rem;
+		overflow: hidden;
+		font-weight: 650;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.filebrowser__board-meta {
-		font-size: 0.75rem;
+		display: flex;
+		align-items: center;
+		gap: var(--ink-space-2);
 		color: var(--ink-text-muted);
+		font-size: var(--ink-type-xs);
+	}
+
+	.filebrowser__board-badge {
+		padding: 0.125rem 0.375rem;
+		border-radius: 999px;
+		color: var(--ink-accent);
+		background: color-mix(in srgb, var(--ink-accent) 14%, transparent);
+		font-weight: 650;
 	}
 
 	.filebrowser__board-actions {
 		display: flex;
-		gap: 0.5rem;
+		flex: 0 0 auto;
+		gap: var(--ink-space-1);
 	}
 
 	.filebrowser__board-action {
-		padding: 0.25rem 0.5rem;
+		display: grid;
+		width: var(--ink-control-height-sm);
+		height: var(--ink-control-height-sm);
+		place-items: center;
+		padding: 0;
+		border: 1px solid transparent;
+		border-radius: var(--ink-radius-control-small);
 		background: transparent;
-		border: none;
+		color: var(--ink-text-muted);
 		cursor: pointer;
-		font-size: 1rem;
-		opacity: 0.7;
-		transition: opacity 0.15s;
 	}
 
-	.filebrowser__board-action:hover {
-		opacity: 1;
+	.filebrowser__board-action:hover,
+	.filebrowser__board-action:focus-visible {
+		border-color: var(--ink-border);
+		background: var(--ink-surface-hover);
+		color: var(--ink-text);
+	}
+
+	.filebrowser__board-action:focus-visible {
+		outline: var(--ink-line-width-strong) solid var(--ink-focus);
+		outline-offset: 2px;
 	}
 
 	/* Inspector styles */
@@ -786,5 +1140,51 @@
 
 	.inspector__value {
 		color: var(--ink-text-muted);
+	}
+
+	@media (max-width: 560px) {
+		:global(.filebrowser-sheet) {
+			width: 100vw;
+		}
+
+		.filebrowser__header {
+			padding: var(--ink-space-3);
+		}
+
+		.filebrowser__summary,
+		.filebrowser__workspace,
+		.filebrowser__search {
+			padding-inline: var(--ink-space-3);
+		}
+
+		.filebrowser__summary-grid {
+			gap: var(--ink-space-2);
+		}
+
+		.filebrowser__search {
+			grid-template-columns: 1fr;
+		}
+
+		.filebrowser__sort select {
+			width: 100%;
+			max-width: none;
+		}
+
+		.filebrowser__board {
+			padding-inline: var(--ink-space-3);
+		}
+	}
+
+	@media (pointer: coarse) {
+		.filebrowser__close,
+		.filebrowser__board-action {
+			min-width: 2.75rem;
+			min-height: 2.75rem;
+		}
+
+		.filebrowser__workspace-mode,
+		.filebrowser__workspace-change {
+			min-height: 2.75rem;
+		}
 	}
 </style>
