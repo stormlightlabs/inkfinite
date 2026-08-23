@@ -82,13 +82,13 @@ and rendered output where visual fidelity matters.
 
 ### Mutations
 
-- [ ] Create, patch, move, reparent, and delete shapes through Rust MCP tools
-- [ ] Create and patch layers, containers, cards, frames, and assets
-- [ ] Read and write semantic metadata and typed relationships
-- [ ] Apply shared layout operations and manage connections
-- [ ] Import SVG and supported interchange formats where appropriate
-- [ ] Return affected IDs and heads from every mutation
-- [ ] Expose dry-run or preview behavior where useful
+- [x] Create, patch, move, reparent, and delete shapes through Rust MCP tools
+- [x] Create and patch layers, containers, cards, frames, and assets
+- [x] Read and write semantic metadata and typed relationships
+- [x] Apply shared layout operations and manage connections
+- [x] Import SVG and supported interchange formats where appropriate
+- [x] Return affected IDs and heads from every mutation
+- [x] Expose dry-run or preview behavior where useful
 
 ### Permissions
 

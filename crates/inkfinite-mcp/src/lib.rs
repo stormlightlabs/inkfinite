@@ -1,19 +1,25 @@
-//! Permission-aware MCP discovery and read access for Inkfinite.
+//! Permission-aware MCP discovery and mutation access for Inkfinite.
 //!
 //! The server uses Inkfinite's local IPC contract for live desktop sessions and
 //! the core transaction engine for explicitly configured files. It never
 //! shells out to the CLI and does not treat an arbitrary path supplied by a
-//! model as permission to read it.
+//! model as permission to read or change it.
 
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use inkfinite_core::engine::TransactionEngine;
+use inkfinite_core::engine::{EngineError, TransactionEngine};
+use inkfinite_core::file::{DocumentFile, FileError};
 use inkfinite_core::ipc::{self, AppRequest, AppResponse, IpcError};
-use inkfinite_core::proto::{Bounds, ProtocolError, Query, QueryResult};
+use inkfinite_core::proto::{
+    AffectedRegion, Bounds, CommitResult, DocumentPatch, Operation, ProtocolError, Query, QueryResult, RecordId,
+    TransactionDraft, TransactionId, Warning,
+};
 use inkfinite_core::session::{SessionStatus, SyncState};
-use inkfinite_core::{ActorId, BUILTIN_SHAPE_KINDS, DocumentSnapshot};
+use inkfinite_core::svg_import::import_svg as parse_svg;
+use inkfinite_core::svg_transaction::{SvgImportTransactionOptions, build_svg_import_transaction};
+use inkfinite_core::{ActorId, BUILTIN_SHAPE_KINDS, ChangeHash, DocumentSnapshot, LayerId, Origin, PageId, Timestamp};
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::model::{Implementation, ServerCapabilities, ServerInfo};
 use rmcp::{ErrorData as McpError, ServerHandler, ServiceExt, tool, tool_handler, tool_router};
@@ -23,10 +29,11 @@ use serde::{Deserialize, Serialize};
 /// Stable MCP server name advertised during initialization.
 pub const SERVER_NAME: &str = "inkfinite-mcp";
 /// Human-readable description of the server's current surface.
-pub const SERVER_DESCRIPTION: &str = "Permissioned local discovery and read access for Inkfinite documents";
+pub const SERVER_DESCRIPTION: &str = "Permissioned local discovery and mutation access for Inkfinite documents";
 /// Environment variable containing the explicitly accessible document paths.
 pub const DOCUMENTS_ENV: &str = "INKFINITE_MCP_DOCUMENTS";
-const MCP_READER_ACTOR: &str = "actor:inkfinite-mcp-reader";
+const MCP_ACTOR: &str = "actor:inkfinite-mcp";
+const MAX_MUTATION_OPERATIONS: usize = 256;
 
 /// A document source selected by an MCP caller.
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema)]
@@ -82,6 +89,77 @@ pub struct QueryRecordsParams {
     pub include_records: bool,
     /// Maximum number of records to return.
     pub limit: Option<u32>,
+}
+
+/// Parameters shared by all transaction-backed MCP mutations.
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema)]
+pub struct MutationParams {
+    /// Document source to mutate. Omit both fields only when one source is available.
+    #[serde(flatten)]
+    pub target: DocumentTarget,
+    /// Causal heads inspected by the caller. The current heads are used when omitted.
+    pub base_heads: Option<Vec<ChangeHash>>,
+    /// Stable transaction identifier. One is derived from the current heads when omitted.
+    pub transaction_id: Option<String>,
+    /// Human-readable history description.
+    pub description: Option<String>,
+    /// Ordered core operations to validate and commit as one transaction.
+    pub operations: Vec<Operation>,
+    /// Validate and return the patch without changing the document.
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
+/// Parameters for importing SVG markup through the shared Rust importer.
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema)]
+pub struct ImportSvgParams {
+    /// Document source to mutate. Omit both fields only when one source is available.
+    #[serde(flatten)]
+    pub target: DocumentTarget,
+    /// SVG markup to parse and import.
+    pub svg: String,
+    /// Optional source filename retained in provenance and the root name.
+    pub source_name: Option<String>,
+    /// Target page. The active page or first page is used when omitted.
+    pub page_id: Option<String>,
+    /// Target layer. The active layer or first layer on the page is used when omitted.
+    pub layer_id: Option<String>,
+    /// Stable transaction identifier. One is derived from the source asset when omitted.
+    pub transaction_id: Option<String>,
+    /// Human-readable history description.
+    pub description: Option<String>,
+    /// Validate and return the patch without changing the document.
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
+/// Result returned by every MCP mutation, including dry runs.
+#[derive(Clone, Debug, JsonSchema, Serialize)]
+pub struct MutationResult {
+    /// Transaction identifier used by the core engine.
+    pub transaction_id: TransactionId,
+    /// Causal heads observed before validation.
+    pub previous_heads: Vec<ChangeHash>,
+    /// Causal heads after commit, or the unchanged heads after a dry run.
+    pub current_heads: Vec<ChangeHash>,
+    /// Records created, changed, or deleted by the transaction.
+    pub patch: DocumentPatch,
+    /// Records affected directly or through deterministic hierarchy repairs.
+    pub affected_ids: Vec<RecordId>,
+    /// Visual regions invalidated by the transaction.
+    pub affected_regions: Vec<AffectedRegion>,
+    /// Non-fatal repairs performed by the core engine.
+    pub warnings: Vec<Warning>,
+    /// Parser or renderer diagnostics that are not core commit warnings.
+    pub diagnostics: Vec<String>,
+    /// Whether the document was left unchanged.
+    pub dry_run: bool,
+    /// Native shape IDs created by an SVG import.
+    pub imported_shape_ids: Vec<inkfinite_core::ShapeId>,
+    /// Asset IDs included by an SVG import.
+    pub imported_asset_ids: Vec<inkfinite_core::AssetId>,
+    /// SVG image nodes omitted because no native representation was available.
+    pub omitted_image_count: usize,
 }
 
 /// Stable metadata describing the records in one document.
@@ -207,7 +285,7 @@ pub struct CapabilityMetadata {
     pub protocol_version: u32,
     /// Built-in shape kinds understood by the shared document model.
     pub shape_kinds: Vec<String>,
-    /// Read operations currently exposed by this server.
+    /// Read and mutation operations currently exposed by this server.
     pub operations: Vec<String>,
     /// How a source becomes visible to this server.
     pub source_policy: String,
@@ -219,8 +297,27 @@ pub struct InkfiniteMcp {
     accessible_paths: BTreeSet<PathBuf>,
 }
 
+enum MutationDestination {
+    Session(String),
+    File(Box<DocumentFile>),
+}
+
+struct MutationData {
+    patch: DocumentPatch,
+    affected_ids: Vec<RecordId>,
+    affected_regions: Vec<AffectedRegion>,
+    warnings: Vec<Warning>,
+    diagnostics: Vec<String>,
+}
+
+struct ResolvedMutation {
+    destination: MutationDestination,
+    snapshot: DocumentSnapshot,
+    actor_id: ActorId,
+}
+
 impl InkfiniteMcp {
-    /// Creates a server with the supplied file paths as its read allowlist.
+    /// Creates a server with the supplied file paths as its file access allowlist.
     #[must_use]
     pub fn new(paths: impl IntoIterator<Item = PathBuf>) -> Self {
         Self { accessible_paths: paths.into_iter().map(|path| normalize_path(&path)).collect() }
@@ -259,6 +356,8 @@ impl InkfiniteMcp {
                 "inkfinite_list_documents".into(),
                 "inkfinite_inspect_document".into(),
                 "inkfinite_query_records".into(),
+                "inkfinite_mutate".into(),
+                "inkfinite_import_svg".into(),
             ],
             source_policy: format!(
                 "Open desktop sessions are discovered through authenticated local IPC; standalone files must be listed in {DOCUMENTS_ENV} or supplied as server command-line paths."
@@ -320,13 +419,277 @@ impl InkfiniteMcp {
                 path.display()
             ))
         })?;
-        let engine = TransactionEngine::load(&bytes, ActorId::from(MCP_READER_ACTOR)).map_err(|error| {
+        let engine = TransactionEngine::load(&bytes, ActorId::from(MCP_ACTOR)).map_err(|error| {
             internal_error(format!(
                 "could not load configured Inkfinite file {}: {error}",
                 path.display()
             ))
         })?;
         Ok((path, engine))
+    }
+
+    async fn resolve_mutation_target(&self, target: &DocumentTarget) -> Result<ResolvedMutation, McpError> {
+        validate_target(target)?;
+        if let Some(session_id) = &target.session_id {
+            return self.open_session_mutation(session_id).await;
+        }
+        if let Some(path) = &target.path {
+            return self.open_file_mutation(path);
+        }
+
+        let statuses = match self.session_statuses().await {
+            Ok(statuses) => statuses,
+            Err(_error) if !self.accessible_paths.is_empty() => Vec::new(),
+            Err(error) => return Err(error),
+        };
+        if statuses.len() == 1 {
+            return self.open_session_mutation(&statuses[0].session_id.0).await;
+        }
+        if statuses.is_empty()
+            && self.accessible_paths.len() == 1
+            && let Some(path) = self.accessible_paths.iter().next()
+        {
+            return self.open_file_mutation(&path.to_string_lossy());
+        }
+        Err(McpError::invalid_params(
+            if statuses.is_empty() {
+                "document source is required; no open session or unique configured file is available"
+            } else {
+                "document source is required because multiple open sessions are available"
+            },
+            Some(serde_json::json!({ "code": "document_source_required" })),
+        ))
+    }
+
+    async fn open_session_mutation(&self, session_id: &str) -> Result<ResolvedMutation, McpError> {
+        let status = self
+            .session_statuses()
+            .await?
+            .into_iter()
+            .find(|status| status.session_id.0 == session_id)
+            .ok_or_else(|| {
+                McpError::invalid_params(
+                    format!("desktop session {session_id} is not open"),
+                    Some(serde_json::json!({ "code": "session_not_found", "session_id": session_id })),
+                )
+            })?;
+        Ok(ResolvedMutation {
+            destination: MutationDestination::Session(status.session_id.0.clone()),
+            snapshot: status.snapshot,
+            actor_id: status.actor_id,
+        })
+    }
+
+    fn open_file_mutation(&self, raw_path: &str) -> Result<ResolvedMutation, McpError> {
+        let path = self.file_path(raw_path)?;
+        let file = DocumentFile::open(&path, ActorId::from(MCP_ACTOR)).map_err(|error| file_mutation_error(&error))?;
+        let mut snapshot_file = file;
+        let snapshot = snapshot_file.snapshot().map_err(|error| file_mutation_error(&error))?;
+        let actor_id = snapshot_file.actor_id().clone();
+        Ok(ResolvedMutation { destination: MutationDestination::File(Box::new(snapshot_file)), snapshot, actor_id })
+    }
+
+    async fn session_context(&self, session_id: &str) -> Result<inkfinite_core::session::SessionContext, McpError> {
+        let response = ipc::send(AppRequest::Context {
+            session_id: Some(inkfinite_core::proto::SessionId(session_id.to_owned())),
+        })
+        .await
+        .map_err(|error| ipc_mcp_error(&error))?;
+        match response.result {
+            Ok(AppResponse::Context(context)) => Ok(context),
+            Ok(_) => Err(internal_error("desktop returned an unexpected context response")),
+            Err(error) => Err(protocol_mcp_error(error)),
+        }
+    }
+
+    fn build_transaction(resolved: &ResolvedMutation, params: &MutationParams) -> Result<TransactionDraft, McpError> {
+        validate_mutation_limits(&params.operations, params.description.as_deref())?;
+        let base_heads = params
+            .base_heads
+            .clone()
+            .unwrap_or_else(|| resolved.snapshot.heads.clone());
+        let transaction_id = params.transaction_id.clone().unwrap_or_else(|| {
+            let heads = base_heads.iter().map(ToString::to_string).collect::<Vec<_>>().join(".");
+            format!("transaction:mcp:{heads}:{}", params.operations.len())
+        });
+        Ok(TransactionDraft {
+            id: TransactionId(transaction_id),
+            actor_id: resolved.actor_id.clone(),
+            origin: Origin::Agent,
+            base_heads,
+            description: params.description.clone().unwrap_or_else(|| "MCP mutation".into()),
+            operations: params.operations.clone(),
+            timestamp: Timestamp(0),
+        })
+    }
+
+    async fn execute_mutation(
+        &self, resolved: ResolvedMutation, transaction: TransactionDraft, dry_run: bool,
+    ) -> Result<MutationResult, McpError> {
+        let previous_heads = resolved.snapshot.heads.clone();
+        match resolved.destination {
+            MutationDestination::File(mut file) => {
+                if dry_run {
+                    let preview = file
+                        .engine_mut()
+                        .preview(&transaction)
+                        .map_err(|error| engine_mutation_error_with_heads(&error, &previous_heads))?;
+                    return Ok(mutation_result(
+                        transaction.id,
+                        previous_heads,
+                        MutationData {
+                            patch: preview.patch,
+                            affected_ids: preview.affected_ids,
+                            affected_regions: preview.affected_regions,
+                            warnings: Vec::new(),
+                            diagnostics: Vec::new(),
+                        },
+                        true,
+                    ));
+                }
+                let commit = file
+                    .commit(transaction)
+                    .map_err(|error| file_mutation_error_with_heads(&error, &previous_heads))?;
+                let result = mutation_result_from_commit(commit, previous_heads, false);
+                file.save().map_err(|error| file_mutation_error(&error))?;
+                Ok(result)
+            }
+            MutationDestination::Session(session_id) => {
+                let session_id = inkfinite_core::proto::SessionId(session_id);
+                if dry_run {
+                    let response = ipc::send(AppRequest::Render {
+                        session_id: Some(session_id),
+                        transaction: Some(transaction.clone()),
+                        page_id: None,
+                        region: None,
+                    })
+                    .await
+                    .map_err(|error| ipc_mcp_error(&error))?;
+                    let preview = match response.result {
+                        Ok(AppResponse::Rendered(preview)) => *preview,
+                        Ok(_) => {
+                            return Err(internal_error(
+                                "desktop returned an unexpected mutation preview response",
+                            ));
+                        }
+                        Err(error) => return Err(mutation_protocol_error(error)),
+                    };
+                    let patch = preview.preview.ok_or_else(|| {
+                        internal_error("desktop did not return a transaction patch for the mutation preview")
+                    })?;
+                    let affected_ids = patch_record_ids(&patch);
+                    return Ok(mutation_result(
+                        transaction.id,
+                        previous_heads,
+                        MutationData {
+                            patch,
+                            affected_ids,
+                            affected_regions: preview.affected_regions,
+                            warnings: Vec::new(),
+                            diagnostics: preview.warnings,
+                        },
+                        true,
+                    ));
+                }
+                let response = ipc::send(AppRequest::Apply { session_id: Some(session_id), transaction })
+                    .await
+                    .map_err(|error| ipc_mcp_error(&error))?;
+                match response.result {
+                    Ok(AppResponse::Committed(commit)) => {
+                        Ok(mutation_result_from_commit(commit.commit, previous_heads, false))
+                    }
+                    Ok(_) => Err(internal_error("desktop returned an unexpected mutation response")),
+                    Err(error) => Err(mutation_protocol_error(error)),
+                }
+            }
+        }
+    }
+
+    async fn import_svg_mutation(&self, params: ImportSvgParams) -> Result<MutationResult, McpError> {
+        if params.svg.trim().is_empty() {
+            return Err(McpError::invalid_params(
+                "SVG markup must not be empty",
+                Some(serde_json::json!({ "code": "invalid_svg_input" })),
+            ));
+        }
+        let resolved = self.resolve_mutation_target(&params.target).await?;
+        let context = match &resolved.destination {
+            MutationDestination::Session(session_id) => Some(self.session_context(session_id).await?),
+            MutationDestination::File(_) => None,
+        };
+        let parsed = parse_svg(params.svg.as_bytes()).map_err(|error| {
+            McpError::invalid_params(
+                format!("could not parse SVG input: {error}"),
+                Some(serde_json::json!({ "code": "svg_import_failed" })),
+            )
+        })?;
+        let page_id = params
+            .page_id
+            .map(PageId::from)
+            .or_else(|| context.as_ref().and_then(|context| context.page_id.clone()))
+            .or_else(|| resolved.snapshot.document.page_ids.first().cloned())
+            .ok_or_else(|| import_error("document has no page for SVG import"))?;
+        let page = resolved
+            .snapshot
+            .document
+            .pages
+            .get(&page_id)
+            .ok_or_else(|| import_error(format!("page {page_id} does not exist")))?;
+        let layer_id = params
+            .layer_id
+            .map(LayerId::from)
+            .or_else(|| {
+                context.as_ref().and_then(|context| {
+                    context
+                        .active_layer_id
+                        .clone()
+                        .filter(|layer_id| page.layer_ids.contains(layer_id))
+                })
+            })
+            .or_else(|| page.layer_ids.first().cloned())
+            .ok_or_else(|| import_error(format!("page {page_id} has no layer for SVG import")))?;
+        let digest = parsed.source_asset.digest.replace(':', "-");
+        let transaction_id = params
+            .transaction_id
+            .map(TransactionId)
+            .unwrap_or_else(|| TransactionId(format!("transaction:svg-import:{digest}")));
+        let transaction = build_svg_import_transaction(
+            &resolved.snapshot,
+            &parsed,
+            SvgImportTransactionOptions {
+                actor_id: resolved.actor_id.clone(),
+                origin: Origin::Agent,
+                page_id,
+                layer_id,
+                transaction_id,
+                description: params.description.unwrap_or_else(|| {
+                    params
+                        .source_name
+                        .as_deref()
+                        .map(|name| format!("Import SVG {name}"))
+                        .unwrap_or_else(|| "Import SVG".into())
+                }),
+                source_name: params.source_name,
+                timestamp: Timestamp(0),
+            },
+        )
+        .map_err(|error| import_error(error.to_string()))?;
+        validate_mutation_limits(
+            &transaction.transaction.operations,
+            Some(&transaction.transaction.description),
+        )?;
+        let shape_ids = transaction.shape_ids;
+        let asset_ids = transaction.asset_ids;
+        let omitted_image_count = transaction.omitted_image_count;
+        let diagnostics: Vec<String> = parsed.warnings.iter().map(ToString::to_string).collect();
+        let mut result = self
+            .execute_mutation(resolved, transaction.transaction, params.dry_run)
+            .await?;
+        result.imported_shape_ids = shape_ids;
+        result.imported_asset_ids = asset_ids;
+        result.omitted_image_count = omitted_image_count;
+        result.diagnostics.extend(diagnostics);
+        Ok(result)
     }
 
     async fn query_target(&self, target: &DocumentTarget, query: Query) -> Result<QueryResult, McpError> {
@@ -437,7 +800,7 @@ impl InkfiniteMcp {
 
 #[tool_router]
 impl InkfiniteMcp {
-    /// Returns the document format, protocol, shape registry, and read surface.
+    /// Returns the document format, protocol, shape registry, and read/write surface.
     #[tool(
         name = "inkfinite_capabilities",
         description = "Describe Inkfinite MCP capabilities and source access policy"
@@ -507,6 +870,32 @@ impl InkfiniteMcp {
         };
         Ok(Json(self.query_target(&params.target, query).await?))
     }
+
+    /// Validates and optionally commits one ordered core transaction.
+    #[tool(
+        name = "inkfinite_mutate",
+        description = "Create, patch, move, reparent, delete, connect, and lay out Inkfinite records through one validated transaction"
+    )]
+    pub async fn mutate_document(
+        &self, Parameters(params): Parameters<MutationParams>,
+    ) -> Result<Json<MutationResult>, McpError> {
+        let resolved = self.resolve_mutation_target(&params.target).await?;
+        let transaction = Self::build_transaction(&resolved, &params)?;
+        Ok(Json(
+            self.execute_mutation(resolved, transaction, params.dry_run).await?,
+        ))
+    }
+
+    /// Parses SVG markup and commits its native shapes and retained assets as one transaction.
+    #[tool(
+        name = "inkfinite_import_svg",
+        description = "Import SVG markup into the active or selected Inkfinite page and layer using the shared Rust importer"
+    )]
+    pub async fn import_svg(
+        &self, Parameters(params): Parameters<ImportSvgParams>,
+    ) -> Result<Json<MutationResult>, McpError> {
+        Ok(Json(self.import_svg_mutation(params).await?))
+    }
 }
 
 #[tool_handler]
@@ -519,7 +908,7 @@ impl ServerHandler for InkfiniteMcp {
                     .with_description(SERVER_DESCRIPTION),
             )
             .with_instructions(
-                "Use the Inkfinite discovery and read tools before proposing changes. Open sessions are reached through authenticated local IPC; standalone files are limited to the server's configured allowlist.",
+                "Use the Inkfinite discovery and read tools to inspect current heads before mutating. Mutations are validated by inkfinite-core; open sessions use authenticated local IPC and standalone files are limited to the server's configured allowlist. Set dry_run to preview a transaction without changing the document.",
             )
     }
 }
@@ -642,6 +1031,160 @@ fn protocol_mcp_error(error: ProtocolError) -> McpError {
     )
 }
 
+fn validate_mutation_limits(operations: &[Operation], description: Option<&str>) -> Result<(), McpError> {
+    if operations.len() > MAX_MUTATION_OPERATIONS {
+        return Err(McpError::invalid_params(
+            format!(
+                "mutation contains {} operations; the limit is {MAX_MUTATION_OPERATIONS}",
+                operations.len()
+            ),
+            Some(serde_json::json!({ "code": "mutation_too_large", "max_operations": MAX_MUTATION_OPERATIONS })),
+        ));
+    }
+    if description.is_some_and(|description| description.len() > 4096) {
+        return Err(McpError::invalid_params(
+            "mutation description is too long",
+            Some(serde_json::json!({ "code": "description_too_long", "max_bytes": 4096 })),
+        ));
+    }
+    Ok(())
+}
+
+fn mutation_result(
+    transaction_id: TransactionId, previous_heads: Vec<ChangeHash>, data: MutationData, dry_run: bool,
+) -> MutationResult {
+    MutationResult {
+        transaction_id,
+        current_heads: previous_heads.clone(),
+        previous_heads,
+        patch: data.patch,
+        affected_ids: data.affected_ids,
+        affected_regions: data.affected_regions,
+        warnings: data.warnings,
+        diagnostics: data.diagnostics,
+        dry_run,
+        imported_shape_ids: Vec::new(),
+        imported_asset_ids: Vec::new(),
+        omitted_image_count: 0,
+    }
+}
+
+fn mutation_result_from_commit(commit: CommitResult, previous_heads: Vec<ChangeHash>, dry_run: bool) -> MutationResult {
+    MutationResult {
+        transaction_id: commit.transaction_id,
+        previous_heads,
+        current_heads: commit.heads,
+        patch: commit.patch,
+        affected_ids: commit.affected_ids,
+        affected_regions: commit.affected_regions,
+        warnings: commit.warnings,
+        diagnostics: Vec::new(),
+        dry_run,
+        imported_shape_ids: Vec::new(),
+        imported_asset_ids: Vec::new(),
+        omitted_image_count: 0,
+    }
+}
+
+fn patch_record_ids(patch: &DocumentPatch) -> Vec<RecordId> {
+    let mut ids = Vec::new();
+    for id in patch.created.iter().chain(&patch.changed).chain(&patch.deleted) {
+        if !ids.contains(id) {
+            ids.push(id.clone());
+        }
+    }
+    ids
+}
+
+fn import_error(message: impl Into<String>) -> McpError {
+    McpError::invalid_params(message.into(), Some(serde_json::json!({ "code": "svg_import_failed" })))
+}
+
+fn engine_error_code(error: &EngineError) -> &'static str {
+    match error {
+        EngineError::StaleHeads => "stale_heads",
+        EngineError::Precondition(_) => "precondition_failed",
+        EngineError::Permission(_) => "permission_denied",
+        EngineError::Schema(_) => "validation_error",
+        EngineError::Invariant(_) => "validation_error",
+        EngineError::Crdt(_) | EngineError::Sync(_) | EngineError::EmptyHistory { .. } => "document_engine_error",
+    }
+}
+
+fn mutation_error(code: &str, message: impl Into<String>, invalid_params: bool) -> McpError {
+    let data = Some(serde_json::json!({ "code": code }));
+    if invalid_params {
+        McpError::invalid_params(message.into(), data)
+    } else {
+        McpError::internal_error(message.into(), data)
+    }
+}
+
+fn engine_mutation_error(error: &EngineError) -> McpError {
+    let code = engine_error_code(error);
+    mutation_error(code, format!("Inkfinite mutation failed [{code}]: {error}"), true)
+}
+
+fn engine_mutation_error_with_heads(error: &EngineError, heads: &[ChangeHash]) -> McpError {
+    add_current_heads(engine_mutation_error(error), error, heads)
+}
+
+fn file_mutation_error(error: &FileError) -> McpError {
+    let code = match error {
+        FileError::Locked { .. } => "document_locked",
+        FileError::Engine(error) => engine_error_code(error),
+        FileError::InvalidDocument(_)
+        | FileError::Json(_)
+        | FileError::UnsupportedFormat { .. }
+        | FileError::UnsupportedShapeKind { .. }
+        | FileError::SamePath { .. }
+        | FileError::RecoveryNotFound { .. }
+        | FileError::InvalidRecovery(_)
+        | FileError::RecoveryAhead { .. }
+        | FileError::Io { .. }
+        | FileError::AlreadyExists { .. }
+        | FileError::Sync(_) => "document_file_error",
+    };
+    mutation_error(code, format!("Inkfinite mutation failed [{code}]: {error}"), true)
+}
+
+fn file_mutation_error_with_heads(error: &FileError, heads: &[ChangeHash]) -> McpError {
+    match error {
+        FileError::Engine(engine @ (EngineError::StaleHeads | EngineError::Precondition(_))) => {
+            add_current_heads(file_mutation_error(error), engine, heads)
+        }
+        _ => file_mutation_error(error),
+    }
+}
+
+fn add_current_heads(mut mapped: McpError, error: &EngineError, heads: &[ChangeHash]) -> McpError {
+    if !matches!(error, EngineError::StaleHeads | EngineError::Precondition(_)) {
+        return mapped;
+    }
+    let current_heads = serde_json::to_value(heads).unwrap_or_else(|_| serde_json::json!([]));
+    match mapped.data.as_mut() {
+        Some(serde_json::Value::Object(details)) => {
+            details.insert("current_heads".into(), current_heads);
+        }
+        _ => mapped.data = Some(serde_json::json!({ "current_heads": current_heads })),
+    }
+    mapped
+}
+
+fn mutation_protocol_error(error: ProtocolError) -> McpError {
+    let code = error.code;
+    let message = format!("Inkfinite mutation failed [{code}]: {}", error.message);
+    let details = match error.details {
+        Some(serde_json::Value::Object(mut details)) => {
+            details.insert("code".into(), serde_json::Value::String(code));
+            serde_json::Value::Object(details)
+        }
+        Some(details) => serde_json::json!({ "code": code, "details": details }),
+        None => serde_json::json!({ "code": code }),
+    };
+    McpError::invalid_params(message, Some(details))
+}
+
 fn internal_error(message: impl Into<String>) -> McpError {
     McpError::internal_error(message.into(), None)
 }
@@ -649,15 +1192,39 @@ fn internal_error(message: impl Into<String>) -> McpError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use inkfinite_core::{DocumentId, blank_document};
+    use inkfinite_core::{
+        DocumentId, Provenance, RecordVersion, SemanticMetadata, ShapeId, ShapeKind, ShapeParent, ShapeRecord,
+        ShapeStyle, SiblingAnchor, Transform, Vec2, blank_document,
+    };
+    use serde_json::json;
+    use std::collections::BTreeMap;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    fn blank_file(label: &str) -> PathBuf {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after epoch")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("inkfinite-mcp-{label}-{suffix}.inkfinite"));
+        let document_id = DocumentId::from(format!("document:mcp-{label}-{suffix}"));
+        let mut engine = TransactionEngine::create(
+            document_id.clone(),
+            ActorId::from(MCP_ACTOR),
+            blank_document(&document_id, None),
+        )
+        .expect("blank document should be valid");
+        fs::write(&path, engine.save().expect("document should save")).expect("document should write");
+        path
+    }
+
     #[test]
-    fn capabilities_identify_read_only_stdio_surface() {
+    fn capabilities_identify_stdio_read_write_surface() {
         let metadata = InkfiniteMcp::capabilities();
         assert_eq!(metadata.server, SERVER_NAME);
         assert_eq!(metadata.transport, "stdio");
         assert!(metadata.operations.contains(&"inkfinite_query_records".into()));
+        assert!(metadata.operations.contains(&"inkfinite_mutate".into()));
+        assert!(metadata.operations.contains(&"inkfinite_import_svg".into()));
         assert!(metadata.shape_kinds.contains(&"rect".into()));
     }
 
@@ -679,20 +1246,7 @@ mod tests {
 
     #[test]
     fn file_query_uses_core_query_filters() {
-        let directory = std::env::temp_dir();
-        let suffix = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock should be after epoch")
-            .as_nanos();
-        let path = directory.join(format!("inkfinite-mcp-test-{suffix}.inkfinite"));
-        let mut engine = TransactionEngine::create(
-            DocumentId::from("document:mcp-test"),
-            ActorId::from(MCP_READER_ACTOR),
-            blank_document(&DocumentId::from("document:mcp-test"), None),
-        )
-        .expect("blank document should be valid");
-        fs::write(&path, engine.save().expect("document should save")).expect("document should write");
-
+        let path = blank_file("query");
         let server = InkfiniteMcp::new([path.clone()]);
         let (_, mut engine) = server
             .file_engine(path.to_str().expect("temporary path is UTF-8"))
@@ -702,6 +1256,110 @@ mod tests {
             .expect("query should use the core engine");
         assert_eq!(result.records.len(), 1);
         assert_eq!(result.total, 1);
+        let _ = fs::remove_file(path);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn file_mutation_supports_preview_and_commit() {
+        let path = blank_file("mutation");
+        let server = InkfiniteMcp::new([path.clone()]);
+        let snapshot = {
+            let (_, mut engine) = server
+                .file_engine(path.to_str().expect("temporary path is UTF-8"))
+                .expect("file should load");
+            engine.snapshot().expect("snapshot should load")
+        };
+        let layer_id = snapshot
+            .document
+            .page_ids
+            .first()
+            .and_then(|page_id| snapshot.document.pages[page_id].layer_ids.first().cloned())
+            .expect("blank document should have a layer");
+        let shape_id = ShapeId::from("shape:mcp-rect");
+        let shape = ShapeRecord {
+            id: shape_id.clone(),
+            kind: ShapeKind::from("rect"),
+            parent: ShapeParent::Layer(layer_id),
+            transform: Transform { translation: Vec2 { x: 10.0, y: 20.0 }, rotation: 0.0, scale_x: 1.0, scale_y: 1.0 },
+            child_ids: Vec::new(),
+            layout: None,
+            properties: BTreeMap::from([("width".into(), json!(100.0)), ("height".into(), json!(60.0))]),
+            metadata: SemanticMetadata {
+                name: Some("MCP rectangle".into()),
+                title: None,
+                role: Some("test.rectangle".into()),
+                description: None,
+                body: None,
+                tags: vec!["test".into()],
+                source: None,
+                link: None,
+                custom_metadata: BTreeMap::new(),
+                locked: false,
+                agent_editable: true,
+                provenance: Provenance {
+                    actor_id: ActorId::from(MCP_ACTOR),
+                    origin: Origin::Agent,
+                    timestamp: Timestamp(0),
+                    source: None,
+                },
+            },
+            style: ShapeStyle { opacity: inkfinite_core::Opacity::OPAQUE, fill_opacity: None, stroke_opacity: None },
+            version: RecordVersion(1),
+        };
+        let operation = Operation::CreateShape { shape, anchor: SiblingAnchor::Last };
+        let preview = server
+            .mutate_document(Parameters(MutationParams {
+                target: DocumentTarget { path: Some(path.to_string_lossy().into_owned()), ..DocumentTarget::default() },
+                operations: vec![operation.clone()],
+                dry_run: true,
+                ..MutationParams::default()
+            }))
+            .await
+            .expect("dry run should succeed")
+            .0;
+        assert!(preview.dry_run);
+        assert!(preview.patch.created.contains(&RecordId::Shape(shape_id.clone())));
+
+        let committed = server
+            .mutate_document(Parameters(MutationParams {
+                target: DocumentTarget { path: Some(path.to_string_lossy().into_owned()), ..DocumentTarget::default() },
+                operations: vec![operation],
+                ..MutationParams::default()
+            }))
+            .await
+            .expect("mutation should commit")
+            .0;
+        assert!(!committed.dry_run);
+        assert!(committed.affected_ids.contains(&RecordId::Shape(shape_id.clone())));
+        assert_ne!(committed.previous_heads, committed.current_heads);
+
+        let (_, mut engine) = server
+            .file_engine(path.to_str().expect("temporary path is UTF-8"))
+            .expect("committed file should load");
+        let result = engine
+            .query(&Query { id: Some(shape_id.to_string()), ..Query::default() })
+            .expect("committed shape should be queryable");
+        assert_eq!(result.total, 1);
+        let _ = fs::remove_file(path);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn svg_mutation_uses_shared_import_transaction() {
+        let path = blank_file("svg");
+        let server = InkfiniteMcp::new([path.clone()]);
+        let result = server
+            .import_svg(Parameters(ImportSvgParams {
+                target: DocumentTarget { path: Some(path.to_string_lossy().into_owned()), ..DocumentTarget::default() },
+                svg: r#"<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><rect width="40" height="20" /></svg>"#.into(),
+                source_name: Some("mcp.svg".into()),
+                ..ImportSvgParams::default()
+            }))
+            .await
+            .expect("SVG import should commit")
+            .0;
+        assert!(!result.imported_shape_ids.is_empty());
+        assert!(!result.imported_asset_ids.is_empty());
+        assert!(result.affected_ids.iter().any(|id| matches!(id, RecordId::Shape(_))));
         let _ = fs::remove_file(path);
     }
 }

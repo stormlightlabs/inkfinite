@@ -71,9 +71,11 @@ light and dark themes.
 ### Permissioned MCP
 
 Add a local stdio MCP server as the policy-aware interface for model-controlled
-access. It should call `inkfinite-core` directly for discovery, queries,
-transactions, semantic relationships, layout, proposals, and results rather
-than shelling out or creating a second document API.
+access. It calls `inkfinite-core` directly for discovery, queries, transactions,
+semantic relationships, layout, SVG import, and mutation results rather than
+shelling out or creating a second document API. The mutation tool accepts the
+shared ordered operations, returns affected records and causal heads, and can
+preview a transaction without changing the document.
 
 MCP owns read and write scopes, per-document or per-session policy,
 `agent_editable`, hidden-layer visibility, and any optional review workflow.
