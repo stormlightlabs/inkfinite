@@ -22,8 +22,8 @@
 
 ## Verification
 
-For affected editor surfaces, run the relevant capture scripts (or add new ones) and inspect
-`scripts/images/__screenshots__` at their full captured size. These are in `scripts/images/*.mjs`
+For affected editor surfaces, run the relevant Playwright visual tests (or add new ones) and
+inspect the baselines in `apps/web/e2e/visual/*-snapshots/` at their full captured size.
 
 ### Code Quality
 

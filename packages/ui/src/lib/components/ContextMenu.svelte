@@ -67,9 +67,11 @@
 		void tick().then(async () => {
 			if (cancelled || !menuEl) return;
 			const gutter = 8;
+			// Keep commands above the editor's fixed status bar.
+			const bottomGutter = 56;
 			const bounds = menuEl.getBoundingClientRect();
 			left = Math.max(gutter, Math.min(x, window.innerWidth - bounds.width - gutter));
-			top = Math.max(gutter, Math.min(y, window.innerHeight - bounds.height - gutter));
+			top = Math.max(gutter, Math.min(y, window.innerHeight - bounds.height - bottomGutter));
 			positioned = true;
 			await tick();
 			if (cancelled) return;
@@ -185,7 +187,7 @@
 		display: grid;
 		min-width: 13rem;
 		max-width: min(20rem, calc(100vw - 1rem));
-		max-height: calc(100vh - 1rem);
+		max-height: calc(100vh - 4rem);
 		padding: var(--ink-space-1);
 		overflow-y: auto;
 		border-radius: var(--ink-radius-panel-small);

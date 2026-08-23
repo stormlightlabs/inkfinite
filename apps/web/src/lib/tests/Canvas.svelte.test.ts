@@ -118,21 +118,10 @@ describe('Canvas component', () => {
 		const { container } = renderCanvas();
 		const toolButtons = container.querySelectorAll('.toolbar .tool-button');
 
-		expect(toolButtons.length).toBe(10);
-
-		const toolIds = Array.from(toolButtons).map((btn) => btn.getAttribute('data-tool-id'));
-		expect(toolIds).toEqual([
-			'select',
-			'direct-select',
-			'rect',
-			'ellipse',
-			'frame',
-			'line',
-			'arrow',
-			'text',
-			'markdown',
-			'pen'
-		]);
+		expect(toolButtons.length).toBe(6);
+		expect(Array.from(toolButtons).map((button) => button.getAttribute('aria-label'))).toEqual(
+			['Select', 'Direct Select', 'Shapes', 'Text', 'Markdown', 'Pen']
+		);
 
 		const insertButton = container.querySelector(
 			'.application-chrome [aria-label="Open stencils library"]'
@@ -148,26 +137,20 @@ describe('Canvas component', () => {
 		expect(selectButton?.classList.contains('active')).toBe(true);
 	});
 
-	it('should change active tool when toolbar button is clicked', async () => {
+	it('should change active tool when a shape is selected', async () => {
 		const { container } = renderCanvas();
-
 		const selectButton = container.querySelector('.tool-button[data-tool-id="select"]');
-		const rectButton = container.querySelector(
-			'.tool-button[data-tool-id="rect"]'
-		) as HTMLButtonElement;
+		const shapesButton = container.querySelector('[aria-label="Shapes"]') as HTMLButtonElement;
 
 		expect(selectButton?.classList.contains('active')).toBe(true);
-		expect(rectButton?.classList.contains('active')).toBe(false);
+		shapesButton.click();
+		await vi.waitFor(() =>
+			expect(document.querySelector('[aria-label="Shape tools"]')).toBeTruthy()
+		);
+		(document.querySelector('[role="menuitem"]') as HTMLButtonElement).click();
 
-		rectButton.click();
-
-		await new Promise((resolve) => setTimeout(resolve, 50));
-
-		const selectButtonAfter = container.querySelector('.tool-button[data-tool-id="select"]');
-		const rectButtonAfter = container.querySelector('.tool-button[data-tool-id="rect"]');
-
-		expect(selectButtonAfter?.classList.contains('active')).toBe(false);
-		expect(rectButtonAfter?.classList.contains('active')).toBe(true);
+		await vi.waitFor(() => expect(selectButton?.classList.contains('active')).toBe(false));
+		expect(shapesButton.classList.contains('toolbar__tool-button--active')).toBe(true);
 	});
 
 	it('ends panning when the pointer is released outside the canvas', async () => {

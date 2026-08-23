@@ -28,9 +28,10 @@ describe('Toolbar accessibility', () => {
 		expect(selectButton?.getAttribute('aria-label')).toBe('Select');
 		expect(selectButton?.getAttribute('aria-pressed')).toBe('true');
 
-		const rectButton = container.querySelector('[data-tool-id="rect"]');
-		expect(rectButton?.getAttribute('aria-label')).toBe('Rectangle');
-		expect(rectButton?.getAttribute('aria-pressed')).toBe('false');
+		const shapesButton = container.querySelector('[aria-label="Shapes"]');
+		expect(shapesButton?.getAttribute('aria-haspopup')).toBe('menu');
+		expect(shapesButton?.getAttribute('aria-expanded')).toBe('false');
+		expect(shapesButton?.getAttribute('aria-pressed')).toBe('false');
 	});
 
 	it('should have ARIA attributes on export button', () => {

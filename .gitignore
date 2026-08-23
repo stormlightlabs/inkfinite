@@ -10,3 +10,6 @@ target/
 .agents
 !AGENTS.md
 .svelte-kit/
+
+test-results/
+*-snapshots/
