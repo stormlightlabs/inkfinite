@@ -25,3 +25,5 @@ type Story = StoryObj<typeof meta>;
 export const Web: Story = { args: { showAgentControl: false } };
 
 export const Desktop: Story = { args: { showAgentControl: true } };
+
+export const Busy: Story = { args: { interchangeBusy: true } };

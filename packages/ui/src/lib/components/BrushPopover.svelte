@@ -19,11 +19,15 @@
 </script>
 
 <script lang="ts">
+	import { tick } from 'svelte';
+
 	let { brush, onBrushChange, disabled = false, align = 'start' }: BrushPopoverProps = $props();
 
 	let isOpen = $state(false);
 	let popoverEl = $state<HTMLDivElement | null>(null);
 	let buttonEl = $state<HTMLButtonElement | null>(null);
+	let menuPosition = $state({ left: 8, top: 8 });
+	let positioned = $state(false);
 
 	let size = $derived(brush.size);
 	let thinning = $derived(brush.thinning);
@@ -42,22 +46,56 @@
 	});
 
 	$effect(() => {
-		if (!isOpen || typeof document === 'undefined') {
-			return;
+		if (!isOpen || typeof document === 'undefined') return;
+		let cancelled = false;
+
+		async function positionMenu() {
+			positioned = false;
+			await tick();
+			if (cancelled || !popoverEl || !buttonEl) return;
+			const gutter = 8;
+			const trigger = buttonEl.getBoundingClientRect();
+			const menu = popoverEl.getBoundingClientRect();
+			const preferredLeft = align === 'end' ? trigger.right - menu.width : trigger.left;
+			const below = trigger.bottom + gutter;
+			const top =
+				below + menu.height <= window.innerHeight - gutter
+					? below
+					: trigger.top - menu.height - gutter;
+			menuPosition = {
+				left: Math.max(
+					gutter,
+					Math.min(preferredLeft, window.innerWidth - menu.width - gutter)
+				),
+				top: Math.max(gutter, Math.min(top, window.innerHeight - menu.height - gutter))
+			};
+			positioned = true;
+			await tick();
+			popoverEl.querySelector<HTMLElement>('input, button')?.focus();
 		}
+
+		void positionMenu();
 		const handlePointerDown = (event: PointerEvent) => {
 			const target = event.target as Node | null;
-			if (!target) {
-				return;
-			}
-			if (popoverEl?.contains(target) || buttonEl?.contains(target)) {
-				return;
-			}
+			if (!target || popoverEl?.contains(target) || buttonEl?.contains(target)) return;
 			isOpen = false;
+		};
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key !== 'Escape') return;
+			event.preventDefault();
+			isOpen = false;
+			buttonEl?.focus();
 		};
 
 		document.addEventListener('pointerdown', handlePointerDown);
-		return () => document.removeEventListener('pointerdown', handlePointerDown);
+		document.addEventListener('keydown', handleKeyDown);
+		window.addEventListener('resize', positionMenu);
+		return () => {
+			cancelled = true;
+			document.removeEventListener('pointerdown', handlePointerDown);
+			document.removeEventListener('keydown', handleKeyDown);
+			window.removeEventListener('resize', positionMenu);
+		};
 	});
 
 	function togglePopover() {
@@ -133,9 +171,11 @@
 	{#if isOpen}
 		<div
 			class="brush-popover__menu"
-			class:brush-popover__menu--end={align === 'end'}
 			bind:this={popoverEl}
 			role="dialog"
+			style:left={`${menuPosition.left}px`}
+			style:top={`${menuPosition.top}px`}
+			style:visibility={positioned ? 'visible' : 'hidden'}
 			aria-label="Brush settings">
 			<div class="brush-popover__control">
 				<label for="brush-size">
@@ -240,11 +280,12 @@
 	}
 
 	.brush-popover__button {
-		border: var(--ink-line-width) solid var(--ink-border-strong);
+		min-height: var(--ink-control-height);
+		border: var(--ink-line-width) solid var(--ink-border);
 		background: var(--ink-surface-raised);
 		color: var(--ink-text);
-		padding: 0.5rem 0.75rem;
-		border-radius: 0.25rem;
+		padding: 0 var(--ink-space-3);
+		border-radius: var(--ink-radius-control-small);
 		cursor: pointer;
 		font-size: 13px;
 		min-width: 60px;
@@ -254,7 +295,11 @@
 		background: var(--ink-surface-hover);
 	}
 
-	.brush-popover__button:focus {
+	.brush-popover__button:active:not(:disabled) {
+		transform: scale(0.96);
+	}
+
+	.brush-popover__button:focus-visible {
 		outline: 3px solid var(--ink-focus);
 		outline-offset: 2px;
 	}
@@ -265,9 +310,7 @@
 	}
 
 	.brush-popover__menu {
-		position: absolute;
-		top: calc(100% + 4px);
-		left: 0;
+		position: fixed;
 		background: var(--ink-surface-raised);
 		color: var(--ink-text);
 		border: var(--ink-line-width) solid var(--ink-border-strong);
@@ -277,13 +320,8 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
-		z-index: 10;
-		min-width: 200px;
-	}
-
-	.brush-popover__menu--end {
-		right: 0;
-		left: auto;
+		z-index: 1000;
+		width: min(14rem, calc(100vw - 1rem));
 	}
 
 	.brush-popover__control {

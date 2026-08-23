@@ -51,7 +51,7 @@
 
 	let editorState = $derived<EditorStateType>(store.getState());
 	let exportMenuOpen = $state(false);
-	let exportMenuEl = $state<HTMLDivElement | null>(null);
+	let exportMenuPoint = $state({ x: 0, y: 0 });
 	let exportButtonEl = $state<HTMLButtonElement | null>(null);
 	let importMenuOpen = $state(false);
 	let importMenuPoint = $state({ x: 0, y: 0 });
@@ -93,25 +93,6 @@
 		if (window.matchMedia('(max-width: 760px), (pointer: coarse)').matches) {
 			orientation = 'horizontal';
 		}
-	});
-
-	$effect(() => {
-		if (!exportMenuOpen || typeof document === 'undefined') {
-			return;
-		}
-		const handlePointerDown = (event: PointerEvent) => {
-			const target = event.target as Node | null;
-			if (!target) {
-				return;
-			}
-			if (exportMenuEl?.contains(target) || exportButtonEl?.contains(target)) {
-				return;
-			}
-			exportMenuOpen = false;
-		};
-
-		document.addEventListener('pointerdown', handlePointerDown);
-		return () => document.removeEventListener('pointerdown', handlePointerDown);
 	});
 
 	function handleDragStart(event: PointerEvent) {
@@ -236,6 +217,58 @@
 	function exportEditable(format: InterchangeFormat) {
 		exportMenuOpen = false;
 		onExportEditable?.(format);
+	}
+
+	function toggleExportMenu() {
+		if (interchangeBusy || !exportButtonEl) return;
+		if (exportMenuOpen) {
+			exportMenuOpen = false;
+			return;
+		}
+		const bounds = exportButtonEl.getBoundingClientRect();
+		exportMenuPoint = { x: bounds.right, y: bounds.bottom + 8 };
+		exportMenuOpen = true;
+	}
+
+	function getExportMenuItems(): ContextMenuEntry[] {
+		return [
+			{
+				id: 'excalidraw',
+				label: 'Excalidraw',
+				accessibleLabel: 'Export as Excalidraw editable document'
+			},
+			{
+				id: 'json-canvas',
+				label: 'Obsidian Canvas',
+				accessibleLabel: 'Export as Obsidian Canvas editable document'
+			},
+			{ type: 'separator' },
+			{ id: 'png', label: 'PNG (Viewport)', accessibleLabel: 'Export current view as PNG' },
+			{ id: 'svg-all', label: 'SVG (All)', accessibleLabel: 'Export all shapes as SVG' },
+			{
+				id: 'svg-selection',
+				label: 'SVG (Selection)',
+				accessibleLabel: 'Export selected shapes as SVG'
+			}
+		];
+	}
+
+	function handleExportMenuAction(id: string) {
+		switch (id) {
+			case 'excalidraw':
+			case 'json-canvas':
+				exportEditable(id);
+				break;
+			case 'png':
+				void exportPNGViewport();
+				break;
+			case 'svg-all':
+				void exportSVGAll();
+				break;
+			case 'svg-selection':
+				void exportSVGSelection();
+				break;
+		}
 	}
 
 	function toggleImportMenu() {
@@ -364,65 +397,28 @@
 				onOpenChange={(value) => (importMenuOpen = value)}
 				onSelect={handleImportMenuAction} />
 
-			<div class="toolbar__export">
-				<button
-					class="application-chrome__button toolbar__export-button"
-					bind:this={exportButtonEl}
-					type="button"
-					onclick={() => (exportMenuOpen = !exportMenuOpen)}
-					aria-label="Export drawing"
-					aria-haspopup="true"
-					aria-expanded={exportMenuOpen}
-					disabled={interchangeBusy}>
-					<Icon name="save" size={17} />
-					<span class="application-chrome__label">Export</span>
-				</button>
-
-				{#if exportMenuOpen}
-					<div
-						class="toolbar__export-menu"
-						bind:this={exportMenuEl}
-						role="menu"
-						aria-label="Export options">
-						<button
-							class="toolbar__menu-item"
-							role="menuitem"
-							aria-label="Export as Excalidraw editable document"
-							onclick={() => exportEditable('excalidraw')}>
-							Excalidraw
-						</button>
-						<button
-							class="toolbar__menu-item"
-							role="menuitem"
-							aria-label="Export as Obsidian Canvas editable document"
-							onclick={() => exportEditable('json-canvas')}>
-							Obsidian Canvas
-						</button>
-						<div class="toolbar__menu-separator" role="separator"></div>
-						<button
-							class="toolbar__menu-item"
-							role="menuitem"
-							onclick={exportPNGViewport}
-							aria-label="Export current view as PNG">
-							PNG (Viewport)
-						</button>
-						<button
-							class="toolbar__menu-item"
-							role="menuitem"
-							onclick={exportSVGAll}
-							aria-label="Export all shapes as SVG">
-							SVG (All)
-						</button>
-						<button
-							class="toolbar__menu-item"
-							role="menuitem"
-							onclick={exportSVGSelection}
-							aria-label="Export selected shapes as SVG">
-							SVG (Selection)
-						</button>
-					</div>
-				{/if}
-			</div>
+			<button
+				class="application-chrome__button toolbar__export-button"
+				bind:this={exportButtonEl}
+				type="button"
+				onclick={toggleExportMenu}
+				aria-label="Export drawing"
+				aria-haspopup="menu"
+				aria-expanded={exportMenuOpen}
+				disabled={interchangeBusy}>
+				<Icon name="save" size={17} />
+				<span class="application-chrome__label">Export</span>
+			</button>
+			<ContextMenu
+				items={getExportMenuItems()}
+				label="Export options"
+				open={exportMenuOpen}
+				align="end"
+				returnFocus={exportButtonEl}
+				x={exportMenuPoint.x}
+				y={exportMenuPoint.y}
+				onOpenChange={(value) => (exportMenuOpen = value)}
+				onSelect={handleExportMenuAction} />
 		</div>
 	</header>
 
@@ -804,54 +800,6 @@
 		backdrop-filter: blur(14px);
 	}
 
-	.toolbar__export {
-		position: relative;
-	}
-
-	.toolbar__export-menu {
-		position: absolute;
-		top: calc(100% + var(--ink-space-2));
-		right: 0;
-		z-index: 1000;
-		display: grid;
-		min-width: 12rem;
-		gap: var(--ink-space-1);
-		padding: var(--ink-space-1);
-		border: 1px solid var(--ink-border);
-		border-radius: var(--ink-radius-panel-small);
-		color: var(--ink-text);
-		background: var(--ink-surface-raised);
-		box-shadow: var(--ink-shadow-popover);
-	}
-
-	.toolbar__menu-item {
-		min-height: 2.5rem;
-		padding: 0 var(--ink-space-2);
-		border: 0;
-		border-radius: var(--ink-radius-control-small);
-		color: var(--ink-text);
-		background: transparent;
-		font: 600 var(--ink-type-sm) / 1.2 var(--ink-font-body);
-		text-align: left;
-		cursor: pointer;
-	}
-
-	.toolbar__menu-item:hover,
-	.toolbar__menu-item:focus-visible {
-		background: var(--ink-surface-hover);
-	}
-
-	.toolbar__menu-item:focus-visible {
-		outline: 3px solid var(--ink-focus);
-		outline-offset: -2px;
-	}
-
-	.toolbar__menu-separator {
-		height: 1px;
-		margin: var(--ink-space-1) var(--ink-space-2);
-		background: var(--ink-border);
-	}
-
 	@media (max-width: 1180px) {
 		.application-chrome {
 			right: auto;
@@ -909,14 +857,6 @@
 			right: 0.75rem;
 			width: auto;
 		}
-
-		.toolbar__export-menu {
-			position: fixed;
-			top: 4.5rem;
-			right: 0.75rem;
-			left: auto;
-			min-width: min(15rem, calc(100vw - 1.5rem));
-		}
 	}
 
 	@media (max-width: 480px) {
@@ -939,8 +879,7 @@
 		.application-chrome__button,
 		.toolbar,
 		.toolbar__drag-handle,
-		.toolbar__tool-button,
-		.toolbar__menu-item {
+		.toolbar__tool-button {
 			transition: none;
 		}
 	}

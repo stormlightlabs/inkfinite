@@ -3,6 +3,8 @@
 
 	/** One actionable row in a context menu. */
 	export type ContextMenuItem = {
+		/** Accessible name when the visible label needs more context. */
+		accessibleLabel?: string;
 		checked?: boolean;
 		danger?: boolean;
 		disabled?: boolean;
@@ -28,6 +30,10 @@
 		open: boolean;
 		/** Uses denser rows for long command collections. */
 		compact?: boolean;
+		/** Aligns the menu's right edge to x instead of its left edge. */
+		align?: 'start' | 'end';
+		/** Places the menu above y instead of below it. */
+		placement?: 'below' | 'above';
 		returnFocus?: HTMLElement | null;
 		x: number;
 		y: number;
@@ -43,6 +49,8 @@
 		items,
 		label = 'Context menu',
 		compact = false,
+		align = 'start',
+		placement = 'below',
 		onOpenChange,
 		onSelect,
 		open,
@@ -70,8 +78,16 @@
 			// Keep commands above the editor's fixed status bar.
 			const bottomGutter = 56;
 			const bounds = menuEl.getBoundingClientRect();
-			left = Math.max(gutter, Math.min(x, window.innerWidth - bounds.width - gutter));
-			top = Math.max(gutter, Math.min(y, window.innerHeight - bounds.height - bottomGutter));
+			const preferredLeft = align === 'end' ? x - bounds.width : x;
+			const preferredTop = placement === 'above' ? y - bounds.height : y;
+			left = Math.max(
+				gutter,
+				Math.min(preferredLeft, window.innerWidth - bounds.width - gutter)
+			);
+			top = Math.max(
+				gutter,
+				Math.min(preferredTop, window.innerHeight - bounds.height - bottomGutter)
+			);
 			positioned = true;
 			await tick();
 			if (cancelled) return;
@@ -159,6 +175,7 @@
 					class="ink-context-menu__item"
 					class:ink-context-menu__item--danger={entry.danger}
 					role={entry.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+					aria-label={entry.accessibleLabel}
 					aria-checked={entry.checked}
 					disabled={entry.disabled}
 					onclick={() => select(entry)}>

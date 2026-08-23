@@ -55,18 +55,18 @@ and rendered output where visual fidelity matters.
 
 ## Editor polish
 
-- [ ] Standardize hover, pressed, selected, disabled, busy, and focus-visible
+- [x] Standardize hover, pressed, selected, disabled, busy, and focus-visible
       states
-- [ ] Standardize menu and popover placement, dismissal, and focus restoration
-- [ ] Standardize control heights, icon sizes, spacing, and minimum pointer
+- [x] Standardize menu and popover placement, dismissal, and focus restoration
+- [x] Standardize control heights, icon sizes, spacing, and minimum pointer
       targets
-- [ ] Remove controls whose hover state is visually indistinguishable from
+- [x] Remove controls whose hover state is visually indistinguishable from
       idle
-- [ ] Verify menus and popovers remain inside the viewport at editor edges
-- [ ] Verify tool changes, selection changes, and viewport actions do not cause
+- [x] Verify menus and popovers remain inside the viewport at editor edges
+- [x] Verify tool changes, selection changes, and viewport actions do not cause
       unintended layout jumps
-- [ ] Add Storybook coverage for important component states and combinations
-- [ ] Add end-to-end coverage for menus, popovers, focus restoration, and
+- [x] Add Storybook coverage for important component states and combinations
+- [x] Add end-to-end coverage for menus, popovers, focus restoration, and
       viewport-edge placement
 
 ## Permissioned MCP

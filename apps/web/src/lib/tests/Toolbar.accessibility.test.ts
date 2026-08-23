@@ -40,7 +40,7 @@ describe('Toolbar accessibility', () => {
 
 		const exportButton = container.querySelector('.toolbar__export-button');
 		expect(exportButton?.getAttribute('aria-label')).toBe('Export drawing');
-		expect(exportButton?.getAttribute('aria-haspopup')).toBe('true');
+		expect(exportButton?.getAttribute('aria-haspopup')).toBe('menu');
 		expect(exportButton?.getAttribute('aria-expanded')).toBe('false');
 		const importButton = container.querySelector('.toolbar__import-button');
 		expect(importButton?.getAttribute('aria-label')).toBe('Import');
@@ -59,11 +59,10 @@ describe('Toolbar accessibility', () => {
 
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
-		const exportMenu = container.querySelector('.toolbar__export-menu');
-		expect(exportMenu?.getAttribute('role')).toBe('menu');
-		expect(exportMenu?.getAttribute('aria-label')).toBe('Export options');
+		const exportMenu = container.querySelector('[role="menu"][aria-label="Export options"]');
+		expect(exportMenu).toBeTruthy();
 
-		const menuItems = container.querySelectorAll('.toolbar__export-menu .toolbar__menu-item');
+		const menuItems = exportMenu?.querySelectorAll('[role="menuitem"]') ?? [];
 		expect(menuItems.length).toBe(5);
 		menuItems.forEach((item) => {
 			expect(item.getAttribute('role')).toBe('menuitem');

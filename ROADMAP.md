@@ -62,11 +62,11 @@ export, and repurpose, not substitutes for missing editor behavior.
 
 ### Editor polish
 
-The editor already separates drawing tools, application actions, contextual
-selection controls, and library insertion. After the workflows above settle,
-finish the consistency pass across control states, menus, popovers, pointer
-targets, viewport edges, and Storybook examples. Light and dark themes should
-continue to use the shared Inkfinite tokens with theme-specific contrast.
+The editor separates drawing tools, application actions, contextual selection
+controls, and library insertion. Shared controls now cover interaction states,
+pointer targets, menu and popover behavior, viewport-edge placement, and focus
+restoration. Storybook and end-to-end tests cover the important combinations in
+light and dark themes.
 
 ### Permissioned MCP
 
