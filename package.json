@@ -22,6 +22,7 @@
 		"test:visual:update": "pnpm --filter @inkfinite/web test:visual:update",
 		"performance:capture": "pnpm --filter @inkfinite/core build && pnpm --filter @inkfinite/editor build && node scripts/capture-performance.mjs --output fixtures/native/performance/rendering-budget.json",
 		"performance:process": "node scripts/measure-process.mjs",
+		"performance:browser": "pnpm wasm:build && node scripts/measure-browser.mjs",
 		"performance:profile": "node scripts/profile-native.mjs",
 		"bindings:generate": "cargo run -p inkfinite-cli --bin generate-bindings",
 		"bindings:check": "cargo run -p inkfinite-cli --bin generate-bindings -- --check",

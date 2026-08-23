@@ -83,13 +83,33 @@ type WorkerResponseValue =
 	| BrowserDocumentState
 	| BrowserSvgImportState;
 
+type PendingRequest = {
+	resolve: (value: WorkerResponseValue) => void;
+	reject: (error: Error) => void;
+	operation: string;
+	startMark: string;
+};
+
+let performanceSequence = 0;
+
+/** Records a main-thread mark when the browser exposes the User Timing API. */
+function markBrowserPerformance(name: string) {
+	if (typeof performance === 'undefined' || typeof performance.mark !== 'function') return;
+	performance.mark(name);
+}
+
+/** Closes one worker request measure after its response reaches the main thread. */
+function finishBrowserPerformance(operation: string, startMark: string, id: number) {
+	if (typeof performance === 'undefined' || typeof performance.measure !== 'function') return;
+	const endMark = `inkfinite:wasm:${operation}:end:${id}`;
+	markBrowserPerformance(endMark);
+	performance.measure(`inkfinite:wasm:${operation}:${id}`, { start: startMark, end: endMark });
+}
+
 /** A worker boundary that keeps Rust parsing, rendering, and document state off the UI thread. */
 export class DocumentEngineWorkerClient {
 	private nextRequestId = 0;
-	private readonly pending = new Map<
-		number,
-		{ resolve: (value: WorkerResponseValue) => void; reject: (error: Error) => void }
-	>();
+	private readonly pending = new Map<number, PendingRequest>();
 
 	constructor(private readonly worker: Worker) {
 		worker.addEventListener('message', this.handleMessage);
@@ -205,8 +225,16 @@ export class DocumentEngineWorkerClient {
 		transfer: Transferable[] = []
 	): Promise<T> {
 		const id = ++this.nextRequestId;
+		const operation = message.type;
+		const startMark = `inkfinite:wasm:${operation}:start:${++performanceSequence}`;
+		markBrowserPerformance(startMark);
 		return new Promise((resolve, reject) => {
-			this.pending.set(id, { resolve: (value) => resolve(value as T), reject });
+			this.pending.set(id, {
+				resolve: (value) => resolve(value as T),
+				reject,
+				operation,
+				startMark
+			});
 			this.worker.postMessage({ ...message, id }, transfer);
 		});
 	}
@@ -215,6 +243,7 @@ export class DocumentEngineWorkerClient {
 		const request = this.pending.get(event.data.id);
 		if (!request) return;
 		this.pending.delete(event.data.id);
+		finishBrowserPerformance(request.operation, request.startMark, event.data.id);
 		if ('error' in event.data) {
 			request.reject(new Error(event.data.error));
 			return;

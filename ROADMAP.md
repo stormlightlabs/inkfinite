@@ -75,6 +75,15 @@ shared corpus. Keep the no-op Canvas harness only as a renderer traversal
 benchmark; it does not measure rasterization, compositing, text, GPU work, or
 browser GC.
 
+The browser harness in `scripts/measure-browser.mjs` drives the production web
+editor against the shared corpus. It records Chrome frame, paint, raster,
+compositor, long-task, GC, heap, JS-to-WASM, and projection/store measurements
+for load and representative editing gestures. It also checks heap retention
+through sustained editing and active-document replacement. Compact summaries
+and gzipped diagnostic traces are written under
+`fixtures/native/performance/` without enabling Playwright interaction
+tracing.
+
 Set regression budgets from the refreshed native, process, and browser results.
 Add indexes, caches, incremental materialization, alternate rendering, or
 specialized allocation tooling only when a representative measurement

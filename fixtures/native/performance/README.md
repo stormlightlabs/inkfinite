@@ -62,6 +62,33 @@ The capture records the seed, fixture profile and size, warmups, samples,
 hardware, Node/tool versions, and the sampling method in
 `rendering-budget.json`.
 
+## Browser measurements
+
+Run the browser capture for real Chrome editor workloads with:
+
+```sh
+pnpm performance:browser -- --profile flat --size 1000
+```
+
+The harness starts a Vite server, seeds the shared corpus through the browser's
+IndexedDB adapter, and drives the production editor with Playwright. It covers
+load, pan, zoom, box selection, single- and multi-object drag, vector editing,
+connected-shape movement, and nested selection. Workloads that do not match the
+selected document profile are recorded as skipped.
+
+Chrome DevTools Protocol collects frame, paint, raster, compositor, long-task,
+GC, and heap data. Browser performance marks measure document-engine worker
+requests and editor projection/store updates. For a 10,000-shape selection, the
+memory workload opens the board, performs sustained edits, and replaces the
+active board before collecting heap measurements.
+
+The summary is written to
+`fixtures/native/performance/browser-budget.json`. Measured samples also write
+gzipped diagnostic traces to `fixtures/native/performance/browser-traces/`.
+Use `--all-profiles`, `--all-sizes`, `--samples`, `--warmups`, and
+`--no-traces` to control the capture. The harness does not enable Playwright's
+interaction tracing, which would change the workload being measured.
+
 ## Complete process measurements
 
 Install [`hyperfine`](https://github.com/sharkdp/hyperfine), then run:

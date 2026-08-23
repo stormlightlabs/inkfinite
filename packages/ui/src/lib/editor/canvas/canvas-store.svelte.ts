@@ -67,6 +67,24 @@ import { PointerState } from './store/pointer-state.svelte';
 
 type Stencil = stencils.Stencil;
 
+let editorPerformanceSequence = 0;
+
+/** Measures synchronous projection and store commits without changing editor behavior. */
+function measureEditorPerformance<T>(label: string, update: () => T): T {
+	if (typeof performance === 'undefined' || typeof performance.measure !== 'function')
+		return update();
+	const id = ++editorPerformanceSequence;
+	const startMark = `inkfinite:editor:${label}:start:${id}`;
+	const endMark = `inkfinite:editor:${label}:end:${id}`;
+	performance.mark(startMark);
+	try {
+		return update();
+	} finally {
+		performance.mark(endMark);
+		performance.measure(`inkfinite:editor:${label}:${id}`, { start: startMark, end: endMark });
+	}
+}
+
 export type CanvasControllerBindings = {
 	setHistoryViewerOpen(value: boolean): void;
 	setShortcutsOpen(value: boolean): void;
@@ -319,17 +337,19 @@ export function createCanvasController(
 			return;
 		}
 		const firstPageId = doc.order.pageIds[0] ?? Object.keys(doc.pages)[0] ?? null;
-		store.setState((state) => ({
-			...state,
-			doc: {
-				pages: doc.pages,
-				layers: doc.layers ?? doc.order.layers,
-				...(doc.assets ? { assets: doc.assets } : {}),
-				shapes: doc.shapes,
-				bindings: doc.bindings
-			},
-			ui: { ...state.ui, currentPageId: firstPageId, selectionIds: [] }
-		}));
+		measureEditorPerformance('projection', () =>
+			store.setState((state) => ({
+				...state,
+				doc: {
+					pages: doc.pages,
+					layers: doc.layers ?? doc.order.layers,
+					...(doc.assets ? { assets: doc.assets } : {}),
+					shapes: doc.shapes,
+					bindings: doc.bindings
+				},
+				ui: { ...state.ui, currentPageId: firstPageId, selectionIds: [] }
+			}))
+		);
 		if (activeBoardId && syncCanonical) {
 			const boardId = activeBoardId;
 			const hydration = platformSession?.setActiveDocument?.(boardId, doc);
@@ -458,8 +478,12 @@ export function createCanvasController(
 			// Tool movement renders `after` as a local preview. We want restore the
 			// committed mirror before executing the command so history and persistence
 			// receive the real before/after pair exactly once.
-			store.setState(() => before);
-			store.executeCommand(new SnapshotCommand(name, kind, before, after, topologyEdits));
+			measureEditorPerformance('store-commit', () => {
+				store.setState(() => before);
+				store.executeCommand(
+					new SnapshotCommand(name, kind, before, after, topologyEdits)
+				);
+			});
 			syncHandleState();
 		},
 		onBrowseRequested: () => fileBrowser.handleOpen(),

@@ -81,17 +81,17 @@ and rendered output where visual fidelity matters.
 
 ### Browser measurements
 
-- [ ] Add Playwright and CDP workloads for load, pan, zoom, box selection,
+- [x] Add Playwright and CDP workloads for load, pan, zoom, box selection,
       single- and multi-object drag, vector editing, connected-shape movement,
       and nested selection
-- [ ] Capture real Chrome frame, paint, raster, compositor, long-task, GC, and
+- [x] Capture real Chrome frame, paint, raster, compositor, long-task, GC, and
       memory data instead of treating the no-op canvas benchmark as browser
       rendering performance
-- [ ] Measure JS-to-WASM document operations and projection/store updates with
+- [x] Measure JS-to-WASM document operations and projection/store updates with
       browser performance marks
-- [ ] Test heap retention after opening a 10,000-shape board, sustained editing,
+- [x] Test heap retention after opening a 10,000-shape board, sustained editing,
       and replacing the active document
-- [ ] Save compact summaries and diagnostic traces for representative browser
+- [x] Save compact summaries and diagnostic traces for representative browser
       workloads without enabling full Playwright tracing during measurement
 
 ### Baselines and optimization
