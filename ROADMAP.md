@@ -150,7 +150,10 @@ removals; relationships are shown as labeled proposal connectors.
 The review panel lists object-level changes and changed metadata or relationship
 fields alongside the operation summary. Additions, modifications, moves, and
 removals use separate visual tokens and remain separate from ordinary
-selection. MCP may create proposals when local policy allows it, while the
+selection. Desktop session coverage now exercises partial acceptance, rejection,
+and stale-head refresh, while browser review coverage checks the summary and
+canvas ghost states. Accepted and rejected reviews clear the proposal and its
+canvas preview. MCP may create proposals when local policy allows it, while the
 desktop app remains the place for visual review.
 
 ### Richer interoperability and embeds

@@ -128,9 +128,9 @@ before committing them.
 
 ### End-to-end review
 
-- [ ] Add end-to-end tests for the existing proposal summary, partial accept,
+- [x] Add end-to-end tests for the existing proposal summary, partial accept,
       reject, ghost preview, and stale-head flows
-- [ ] Verify accepted and rejected proposals leave no stale canvas or review
+- [x] Verify accepted and rejected proposals leave no stale canvas or review
       state
 
 ## Richer interoperability and embeds

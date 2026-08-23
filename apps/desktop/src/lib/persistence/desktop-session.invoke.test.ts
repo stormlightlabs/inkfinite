@@ -40,6 +40,31 @@ function snapshot(documentId: string): DocumentSnapshot {
 	};
 }
 
+function proposal(document: DocumentSnapshot, id: string, name: string): Proposal {
+	const pageId = document.document.page_ids[0];
+	return {
+		id,
+		transaction: {
+			id: `transaction:${id}`,
+			actor_id: 'actor:desktop',
+			origin: 'agent',
+			base_heads: document.heads,
+			description: name,
+			operations: [
+				{ type: 'rename_page', page_id: pageId, name: `${name} one`, expected_version: null },
+				{ type: 'rename_page', page_id: pageId, name: `${name} two`, expected_version: null }
+			],
+			timestamp: Date.now()
+		},
+		preview: { created: [], changed: [{ kind: 'page', id: pageId }], deleted: [] },
+		operation_previews: [],
+		object_previews: [],
+		affected_regions: [],
+		warnings: [],
+		expires_at: Date.now() + 60_000
+	};
+}
+
 function fileOps() {
 	let savePath = '/tmp/Untitled.inkfinite';
 	const ops: DesktopFileOps = {
@@ -196,6 +221,110 @@ describe('Tauri desktop session command boundary', () => {
 
 		expect(onDocument).toHaveBeenCalledOnce();
 		expect(Object.keys(onDocument.mock.calls[0][0].pages)).toEqual(document.document.page_ids);
+	});
+
+	it('completes live proposal review across partial acceptance, rejection, and stale refresh', async () => {
+		const files = fileOps();
+		const document = snapshot('board:proposal-review');
+		const pageId = document.document.page_ids[0];
+		let currentStatus: SessionStatus = {
+			session_id: 'session:1',
+			path: '/tmp/Untitled.inkfinite',
+			actor_id: 'actor:desktop',
+			snapshot: document,
+			dirty: false,
+			lock_held: true,
+			recovery_available: false,
+			can_undo: false,
+			can_redo: false,
+			sync: { status: 'disabled' }
+		};
+		let proposalListener: ((event: { payload: { session_id?: string; proposal: Proposal } }) => void) | undefined;
+		let stale = false;
+		let saveCount = 0;
+
+		tauri.invoke.mockImplementation(async (command: string, args: Record<string, unknown>) => {
+			if (command === 'create_document') {
+				return { session_id: 'session:1', status: currentStatus } satisfies SessionOpened;
+			}
+			if (command === 'accept_proposal') {
+				if (stale) {
+					const refreshed = proposal(currentStatus.snapshot, 'proposal:stale', 'Refreshed proposal');
+					proposalListener?.({ payload: { session_id: 'session:1', proposal: refreshed } });
+					throw {
+						code: 'proposal_stale',
+						message: 'The document changed while this proposal was open.',
+						details: refreshed
+					};
+				}
+				expect(args).toMatchObject({ sessionId: 'session:1', proposalId: expect.stringMatching(/^proposal:/) });
+				if (args.operationPositions) expect(args.operationPositions).toEqual([1]);
+				const nextSnapshot = structuredClone(currentStatus.snapshot);
+				nextSnapshot.heads = ['head:2'];
+				nextSnapshot.document.pages[pageId].name = 'Selected operation';
+				currentStatus = { ...currentStatus, snapshot: nextSnapshot, dirty: true };
+				return {
+					commit: {
+						transaction_id: 'transaction:proposal-review',
+						heads: nextSnapshot.heads,
+						patch: { created: [], changed: [], deleted: [] },
+						affected_ids: [],
+						affected_regions: [],
+						inverse: { actor_id: 'actor:desktop', operations: [] },
+						warnings: []
+					},
+					status: currentStatus
+				} satisfies SessionCommit;
+			}
+			if (command === 'reject_proposal') return undefined;
+			if (command === 'save') {
+				saveCount += 1;
+				currentStatus = { ...currentStatus, dirty: false };
+				return {
+					save: { path: currentStatus.path, heads: currentStatus.snapshot.heads },
+					status: currentStatus
+				} satisfies SessionSaved;
+			}
+			if (command === 'record_renderer_error') return undefined;
+			throw new Error(`Unexpected command: ${command}`);
+		});
+
+		const repo = createDesktopSessionRepo(files.ops);
+		const boardId = await repo.createBoard('Untitled');
+		const updates: Array<{ proposal: Proposal | null; message?: string }> = [];
+		repo.subscribeProposal((update) => updates.push(update));
+		const listenCalls = tauri.listen.mock.calls as unknown as Array<
+			[string, (event: { payload: { session_id?: string; proposal: Proposal } }) => void]
+		>;
+		proposalListener = listenCalls.find(([event]) => event === 'inkfinite-proposal')?.[1];
+		expect(proposalListener).toBeTypeOf('function');
+
+		const partial = proposal(document, 'proposal:partial', 'Partial proposal');
+		proposalListener?.({ payload: { session_id: 'session:1', proposal: partial } });
+		await repo.acceptProposal(partial.id, [1]);
+		expect(repo.getProposal()).toBeNull();
+		expect((await repo.loadDoc(boardId)).pages[pageId].name).toBe('Selected operation');
+		expect(saveCount).toBe(1);
+
+		const rejected = proposal(currentStatus.snapshot, 'proposal:rejected', 'Rejected proposal');
+		proposalListener?.({ payload: { session_id: 'session:1', proposal: rejected } });
+		await repo.rejectProposal(rejected.id);
+		expect(repo.getProposal()).toBeNull();
+		expect((await repo.loadDoc(boardId)).pages[pageId].name).toBe('Selected operation');
+		expect(saveCount).toBe(1);
+
+		stale = true;
+		const staleProposal = proposal(currentStatus.snapshot, 'proposal:stale', 'Stale proposal');
+		proposalListener?.({ payload: { session_id: 'session:1', proposal: staleProposal } });
+		await expect(repo.acceptProposal(staleProposal.id)).rejects.toThrow(
+			'The document changed while this proposal was open.'
+		);
+		expect(repo.getProposal()?.id).toBe('proposal:stale');
+		stale = false;
+		await repo.acceptProposal('proposal:stale');
+		expect(repo.getProposal()).toBeNull();
+		expect(updates.at(-1)).toEqual({ proposal: null });
+		expect(saveCount).toBe(2);
 	});
 
 	it('clears a live proposal when its review window expires', async () => {
