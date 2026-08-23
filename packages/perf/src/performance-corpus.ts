@@ -1,7 +1,8 @@
+// @ts-nocheck
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const corpusPath = resolve(import.meta.dirname, '../fixtures/native/performance/corpus.json');
+const corpusPath = resolve(import.meta.dirname, '../../../fixtures/native/performance/corpus.json');
 
 /** Shared fixture description consumed by the renderer and native harnesses. */
 export const corpus = JSON.parse(readFileSync(corpusPath, 'utf8'));

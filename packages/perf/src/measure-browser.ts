@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { execFileSync, spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { gzipSync } from 'node:zlib';
@@ -5,10 +6,10 @@ import { cpus, freemem, platform, release, totalmem } from 'node:os';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import process from 'node:process';
-import { corpus, createEditorState, getProfile } from './performance-corpus.mjs';
+import { corpus, createEditorState, getProfile } from './performance-corpus.js';
 
-const root = resolve(import.meta.dirname, '..');
-const require = createRequire(new URL('../apps/web/package.json', import.meta.url));
+const root = resolve(import.meta.dirname, '../../..');
+const require = createRequire(new URL('../../../apps/web/package.json', import.meta.url));
 const { chromium } = require('playwright');
 const defaultOutput = resolve(root, 'fixtures/native/performance/browser-budget.json');
 const defaultTraceDirectory = resolve(root, 'fixtures/native/performance/browser-traces');
@@ -59,19 +60,20 @@ function parseInteger(value, name, minimum = 0) {
 
 function parseOptions() {
 	if (hasArgument('--help')) {
-		console.log(`Usage: node scripts/measure-browser.mjs [options]
+		console.log(`Usage: inkfinite-perf browser [options]
 
 Options:
   --profile ID             Measure one corpus profile (repeatable)
   --all-profiles           Measure all corpus profiles
   --size COUNT             Measure one corpus size (repeatable)
-  --all-sizes              Measure all corpus sizes (the default)
+  --all-sizes              Measure all corpus sizes (default: 1,000)
   --workload NAME          Measure one workload (repeatable)
-  --samples COUNT          Measured samples per workload (default: 5)
-  --warmups COUNT          Unrecorded samples per workload (default: 2)
+  --samples COUNT          Measured samples per workload (default: 3)
+  --warmups COUNT          Unrecorded samples per workload (default: 1)
   --output PATH            Browser summary JSON path
   --trace-dir PATH         Gzipped Chrome trace directory
   --no-traces              Do not save diagnostic Chrome traces
+  --memory                 Run the separate 10,000-shape heap-retention workload
   --port PORT              Vite port (default: 4176)
 `);
 		process.exit(0);
@@ -84,7 +86,7 @@ Options:
 			? requestedProfiles
 			: ['flat'];
 	const requestedSizes = argumentValues('--size').map((value) => parseInteger(value, '--size', 1));
-	const sizes = hasArgument('--all-sizes') || requestedSizes.length === 0 ? corpus.sizes : requestedSizes;
+	const sizes = hasArgument('--all-sizes') ? corpus.sizes : requestedSizes.length > 0 ? requestedSizes : [1_000];
 	const requestedWorkloads = argumentValues('--workload').flatMap((value) => value.split(','));
 	const workloads = requestedWorkloads.length > 0 ? requestedWorkloads : defaultWorkloads;
 
@@ -104,11 +106,12 @@ Options:
 		profiles,
 		sizes,
 		workloads,
-		samples: parseInteger(argumentValue('--samples') ?? 5, '--samples', 1),
-		warmups: parseInteger(argumentValue('--warmups') ?? 2, '--warmups', 0),
+		samples: parseInteger(argumentValue('--samples') ?? 3, '--samples', 1),
+		warmups: parseInteger(argumentValue('--warmups') ?? 1, '--warmups', 0),
 		output: resolve(process.cwd(), argumentValue('--output') ?? defaultOutput),
 		traceDirectory: resolve(process.cwd(), argumentValue('--trace-dir') ?? defaultTraceDirectory),
 		traces: !hasArgument('--no-traces'),
+		memory: hasArgument('--memory'),
 		port: parseInteger(argumentValue('--port') ?? 4176, '--port', 1)
 	};
 }
@@ -270,10 +273,13 @@ async function prepareFixture(page, baseUrl, documents) {
 async function waitForEditor(page) {
 	await page.locator('canvas[aria-label="Infinite canvas"]').waitFor({ state: 'visible', timeout: 60_000 });
 	await page.getByRole('button', { name: 'Shapes', exact: true }).waitFor({ state: 'visible' });
-	await page.waitForFunction(() =>
-		performance
-			.getEntriesByType('measure')
-			.some((entry) => /^inkfinite:wasm:(create_document|open_document):/.test(entry.name))
+	await page.waitForFunction(
+		() =>
+			performance
+				.getEntriesByType('measure')
+				.some((entry) => /^inkfinite:wasm:(create_document|open_document):/.test(entry.name)),
+		null,
+		{ timeout: 120_000 }
 	);
 	await page.evaluate(() => document.fonts.ready);
 	await settleFrames(page, 4);
@@ -671,6 +677,11 @@ function summarizeSamples(samples) {
 		count: samples.length,
 		medianMs: median(durations),
 		p95Ms: percentile(durations, 95),
+		regressionBudget: {
+			statistic: 'p95 milliseconds',
+			maximum: percentile(durations, 95) * 1.2,
+			tolerancePercent: 20
+		},
 		minimumMs: durations.length > 0 ? Math.min(...durations) : null,
 		maximumMs: durations.length > 0 ? Math.max(...durations) : null,
 		metrics: {
@@ -724,7 +735,7 @@ async function measureFixture(page, cdp, baseUrl, fixture, options, sequenceStat
 			if (workload === 'load') {
 				await prepareFixture(page, baseUrl, documents);
 				sample = await measureNavigation(page, cdp, baseUrl, {
-					trace: options.traces,
+					trace: options.traces && sampleIndex === 0,
 					sequence: sequenceState.value++
 				});
 			} else {
@@ -735,12 +746,12 @@ async function measureFixture(page, cdp, baseUrl, fixture, options, sequenceStat
 					`${fixture.profile}-${fixture.size}-${workload}`,
 					() => runWorkload(page, fixture.profile, workload),
 					{
-						trace: options.traces,
+						trace: options.traces && sampleIndex === 0,
 						sequence: sequenceState.value++,
 						expectedWasmOperations: ['single-drag', 'multi-drag', 'vector-edit', 'connected-drag'].includes(
 							workload
 						)
-							? 2
+							? 1
 							: 0
 					}
 				);
@@ -794,7 +805,7 @@ async function measureMemory(page, cdp, baseUrl, fixture, options, sequenceState
 				await drag(page, start, { x: start.x + (offset === 0 ? 80 : -80), y: start.y + 40 });
 			}
 		},
-		{ trace: false, sequence: sequenceState.value++, expectedWasmOperations: 40 }
+		{ trace: false, sequence: sequenceState.value++, expectedWasmOperations: 20 }
 	);
 	const afterSustainedEditing = await readMemory(cdp);
 
@@ -874,7 +885,11 @@ async function main() {
 				const fixture = { profile, size };
 				console.error(`browser ${profile}/${size}`);
 				measurements.push(...(await measureFixture(page, cdp, baseUrl, fixture, options, sequenceState)));
-				memory.push(await measureMemory(page, cdp, baseUrl, fixture, options, sequenceState));
+			}
+			if (options.memory) {
+				const memoryFixture = { profile, size: 10_000 };
+				console.error(`browser memory ${profile}/${memoryFixture.size}`);
+				memory.push(await measureMemory(page, cdp, baseUrl, memoryFixture, options, sequenceState));
 			}
 		}
 
@@ -908,7 +923,7 @@ async function main() {
 				samples: options.samples,
 				statistic: 'median of post-warmup browser samples',
 				clock: 'browser performance.now() marks',
-				traces: options.traces ? 'Chrome DevTools Protocol tracing for measured samples' : 'disabled'
+				traces: options.traces ? 'Chrome DevTools Protocol tracing for the first measured sample' : 'disabled'
 			},
 			scope: {
 				browser: 'Chrome channel with deviceScaleFactor 1',

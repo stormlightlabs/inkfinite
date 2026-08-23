@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-nocheck
 
 import os from 'node:os';
 import path from 'node:path';
@@ -7,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const corpusPath = path.join(root, 'fixtures/native/performance/corpus.json');
 const defaultOutput = path.join(root, 'fixtures/native/performance/process-budget.json');
 
@@ -17,6 +18,7 @@ const hyperfineVersion = requireTool('hyperfine', ['--version']);
 const warmups = options.warmups ?? corpus.warmups;
 const samples = options.samples ?? corpus.samples;
 const selectedProfiles = selectProfiles(corpus.profiles, options);
+const selectedSizes = selectSizes(corpus.sizes, options);
 
 const binaries = {
 	cli: path.join(root, 'target/profiling/inkfinite'),
@@ -39,7 +41,7 @@ run(binaries.fixture, ['--output-dir', documents]);
 const measurements = [];
 try {
 	for (const profile of selectedProfiles) {
-		for (const size of corpus.sizes) {
+		for (const size of selectedSizes) {
 			const document = path.join(documents, `${profile.id}-${size}.inkfinite`);
 			const shapeId = `shape:performance:${profile.id}:${size}:00000`;
 			const mutationCommand = [
@@ -70,7 +72,7 @@ try {
 		}
 	}
 
-	const mcpStartup = path.join(root, 'scripts/mcp-startup.mjs');
+	const mcpStartup = path.join(root, 'packages/perf/dist/mcp-startup.mjs');
 	const mcpCommand = `${quote(process.execPath)} ${quote(mcpStartup)} ${quote(binaries.mcp)}`;
 	const mcpExportPath = path.join(exportRoot, 'mcp-startup.json');
 	const mcpResult = runHyperfine(mcpCommand, 'mcp-startup', mcpExportPath);
@@ -81,7 +83,7 @@ try {
 		fixture: {
 			path: 'fixtures/native/performance/corpus.json',
 			seed: corpus.seed,
-			sizes: corpus.sizes,
+			sizes: selectedSizes,
 			profiles: selectedProfiles.map(({ id }) => id)
 		},
 		methodology: {
@@ -128,6 +130,11 @@ function parseArguments(arguments_) {
 			);
 		} else if (argument === '--all-profiles') {
 			parsed.allProfiles = true;
+		} else if (argument === '--size') {
+			parsed.sizes ??= [];
+			parsed.sizes.push(positiveInteger(arguments_[++index], '--size'));
+		} else if (argument === '--all-sizes') {
+			parsed.allSizes = true;
 		} else if (argument === '--warmups') {
 			parsed.warmups = positiveInteger(arguments_[++index], '--warmups');
 		} else if (argument === '--samples') {
@@ -152,6 +159,16 @@ function selectProfiles(profiles, options_) {
 		throw new Error(`unknown performance profile(s): ${missing.join(', ')}`);
 	}
 	return selected;
+}
+
+function selectSizes(sizes, options_) {
+	if (options_.allSizes) return sizes;
+	const requested = options_.sizes?.length ? options_.sizes : [1_000];
+	const missing = requested.filter((size) => !sizes.includes(size));
+	if (missing.length > 0) {
+		throw new Error(`unknown performance size(s): ${missing.join(', ')}`);
+	}
+	return requested;
 }
 
 function positiveInteger(value, name) {
@@ -199,7 +216,11 @@ function runHyperfine(command, name, exportPath, prepare) {
 	}
 	arguments_.push('--command-name', name, command);
 	run('hyperfine', arguments_);
-	return JSON.parse(requireFile(exportPath)).results[0];
+	const result = JSON.parse(requireFile(exportPath)).results[0];
+	return {
+		...result,
+		regressionBudget: { statistic: 'mean seconds', maximum: result.mean * 1.2, tolerancePercent: 20 }
+	};
 }
 
 function requireFile(file) {

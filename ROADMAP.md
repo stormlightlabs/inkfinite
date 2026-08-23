@@ -75,8 +75,8 @@ shared corpus. Keep the no-op Canvas harness only as a renderer traversal
 benchmark; it does not measure rasterization, compositing, text, GPU work, or
 browser GC.
 
-The browser harness in `scripts/measure-browser.mjs` drives the production web
-editor against the shared corpus. It records Chrome frame, paint, raster,
+The browser command in `@inkfinite/perf` drives the production web editor
+against the shared corpus. It records Chrome frame, paint, raster,
 compositor, long-task, GC, heap, JS-to-WASM, and projection/store measurements
 for load and representative editing gestures. It also checks heap retention
 through sustained editing and active-document replacement. Compact summaries
@@ -84,10 +84,18 @@ and gzipped diagnostic traces are written under
 `fixtures/native/performance/` without enabling Playwright interaction
 tracing.
 
-Set regression budgets from the refreshed native, process, and browser results.
-Add indexes, caches, incremental materialization, alternate rendering, or
-specialized allocation tooling only when a representative measurement
-identifies the cost it addresses.
+The August 2026 native, process, renderer-traversal, and browser baselines now
+record machine-specific regression ceilings. Routine process and browser runs
+use the flat 1,000-shape fixture; full size and profile sweeps are explicit.
+Exact Criterion filters are anchored so a 1,000-shape investigation does not
+also run the 10,000-shape case.
+
+Document loading is the first confirmed scaling concern: the flat 10,000-shape
+Criterion case takes about 6.8 seconds per load on the reference Apple M1. The
+10,000-shape browser heap-retention edit sequence also needs a reliable
+completion path before it can serve as a baseline. Profile those paths before
+adding indexes, caches, incremental materialization, alternate rendering, or
+specialized allocation tooling.
 
 ## Later
 

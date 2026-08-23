@@ -96,13 +96,22 @@ and rendered output where visual fidelity matters.
 
 ### Baselines and optimization
 
-- [ ] Refresh the July 2026 baseline and set regression budgets from current
+- [x] Refresh the July 2026 baseline and set regression budgets from current
       native, process, and browser measurements
-- [ ] Record dominant costs and use Criterion deltas, Chrome traces, and
+- [x] Record dominant costs and use Criterion deltas, Chrome traces, and
       `samply` profiles to investigate regressions
-- [ ] Evaluate spatial indexes, path/render caches, incremental materialization,
+- [x] Evaluate spatial indexes, path/render caches, incremental materialization,
       alternate renderers, or allocation profilers only when a measured
       bottleneck supports the change
+
+### Performance follow-up
+
+- [ ] Investigate native document load scaling: the flat 10,000-shape Criterion
+      case takes about 6.8 seconds per load on the reference Apple M1
+- [ ] Make the 10,000-shape browser heap-retention edit sequence finish reliably
+      before using it as a regression baseline
+- [ ] Profile the confirmed load and mutation costs before choosing indexes,
+      caches, incremental materialization, or allocation changes
 
 ## Backlog
 

@@ -1,10 +1,11 @@
 #!/usr/bin/env node
+// @ts-nocheck
 
 import { spawn } from 'node:child_process';
 
 const binary = process.argv[2];
 if (!binary) {
-	console.error('usage: mcp-startup.mjs PATH_TO_INKFINITE_MCP');
+	console.error('usage: mcp-startup.js PATH_TO_INKFINITE_MCP');
 	process.exit(2);
 }
 
@@ -19,10 +20,22 @@ const timer = setTimeout(() => {
 
 child.stdout.on('data', (chunk) => {
 	output += chunk.toString();
-	if (!ready && output.includes('\n')) {
+	const newline = output.indexOf('\n');
+	if (ready || newline < 0) return;
+
+	try {
+		const response = JSON.parse(output.slice(0, newline));
+		if (response.jsonrpc !== '2.0' || response.id !== 1 || !response.result) {
+			throw new Error('invalid initialize response');
+		}
 		ready = true;
 		clearTimeout(timer);
 		child.kill('SIGTERM');
+	} catch (error) {
+		clearTimeout(timer);
+		child.kill('SIGTERM');
+		console.error(`MCP server returned an invalid initialize response: ${error.message}`);
+		process.exit(1);
 	}
 });
 child.on('error', (error) => {

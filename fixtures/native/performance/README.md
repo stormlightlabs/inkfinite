@@ -35,7 +35,7 @@ To capture a confirmed hotspot with `samply`, select a Criterion benchmark and
 write the profiler output to `profiles/`:
 
 ```sh
-pnpm performance:profile -- --filter 'transactions/commit/semantic-binding-heavy/100'
+pnpm performance:profile -- --filter 'transactions/commit/semantic-binding-heavy/100$'
 ```
 
 The profiling command uses the `profiling` Cargo profile so symbols remain
@@ -67,8 +67,13 @@ hardware, Node/tool versions, and the sampling method in
 Run the browser capture for real Chrome editor workloads with:
 
 ```sh
-pnpm performance:browser -- --profile flat --size 1000
+pnpm performance:browser
 ```
+
+The default capture measures the flat 1,000-shape fixture with three samples
+and one warmup per workload. Run the slower 10,000-shape heap-retention workload
+with `--memory`. This is the reference baseline; broader corpus sweeps must be
+requested explicitly.
 
 The harness starts a Vite server, seeds the shared corpus through the browser's
 IndexedDB adapter, and drives the production editor with Playwright. It covers
@@ -83,11 +88,13 @@ memory workload opens the board, performs sustained edits, and replaces the
 active board before collecting heap measurements.
 
 The summary is written to
-`fixtures/native/performance/browser-budget.json`. Measured samples also write
-gzipped diagnostic traces to `fixtures/native/performance/browser-traces/`.
-Use `--all-profiles`, `--all-sizes`, `--samples`, `--warmups`, and
-`--no-traces` to control the capture. The harness does not enable Playwright's
-interaction tracing, which would change the workload being measured.
+`fixtures/native/performance/browser-budget.json`. The first measured sample
+for each workload also writes a gzipped diagnostic trace to
+`fixtures/native/performance/browser-traces/`. Use `--all-profiles`,
+`--all-sizes`, `--samples`, `--warmups`, and `--no-traces` to control the
+capture. Use `--memory` to include heap retention. The harness does not
+enable Playwright's interaction tracing, which would change the workload being
+measured.
 
 ## Complete process measurements
 
@@ -99,9 +106,9 @@ pnpm performance:process
 
 This builds the profiling CLI, MCP server, and fixture emitter, materializes
 the shared corpus, and measures complete CLI `inspect`, `query`, `validate`,
-`render`, and `shape patch` commands for every corpus size in the `flat`
-profile by default. Use `--profile semantic-binding-heavy` or
-`--all-profiles` to cover additional document structures. Mutation samples
+`render`, and `shape patch` commands for the 1,000-shape `flat` profile by
+default. Use `--size`, `--all-sizes`, `--profile semantic-binding-heavy`, or
+`--all-profiles` for a scale-specific investigation or baseline refresh. Mutation samples
 start from a fresh fixture copy. The same run measures MCP startup by
 sending one JSON-RPC `initialize` request and closing stdin. Results include
 hyperfine's individual sample times in `process-budget.json`; the startup

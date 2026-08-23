@@ -3,6 +3,7 @@ import type { Box2, Vec2 } from './math';
 import { Box2 as Box2Ops, Mat3, Vec2 as Vec2Ops } from './math';
 import type {
 	ArrowShape,
+	BindingRecord,
 	BrushConfig,
 	EllipseShape,
 	LineShape,
@@ -812,6 +813,9 @@ export function computeNormalizedAnchor(point: Vec2, shape: ShapeRecord): { nx: 
 	return { nx, ny };
 }
 
+/** Pre-indexed bindings keyed by their source shape ID for repeated geometry work. */
+export type BindingIndex = ReadonlyMap<string, readonly BindingRecord[]>;
+
 /**
  * Resolve arrow endpoints considering bindings
  *
@@ -821,9 +825,14 @@ export function computeNormalizedAnchor(point: Vec2, shape: ShapeRecord): { nx: 
  *
  * @param state - Editor state
  * @param arrowId - ID of the arrow shape
+ * @param bindingsBySource - Optional binding index reused across a render pass
  * @returns Resolved endpoints {a, b} in world coordinates, or null if arrow not found
  */
-export function resolveArrowEndpoints(state: EditorState, arrowId: string): { a: Vec2; b: Vec2 } | null {
+export function resolveArrowEndpoints(
+	state: EditorState,
+	arrowId: string,
+	bindingsBySource?: BindingIndex
+): { a: Vec2; b: Vec2 } | null {
 	const arrow = state.doc.shapes[arrowId];
 	if (!arrow || arrow.type !== 'arrow') return null;
 
@@ -839,9 +848,10 @@ export function resolveArrowEndpoints(state: EditorState, arrowId: string): { a:
 	const targetShapeStrokeWidth = 2;
 	const offset = targetShapeStrokeWidth / 2 + arrowStrokeWidth / 2;
 
-	for (const binding of Object.values(state.doc.bindings)) {
-		if (binding.fromShapeId !== arrowId) continue;
-
+	const bindings =
+		bindingsBySource?.get(arrowId) ??
+		Object.values(state.doc.bindings).filter((binding) => binding.fromShapeId === arrowId);
+	for (const binding of bindings) {
 		const targetShape = state.doc.shapes[binding.toShapeId];
 		if (!targetShape) continue;
 
@@ -973,9 +983,13 @@ export function computeObstacleAwareOrthogonalPath(
 	return fallback;
 }
 
-/** Resolve an arrow's rendered path, including automatic obstacle routing. */
-export function arrowPathForShape(state: EditorState, shape: ArrowShape): Vec2[] {
-	const resolved = resolveArrowEndpoints(state, shape.id);
+/**
+ * Resolve an arrow's rendered path, including automatic obstacle routing.
+ *
+ * @param bindingsBySource - Optional binding index reused across a render pass
+ */
+export function arrowPathForShape(state: EditorState, shape: ArrowShape, bindingsBySource?: BindingIndex): Vec2[] {
+	const resolved = resolveArrowEndpoints(state, shape.id, bindingsBySource);
 	if (!resolved) return [];
 	const endpoints = [
 		worldToLocal(resolved.a, shape),
@@ -985,9 +999,10 @@ export function arrowPathForShape(state: EditorState, shape: ArrowShape): Vec2[]
 	const routing = shape.props.routing?.automatic ? 'orthogonal' : (shape.props.routing?.kind ?? 'straight');
 	if (routing !== 'orthogonal') return arrowPath(endpoints, routing);
 	const boundTargets = new Set(
-		Object.values(state.doc.bindings)
-			.filter((binding) => binding.fromShapeId === shape.id)
-			.map((binding) => binding.toShapeId)
+		(
+			bindingsBySource?.get(shape.id) ??
+			Object.values(state.doc.bindings).filter((binding) => binding.fromShapeId === shape.id)
+		).map((binding) => binding.toShapeId)
 	);
 	const obstacles = getShapesOnCurrentPage(state)
 		.filter(

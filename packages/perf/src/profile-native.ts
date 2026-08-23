@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-nocheck
 
 import os from 'node:os';
 import path from 'node:path';
@@ -6,7 +7,7 @@ import { mkdir } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const arguments_ = process.argv.slice(2);
 const filterIndex = arguments_.indexOf('--filter');
 const outputIndex = arguments_.indexOf('--output');

@@ -1,0 +1,2071 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-08-23T21:45:18.668Z",
+  "fixture": {
+    "path": "fixtures/native/performance/corpus.json",
+    "seed": 439041101,
+    "profiles": [
+      "flat"
+    ],
+    "sizes": [
+      1000
+    ],
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "camera": {
+      "x": 3200,
+      "y": 3200,
+      "zoom": 1
+    }
+  },
+  "hardware": {
+    "platform": "darwin",
+    "osRelease": "25.5.0",
+    "cpu": "Apple M1",
+    "logicalCpuCount": 8,
+    "totalMemoryBytes": 8589934592,
+    "freeMemoryBytesAtCapture": 112050176
+  },
+  "runtime": {
+    "node": "v26.7.0",
+    "chrome": "Google Chrome 152.0.7977.54",
+    "playwright": "Version 1.61.1"
+  },
+  "sampling": {
+    "warmups": 1,
+    "samples": 3,
+    "statistic": "median of post-warmup browser samples",
+    "clock": "browser performance.now() marks",
+    "traces": "Chrome DevTools Protocol tracing for the first measured sample"
+  },
+  "scope": {
+    "browser": "Chrome channel with deviceScaleFactor 1",
+    "workloads": [
+      "load",
+      "pan",
+      "zoom",
+      "box-selection",
+      "single-drag",
+      "multi-drag",
+      "vector-edit",
+      "connected-drag",
+      "nested-selection"
+    ],
+    "measured": [
+      "load",
+      "pan",
+      "zoom",
+      "box selection",
+      "single-object drag",
+      "multi-object drag",
+      "vector editing",
+      "connected-shape movement",
+      "nested selection",
+      "Chrome frames, paint, raster, compositor, long tasks, GC, and memory",
+      "JS-to-WASM requests and editor projection/store marks"
+    ],
+    "excluded": [
+      "full Playwright tracing",
+      "network timing after the editor is ready"
+    ]
+  },
+  "measurements": [
+    {
+      "profile": "flat",
+      "size": 1000,
+      "workload": "load",
+      "status": "measured",
+      "sampling": {
+        "warmups": 1,
+        "samples": 3
+      },
+      "summary": {
+        "count": 3,
+        "medianMs": 1912,
+        "p95Ms": 2197,
+        "minimumMs": 1864,
+        "maximumMs": 2197,
+        "metrics": {
+          "median": {
+            "Timestamp": 1.9112730000633746,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": -4,
+            "Frames": -1,
+            "JSEventListeners": -50,
+            "LayoutObjects": -437,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": -904,
+            "Resources": -364,
+            "ContextLifecycleStateObservers": -14,
+            "V8PerContextDatas": -2,
+            "WorkerGlobalScopes": 1,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": -2,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 0,
+            "ArrayBufferContents": 2,
+            "LayoutCount": 10,
+            "RecalcStyleCount": 9,
+            "LayoutDuration": 0.0047459999999999725,
+            "RecalcStyleDuration": 0.0036220000000000002,
+            "DevToolsCommandDuration": 0.006097000000000005,
+            "ScriptDuration": 0.024207999999999993,
+            "V8CompileDuration": 0.000014999999999999985,
+            "TaskDuration": 0.2462550000000001,
+            "TaskOtherDuration": 0.20642899999999997,
+            "ThreadTime": 0.25466900000000003,
+            "ProcessTime": 2.1968250000000005,
+            "JSHeapUsedSize": 3134660,
+            "JSHeapTotalSize": 9715712,
+            "FirstMeaningfulPaint": 1189903.785901,
+            "DomContentLoaded": 0.18987899995408952,
+            "NavigationStart": 0.2066979999653995
+          }
+        },
+        "regressionBudget": {
+          "statistic": "p95 milliseconds",
+          "maximum": 2636.4,
+          "tolerancePercent": 20
+        }
+      },
+      "samples": [
+        {
+          "wallClockMs": 2197,
+          "metrics": {
+            "Timestamp": 2.2340269999112934,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": -4,
+            "Frames": -1,
+            "JSEventListeners": -50,
+            "LayoutObjects": -437,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": -904,
+            "Resources": -364,
+            "ContextLifecycleStateObservers": -14,
+            "V8PerContextDatas": -2,
+            "WorkerGlobalScopes": 1,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": -2,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 0,
+            "ArrayBufferContents": 2,
+            "LayoutCount": 10,
+            "RecalcStyleCount": 12,
+            "LayoutDuration": 0.005255999999999983,
+            "RecalcStyleDuration": 0.004593,
+            "DevToolsCommandDuration": 0.006097000000000005,
+            "ScriptDuration": 0.024207999999999993,
+            "V8CompileDuration": 0.000014999999999999985,
+            "TaskDuration": 0.25242300000000006,
+            "TaskOtherDuration": 0.212254,
+            "ThreadTime": 0.255451,
+            "ProcessTime": 2.1968250000000005,
+            "JSHeapUsedSize": 3134660,
+            "JSHeapTotalSize": 9715712,
+            "FirstMeaningfulPaint": 1189901.349116,
+            "DomContentLoaded": 0.22517400002107024,
+            "NavigationStart": 0.2391540000680834
+          },
+          "performance": {
+            "benchmark": {
+              "name": "inkfinite:benchmark:load:1",
+              "startTime": 7.700000047683716,
+              "duration": 1882.4000000953674
+            },
+            "wasm": [
+              {
+                "name": "inkfinite:wasm:create_document:1",
+                "startTime": 218.20000004768372,
+                "duration": 1592.2999999523163
+              }
+            ],
+            "projection": [
+              {
+                "name": "inkfinite:editor:projection:1",
+                "startTime": 108.60000014305115,
+                "duration": 3.8999998569488525
+              },
+              {
+                "name": "inkfinite:editor:projection:2",
+                "startTime": 1864.4000000953674,
+                "duration": 1.7000000476837158
+              }
+            ],
+            "longTasks": [
+              {
+                "name": "self",
+                "startTime": 116.5,
+                "duration": 103
+              }
+            ],
+            "gc": []
+          },
+          "trace": {
+            "eventCount": 11182,
+            "frameAndPaint": {
+              "frames": {
+                "count": 490,
+                "eventCount": 490,
+                "timedEventCount": 0,
+                "instantEventCount": 222,
+                "medianMs": null,
+                "p95Ms": null,
+                "maximumMs": null,
+                "totalMs": 0
+              },
+              "paint": {
+                "count": 374,
+                "eventCount": 374,
+                "timedEventCount": 331,
+                "instantEventCount": 43,
+                "medianMs": 0.001,
+                "p95Ms": 0.041,
+                "maximumMs": 2.48,
+                "totalMs": 7.457000000000017
+              },
+              "raster": {
+                "count": 0,
+                "eventCount": 0,
+                "timedEventCount": 0,
+                "instantEventCount": 0,
+                "medianMs": null,
+                "p95Ms": null,
+                "maximumMs": null,
+                "totalMs": 0
+              },
+              "compositor": {
+                "count": 135,
+                "eventCount": 135,
+                "timedEventCount": 38,
+                "instantEventCount": 7,
+                "medianMs": 0.027,
+                "p95Ms": 0.301,
+                "maximumMs": 0.409,
+                "totalMs": 1.7889999999999997
+              },
+              "layout": {
+                "count": 37,
+                "eventCount": 37,
+                "timedEventCount": 37,
+                "instantEventCount": 0,
+                "medianMs": 0.027,
+                "p95Ms": 2.046,
+                "maximumMs": 3.264,
+                "totalMs": 9.661999999999995
+              }
+            },
+            "longTaskCount": 0,
+            "longTaskTotalMs": 0,
+            "gcCount": 393,
+            "gcTotalMs": 75.80700000000003,
+            "unclassifiedEventCount": 4986
+          },
+          "tracePath": "/Users/owais/Projects/StormlightLabs/OpenSource/inkfinite/fixtures/native/performance/browser-traces/flat-1000-load-1.json.gz"
+        },
+        {
+          "wallClockMs": 1864,
+          "metrics": {
+            "Timestamp": 1.8640169999562204,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 4,
+            "Frames": 1,
+            "JSEventListeners": 1199,
+            "LayoutObjects": 225,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 999,
+            "Resources": 89,
+            "ContextLifecycleStateObservers": 17,
+            "V8PerContextDatas": 2,
+            "WorkerGlobalScopes": 1,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": 6,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 2,
+            "ArrayBufferContents": 4,
+            "LayoutCount": 10,
+            "RecalcStyleCount": 9,
+            "LayoutDuration": 0.004588999999999954,
+            "RecalcStyleDuration": 0.0033170000000000005,
+            "DevToolsCommandDuration": 0.005877000000000007,
+            "ScriptDuration": 0.023478,
+            "V8CompileDuration": 0.000009000000000000002,
+            "TaskDuration": 0.218167,
+            "TaskOtherDuration": 0.18089699999999997,
+            "ThreadTime": 0.22682000000000002,
+            "ProcessTime": 2.1352349999999998,
+            "JSHeapUsedSize": 5969244,
+            "JSHeapTotalSize": 11272192,
+            "FirstMeaningfulPaint": 1189903.785901,
+            "DomContentLoaded": 0.1867159998510033,
+            "NavigationStart": 0.2066979999653995
+          },
+          "performance": {
+            "benchmark": {
+              "name": "inkfinite:benchmark:load:2",
+              "startTime": 5.099999904632568,
+              "duration": 1857.5999999046326
+            },
+            "wasm": [
+              {
+                "name": "inkfinite:wasm:create_document:1",
+                "startTime": 198.39999985694885,
+                "duration": 1589.7999999523163
+              }
+            ],
+            "projection": [
+              {
+                "name": "inkfinite:editor:projection:1",
+                "startTime": 89.69999980926514,
+                "duration": 3.9000000953674316
+              },
+              {
+                "name": "inkfinite:editor:projection:2",
+                "startTime": 1841.5999999046326,
+                "duration": 1.5
+              }
+            ],
+            "longTasks": [
+              {
+                "name": "self",
+                "startTime": 94.5,
+                "duration": 105
+              }
+            ],
+            "gc": []
+          },
+          "trace": null,
+          "tracePath": null
+        },
+        {
+          "wallClockMs": 1912,
+          "metrics": {
+            "Timestamp": 1.9112730000633746,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": -12,
+            "Frames": -3,
+            "JSEventListeners": -1309,
+            "LayoutObjects": -1099,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": -2807,
+            "Resources": -614,
+            "ContextLifecycleStateObservers": -45,
+            "V8PerContextDatas": -6,
+            "WorkerGlobalScopes": 1,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": -10,
+            "AdSubframes": 0,
+            "DetachedScriptStates": -2,
+            "ArrayBufferContents": -3,
+            "LayoutCount": 10,
+            "RecalcStyleCount": 9,
+            "LayoutDuration": 0.0047459999999999725,
+            "RecalcStyleDuration": 0.0036220000000000002,
+            "DevToolsCommandDuration": 0.006587999999999997,
+            "ScriptDuration": 0.02484900000000001,
+            "V8CompileDuration": 0.000021000000000000023,
+            "TaskDuration": 0.2462550000000001,
+            "TaskOtherDuration": 0.20642899999999997,
+            "ThreadTime": 0.25466900000000003,
+            "ProcessTime": 2.213591000000001,
+            "JSHeapUsedSize": -4041840,
+            "JSHeapTotalSize": -1032192,
+            "FirstMeaningfulPaint": 1189905.890753,
+            "DomContentLoaded": 0.18987899995408952,
+            "NavigationStart": 0.20448399987071753
+          },
+          "performance": {
+            "benchmark": {
+              "name": "inkfinite:benchmark:load:3",
+              "startTime": 8.700000047683716,
+              "duration": 1900.5999999046326
+            },
+            "wasm": [
+              {
+                "name": "inkfinite:wasm:create_document:1",
+                "startTime": 233.59999990463257,
+                "duration": 1603.7999999523163
+              }
+            ],
+            "projection": [
+              {
+                "name": "inkfinite:editor:projection:1",
+                "startTime": 118.39999985694885,
+                "duration": 3.8000001907348633
+              },
+              {
+                "name": "inkfinite:editor:projection:2",
+                "startTime": 1890.7999999523163,
+                "duration": 1.4000000953674316
+              }
+            ],
+            "longTasks": [
+              {
+                "name": "self",
+                "startTime": 123.39999985694885,
+                "duration": 111
+              }
+            ],
+            "gc": []
+          },
+          "trace": null,
+          "tracePath": null
+        }
+      ]
+    },
+    {
+      "profile": "flat",
+      "size": 1000,
+      "workload": "pan",
+      "status": "measured",
+      "sampling": {
+        "warmups": 1,
+        "samples": 3
+      },
+      "summary": {
+        "count": 3,
+        "medianMs": 349.59999990463257,
+        "p95Ms": 350,
+        "minimumMs": 346.39999985694885,
+        "maximumMs": 350,
+        "metrics": {
+          "median": {
+            "Timestamp": 0.3518460001796484,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 0,
+            "Frames": 0,
+            "JSEventListeners": 48,
+            "LayoutObjects": 0,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 0,
+            "Resources": 0,
+            "ContextLifecycleStateObservers": 0,
+            "V8PerContextDatas": 0,
+            "WorkerGlobalScopes": 0,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": 0,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 0,
+            "ArrayBufferContents": -1,
+            "LayoutCount": 18,
+            "RecalcStyleCount": 4,
+            "LayoutDuration": 0.0020519999999999428,
+            "RecalcStyleDuration": 0.00021100000000001673,
+            "DevToolsCommandDuration": 0.004844000000000015,
+            "ScriptDuration": 0.04653200000000002,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.07137499999999974,
+            "TaskOtherDuration": 0.015744000000000202,
+            "ThreadTime": 0.07152800000000026,
+            "ProcessTime": 0.11858299999999744,
+            "JSHeapUsedSize": 4590480,
+            "JSHeapTotalSize": 786432,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          }
+        },
+        "regressionBudget": {
+          "statistic": "p95 milliseconds",
+          "maximum": 420,
+          "tolerancePercent": 20
+        }
+      },
+      "samples": [
+        {
+          "wallClockMs": 346.39999985694885,
+          "metrics": {
+            "Timestamp": 0.49370200000703335,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 0,
+            "Frames": 0,
+            "JSEventListeners": 48,
+            "LayoutObjects": 0,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 0,
+            "Resources": 0,
+            "ContextLifecycleStateObservers": 0,
+            "V8PerContextDatas": 0,
+            "WorkerGlobalScopes": 0,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": 0,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 0,
+            "ArrayBufferContents": -1,
+            "LayoutCount": 18,
+            "RecalcStyleCount": 4,
+            "LayoutDuration": 0.0022079999999999878,
+            "RecalcStyleDuration": 0.00019899999999999085,
+            "DevToolsCommandDuration": 0.004844000000000015,
+            "ScriptDuration": 0.04620399999999997,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.0734079999999997,
+            "TaskOtherDuration": 0.01995300000000011,
+            "ThreadTime": 0.07297200000000004,
+            "ProcessTime": 0.11990899999999982,
+            "JSHeapUsedSize": 4590480,
+            "JSHeapTotalSize": 524288,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          },
+          "performance": {
+            "benchmark": {
+              "name": "inkfinite:benchmark:flat-1000-pan:4",
+              "startTime": 1857.4000000953674,
+              "duration": 346.39999985694885
+            },
+            "wasm": [],
+            "projection": [],
+            "longTasks": [],
+            "gc": []
+          },
+          "trace": {
+            "eventCount": 7357,
+            "frameAndPaint": {
+              "frames": {
+                "count": 105,
+                "eventCount": 105,
+                "timedEventCount": 0,
+                "instantEventCount": 61,
+                "medianMs": null,
+                "p95Ms": null,
+                "maximumMs": null,
+                "totalMs": 0
+              },
+              "paint": {
+                "count": 197,
+                "eventCount": 197,
+                "timedEventCount": 181,
+                "instantEventCount": 16,
+                "medianMs": 0.003,
+                "p95Ms": 0.11,
+                "maximumMs": 1.013,
+                "totalMs": 5.778999999999995
+              },
+              "raster": {
+                "count": 0,
+                "eventCount": 0,
+                "timedEventCount": 0,
+                "instantEventCount": 0,
+                "medianMs": null,
+                "p95Ms": null,
+                "maximumMs": null,
+                "totalMs": 0
+              },
+              "compositor": {
+                "count": 133,
+                "eventCount": 133,
+                "timedEventCount": 38,
+                "instantEventCount": 19,
+                "medianMs": 0.026,
+                "p95Ms": 0.079,
+                "maximumMs": 0.106,
+                "totalMs": 1.1630000000000003
+              },
+              "layout": {
+                "count": 29,
+                "eventCount": 29,
+                "timedEventCount": 29,
+                "instantEventCount": 0,
+                "medianMs": 0.108,
+                "p95Ms": 0.15,
+                "maximumMs": 0.153,
+                "totalMs": 2.3310000000000004
+              }
+            },
+            "longTaskCount": 0,
+            "longTaskTotalMs": 0,
+            "gcCount": 83,
+            "gcTotalMs": 31.28600000000001,
+            "unclassifiedEventCount": 5425
+          },
+          "tracePath": "/Users/owais/Projects/StormlightLabs/OpenSource/inkfinite/fixtures/native/performance/browser-traces/flat-1000-pan-1.json.gz"
+        },
+        {
+          "wallClockMs": 350,
+          "metrics": {
+            "Timestamp": 0.3518460001796484,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 0,
+            "Frames": 0,
+            "JSEventListeners": 48,
+            "LayoutObjects": 0,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 0,
+            "Resources": 0,
+            "ContextLifecycleStateObservers": 0,
+            "V8PerContextDatas": 0,
+            "WorkerGlobalScopes": 0,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": 0,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 0,
+            "ArrayBufferContents": -1,
+            "LayoutCount": 18,
+            "RecalcStyleCount": 4,
+            "LayoutDuration": 0.0020140000000000158,
+            "RecalcStyleDuration": 0.00026199999999999835,
+            "DevToolsCommandDuration": 0.004906999999999995,
+            "ScriptDuration": 0.04653200000000002,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.06945900000000016,
+            "TaskOtherDuration": 0.015744000000000202,
+            "ThreadTime": 0.06933200000000017,
+            "ProcessTime": 0.11691100000000176,
+            "JSHeapUsedSize": 5608260,
+            "JSHeapTotalSize": 1310720,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          },
+          "performance": {
+            "benchmark": {
+              "name": "inkfinite:benchmark:flat-1000-pan:5",
+              "startTime": 2021.0999999046326,
+              "duration": 350
+            },
+            "wasm": [],
+            "projection": [],
+            "longTasks": [],
+            "gc": []
+          },
+          "trace": null,
+          "tracePath": null
+        },
+        {
+          "wallClockMs": 349.59999990463257,
+          "metrics": {
+            "Timestamp": 0.3507479999680072,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 0,
+            "Frames": 0,
+            "JSEventListeners": 48,
+            "LayoutObjects": 0,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 0,
+            "Resources": 0,
+            "ContextLifecycleStateObservers": 0,
+            "V8PerContextDatas": 0,
+            "WorkerGlobalScopes": 0,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": 0,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 0,
+            "ArrayBufferContents": -1,
+            "LayoutCount": 18,
+            "RecalcStyleCount": 4,
+            "LayoutDuration": 0.0020519999999999428,
+            "RecalcStyleDuration": 0.00021100000000001673,
+            "DevToolsCommandDuration": 0.004576999999999998,
+            "ScriptDuration": 0.05049699999999996,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.07137499999999974,
+            "TaskOtherDuration": 0.014038000000000217,
+            "ThreadTime": 0.07152800000000026,
+            "ProcessTime": 0.11858299999999744,
+            "JSHeapUsedSize": 4421932,
+            "JSHeapTotalSize": 786432,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          },
+          "performance": {
+            "benchmark": {
+              "name": "inkfinite:benchmark:flat-1000-pan:6",
+              "startTime": 1886.5,
+              "duration": 349.59999990463257
+            },
+            "wasm": [],
+            "projection": [],
+            "longTasks": [],
+            "gc": []
+          },
+          "trace": null,
+          "tracePath": null
+        }
+      ]
+    },
+    {
+      "profile": "flat",
+      "size": 1000,
+      "workload": "zoom",
+      "status": "measured",
+      "sampling": {
+        "warmups": 1,
+        "samples": 3
+      },
+      "summary": {
+        "count": 3,
+        "medianMs": 348.59999990463257,
+        "p95Ms": 349.90000009536743,
+        "minimumMs": 347.89999985694885,
+        "maximumMs": 349.90000009536743,
+        "metrics": {
+          "median": {
+            "Timestamp": 0.3511439999565482,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 0,
+            "Frames": 0,
+            "JSEventListeners": 0,
+            "LayoutObjects": 0,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 0,
+            "Resources": 0,
+            "ContextLifecycleStateObservers": 0,
+            "V8PerContextDatas": 0,
+            "WorkerGlobalScopes": 0,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": 0,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 0,
+            "ArrayBufferContents": -1,
+            "LayoutCount": 8,
+            "RecalcStyleCount": 0,
+            "LayoutDuration": 0.0011210000000000386,
+            "RecalcStyleDuration": 0,
+            "DevToolsCommandDuration": 0.0012220000000000009,
+            "ScriptDuration": 0.032222000000000084,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.04500800000000016,
+            "TaskOtherDuration": 0.009771000000000196,
+            "ThreadTime": 0.045428000000000246,
+            "ProcessTime": 0.07441499999999834,
+            "JSHeapUsedSize": 5182024,
+            "JSHeapTotalSize": 0,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          }
+        },
+        "regressionBudget": {
+          "statistic": "p95 milliseconds",
+          "maximum": 419.8800001144409,
+          "tolerancePercent": 20
+        }
+      },
+      "samples": [
+        {
+          "wallClockMs": 347.89999985694885,
+          "metrics": {
+            "Timestamp": 0.47418899997137487,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 0,
+            "Frames": 0,
+            "JSEventListeners": 0,
+            "LayoutObjects": 0,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 0,
+            "Resources": 0,
+            "ContextLifecycleStateObservers": 0,
+            "V8PerContextDatas": 0,
+            "WorkerGlobalScopes": 0,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": 0,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 0,
+            "ArrayBufferContents": -1,
+            "LayoutCount": 8,
+            "RecalcStyleCount": 0,
+            "LayoutDuration": 0.0011210000000000386,
+            "RecalcStyleDuration": 0,
+            "DevToolsCommandDuration": 0.0012220000000000009,
+            "ScriptDuration": 0.02946000000000004,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.04567399999999999,
+            "TaskOtherDuration": 0.013870999999999967,
+            "ThreadTime": 0.046159999999999535,
+            "ProcessTime": 0.0764099999999992,
+            "JSHeapUsedSize": 5189436,
+            "JSHeapTotalSize": 0,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          },
+          "performance": {
+            "benchmark": {
+              "name": "inkfinite:benchmark:flat-1000-zoom:7",
+              "startTime": 1864.4000000953674,
+              "duration": 347.89999985694885
+            },
+            "wasm": [],
+            "projection": [],
+            "longTasks": [],
+            "gc": []
+          },
+          "trace": {
+            "eventCount": 4573,
+            "frameAndPaint": {
+              "frames": {
+                "count": 100,
+                "eventCount": 100,
+                "timedEventCount": 0,
+                "instantEventCount": 52,
+                "medianMs": null,
+                "p95Ms": null,
+                "maximumMs": null,
+                "totalMs": 0
+              },
+              "paint": {
+                "count": 186,
+                "eventCount": 186,
+                "timedEventCount": 169,
+                "instantEventCount": 17,
+                "medianMs": 0.003,
+                "p95Ms": 0.106,
+                "maximumMs": 1.073,
+                "totalMs": 4.345999999999988
+              },
+              "raster": {
+                "count": 0,
+                "eventCount": 0,
+                "timedEventCount": 0,
+                "instantEventCount": 0,
+                "medianMs": null,
+                "p95Ms": null,
+                "maximumMs": null,
+                "totalMs": 0
+              },
+              "compositor": {
+                "count": 80,
+                "eventCount": 80,
+                "timedEventCount": 24,
+                "instantEventCount": 10,
+                "medianMs": 0.03,
+                "p95Ms": 0.053,
+                "maximumMs": 0.082,
+                "totalMs": 0.7650000000000003
+              },
+              "layout": {
+                "count": 15,
+                "eventCount": 15,
+                "timedEventCount": 15,
+                "instantEventCount": 0,
+                "medianMs": 0.11,
+                "p95Ms": 0.155,
+                "maximumMs": 0.155,
+                "totalMs": 1.117
+              }
+            },
+            "longTaskCount": 0,
+            "longTaskTotalMs": 0,
+            "gcCount": 45,
+            "gcTotalMs": 17.21999999999999,
+            "unclassifiedEventCount": 3108
+          },
+          "tracePath": "/Users/owais/Projects/StormlightLabs/OpenSource/inkfinite/fixtures/native/performance/browser-traces/flat-1000-zoom-1.json.gz"
+        },
+        {
+          "wallClockMs": 349.90000009536743,
+          "metrics": {
+            "Timestamp": 0.3511439999565482,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 0,
+            "Frames": 0,
+            "JSEventListeners": 0,
+            "LayoutObjects": 0,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 0,
+            "Resources": 0,
+            "ContextLifecycleStateObservers": 0,
+            "V8PerContextDatas": 0,
+            "WorkerGlobalScopes": 0,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": 0,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 0,
+            "ArrayBufferContents": -1,
+            "LayoutCount": 8,
+            "RecalcStyleCount": 0,
+            "LayoutDuration": 0.0011019999999999364,
+            "RecalcStyleDuration": 0,
+            "DevToolsCommandDuration": 0.0012309999999999821,
+            "ScriptDuration": 0.032222000000000084,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.044325999999999866,
+            "TaskOtherDuration": 0.009771000000000196,
+            "ThreadTime": 0.04459700000000044,
+            "ProcessTime": 0.07353999999999772,
+            "JSHeapUsedSize": 5182024,
+            "JSHeapTotalSize": 0,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          },
+          "performance": {
+            "benchmark": {
+              "name": "inkfinite:benchmark:flat-1000-zoom:8",
+              "startTime": 1896.2000000476837,
+              "duration": 349.90000009536743
+            },
+            "wasm": [],
+            "projection": [],
+            "longTasks": [],
+            "gc": []
+          },
+          "trace": null,
+          "tracePath": null
+        },
+        {
+          "wallClockMs": 348.59999990463257,
+          "metrics": {
+            "Timestamp": 0.3499759999103844,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 0,
+            "Frames": 0,
+            "JSEventListeners": 0,
+            "LayoutObjects": 0,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 0,
+            "Resources": 0,
+            "ContextLifecycleStateObservers": 0,
+            "V8PerContextDatas": 0,
+            "WorkerGlobalScopes": 0,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": 0,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 0,
+            "ArrayBufferContents": -1,
+            "LayoutCount": 8,
+            "RecalcStyleCount": 0,
+            "LayoutDuration": 0.0011219999999999564,
+            "RecalcStyleDuration": 0,
+            "DevToolsCommandDuration": 0.0011749999999999816,
+            "ScriptDuration": 0.03322400000000003,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.04500800000000016,
+            "TaskOtherDuration": 0.009487000000000023,
+            "ThreadTime": 0.045428000000000246,
+            "ProcessTime": 0.07441499999999834,
+            "JSHeapUsedSize": 5136488,
+            "JSHeapTotalSize": 0,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          },
+          "performance": {
+            "benchmark": {
+              "name": "inkfinite:benchmark:flat-1000-zoom:9",
+              "startTime": 1887.4000000953674,
+              "duration": 348.59999990463257
+            },
+            "wasm": [],
+            "projection": [],
+            "longTasks": [],
+            "gc": []
+          },
+          "trace": null,
+          "tracePath": null
+        }
+      ]
+    },
+    {
+      "profile": "flat",
+      "size": 1000,
+      "workload": "box-selection",
+      "status": "measured",
+      "sampling": {
+        "warmups": 1,
+        "samples": 3
+      },
+      "summary": {
+        "count": 3,
+        "medianMs": 432.7000000476837,
+        "p95Ms": 433.90000009536743,
+        "minimumMs": 430.7000000476837,
+        "maximumMs": 433.90000009536743,
+        "metrics": {
+          "median": {
+            "Timestamp": 0.43486299994401634,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 0,
+            "Frames": 0,
+            "JSEventListeners": 49,
+            "LayoutObjects": 89,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 371,
+            "Resources": 0,
+            "ContextLifecycleStateObservers": 0,
+            "V8PerContextDatas": 0,
+            "WorkerGlobalScopes": 0,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": 0,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 0,
+            "ArrayBufferContents": -1,
+            "LayoutCount": 23,
+            "RecalcStyleCount": 26,
+            "LayoutDuration": 0.004434999999999967,
+            "RecalcStyleDuration": 0.002942,
+            "DevToolsCommandDuration": 0.005765999999999993,
+            "ScriptDuration": 0.04557800000000001,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.11900399999999944,
+            "TaskOtherDuration": 0.059345000000000425,
+            "ThreadTime": 0.1191639999999996,
+            "ProcessTime": 0.269436000000006,
+            "JSHeapUsedSize": 18566788,
+            "JSHeapTotalSize": 0,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          }
+        },
+        "regressionBudget": {
+          "statistic": "p95 milliseconds",
+          "maximum": 520.6800001144409,
+          "tolerancePercent": 20
+        }
+      },
+      "samples": [
+        {
+          "wallClockMs": 430.7000000476837,
+          "metrics": {
+            "Timestamp": 0.5876879999414086,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 0,
+            "Frames": 0,
+            "JSEventListeners": 49,
+            "LayoutObjects": 89,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 371,
+            "Resources": 0,
+            "ContextLifecycleStateObservers": 0,
+            "V8PerContextDatas": 0,
+            "WorkerGlobalScopes": 0,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": 0,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 0,
+            "ArrayBufferContents": -1,
+            "LayoutCount": 23,
+            "RecalcStyleCount": 26,
+            "LayoutDuration": 0.004477999999999982,
+            "RecalcStyleDuration": 0.002942,
+            "DevToolsCommandDuration": 0.005657000000000023,
+            "ScriptDuration": 0.044857000000000036,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.11900399999999944,
+            "TaskOtherDuration": 0.06106999999999996,
+            "ThreadTime": 0.1191639999999996,
+            "ProcessTime": 0.4149940000000001,
+            "JSHeapUsedSize": 18566788,
+            "JSHeapTotalSize": 0,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          },
+          "performance": {
+            "benchmark": {
+              "name": "inkfinite:benchmark:flat-1000-box-selection:10",
+              "startTime": 1878.5999999046326,
+              "duration": 430.7000000476837
+            },
+            "wasm": [],
+            "projection": [
+              {
+                "name": "inkfinite:editor:store-commit:3",
+                "startTime": 2199.2999999523163,
+                "duration": 22
+              }
+            ],
+            "longTasks": [
+              {
+                "name": "self",
+                "startTime": 2194.7000000476837,
+                "duration": 69
+              }
+            ],
+            "gc": []
+          },
+          "trace": {
+            "eventCount": 8700,
+            "frameAndPaint": {
+              "frames": {
+                "count": 129,
+                "eventCount": 129,
+                "timedEventCount": 0,
+                "instantEventCount": 69,
+                "medianMs": null,
+                "p95Ms": null,
+                "maximumMs": null,
+                "totalMs": 0
+              },
+              "paint": {
+                "count": 379,
+                "eventCount": 379,
+                "timedEventCount": 364,
+                "instantEventCount": 15,
+                "medianMs": 0.007,
+                "p95Ms": 0.133,
+                "maximumMs": 1.282,
+                "totalMs": 12.716999999999981
+              },
+              "raster": {
+                "count": 0,
+                "eventCount": 0,
+                "timedEventCount": 0,
+                "instantEventCount": 0,
+                "medianMs": null,
+                "p95Ms": null,
+                "maximumMs": null,
+                "totalMs": 0
+              },
+              "compositor": {
+                "count": 145,
+                "eventCount": 145,
+                "timedEventCount": 42,
+                "instantEventCount": 19,
+                "medianMs": 0.037,
+                "p95Ms": 0.073,
+                "maximumMs": 0.102,
+                "totalMs": 1.6520000000000004
+              },
+              "layout": {
+                "count": 59,
+                "eventCount": 59,
+                "timedEventCount": 59,
+                "instantEventCount": 0,
+                "medianMs": 0.085,
+                "p95Ms": 0.161,
+                "maximumMs": 1.805,
+                "totalMs": 7.356
+              }
+            },
+            "longTaskCount": 0,
+            "longTaskTotalMs": 0,
+            "gcCount": 125,
+            "gcTotalMs": 38.550000000000004,
+            "unclassifiedEventCount": 6265
+          },
+          "tracePath": "/Users/owais/Projects/StormlightLabs/OpenSource/inkfinite/fixtures/native/performance/browser-traces/flat-1000-box-selection-1.json.gz"
+        },
+        {
+          "wallClockMs": 433.90000009536743,
+          "metrics": {
+            "Timestamp": 0.43486299994401634,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 0,
+            "Frames": 0,
+            "JSEventListeners": 49,
+            "LayoutObjects": 89,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 371,
+            "Resources": 0,
+            "ContextLifecycleStateObservers": 0,
+            "V8PerContextDatas": 0,
+            "WorkerGlobalScopes": 0,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": 0,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 0,
+            "ArrayBufferContents": -1,
+            "LayoutCount": 23,
+            "RecalcStyleCount": 26,
+            "LayoutDuration": 0.004302000000000028,
+            "RecalcStyleDuration": 0.002912999999999999,
+            "DevToolsCommandDuration": 0.005765999999999993,
+            "ScriptDuration": 0.04557800000000001,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.11052399999999984,
+            "TaskOtherDuration": 0.05196500000000004,
+            "ThreadTime": 0.11090899999999948,
+            "ProcessTime": 0.24233300000000213,
+            "JSHeapUsedSize": 18571112,
+            "JSHeapTotalSize": 262144,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          },
+          "performance": {
+            "benchmark": {
+              "name": "inkfinite:benchmark:flat-1000-box-selection:11",
+              "startTime": 1887.9000000953674,
+              "duration": 433.90000009536743
+            },
+            "wasm": [],
+            "projection": [
+              {
+                "name": "inkfinite:editor:store-commit:3",
+                "startTime": 2211.5,
+                "duration": 22.700000047683716
+              }
+            ],
+            "longTasks": [
+              {
+                "name": "self",
+                "startTime": 2206.7000000476837,
+                "duration": 70
+              }
+            ],
+            "gc": []
+          },
+          "trace": null,
+          "tracePath": null
+        },
+        {
+          "wallClockMs": 432.7000000476837,
+          "metrics": {
+            "Timestamp": 0.43343400000594556,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 0,
+            "Frames": 0,
+            "JSEventListeners": -1046,
+            "LayoutObjects": 88,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 341,
+            "Resources": -10,
+            "ContextLifecycleStateObservers": 0,
+            "V8PerContextDatas": 0,
+            "WorkerGlobalScopes": 0,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": 0,
+            "AdSubframes": 0,
+            "DetachedScriptStates": -4,
+            "ArrayBufferContents": -3,
+            "LayoutCount": 23,
+            "RecalcStyleCount": 26,
+            "LayoutDuration": 0.004434999999999967,
+            "RecalcStyleDuration": 0.0030050000000000354,
+            "DevToolsCommandDuration": 0.00592400000000004,
+            "ScriptDuration": 0.04718200000000006,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.11989099999999997,
+            "TaskOtherDuration": 0.059345000000000425,
+            "ThreadTime": 0.12008799999999997,
+            "ProcessTime": 0.269436000000006,
+            "JSHeapUsedSize": -10327900,
+            "JSHeapTotalSize": -1048576,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          },
+          "performance": {
+            "benchmark": {
+              "name": "inkfinite:benchmark:flat-1000-box-selection:12",
+              "startTime": 1875.2999999523163,
+              "duration": 432.7000000476837
+            },
+            "wasm": [],
+            "projection": [
+              {
+                "name": "inkfinite:editor:store-commit:3",
+                "startTime": 2198.0999999046326,
+                "duration": 23.200000047683716
+              }
+            ],
+            "longTasks": [
+              {
+                "name": "self",
+                "startTime": 2192.7999999523163,
+                "duration": 72
+              }
+            ],
+            "gc": []
+          },
+          "trace": null,
+          "tracePath": null
+        }
+      ]
+    },
+    {
+      "profile": "flat",
+      "size": 1000,
+      "workload": "single-drag",
+      "status": "measured",
+      "sampling": {
+        "warmups": 1,
+        "samples": 3
+      },
+      "summary": {
+        "count": 3,
+        "medianMs": 494.80000019073486,
+        "p95Ms": 498.5,
+        "minimumMs": 488,
+        "maximumMs": 498.5,
+        "metrics": {
+          "median": {
+            "Timestamp": 0.4959269999526441,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 0,
+            "Frames": 0,
+            "JSEventListeners": 49,
+            "LayoutObjects": 72,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 312,
+            "Resources": -6,
+            "ContextLifecycleStateObservers": -1,
+            "V8PerContextDatas": 0,
+            "WorkerGlobalScopes": -1,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": -2,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 0,
+            "ArrayBufferContents": 0,
+            "LayoutCount": 22,
+            "RecalcStyleCount": 11,
+            "LayoutDuration": 0.003054999999999919,
+            "RecalcStyleDuration": 0.0012360000000000149,
+            "DevToolsCommandDuration": 0.00550700000000004,
+            "ScriptDuration": 0.08662499999999995,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.1880740000000003,
+            "TaskOtherDuration": 0.08881200000000078,
+            "ThreadTime": 0.18690400000000018,
+            "ProcessTime": 0.7619319999999945,
+            "JSHeapUsedSize": 10091788,
+            "JSHeapTotalSize": 1048576,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          }
+        },
+        "regressionBudget": {
+          "statistic": "p95 milliseconds",
+          "maximum": 598.1999999999999,
+          "tolerancePercent": 20
+        }
+      },
+      "samples": [
+        {
+          "wallClockMs": 498.5,
+          "metrics": {
+            "Timestamp": 0.6642720000818372,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 0,
+            "Frames": 0,
+            "JSEventListeners": 49,
+            "LayoutObjects": 72,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 312,
+            "Resources": -6,
+            "ContextLifecycleStateObservers": -1,
+            "V8PerContextDatas": 0,
+            "WorkerGlobalScopes": -1,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": -2,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 0,
+            "ArrayBufferContents": 0,
+            "LayoutCount": 22,
+            "RecalcStyleCount": 11,
+            "LayoutDuration": 0.0033840000000000536,
+            "RecalcStyleDuration": 0.0012560000000000349,
+            "DevToolsCommandDuration": 0.00550700000000004,
+            "ScriptDuration": 0.08911499999999983,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.1880740000000003,
+            "TaskOtherDuration": 0.08881200000000078,
+            "ThreadTime": 0.18690400000000018,
+            "ProcessTime": 0.9076310000000021,
+            "JSHeapUsedSize": 27352596,
+            "JSHeapTotalSize": 1835008,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          },
+          "performance": {
+            "benchmark": {
+              "name": "inkfinite:benchmark:flat-1000-single-drag:13",
+              "startTime": 1798.7999999523163,
+              "duration": 498.5
+            },
+            "wasm": [
+              {
+                "name": "inkfinite:wasm:document_state:2",
+                "startTime": 1861.2000000476837,
+                "duration": 428.2999999523163
+              }
+            ],
+            "projection": [
+              {
+                "name": "inkfinite:editor:store-commit:3",
+                "startTime": 1847.7999999523163,
+                "duration": 12.900000095367432
+              },
+              {
+                "name": "inkfinite:editor:store-commit:4",
+                "startTime": 2168.2999999523163,
+                "duration": 12.5
+              }
+            ],
+            "longTasks": [
+              {
+                "name": "self",
+                "startTime": 1840.5,
+                "duration": 54
+              }
+            ],
+            "gc": []
+          },
+          "trace": {
+            "eventCount": 10212,
+            "frameAndPaint": {
+              "frames": {
+                "count": 180,
+                "eventCount": 180,
+                "timedEventCount": 0,
+                "instantEventCount": 76,
+                "medianMs": null,
+                "p95Ms": null,
+                "maximumMs": null,
+                "totalMs": 0
+              },
+              "paint": {
+                "count": 242,
+                "eventCount": 242,
+                "timedEventCount": 221,
+                "instantEventCount": 21,
+                "medianMs": 0.003,
+                "p95Ms": 0.101,
+                "maximumMs": 1.11,
+                "totalMs": 6.9329999999999865
+              },
+              "raster": {
+                "count": 0,
+                "eventCount": 0,
+                "timedEventCount": 0,
+                "instantEventCount": 0,
+                "medianMs": null,
+                "p95Ms": null,
+                "maximumMs": null,
+                "totalMs": 0
+              },
+              "compositor": {
+                "count": 188,
+                "eventCount": 188,
+                "timedEventCount": 44,
+                "instantEventCount": 20,
+                "medianMs": 0.025,
+                "p95Ms": 0.051,
+                "maximumMs": 0.105,
+                "totalMs": 1.256
+              },
+              "layout": {
+                "count": 42,
+                "eventCount": 42,
+                "timedEventCount": 42,
+                "instantEventCount": 0,
+                "medianMs": 0.095,
+                "p95Ms": 0.154,
+                "maximumMs": 1.302,
+                "totalMs": 4.578
+              }
+            },
+            "longTaskCount": 0,
+            "longTaskTotalMs": 0,
+            "gcCount": 317,
+            "gcTotalMs": 83.04700000000008,
+            "unclassifiedEventCount": 6906
+          },
+          "tracePath": "/Users/owais/Projects/StormlightLabs/OpenSource/inkfinite/fixtures/native/performance/browser-traces/flat-1000-single-drag-1.json.gz"
+        },
+        {
+          "wallClockMs": 494.80000019073486,
+          "metrics": {
+            "Timestamp": 0.4959269999526441,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": -10,
+            "Frames": -2,
+            "JSEventListeners": -2361,
+            "LayoutObjects": -662,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": -3094,
+            "Resources": -543,
+            "ContextLifecycleStateObservers": -45,
+            "V8PerContextDatas": -4,
+            "WorkerGlobalScopes": -1,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": -12,
+            "AdSubframes": 0,
+            "DetachedScriptStates": -6,
+            "ArrayBufferContents": -6,
+            "LayoutCount": 22,
+            "RecalcStyleCount": 11,
+            "LayoutDuration": 0.003054999999999919,
+            "RecalcStyleDuration": 0.0012360000000000149,
+            "DevToolsCommandDuration": 0.005607999999999946,
+            "ScriptDuration": 0.08554700000000004,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.1957500000000003,
+            "TaskOtherDuration": 0.1003039999999995,
+            "ThreadTime": 0.19467200000000062,
+            "ProcessTime": 0.7619319999999945,
+            "JSHeapUsedSize": -25200052,
+            "JSHeapTotalSize": 1048576,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          },
+          "performance": {
+            "benchmark": {
+              "name": "inkfinite:benchmark:flat-1000-single-drag:14",
+              "startTime": 1816.7999999523163,
+              "duration": 494.80000019073486
+            },
+            "wasm": [
+              {
+                "name": "inkfinite:wasm:document_state:2",
+                "startTime": 1872,
+                "duration": 430.7999999523163
+              }
+            ],
+            "projection": [
+              {
+                "name": "inkfinite:editor:store-commit:3",
+                "startTime": 1860.2999999523163,
+                "duration": 11.300000190734863
+              },
+              {
+                "name": "inkfinite:editor:store-commit:4",
+                "startTime": 2182.2000000476837,
+                "duration": 10.599999904632568
+              }
+            ],
+            "longTasks": [
+              {
+                "name": "self",
+                "startTime": 1853.2000000476837,
+                "duration": 51
+              }
+            ],
+            "gc": []
+          },
+          "trace": null,
+          "tracePath": null
+        },
+        {
+          "wallClockMs": 488,
+          "metrics": {
+            "Timestamp": 0.4886819999665022,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 0,
+            "Frames": 0,
+            "JSEventListeners": 49,
+            "LayoutObjects": 72,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 312,
+            "Resources": -6,
+            "ContextLifecycleStateObservers": -1,
+            "V8PerContextDatas": 0,
+            "WorkerGlobalScopes": -1,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": -2,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 0,
+            "ArrayBufferContents": 1,
+            "LayoutCount": 22,
+            "RecalcStyleCount": 11,
+            "LayoutDuration": 0.0029839999999999867,
+            "RecalcStyleDuration": 0.0011849999999999916,
+            "DevToolsCommandDuration": 0.005263000000000018,
+            "ScriptDuration": 0.08662499999999995,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.17598699999999923,
+            "TaskOtherDuration": 0.07993000000000006,
+            "ThreadTime": 0.17528200000000105,
+            "ProcessTime": 0.7302389999999974,
+            "JSHeapUsedSize": 10091788,
+            "JSHeapTotalSize": 0,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          },
+          "performance": {
+            "benchmark": {
+              "name": "inkfinite:benchmark:flat-1000-single-drag:15",
+              "startTime": 1796.2999999523163,
+              "duration": 488
+            },
+            "wasm": [
+              {
+                "name": "inkfinite:wasm:document_state:2",
+                "startTime": 1856.2999999523163,
+                "duration": 425.7999999523163
+              }
+            ],
+            "projection": [
+              {
+                "name": "inkfinite:editor:store-commit:3",
+                "startTime": 1842.7999999523163,
+                "duration": 13.099999904632568
+              },
+              {
+                "name": "inkfinite:editor:store-commit:4",
+                "startTime": 2166.7999999523163,
+                "duration": 10.599999904632568
+              }
+            ],
+            "longTasks": [
+              {
+                "name": "self",
+                "startTime": 1836.1999998092651,
+                "duration": 51
+              }
+            ],
+            "gc": []
+          },
+          "trace": null,
+          "tracePath": null
+        }
+      ]
+    },
+    {
+      "profile": "flat",
+      "size": 1000,
+      "workload": "multi-drag",
+      "status": "measured",
+      "sampling": {
+        "warmups": 1,
+        "samples": 3
+      },
+      "summary": {
+        "count": 3,
+        "medianMs": 549.7999999523163,
+        "p95Ms": 550.2000000476837,
+        "minimumMs": 547.8000001907349,
+        "maximumMs": 550.2000000476837,
+        "metrics": {
+          "median": {
+            "Timestamp": 0.5506150000728667,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 0,
+            "Frames": 0,
+            "JSEventListeners": 49,
+            "LayoutObjects": 88,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 365,
+            "Resources": 0,
+            "ContextLifecycleStateObservers": 0,
+            "V8PerContextDatas": 0,
+            "WorkerGlobalScopes": 0,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": 0,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 0,
+            "ArrayBufferContents": 0,
+            "LayoutCount": 25,
+            "RecalcStyleCount": 14,
+            "LayoutDuration": 0.003631000000000162,
+            "RecalcStyleDuration": 0.0018129999999999535,
+            "DevToolsCommandDuration": 0.005794000000000077,
+            "ScriptDuration": 0.10488300000000006,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.2399199999999997,
+            "TaskOtherDuration": 0.1208670000000005,
+            "ThreadTime": 0.2363710000000001,
+            "ProcessTime": 0.8291139999999899,
+            "JSHeapUsedSize": 30430124,
+            "JSHeapTotalSize": 262144,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          }
+        },
+        "regressionBudget": {
+          "statistic": "p95 milliseconds",
+          "maximum": 660.2400000572204,
+          "tolerancePercent": 20
+        }
+      },
+      "samples": [
+        {
+          "wallClockMs": 550.2000000476837,
+          "metrics": {
+            "Timestamp": 0.7338600000366569,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": -10,
+            "Frames": -2,
+            "JSEventListeners": -2361,
+            "LayoutObjects": -662,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": -3098,
+            "Resources": -543,
+            "ContextLifecycleStateObservers": -45,
+            "V8PerContextDatas": -4,
+            "WorkerGlobalScopes": -1,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": -12,
+            "AdSubframes": 0,
+            "DetachedScriptStates": -6,
+            "ArrayBufferContents": -7,
+            "LayoutCount": 25,
+            "RecalcStyleCount": 14,
+            "LayoutDuration": 0.003631000000000162,
+            "RecalcStyleDuration": 0.0017940000000000178,
+            "DevToolsCommandDuration": 0.005543000000000076,
+            "ScriptDuration": 0.09677200000000008,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.2480639999999994,
+            "TaskOtherDuration": 0.14032399999999967,
+            "ThreadTime": 0.2470219999999994,
+            "ProcessTime": 1.08587,
+            "JSHeapUsedSize": -30702672,
+            "JSHeapTotalSize": 4194304,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          },
+          "performance": {
+            "benchmark": {
+              "name": "inkfinite:benchmark:flat-1000-multi-drag:16",
+              "startTime": 1801.7999999523163,
+              "duration": 550.2000000476837
+            },
+            "wasm": [
+              {
+                "name": "inkfinite:wasm:document_state:2",
+                "startTime": 1859.7999999523163,
+                "duration": 430.90000009536743
+              }
+            ],
+            "projection": [
+              {
+                "name": "inkfinite:editor:store-commit:3",
+                "startTime": 1848.7000000476837,
+                "duration": 10.700000047683716
+              },
+              {
+                "name": "inkfinite:editor:store-commit:4",
+                "startTime": 1905.2000000476837,
+                "duration": 10.599999904632568
+              },
+              {
+                "name": "inkfinite:editor:store-commit:5",
+                "startTime": 2236,
+                "duration": 10.700000047683716
+              }
+            ],
+            "longTasks": [
+              {
+                "name": "self",
+                "startTime": 1839.7999999523163,
+                "duration": 52
+              }
+            ],
+            "gc": []
+          },
+          "trace": {
+            "eventCount": 11794,
+            "frameAndPaint": {
+              "frames": {
+                "count": 162,
+                "eventCount": 162,
+                "timedEventCount": 0,
+                "instantEventCount": 82,
+                "medianMs": null,
+                "p95Ms": null,
+                "maximumMs": null,
+                "totalMs": 0
+              },
+              "paint": {
+                "count": 288,
+                "eventCount": 288,
+                "timedEventCount": 259,
+                "instantEventCount": 29,
+                "medianMs": 0.004,
+                "p95Ms": 0.103,
+                "maximumMs": 1.144,
+                "totalMs": 8.383999999999999
+              },
+              "raster": {
+                "count": 0,
+                "eventCount": 0,
+                "timedEventCount": 0,
+                "instantEventCount": 0,
+                "medianMs": null,
+                "p95Ms": null,
+                "maximumMs": null,
+                "totalMs": 0
+              },
+              "compositor": {
+                "count": 172,
+                "eventCount": 172,
+                "timedEventCount": 48,
+                "instantEventCount": 22,
+                "medianMs": 0.025,
+                "p95Ms": 0.063,
+                "maximumMs": 0.113,
+                "totalMs": 1.405
+              },
+              "layout": {
+                "count": 49,
+                "eventCount": 49,
+                "timedEventCount": 49,
+                "instantEventCount": 0,
+                "medianMs": 0.088,
+                "p95Ms": 0.353,
+                "maximumMs": 1.153,
+                "totalMs": 5.365000000000001
+              }
+            },
+            "longTaskCount": 0,
+            "longTaskTotalMs": 0,
+            "gcCount": 628,
+            "gcTotalMs": 131.4750000000003,
+            "unclassifiedEventCount": 7958
+          },
+          "tracePath": "/Users/owais/Projects/StormlightLabs/OpenSource/inkfinite/fixtures/native/performance/browser-traces/flat-1000-multi-drag-1.json.gz"
+        },
+        {
+          "wallClockMs": 547.8000001907349,
+          "metrics": {
+            "Timestamp": 0.5491530001163483,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 0,
+            "Frames": 0,
+            "JSEventListeners": 49,
+            "LayoutObjects": 88,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 365,
+            "Resources": 0,
+            "ContextLifecycleStateObservers": 0,
+            "V8PerContextDatas": 0,
+            "WorkerGlobalScopes": 0,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": 0,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 0,
+            "ArrayBufferContents": 1,
+            "LayoutCount": 25,
+            "RecalcStyleCount": 14,
+            "LayoutDuration": 0.0038759999999999906,
+            "RecalcStyleDuration": 0.0024769999999999515,
+            "DevToolsCommandDuration": 0.007817000000000074,
+            "ScriptDuration": 0.10488300000000006,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.2399199999999997,
+            "TaskOtherDuration": 0.1208670000000005,
+            "ThreadTime": 0.2363710000000001,
+            "ProcessTime": 0.8291139999999899,
+            "JSHeapUsedSize": 30430124,
+            "JSHeapTotalSize": 0,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          },
+          "performance": {
+            "benchmark": {
+              "name": "inkfinite:benchmark:flat-1000-multi-drag:17",
+              "startTime": 1999,
+              "duration": 547.8000001907349
+            },
+            "wasm": [
+              {
+                "name": "inkfinite:wasm:document_state:2",
+                "startTime": 2060.300000190735,
+                "duration": 428.7999999523163
+              }
+            ],
+            "projection": [
+              {
+                "name": "inkfinite:editor:store-commit:3",
+                "startTime": 2047.2000000476837,
+                "duration": 12.700000047683716
+              },
+              {
+                "name": "inkfinite:editor:store-commit:4",
+                "startTime": 2110.600000143051,
+                "duration": 10.899999856948853
+              },
+              {
+                "name": "inkfinite:editor:store-commit:5",
+                "startTime": 2431.4000000953674,
+                "duration": 10.900000095367432
+              }
+            ],
+            "longTasks": [
+              {
+                "name": "self",
+                "startTime": 2037.6000001430511,
+                "duration": 60
+              },
+              {
+                "name": "self",
+                "startTime": 2102.100000143051,
+                "duration": 50
+              }
+            ],
+            "gc": []
+          },
+          "trace": null,
+          "tracePath": null
+        },
+        {
+          "wallClockMs": 549.7999999523163,
+          "metrics": {
+            "Timestamp": 0.5506150000728667,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 0,
+            "Frames": 0,
+            "JSEventListeners": 49,
+            "LayoutObjects": 88,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 365,
+            "Resources": 0,
+            "ContextLifecycleStateObservers": 0,
+            "V8PerContextDatas": 0,
+            "WorkerGlobalScopes": 0,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": 0,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 0,
+            "ArrayBufferContents": 0,
+            "LayoutCount": 25,
+            "RecalcStyleCount": 14,
+            "LayoutDuration": 0.0036129999999998663,
+            "RecalcStyleDuration": 0.0018129999999999535,
+            "DevToolsCommandDuration": 0.005794000000000077,
+            "ScriptDuration": 0.10535799999999984,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.23163499999999893,
+            "TaskOtherDuration": 0.1150569999999993,
+            "ThreadTime": 0.23059999999999903,
+            "ProcessTime": 0.8185580000000101,
+            "JSHeapUsedSize": 30743396,
+            "JSHeapTotalSize": 262144,
+            "FirstMeaningfulPaint": 0,
+            "DomContentLoaded": 0,
+            "NavigationStart": 0
+          },
+          "performance": {
+            "benchmark": {
+              "name": "inkfinite:benchmark:flat-1000-multi-drag:18",
+              "startTime": 1829.0999999046326,
+              "duration": 549.7999999523163
+            },
+            "wasm": [
+              {
+                "name": "inkfinite:wasm:document_state:2",
+                "startTime": 1890.7999999523163,
+                "duration": 429.2000000476837
+              }
+            ],
+            "projection": [
+              {
+                "name": "inkfinite:editor:store-commit:3",
+                "startTime": 1876.5,
+                "duration": 13.899999856948853
+              },
+              {
+                "name": "inkfinite:editor:store-commit:4",
+                "startTime": 1933.2000000476837,
+                "duration": 11.799999952316284
+              },
+              {
+                "name": "inkfinite:editor:store-commit:5",
+                "startTime": 2265.0999999046326,
+                "duration": 12.5
+              }
+            ],
+            "longTasks": [
+              {
+                "name": "self",
+                "startTime": 1868.3999998569489,
+                "duration": 54
+              }
+            ],
+            "gc": []
+          },
+          "trace": null,
+          "tracePath": null
+        }
+      ]
+    },
+    {
+      "profile": "flat",
+      "size": 1000,
+      "workload": "vector-edit",
+      "status": "skipped",
+      "reason": "Requires the native path profile."
+    },
+    {
+      "profile": "flat",
+      "size": 1000,
+      "workload": "connected-drag",
+      "status": "skipped",
+      "reason": "Requires the connection-heavy profile."
+    },
+    {
+      "profile": "flat",
+      "size": 1000,
+      "workload": "nested-selection",
+      "status": "skipped",
+      "reason": "Requires the deeply-nested profile."
+    }
+  ],
+  "memory": []
+}

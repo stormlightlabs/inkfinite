@@ -1,0 +1,226 @@
+{
+  "schemaVersion": 1,
+  "fixture": {
+    "path": "fixtures/native/performance/corpus.json",
+    "seed": 439041101,
+    "sizes": [
+      1000
+    ],
+    "profiles": [
+      "flat"
+    ]
+  },
+  "methodology": {
+    "tool": "hyperfine",
+    "hyperfineVersion": "hyperfine 1.20.0",
+    "warmups": 1,
+    "samples": 3,
+    "clock": "hyperfine wall-clock process duration",
+    "mutation": "each mutation sample starts from a fresh copy of its fixture",
+    "mcp": "one JSON-RPC initialize request, then terminate after the first response"
+  },
+  "hardware": {
+    "platform": "darwin arm64",
+    "cpus": 8,
+    "model": "Apple M1",
+    "node": "v26.7.0"
+  },
+  "measurements": [
+    {
+      "profile": "flat",
+      "size": 1000,
+      "operation": "inspect",
+      "command": "inspect",
+      "mean": 1.4914897187866665,
+      "stddev": 0.0030043044199608493,
+      "median": 1.49033456612,
+      "user": 1.4763759666666667,
+      "system": 0.006661366666666667,
+      "min": 1.48923444112,
+      "max": 1.49490014912,
+      "times": [
+        1.49033456612,
+        1.49490014912,
+        1.48923444112
+      ],
+      "memory_usage_byte": [
+        36945920,
+        36945920,
+        36945920
+      ],
+      "exit_codes": [
+        0,
+        0,
+        0
+      ],
+      "regressionBudget": {
+        "statistic": "mean seconds",
+        "maximum": 1.7897876625439997,
+        "tolerancePercent": 20
+      }
+    },
+    {
+      "profile": "flat",
+      "size": 1000,
+      "operation": "query",
+      "command": "query",
+      "mean": 1.4929549548333334,
+      "stddev": 0.0009677970143172012,
+      "median": 1.4927401495000001,
+      "user": 1.4769694666666666,
+      "system": 0.006210240000000001,
+      "min": 1.4921126075000002,
+      "max": 1.4940121075000001,
+      "times": [
+        1.4921126075000002,
+        1.4940121075000001,
+        1.4927401495000001
+      ],
+      "memory_usage_byte": [
+        36651008,
+        36651008,
+        36667392
+      ],
+      "exit_codes": [
+        0,
+        0,
+        0
+      ],
+      "regressionBudget": {
+        "statistic": "mean seconds",
+        "maximum": 1.7915459458,
+        "tolerancePercent": 20
+      }
+    },
+    {
+      "profile": "flat",
+      "size": 1000,
+      "operation": "validate",
+      "command": "validate",
+      "mean": 1.5184390823933331,
+      "stddev": 0.029967076679615765,
+      "median": 1.5046916660599998,
+      "user": 1.4904012333333332,
+      "system": 0.006056733333333332,
+      "min": 1.49781220706,
+      "max": 1.5528133740599999,
+      "times": [
+        1.5528133740599999,
+        1.49781220706,
+        1.5046916660599998
+      ],
+      "memory_usage_byte": [
+        36192256,
+        36192256,
+        36192256
+      ],
+      "exit_codes": [
+        0,
+        0,
+        0
+      ],
+      "regressionBudget": {
+        "statistic": "mean seconds",
+        "maximum": 1.8221268988719996,
+        "tolerancePercent": 20
+      }
+    },
+    {
+      "profile": "flat",
+      "size": 1000,
+      "operation": "render",
+      "command": "render",
+      "mean": 1.5237087669066665,
+      "stddev": 0.03528755321102536,
+      "median": 1.50941442024,
+      "user": 1.4842139399999998,
+      "system": 0.0066065666666666675,
+      "min": 1.4978110442400001,
+      "max": 1.56390083624,
+      "times": [
+        1.4978110442400001,
+        1.56390083624,
+        1.50941442024
+      ],
+      "memory_usage_byte": [
+        36438016,
+        36438016,
+        38436864
+      ],
+      "exit_codes": [
+        0,
+        0,
+        0
+      ],
+      "regressionBudget": {
+        "statistic": "mean seconds",
+        "maximum": 1.8284505202879997,
+        "tolerancePercent": 20
+      }
+    },
+    {
+      "profile": "flat",
+      "size": 1000,
+      "operation": "mutate",
+      "command": "mutate",
+      "mean": 3.57946184882,
+      "stddev": 0.0008197872105851129,
+      "median": 3.57901380682,
+      "user": 3.5373013066666665,
+      "system": 0.010650866666666666,
+      "min": 3.57896372382,
+      "max": 3.58040801582,
+      "times": [
+        3.57901380682,
+        3.57896372382,
+        3.58040801582
+      ],
+      "memory_usage_byte": [
+        46268416,
+        46268416,
+        46268416
+      ],
+      "exit_codes": [
+        0,
+        0,
+        0
+      ],
+      "regressionBudget": {
+        "statistic": "mean seconds",
+        "maximum": 4.2953542185839995,
+        "tolerancePercent": 20
+      }
+    },
+    {
+      "operation": "mcp-startup",
+      "command": "mcp-startup",
+      "mean": 0.047285960339999995,
+      "stddev": 0.013742777882040003,
+      "median": 0.03946698834,
+      "user": 0.04010709333333334,
+      "system": 0.00943396,
+      "min": 0.03923669634,
+      "max": 0.06315419634,
+      "times": [
+        0.06315419634,
+        0.03923669634,
+        0.03946698834
+      ],
+      "memory_usage_byte": [
+        48529408,
+        48529408,
+        48529408
+      ],
+      "exit_codes": [
+        0,
+        0,
+        0
+      ],
+      "regressionBudget": {
+        "statistic": "mean seconds",
+        "maximum": 0.05674315240799999,
+        "tolerancePercent": 20
+      }
+    }
+  ]
+}

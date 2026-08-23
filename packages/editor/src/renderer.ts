@@ -1,5 +1,7 @@
 import type {
 	ArrowShape,
+	BindingIndex,
+	BindingRecord,
 	Camera,
 	CursorState,
 	EditorState,
@@ -246,15 +248,22 @@ function drawScene(
 	drawGrid(context, state.camera, viewport, snapSettings);
 
 	const shapes = getShapesOnCurrentPage(state);
+	const bindingsBySource = new Map<string, BindingRecord[]>();
+	for (const binding of Object.values(state.doc.bindings)) {
+		const bindings = bindingsBySource.get(binding.fromShapeId);
+		if (bindings) bindings.push(binding);
+		else bindingsBySource.set(binding.fromShapeId, [binding]);
+	}
 	const visibleBounds = getExpandedViewportBounds(state.camera, viewport);
 	const layers = getLayersOnCurrentPage(state);
 	if (layers.length === 0) {
 		for (const shape of shapes) {
-			if (!isShapeVisible(state, shape, visibleBounds)) continue;
+			if (!isShapeVisible(state, shape, visibleBounds, bindingsBySource)) continue;
 			drawShape(
 				context,
 				state,
 				shape,
+				bindingsBySource,
 				theme,
 				textLayoutCache,
 				textMetricCache,
@@ -269,11 +278,12 @@ function drawScene(
 			context.globalAlpha *= layer.opacity;
 			for (const shapeId of layer.shapeIds) {
 				const shape = state.doc.shapes[shapeId];
-				if (!shape || !isShapeVisible(state, shape, visibleBounds)) continue;
+				if (!shape || !isShapeVisible(state, shape, visibleBounds, bindingsBySource)) continue;
 				drawShape(
 					context,
 					state,
 					shape,
+					bindingsBySource,
 					theme,
 					textLayoutCache,
 					textMetricCache,
@@ -285,7 +295,7 @@ function drawScene(
 		}
 	}
 
-	drawSelection(context, state, shapes, handleState);
+	drawSelection(context, state, shapes, handleState, bindingsBySource);
 
 	drawBindingPreview(context, state);
 
@@ -308,9 +318,14 @@ function getExpandedViewportBounds(camera: Camera, viewport: Viewport): VisibleB
 	};
 }
 
-function isShapeVisible(state: EditorState, shape: ShapeRecord, viewport: VisibleBounds): boolean {
+function isShapeVisible(
+	state: EditorState,
+	shape: ShapeRecord,
+	viewport: VisibleBounds,
+	bindingsBySource?: BindingIndex
+): boolean {
 	if (shape.type === 'arrow' && (shape.props.start?.kind === 'bound' || shape.props.end?.kind === 'bound')) {
-		const endpoints = resolveArrowEndpoints(state, shape.id);
+		const endpoints = resolveArrowEndpoints(state, shape.id, bindingsBySource);
 		if (endpoints) {
 			const minX = Math.min(endpoints.a.x, endpoints.b.x);
 			const minY = Math.min(endpoints.a.y, endpoints.b.y);
@@ -508,6 +523,7 @@ function drawShape(
 	context: CanvasRenderingContext2D,
 	state: EditorState,
 	shape: ShapeRecord,
+	bindingsBySource?: BindingIndex,
 	theme: 'light' | 'dark' = 'light',
 	textLayoutCache = new LruCache<string, string[]>(512),
 	textMetricCache = new LruCache<string, number>(2_048),
@@ -533,7 +549,7 @@ function drawShape(
 			break;
 		}
 		case 'arrow': {
-			drawArrow(context, state, shape);
+			drawArrow(context, state, shape, bindingsBySource);
 			break;
 		}
 		case 'text': {
@@ -781,11 +797,16 @@ function drawContainer(context: CanvasRenderingContext2D, shape: Extract<ShapeRe
 /**
  * Draw an arrow shape
  */
-function drawArrow(context: CanvasRenderingContext2D, state: EditorState, shape: ArrowShape) {
+function drawArrow(
+	context: CanvasRenderingContext2D,
+	state: EditorState,
+	shape: ArrowShape,
+	bindingsBySource?: BindingIndex
+) {
 	const style = shape.props.style;
 	const shapeAlpha = context.globalAlpha;
 
-	const points = arrowPathForShape(state, shape);
+	const points = arrowPathForShape(state, shape, bindingsBySource);
 	if (points.length < 2) return;
 
 	context.beginPath();
@@ -1305,7 +1326,8 @@ function drawSelection(
 	context: CanvasRenderingContext2D,
 	state: EditorState,
 	shapes: ShapeRecord[],
-	handleState?: HandleRenderState
+	handleState?: HandleRenderState,
+	bindingsBySource?: BindingIndex
 ) {
 	const selectedIds = new Set(state.ui.selectionIds);
 	const singleSelectionId = state.ui.selectionIds.length === 1 ? state.ui.selectionIds[0] : null;
@@ -1424,7 +1446,7 @@ function drawSelection(
 		context.restore();
 
 		if (singleSelectionId === shape.id) {
-			drawHandles(context, state, shape, handleState);
+			drawHandles(context, state, shape, handleState, bindingsBySource);
 			if (
 				state.ui.toolId === 'direct-select' &&
 				state.ui.pathSelection?.pathId === shape.id &&
@@ -1444,12 +1466,13 @@ function drawHandles(
 	context: CanvasRenderingContext2D,
 	state: EditorState,
 	shape: ShapeRecord,
-	handleState?: HandleRenderState
+	handleState?: HandleRenderState,
+	bindingsBySource?: BindingIndex
 ) {
 	if (!handleState) {
 		return;
 	}
-	const handles = getHandlesForShape(state, shape);
+	const handles = getHandlesForShape(state, shape, bindingsBySource);
 	if (handles.length === 0) {
 		return;
 	}
@@ -1548,7 +1571,7 @@ function drawPathEditingHandles(
 	context.restore();
 }
 
-function getHandlesForShape(state: EditorState, shape: ShapeRecord): HandleVisual[] {
+function getHandlesForShape(state: EditorState, shape: ShapeRecord, bindingsBySource?: BindingIndex): HandleVisual[] {
 	const handles: HandleVisual[] = [];
 	if (
 		shape.type === 'rect' ||
@@ -1592,7 +1615,7 @@ function getHandlesForShape(state: EditorState, shape: ShapeRecord): HandleVisua
 	}
 
 	if (shape.type === 'arrow') {
-		const resolved = resolveArrowEndpoints(state, shape.id);
+		const resolved = resolveArrowEndpoints(state, shape.id, bindingsBySource);
 		if (resolved && shape.props.points && shape.props.points.length >= 2) {
 			handles.push({ id: 'line-start', position: resolved.a });
 

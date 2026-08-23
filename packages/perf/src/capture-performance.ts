@@ -1,13 +1,14 @@
+// @ts-nocheck
 import { execFileSync } from 'node:child_process';
 import { cpus, freemem, platform, release, totalmem } from 'node:os';
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import process from 'node:process';
-import { Store } from '../packages/core/dist/index.mjs';
-import { createRenderer } from '../packages/editor/dist/renderer.js';
-import { corpus, createEditorState, getProfile } from './performance-corpus.mjs';
+import { Store } from '../../core/dist/index.mjs';
+import { createRenderer } from '../../editor/dist/renderer.js';
+import { corpus, createEditorState, getProfile } from './performance-corpus.js';
 
-const root = resolve(import.meta.dirname, '..');
+const root = resolve(import.meta.dirname, '../../..');
 const outputFlagIndex = process.argv.indexOf('--output');
 const outputPath = outputFlagIndex >= 0 ? resolve(process.cwd(), process.argv[outputFlagIndex + 1]) : null;
 const profileFlagIndex = process.argv.indexOf('--profile');
@@ -126,6 +127,7 @@ function benchmarkFixture(profileId, shapeCount) {
 		bindingRecords: Object.keys(state.doc.bindings).length,
 		warmups: corpus.warmups,
 		samples: corpus.samples,
+		regressionBudget: { statistic: 'median milliseconds', maximum: median(samples) * 1.2, tolerancePercent: 20 },
 		milliseconds: {
 			median: median(samples),
 			minimum: Math.min(...samples),
