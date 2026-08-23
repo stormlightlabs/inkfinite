@@ -38,6 +38,7 @@ pub fn run() {
             session::redo,
             session::save,
             session::save_as,
+            session::duplicate_document,
             session::save_draft_as,
             session::query,
             session::validate,

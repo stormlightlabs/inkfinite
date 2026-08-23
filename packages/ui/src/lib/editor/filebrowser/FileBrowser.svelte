@@ -41,6 +41,7 @@
 	let searchQuery = $derived(vm.query);
 	let inspectorOpen = $state(false);
 	let inspectorData = $state<BoardInspectorData | null>(null);
+	let inspectorBoard = $state<BoardMeta | null>(null);
 	let inspectorLoading = $state(false);
 	let inspectorError = $state<string | null>(null);
 
@@ -53,6 +54,8 @@
 	let currentFilePath = $state<string | null>(null);
 	let workspaceBusy = $state(false);
 	let workspaceError = $state<string | null>(null);
+	let actionBusy = $state<string | null>(null);
+	let actionError = $state<string | null>(null);
 	let persistenceSnapshot = $state<PersistenceStatus | null>(null);
 
 	$effect(() => {
@@ -156,37 +159,78 @@
 		handleClose?.();
 	}
 
+	function describeError(error: unknown): string {
+		return error instanceof Error ? error.message : String(error);
+	}
+
+	function beginAction(action: string): boolean {
+		if (actionBusy) return false;
+		actionBusy = action;
+		actionError = null;
+		return true;
+	}
+
+	function endAction(action: string) {
+		if (actionBusy === action) actionBusy = null;
+	}
+
+	function reportActionError(action: string, error: unknown) {
+		actionError = `${action}: ${describeError(error)}`;
+	}
+
 	async function handleOpenBoard(boardId: string) {
+		const board = vm.boards.find((item) => item.id === boardId);
+		if (!beginAction(`open:${boardId}`)) return;
 		try {
 			await vm.actions.open(boardId);
 			closeBrowser();
 		} catch (error) {
-			console.error('Failed to open board:', error);
+			reportActionError(`Could not open ${board?.name ?? 'board'}`, error);
+		} finally {
+			endAction(`open:${boardId}`);
 		}
 	}
 
 	async function handleCreateBoard() {
-		if (!newBoardName.trim()) return;
+		if (!newBoardName.trim() || !beginAction('create')) return;
 		try {
 			const boardId = await vm.actions.create(newBoardName);
 			isCreating = false;
 			newBoardName = '';
 			onUpdate?.(vm);
-			await handleOpenBoard(boardId);
+			await vm.actions.open(boardId);
+			closeBrowser();
 		} catch (error) {
-			console.error('Failed to create board:', error);
+			reportActionError('Could not create board', error);
+		} finally {
+			endAction('create');
+		}
+	}
+
+	async function handleDuplicateBoard(board: BoardMeta) {
+		if (!beginAction(`duplicate:${board.id}`)) return;
+		try {
+			await vm.actions.duplicate(board.id, `Copy of ${board.name}`);
+			onUpdate?.(vm);
+			closeBrowser();
+		} catch (error) {
+			reportActionError(`Could not duplicate ${board.name}`, error);
+		} finally {
+			endAction(`duplicate:${board.id}`);
 		}
 	}
 
 	async function handleRenameBoard(boardId: string) {
-		if (!editingBoardName.trim()) return;
+		if (!editingBoardName.trim() || !beginAction(`rename:${boardId}`)) return;
 		try {
 			await vm.actions.rename(boardId, editingBoardName);
 			editingBoardId = null;
 			editingBoardName = '';
 			onUpdate?.(vm);
 		} catch (error) {
-			console.error('Failed to rename board:', error);
+			reportActionError('Could not rename board', error);
+		} finally {
+			endAction(`rename:${boardId}`);
 		}
 	}
 
@@ -196,34 +240,50 @@
 		) {
 			return;
 		}
+		const board = vm.boards.find((item) => item.id === boardId);
+		if (!beginAction(`delete:${boardId}`)) return;
 		try {
 			await vm.actions.delete(boardId);
-			if (inspectorOpen && vm.selectedId === boardId) {
+			if (inspectorOpen && inspectorBoard?.id === boardId) {
 				inspectorOpen = false;
 				inspectorData = null;
+				inspectorBoard = null;
 			}
 			onUpdate?.(vm);
+			if (activeBoardId === boardId) {
+				const replacement = vm.boards.find((item) => item.id !== boardId);
+				if (replacement) {
+					await vm.actions.open(replacement.id);
+				} else {
+					const replacementId = await vm.actions.create('Untitled Board');
+					await vm.actions.open(replacementId);
+				}
+				closeBrowser();
+			}
 		} catch (error) {
-			console.error('Failed to delete board:', error);
+			reportActionError(`Could not delete ${board?.name ?? 'board'}`, error);
+		} finally {
+			endAction(`delete:${boardId}`);
 		}
 	}
 
 	async function handleInspectBoard(board: BoardMeta) {
-		if (!fetchInspectorData) {
-			console.warn('Inspector data fetcher not provided');
-			return;
-		}
-
+		inspectorBoard = board;
 		inspectorOpen = true;
 		inspectorLoading = true;
 		inspectorError = null;
+		inspectorData = null;
+
+		if (!fetchInspectorData) {
+			inspectorLoading = false;
+			inspectorError = 'Board diagnostics are not available on this platform.';
+			return;
+		}
 
 		try {
 			inspectorData = await fetchInspectorData(board.id);
 		} catch (error) {
-			inspectorError =
-				error instanceof Error ? error.message : 'Failed to load inspector data';
-			inspectorData = null;
+			inspectorError = describeError(error);
 		} finally {
 			inspectorLoading = false;
 		}
@@ -257,10 +317,6 @@
 
 	function storageLocation(): string {
 		return currentFilePath || activeBoard?.storage?.location || workspaceDir || 'IndexedDB';
-	}
-
-	function describeError(error: unknown): string {
-		return error instanceof Error ? error.message : String(error);
 	}
 
 	function startRename(board: BoardMeta) {
@@ -321,10 +377,19 @@
 				</button>
 				<h2 class="filebrowser__title">Boards</h2>
 			</div>
+			{#if actionError}
+				<div class="filebrowser__action-error" role="alert" aria-live="assertive">
+					{actionError}
+				</div>
+			{/if}
 			<button
 				type="button"
 				class="filebrowser__action filebrowser__action--create"
-				onclick={() => (isCreating = true)}
+				onclick={() => {
+					actionError = null;
+					isCreating = true;
+				}}
+				disabled={actionBusy !== null}
 				aria-label="Create new board">
 				+ New
 			</button>
@@ -448,6 +513,8 @@
 						class="filebrowser__btn filebrowser__btn--primary"
 						variant="primary"
 						size="small"
+						busy={actionBusy === 'create'}
+						disabled={actionBusy !== null}
 						onclick={handleCreateBoard}>
 						Create
 					</Button>
@@ -506,6 +573,8 @@
 								class="filebrowser__board-info"
 								data-board-id={board.id}
 								id={board.id}
+								disabled={actionBusy !== null}
+								aria-busy={actionBusy === `open:${board.id}`}
 								tabindex={vm.selectedId === board.id ? 0 : -1}
 								onfocus={() => selectBoard(board.id)}
 								onkeydown={(event) => handleBoardKeydown(event, board.id)}
@@ -526,6 +595,7 @@
 								<button
 									type="button"
 									class="filebrowser__board-action"
+									disabled={actionBusy !== null}
 									onclick={() => handleInspectBoard(board)}
 									aria-label="Inspect board"
 									title={`Inspect ${board.name}`}>
@@ -534,6 +604,16 @@
 								<button
 									type="button"
 									class="filebrowser__board-action"
+									disabled={actionBusy !== null}
+									onclick={() => handleDuplicateBoard(board)}
+									aria-label="Duplicate board"
+									title={`Duplicate ${board.name}`}>
+									<Icon name="copy" size={16} />
+								</button>
+								<button
+									type="button"
+									class="filebrowser__board-action"
+									disabled={actionBusy !== null}
 									onclick={() => startRename(board)}
 									aria-label="Rename board"
 									title={`Rename ${board.name}`}>
@@ -542,6 +622,7 @@
 								<button
 									type="button"
 									class="filebrowser__board-action"
+									disabled={actionBusy !== null}
 									onclick={() => handleDeleteBoard(board.id)}
 									aria-label="Delete board"
 									title={`Delete ${board.name}`}>
@@ -574,6 +655,31 @@
 			<div class="inspector__error">{inspectorError}</div>
 		{:else if inspectorData}
 			<div class="inspector__content">
+				{#if inspectorBoard}
+					<section class="inspector__section">
+						<h4 class="inspector__section-title">Board details</h4>
+						<div class="inspector__item">
+							<span class="inspector__label">Name:</span>
+							<span class="inspector__value">{inspectorBoard.name}</span>
+						</div>
+						<div class="inspector__item">
+							<span class="inspector__label">Created:</span>
+							<span class="inspector__value"
+								>{formatTimestamp(inspectorBoard.createdAt)}</span>
+						</div>
+						<div class="inspector__item">
+							<span class="inspector__label">Last updated:</span>
+							<span class="inspector__value"
+								>{formatTimestamp(inspectorBoard.updatedAt)}</span>
+						</div>
+						<div class="inspector__item">
+							<span class="inspector__label">Location:</span>
+							<span class="inspector__value"
+								>{inspectorBoard.storage?.location ?? 'Not available'}</span>
+						</div>
+					</section>
+				{/if}
+
 				<section class="inspector__section">
 					<h4 class="inspector__section-title">Storage</h4>
 					<div class="inspector__item">
@@ -596,6 +702,33 @@
 					</div>
 				</section>
 
+				{#if inspectorData.document}
+					<section class="inspector__section">
+						<h4 class="inspector__section-title">Document</h4>
+						<div class="inspector__item">
+							<span class="inspector__label">Representation:</span>
+							<span class="inspector__value"
+								>{inspectorData.document.canonical
+									? 'Canonical'
+									: 'Materialized rows'}</span>
+						</div>
+						{#if inspectorData.document.documentId}
+							<div class="inspector__item">
+								<span class="inspector__label">Document ID:</span>
+								<span class="inspector__value"
+									>{inspectorData.document.documentId}</span>
+							</div>
+						{/if}
+						{#if inspectorData.document.formatVersion !== undefined}
+							<div class="inspector__item">
+								<span class="inspector__label">Format Version:</span>
+								<span class="inspector__value"
+									>{inspectorData.document.formatVersion}</span>
+							</div>
+						{/if}
+					</section>
+				{/if}
+
 				<section class="inspector__section">
 					<h4 class="inspector__section-title">Statistics</h4>
 					<div class="inspector__item">
@@ -610,6 +743,18 @@
 						<span class="inspector__label">Bindings:</span>
 						<span class="inspector__value">{inspectorData.stats.bindingCount}</span>
 					</div>
+					{#if inspectorData.stats.layerCount !== undefined}
+						<div class="inspector__item">
+							<span class="inspector__label">Layers:</span>
+							<span class="inspector__value">{inspectorData.stats.layerCount}</span>
+						</div>
+					{/if}
+					{#if inspectorData.stats.assetCount !== undefined}
+						<div class="inspector__item">
+							<span class="inspector__label">Assets:</span>
+							<span class="inspector__value">{inspectorData.stats.assetCount}</span>
+						</div>
+					{/if}
 					<div class="inspector__item">
 						<span class="inspector__label">Doc Size:</span>
 						<span class="inspector__value"
@@ -661,6 +806,13 @@
 		margin: 0;
 		font-size: var(--ink-type-lg);
 		font-weight: 650;
+	}
+
+	.filebrowser__action-error {
+		flex: 1;
+		margin: 0 var(--ink-space-2);
+		color: var(--ink-danger);
+		font-size: var(--ink-type-xs);
 	}
 
 	.filebrowser__summary {
@@ -752,6 +904,13 @@
 
 	.filebrowser__action:hover {
 		background-color: var(--ink-accent-hover);
+	}
+
+	.filebrowser__action:disabled,
+	.filebrowser__board-action:disabled,
+	.filebrowser__board-info:disabled {
+		cursor: wait;
+		opacity: 0.6;
 	}
 
 	.filebrowser__workspace {
@@ -1039,7 +1198,7 @@
 		cursor: pointer;
 	}
 
-	.filebrowser__board-action:hover,
+	.filebrowser__board-action:hover:not(:disabled),
 	.filebrowser__board-action:focus-visible {
 		border-color: var(--ink-border);
 		background: var(--ink-surface-hover);

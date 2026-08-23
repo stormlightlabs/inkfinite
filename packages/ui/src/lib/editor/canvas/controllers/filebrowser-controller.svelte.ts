@@ -47,7 +47,6 @@ export class FileBrowserController {
 				this.vm = FileBrowserVM.create({ repo: this.createBrowserRepo(repo), boards });
 			}
 		} catch (error) {
-			console.error('Failed to list boards', error);
 			this.onError?.(error, 'Document error');
 		}
 	};
@@ -72,6 +71,27 @@ export class FileBrowserController {
 					onLoadDoc?.(boardId, doc);
 				} catch (error) {
 					onError?.(error, 'Load document failed');
+					throw error;
+				}
+			},
+			async duplicateBoard(boardId, name) {
+				try {
+					await prepareToSwitch?.();
+					const duplicateId = await repo.duplicateBoard(boardId, name);
+					const doc = await repo.loadDoc(duplicateId);
+					onLoadDoc?.(duplicateId, doc);
+					return duplicateId;
+				} catch (error) {
+					onError?.(error, 'Duplicate board failed');
+					throw error;
+				}
+			},
+			async deleteBoard(boardId) {
+				try {
+					await prepareToSwitch?.();
+					await repo.deleteBoard(boardId);
+				} catch (error) {
+					onError?.(error, 'Delete board failed');
 					throw error;
 				}
 			}

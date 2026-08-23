@@ -6,6 +6,7 @@ function createRepoMock(): DocRepo {
 	return {
 		listBoards: vi.fn(async () => []),
 		createBoard: vi.fn(async () => 'board:new'),
+		duplicateBoard: vi.fn(async () => 'board:copy'),
 		openBoard: vi.fn(async () => {}),
 		renameBoard: vi.fn(async () => {}),
 		deleteBoard: vi.fn(async () => {})
@@ -64,6 +65,9 @@ describe('FileBrowserVM', () => {
 
 		await vm.actions.create('Untitled');
 		expect(repo.createBoard).toHaveBeenCalledWith('Untitled');
+
+		await vm.actions.duplicate('board:alpha', 'Copy');
+		expect(repo.duplicateBoard).toHaveBeenCalledWith('board:alpha', 'Copy');
 
 		await vm.actions.rename('board:alpha', 'Renamed');
 		expect(repo.renameBoard).toHaveBeenCalledWith('board:alpha', 'Renamed');

@@ -322,6 +322,26 @@ function createFakeSessionApi() {
 			};
 		},
 
+		async duplicateDocument(args: Parameters<SessionApi['duplicateDocument']>[0]): Promise<SessionOpened> {
+			const source = sessions.get(args.session_id);
+			if (!source) throw new Error('Missing fake session');
+			const snapshot = structuredClone(source.status.snapshot);
+			snapshot.document_id = args.document_id;
+			const sessionId = `session:${++sessionNumber}`;
+			const status: SessionStatus = {
+				...source.status,
+				session_id: sessionId,
+				path: args.path,
+				actor_id: args.actor_id,
+				snapshot,
+				dirty: false
+			};
+			sessions.delete(args.session_id);
+			sessions.set(sessionId, { status, undo: [], redo: [] });
+			files.set(args.path, structuredClone(snapshot));
+			return { session_id: sessionId, status: statusFor(sessionId, sessions.get(sessionId)!) };
+		},
+
 		async saveDraftAs(args: Parameters<SessionApi['saveDraftAs']>[0]): Promise<SessionSaved> {
 			const session = sessions.get(args.session_id);
 			if (!session) throw new Error('Missing fake session');
@@ -519,6 +539,19 @@ describe('Rust-backed desktop session repository', () => {
 		expect(reopened.pages[pageId].name).toBe('Renamed');
 	});
 
+	it('duplicates the active board through the Rust session service', async () => {
+		fileOps.setSavePath('/tmp/source.inkfinite');
+		const repo = createDesktopSessionRepo(fileOps.ops, { api: session.api });
+		const sourceId = await repo.createBoard('Source');
+		fileOps.setSavePath('/tmp/source-copy.inkfinite');
+
+		const duplicateId = await repo.duplicateBoard(sourceId);
+
+		expect(duplicateId).not.toBe(sourceId);
+		expect(repo.getCurrentFile()?.path).toBe('/tmp/source-copy.inkfinite');
+		expect(repo.getSessionStatus()?.snapshot.document_id).toBe(duplicateId);
+	});
+
 	it('routes layer changes through the Rust reconciliation command', async () => {
 		const repo = createDesktopSessionRepo(fileOps.ops, { api: session.api });
 		const opened = await repo.openDraft();
@@ -593,10 +626,7 @@ describe('Rust-backed desktop session repository', () => {
 
 		expect(boards.map((board) => board.name)).toEqual(['alpha']);
 		expect(boards.every((board) => board.id.startsWith('path:'))).toBe(true);
-		expect(boards[0]).toMatchObject({
-			updatedAt: 1234,
-			storage: { kind: 'workspace', location: '/workspace' }
-		});
+		expect(boards[0]).toMatchObject({ updatedAt: 1234, storage: { kind: 'workspace', location: '/workspace' } });
 	});
 
 	it('persists the app-managed draft across renderer sessions without adding it to recent files', async () => {

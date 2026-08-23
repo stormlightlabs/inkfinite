@@ -10,6 +10,7 @@ export const ICONS = {
 	'chevron-left': 'i-tabler-chevron-left',
 	'chevron-right': 'i-tabler-chevron-right',
 	close: 'i-ph-x-bold',
+	copy: 'i-ph-copy',
 	dark: 'i-tabler-moon',
 	delete: 'i-bi-trash3',
 	'dots-vertical': 'i-tabler-dots-vertical',

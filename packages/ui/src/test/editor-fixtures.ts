@@ -19,6 +19,7 @@ export function createFileBrowserFixture(boards: BoardMeta[] = testBoards) {
 	const repo: DocRepo = {
 		listBoards: vi.fn(async () => boards),
 		createBoard: vi.fn(async () => 'board:new'),
+		duplicateBoard: vi.fn(async () => 'board:copy'),
 		openBoard: vi.fn(async () => {}),
 		renameBoard: vi.fn(async () => {}),
 		deleteBoard: vi.fn(async () => {})

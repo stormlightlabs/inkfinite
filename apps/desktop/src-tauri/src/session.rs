@@ -384,6 +384,23 @@ pub fn save_draft_as(
     Ok(saved)
 }
 
+/// Creates an independent document from the current session and opens it.
+#[tauri::command]
+pub fn duplicate_document(
+    state: State<'_, DesktopState>, session_id: String, path: DocumentPath, document_id: String, actor_id: String,
+    expected_heads: Vec<ChangeHash>,
+) -> Result<SessionOpened> {
+    lock_service(&state)?
+        .duplicate(
+            &SessionId(session_id),
+            path.0,
+            DocumentId::new(document_id),
+            ActorId::new(actor_id),
+            &expected_heads,
+        )
+        .map_err(to_protocol_error)
+}
+
 /// Queries records through the shared deterministic query implementation.
 #[tauri::command]
 pub fn query(state: State<'_, DesktopState>, session_id: String, query: Query) -> Result<QueryResult> {

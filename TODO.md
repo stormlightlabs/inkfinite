@@ -183,14 +183,14 @@ the canvas editor.
 
 ### Board actions
 
-- [ ] Add board duplication through the shared TypeScript repository interface
+- [x] Add board duplication through the shared TypeScript repository interface
       and the existing Rust desktop file/session services
-- [ ] Surface TypeScript UI busy and failure states instead of logging
+- [x] Surface TypeScript UI busy and failure states instead of logging
       board-action errors to the console
-- [ ] Protect board switches when pending editor changes cannot be flushed
-- [ ] Make the board inspector useful to users while retaining file, schema, and
+- [x] Protect board switches when pending editor changes cannot be flushed
+- [x] Make the board inspector useful to users while retaining file, schema, and
       document diagnostics for maintainers
-- [ ] Add end-to-end tests for the existing board actions plus duplication,
+- [x] Add end-to-end tests for the existing board actions plus duplication,
       switching, workspace selection, and persistence across reloads
 
 ## Editor polish

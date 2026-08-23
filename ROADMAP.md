@@ -193,10 +193,11 @@ board-management interaction, with file timestamps supplied by desktop storage
 when available.
 
 The browser is responsive and accessible on narrow viewports and coarse
-pointers. The next pass should add duplication, surface board-action failures,
-and protect switches when pending changes cannot be flushed. User-facing board
-details should stay easy to scan while file, schema, and document diagnostics
-remain available when needed.
+pointers. Board actions duplicate boards through each platform's repository,
+show busy and failure states in the browser, flush pending edits before a
+switch, and recover the active canvas when its board is deleted. The inspector
+leads with board name, dates, and location, then shows storage, schema,
+document, and record diagnostics.
 
 ### Editor polish
 

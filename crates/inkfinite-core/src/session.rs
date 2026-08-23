@@ -930,6 +930,30 @@ impl SessionService {
         Ok(SessionSaved { save, status })
     }
 
+    /// Creates an independent document from the current session and switches to it.
+    ///
+    /// The source heads are checked before the snapshot is copied. The source
+    /// session is closed only after the new file has been created and opened.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed session, stale-head, validation, lock, or filesystem
+    /// error when the source or destination cannot be handled safely.
+    pub fn duplicate(
+        &mut self, session_id: &SessionId, path: impl AsRef<Path>, document_id: DocumentId, actor_id: ActorId,
+        expected_heads: &[crate::ChangeHash],
+    ) -> Result<SessionOpened, SessionError> {
+        let snapshot = {
+            let session = self.session_mut(session_id)?;
+            ensure_heads(&mut session.file, expected_heads)?;
+            session.file.snapshot()?
+        };
+        let file = DocumentFile::create(path, document_id, actor_id, snapshot.document)?;
+        let opened = self.insert(file)?;
+        self.close(session_id)?;
+        Ok(opened)
+    }
+
     /// Runs a deterministic semantic query against the current snapshot.
     ///
     /// # Errors
@@ -1726,6 +1750,49 @@ mod tests {
         assert_eq!(context.heads, opened.status.snapshot.heads);
 
         service.close(&opened.session_id).expect("close session");
+        remove_test_directory(root);
+    }
+
+    #[test]
+    fn duplicate_creates_an_independent_session_with_current_content() {
+        let root = test_directory();
+        let source_path = root.join("source.inkfinite");
+        let duplicate_path = root.join("source-copy.inkfinite");
+        let actor = ActorId::from("actor:session-test");
+        let mut service = SessionService::new();
+        let source = service
+            .create(
+                &source_path,
+                DocumentId::from("document:source"),
+                actor.clone(),
+                Some("Source"),
+            )
+            .expect("create source");
+        let source_heads = source.status.snapshot.heads.clone();
+
+        let duplicate = service
+            .duplicate(
+                &source.session_id,
+                &duplicate_path,
+                DocumentId::from("document:source-copy"),
+                actor,
+                &source_heads,
+            )
+            .expect("duplicate source");
+
+        assert_eq!(
+            duplicate.status.snapshot.document_id,
+            DocumentId::from("document:source-copy")
+        );
+        assert_eq!(
+            duplicate.status.snapshot.document.pages.values().next().unwrap().name,
+            "Source"
+        );
+        assert!(matches!(
+            service.status(&source.session_id),
+            Err(SessionError::NotFound(_))
+        ));
+        service.close(&duplicate.session_id).expect("close duplicate");
         remove_test_directory(root);
     }
 

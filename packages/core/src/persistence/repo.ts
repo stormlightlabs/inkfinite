@@ -27,6 +27,14 @@ export interface DocRepo {
 	createBoard(name: string): Promise<string>;
 
 	/**
+	 * Duplicate a board and return the new board identifier.
+	 *
+	 * The duplicate receives an independent document identity and uses the
+	 * supplied name when provided.
+	 */
+	duplicateBoard(boardId: string, name?: string): Promise<string>;
+
+	/**
 	 * Load the requested board into the active editing context.
 	 */
 	openBoard(boardId: string): Promise<void>;

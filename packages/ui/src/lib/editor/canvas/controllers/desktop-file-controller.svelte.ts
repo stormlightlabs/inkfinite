@@ -49,7 +49,6 @@ export class DesktopFileController {
 			this.boards = boards;
 			return boards;
 		} catch (error) {
-			console.error('Failed to list boards', error);
 			this.report(error, 'Document error');
 			this.boards = [];
 			return [];
@@ -71,7 +70,6 @@ export class DesktopFileController {
 			if (isUserCancelled(error)) {
 				return;
 			}
-			console.error('Failed to open board', error);
 			this.report(error, 'Open document failed');
 		}
 	};
@@ -92,7 +90,6 @@ export class DesktopFileController {
 			if (isUserCancelled(error)) {
 				return;
 			}
-			console.error('Failed to create board', error);
 			this.report(error, 'Create document failed');
 		}
 	};
@@ -111,7 +108,6 @@ export class DesktopFileController {
 			if (isUserCancelled(error)) {
 				return;
 			}
-			console.error('Failed to save board', error);
 			this.report(error, 'Save document failed');
 		}
 	};
@@ -134,7 +130,6 @@ export class DesktopFileController {
 			this.onLoadDoc(boardId, loaded);
 			await this.refreshBoards();
 		} catch (error) {
-			console.error('Failed to load board', error);
 			this.report(error, 'Load document failed');
 		}
 	};

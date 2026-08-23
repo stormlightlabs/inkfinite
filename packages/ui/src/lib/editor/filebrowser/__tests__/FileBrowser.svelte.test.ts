@@ -32,6 +32,31 @@ describe('FileBrowser', () => {
 		expect(onClose).toHaveBeenCalledOnce();
 	});
 
+	it('duplicates a board and closes after the copy is created', async () => {
+		const onClose = vi.fn();
+		const { repo, vm } = createFileBrowserFixture();
+		const screen = render(FileBrowser, { vm, open: true, onClose });
+
+		await screen.getByTitle('Duplicate Second board').click();
+
+		expect(repo.duplicateBoard).toHaveBeenCalledWith('board:two', 'Copy of Second board');
+		expect(onClose).toHaveBeenCalledOnce();
+	});
+
+	it('shows action failures in the browser', async () => {
+		const onClose = vi.fn();
+		const { repo, vm } = createFileBrowserFixture();
+		vi.mocked(repo.openBoard).mockRejectedValueOnce(new Error('Write failed'));
+		const screen = render(FileBrowser, { vm, open: true, onClose });
+
+		await screen.getByRole('button', { name: 'Open Second board' }).click();
+
+		await expect
+			.element(screen.getByRole('alert'))
+			.toHaveTextContent('Could not open Second board: Write failed');
+		expect(onClose).not.toHaveBeenCalled();
+	});
+
 	it('shows the active board storage and save state', async () => {
 		const { vm } = createFileBrowserFixture();
 		const persistence = createStatusStore({

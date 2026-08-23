@@ -8,6 +8,7 @@ import { page } from 'vitest/browser';
 const mockRepo = {
 	listBoards: vi.fn(),
 	createBoard: vi.fn(),
+	duplicateBoard: vi.fn(),
 	openBoard: vi.fn(),
 	renameBoard: vi.fn(),
 	deleteBoard: vi.fn()

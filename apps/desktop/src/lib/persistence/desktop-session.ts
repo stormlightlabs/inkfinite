@@ -150,6 +150,13 @@ export interface SessionApi {
 	redo(args: { session_id: string; actor_id: string }): Promise<SessionCommit>;
 	save(args: { session_id: string; expected_heads: ChangeHash[] }): Promise<SessionSaved>;
 	saveAs(args: { session_id: string; path: string; expected_heads: ChangeHash[] }): Promise<SessionSaved>;
+	duplicateDocument(args: {
+		session_id: string;
+		path: string;
+		document_id: string;
+		actor_id: string;
+		expected_heads: ChangeHash[];
+	}): Promise<SessionOpened>;
 	saveDraftAs(args: { session_id: string; path: string; expected_heads: ChangeHash[] }): Promise<SessionSaved>;
 	query(args: { session_id: string; query: Query }): Promise<QueryResult>;
 	validate(args: { session_id: string }): Promise<SessionStatus>;
@@ -219,6 +226,14 @@ function createSessionApi(): SessionApi {
 			invokeSession<SessionSaved>('save_as', {
 				sessionId: args.session_id,
 				path: args.path,
+				expectedHeads: args.expected_heads
+			}),
+		duplicateDocument: (args) =>
+			invokeSession<SessionOpened>('duplicate_document', {
+				sessionId: args.session_id,
+				path: args.path,
+				documentId: args.document_id,
+				actorId: args.actor_id,
 				expectedHeads: args.expected_heads
 			}),
 		saveDraftAs: (args) =>
@@ -568,6 +583,34 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		return opened.status.snapshot.document_id;
 	}
 
+	async function duplicateBoard(boardId: string, name?: string): Promise<string> {
+		await ensureBoardLoaded(boardId);
+		if (!currentStatus || !currentBoard || !currentFile) throw new Error('No board loaded');
+
+		if (currentStatus.dirty) await saveCurrentSession();
+		if (!currentStatus || !currentBoard || !currentFile) throw new Error('No board loaded');
+
+		const boardName = name?.trim() || `Copy of ${currentBoard.name}`;
+		const workspace = await fileOps.getWorkspaceDir();
+		const path = workspace
+			? joinPath(workspace, `${safeFileStem(boardName)}.inkfinite`)
+			: await fileOps.showSaveDialog(`${safeFileStem(boardName)}.inkfinite`);
+		if (!path) throw new Error('Save cancelled');
+
+		const sourceStatus = currentStatus;
+		const opened = await api.duplicateDocument({
+			session_id: sourceStatus.session_id,
+			path,
+			document_id: createId('board'),
+			actor_id: ACTOR_ID,
+			expected_heads: sourceStatus.snapshot.heads
+		});
+		setCurrentState(opened.status, boardName);
+		currentBoard = { ...currentBoard!, createdAt: Date.now(), updatedAt: Date.now() };
+		if (!workspace && currentFile) await fileOps.addRecentFile(currentFile);
+		return opened.status.snapshot.document_id;
+	}
+
 	async function importSvg(path?: string): Promise<SvgImportResult | null> {
 		if (!currentStatus || !currentDoc) throw new Error('No board loaded');
 		const selectedPath = path ?? (await fileOps.showSvgDialog());
@@ -877,6 +920,7 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		isDraft: () => currentIsDraft,
 		listBoards,
 		createBoard,
+		duplicateBoard,
 		openBoard,
 		renameBoard,
 		deleteBoard,

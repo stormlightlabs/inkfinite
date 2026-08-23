@@ -57,6 +57,33 @@ describe('DocRepo (Dexie)', () => {
 		expect(boardRow?.name).toBe('Renamed');
 	});
 
+	it('duplicates a board into an independent board with a fresh name and id', async () => {
+		const database = createTestDb();
+		const repo = createDexieDocRepo(database);
+		const sourceId = await repo.createBoard('Source');
+
+		const page = PageRecord.create('Canvas');
+		const rect = ShapeRecord.createRect(page.id, 0, 0, {
+			w: 20,
+			h: 20,
+			fill: '#000',
+			stroke: '#fff',
+			radius: 0
+		});
+		page.shapeIds.push(rect.id);
+		const doc = DocumentOps.create();
+		doc.pages[page.id] = page;
+		doc.shapes[rect.id] = rect;
+		await repo.applyDocPatch(sourceId, diffDoc(DocumentOps.create(), doc));
+
+		const duplicateId = await repo.duplicateBoard(sourceId);
+		expect(duplicateId).not.toBe(sourceId);
+		expect((await repo.listBoards()).map((board) => board.name)).toEqual(
+			expect.arrayContaining(['Source', 'Copy of Source'])
+		);
+		expect((await repo.loadDoc(duplicateId)).shapes[rect.id]).toEqual(rect);
+	});
+
 	it('round-trips docs via applyDocPatch + loadDoc', async () => {
 		const database = createTestDb();
 		const repo = createDexieDocRepo(database);

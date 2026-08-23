@@ -120,8 +120,28 @@ export function createDexieDocRepo(
 		return boardId;
 	}
 
+	async function duplicateBoard(boardId: string, name?: string): Promise<string> {
+		const source = await exportBoard(boardId);
+		const duplicateId = createId('board');
+		const timestamp = now();
+		const duplicateName = name?.trim() || `Copy of ${source.board.name}`;
+		return importBoard({
+			...source,
+			board: {
+				...source.board,
+				id: duplicateId,
+				name: duplicateName,
+				createdAt: timestamp,
+				updatedAt: timestamp
+			}
+		});
+	}
+
 	async function renameBoard(boardId: string, name: string): Promise<void> {
-		await boards().update(boardId, { name, updatedAt: now() });
+		await boards().update(boardId, {
+			name: name.trim() || DEFAULT_BOARD_NAME,
+			updatedAt: now()
+		});
 	}
 
 	async function deleteBoard(boardId: string): Promise<void> {
@@ -417,6 +437,7 @@ export function createDexieDocRepo(
 	return {
 		listBoards,
 		createBoard,
+		duplicateBoard,
 		openBoard,
 		renameBoard,
 		deleteBoard,
@@ -653,30 +674,49 @@ export async function getBoardStats(database: DexieLike, boardId: string): Promi
 	const shapes = database.table<ShapeRow>('shapes');
 	const bindings = database.table<BindingRow>('bindings');
 	const boards = database.table<BoardMeta>('boards');
+	const canonical = database.table<CanonicalRow>('canonical');
+	const meta = database.table<MetaRow>('meta');
 
-	const [pageCount, shapeCount, bindingCount, board] = await Promise.all([
-		pages.where('boardId').equals(boardId).count(),
-		shapes.where('boardId').equals(boardId).count(),
-		bindings.where('boardId').equals(boardId).count(),
-		boards.get(boardId)
-	]);
+	const [board, canonicalRow] = await Promise.all([boards.get(boardId), canonical.get(boardId)]);
+	if (canonicalRow) {
+		const document = canonicalRow.snapshot.document;
+		return BoardStatsOps.create({
+			pageCount: Object.keys(document.pages).length,
+			shapeCount: Object.keys(document.shapes).length,
+			bindingCount: Object.keys(document.bindings).length,
+			layerCount: Object.keys(document.layers).length,
+			assetCount: Object.keys(document.assets).length,
+			docSizeBytes: canonicalRow.bytes.byteLength,
+			lastUpdated: board?.updatedAt ?? canonicalRow.updatedAt
+		});
+	}
 
-	const allRows = await Promise.all([
+	const [pageRows, shapeRows, bindingRows, layersRow, assetsRow] = await Promise.all([
 		pages.where('boardId').equals(boardId).toArray(),
 		shapes.where('boardId').equals(boardId).toArray(),
-		bindings.where('boardId').equals(boardId).toArray()
+		bindings.where('boardId').equals(boardId).toArray(),
+		meta.get(layersKey(boardId)),
+		meta.get(assetsKey(boardId))
 	]);
 
 	const docSizeBytes = JSON.stringify({
-		pages: allRows[0],
-		shapes: allRows[1],
-		bindings: allRows[2]
+		pages: pageRows,
+		shapes: shapeRows,
+		bindings: bindingRows,
+		layers: layersRow?.value,
+		assets: assetsRow?.value
 	}).length;
 
 	return BoardStatsOps.create({
-		pageCount,
-		shapeCount,
-		bindingCount,
+		pageCount: pageRows.length,
+		shapeCount: shapeRows.length,
+		bindingCount: bindingRows.length,
+		layerCount: layersRow?.value
+			? Object.keys(layersRow.value as Record<string, unknown>).length
+			: undefined,
+		assetCount: assetsRow?.value
+			? Object.keys(assetsRow.value as Record<string, unknown>).length
+			: undefined,
 		docSizeBytes,
 		lastUpdated: board?.updatedAt ?? 0
 	});
@@ -694,9 +734,21 @@ export async function getBoardInspectorData(
 	database: Dexie,
 	boardId: string
 ): Promise<BoardInspectorData> {
-	const [stats, schema] = await Promise.all([
+	const [stats, schema, canonicalRow] = await Promise.all([
 		getBoardStats(database, boardId),
-		getSchemaInfo(database)
+		getSchemaInfo(database),
+		database.table<CanonicalRow>('canonical').get(boardId)
 	]);
-	return { storageType: 'IndexedDB (Dexie)', stats, schema };
+	return {
+		storageType: 'IndexedDB (Dexie)',
+		stats,
+		schema,
+		document: canonicalRow
+			? {
+					documentId: canonicalRow.snapshot.document_id,
+					formatVersion: canonicalRow.snapshot.format_version,
+					canonical: true
+				}
+			: { canonical: false }
+	};
 }

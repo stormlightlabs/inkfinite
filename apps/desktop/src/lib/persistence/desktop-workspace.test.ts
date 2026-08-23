@@ -94,6 +94,9 @@ describe('desktop workspace adapter', () => {
 				saveAs: async () => {
 					throw new Error('not used');
 				},
+				duplicateDocument: async () => {
+					throw new Error('not used');
+				},
 				saveDraftAs: async () => {
 					throw new Error('not used');
 				},

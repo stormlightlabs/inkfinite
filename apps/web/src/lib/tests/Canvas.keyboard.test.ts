@@ -102,6 +102,7 @@ vi.mock('$lib/persistence/repository', () => ({
 			{ id: 'board-1', name: 'Test Board', createdAt: 0, updatedAt: 0 }
 		],
 		createBoard: async () => 'board-1',
+		duplicateBoard: async () => 'board-copy',
 		openBoard: async () => {},
 		renameBoard: async () => {},
 		deleteBoard: async () => {},

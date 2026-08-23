@@ -9,6 +9,7 @@ function createMockRepo(): PersistentDocRepo {
 	return {
 		listBoards: vi.fn(async () => []),
 		createBoard: vi.fn(async () => 'board:mock'),
+		duplicateBoard: vi.fn(async () => 'board:copy'),
 		openBoard: vi.fn(async () => {}),
 		renameBoard: vi.fn(async () => {}),
 		deleteBoard: vi.fn(async () => {}),

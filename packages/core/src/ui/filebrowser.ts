@@ -3,6 +3,7 @@ import type { BoardMeta, DocRepo } from '../persistence/repo';
 export type FileBrowserActions = {
 	open(boardId: string): Promise<void>;
 	create(name: string): Promise<string>;
+	duplicate(boardId: string, name?: string): Promise<string>;
 	rename(boardId: string, name: string): Promise<void>;
 	delete(boardId: string): Promise<void>;
 };
@@ -134,6 +135,9 @@ function createActions(repo: DocRepo): FileBrowserActions {
 		},
 		async create(name: string) {
 			return repo.createBoard(name);
+		},
+		async duplicate(boardId: string, name?: string) {
+			return repo.duplicateBoard(boardId, name);
 		},
 		async rename(boardId: string, name: string) {
 			await repo.renameBoard(boardId, name);

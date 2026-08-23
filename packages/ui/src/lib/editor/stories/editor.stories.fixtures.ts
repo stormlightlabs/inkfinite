@@ -33,6 +33,7 @@ export function createStoryFileBrowser(boards: BoardMeta[] = storyBoards) {
 	const repo: DocRepo = {
 		listBoards: async () => storyBoards,
 		createBoard: async (name) => `board:${name.toLowerCase().replaceAll(' ', '-')}`,
+		duplicateBoard: async () => 'board:copy',
 		openBoard: async () => {},
 		renameBoard: async () => {},
 		deleteBoard: async () => {}
@@ -93,6 +94,7 @@ export function createStoryPlatform(): EditorPlatformAdapter {
 				repo: {
 					listBoards: async () => [board],
 					createBoard: async () => board.id,
+					duplicateBoard: async () => 'board:copy',
 					openBoard: async () => {},
 					renameBoard: async () => {},
 					deleteBoard: async () => {},
