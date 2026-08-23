@@ -6,6 +6,11 @@ pub mod crdt;
 pub mod editor;
 pub mod engine;
 pub mod file;
+pub mod graph_layout;
+pub use graph_layout::{
+    GraphLayoutAlgorithm, GraphLayoutDirection, GraphLayoutEdge, GraphLayoutGraph, GraphLayoutNode, GraphLayoutOptions,
+    GraphLayoutResult,
+};
 pub mod ipc;
 pub mod path;
 pub mod proto;

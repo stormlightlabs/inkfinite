@@ -106,11 +106,11 @@ as a permanent graph constraint.
 
 ### Graph layout
 
-- [ ] Add deterministic Rust tree and flow layouts using structured connections
-- [ ] Add Rust radial layout after tree and flow behavior is stable
-- [ ] Verify layout through undo/redo, save/reopen, merge, and stale-head
+- [x] Add deterministic Rust tree and flow layouts using structured connections
+- [x] Add Rust radial layout after tree and flow behavior is stable
+- [x] Verify layout through undo/redo, save/reopen, merge, and stale-head
       handling
-- [ ] Add integration tests for representative before/after layout operations
+- [x] Add integration tests for representative before/after layout operations
 
 ## Agent proposal review
 

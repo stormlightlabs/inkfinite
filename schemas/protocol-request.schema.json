@@ -358,6 +358,71 @@
       "description": "Cross-platform serialized document path used at file-service boundaries.",
       "type": "string"
     },
+    "GraphLayoutAlgorithm": {
+      "description": "Graph layout algorithm exposed by Inkfinite.",
+      "oneOf": [
+        {
+          "const": "flow",
+          "description": "Layer a directed graph by rank.",
+          "type": "string"
+        },
+        {
+          "const": "tree",
+          "description": "Layer a directed graph with tree-oriented stable ordering.",
+          "type": "string"
+        },
+        {
+          "const": "radial",
+          "description": "Place graph ranks on concentric circles.",
+          "type": "string"
+        }
+      ]
+    },
+    "GraphLayoutDirection": {
+      "description": "Direction of ranked graph layouts.",
+      "oneOf": [
+        {
+          "const": "top_to_bottom",
+          "description": "Sources appear above their targets.",
+          "type": "string"
+        },
+        {
+          "const": "left_to_right",
+          "description": "Sources appear to the left of their targets.",
+          "type": "string"
+        }
+      ]
+    },
+    "GraphLayoutOptions": {
+      "description": "Options shared by graph layout operations.",
+      "properties": {
+        "algorithm": {
+          "$ref": "#/$defs/GraphLayoutAlgorithm",
+          "description": "Layout algorithm to use."
+        },
+        "direction": {
+          "$ref": "#/$defs/GraphLayoutDirection",
+          "description": "Direction for ranked layouts."
+        },
+        "node_gap": {
+          "description": "Space between adjacent nodes in one rank or radial ring.",
+          "format": "double",
+          "type": "number"
+        },
+        "rank_gap": {
+          "description": "Space between ranked rows or radial rings.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "algorithm",
+        "direction",
+        "node_gap",
+        "rank_gap"
+      ],
+      "type": "object"
+    },
     "Insets": {
       "description": "Padding inside a layout container.",
       "properties": {
@@ -1270,6 +1335,40 @@
             "type",
             "shape_ids",
             "gap",
+            "expected_versions"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Arrange selected shapes from their structured connections.",
+          "properties": {
+            "expected_versions": {
+              "additionalProperties": {
+                "$ref": "#/$defs/RecordVersion"
+              },
+              "description": "Optional optimistic versions keyed by shape ID.",
+              "type": "object"
+            },
+            "layout": {
+              "$ref": "#/$defs/GraphLayoutOptions",
+              "description": "Graph algorithm and spacing options."
+            },
+            "shape_ids": {
+              "description": "Shapes to arrange.",
+              "items": {
+                "$ref": "#/$defs/ShapeId"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "graph_layout",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "shape_ids",
+            "layout",
             "expected_versions"
           ],
           "type": "object"

@@ -90,59 +90,53 @@ inspection, and stale-head workflows.
 
 #### Graph layout
 
-Use Graphviz as the graph-layout engine rather than implementing general graph
-layout algorithms in Inkfinite. Keep Graphviz behind an Inkfinite-owned adapter
-so the document model, transaction engine, CLI, MCP, and editor do not depend on
-DOT or Graphviz-specific types.
+Use an Inkfinite-owned deterministic adapter rather than adding a Graphviz
+runtime to native and browser builds. This keeps the layout behavior in the
+shared document model and avoids separate native and WebAssembly engine
+integrations. The document model, transaction engine, CLI, MCP, and editor
+must depend only on the Inkfinite graph layout contract.
 
 Build a small internal layout graph from selected shapes, their measured
 world-space bounds, and explicit structured connections. Nodes and edges must be
-ordered deterministically before invoking the layout engine. Graph layout must
-not infer semantic relationships from visual proximity or connector geometry.
+ordered deterministically before layout. Graph layout must not infer semantic
+relationships from visual proximity or connector geometry.
 
 Support these layouts initially:
 
-- `flow`: Graphviz `dot`, with top-to-bottom and left-to-right directions.
-- `tree`: Graphviz `dot` with tree-oriented constraints and stable relationship
-  ordering.
-- `radial`: Graphviz `twopi`, after tree and flow behavior is stable.
+- `flow`: layered placement with top-to-bottom and left-to-right directions.
+- `tree`: layered placement with stable relationship ordering and tree-oriented
+  rank handling.
+- `radial`: concentric placement after flow and tree behavior is stable.
 
-Use Graphviz only to determine node placement. Do not adopt Graphviz edge
-splines, routing, rendering, graph storage, or SVG as Inkfinite state.
-After applying returned node positions, rerun Inkfinite's existing
-obstacle-aware connector router so connectors remain native editable objects.
+Use the layout adapter only to determine node placement. Connector routing,
+rendering, graph storage, and SVG output remain Inkfinite concerns. After node
+positions change, Inkfinite's obstacle-aware connector router continues to
+produce native editable connector paths.
 
-Introduce an Inkfinite-owned graph layout contract containing stable shape IDs,
-node dimensions, structured edges, layout options, and returned positions.
-Normalize Graphviz coordinates into Inkfinite world coordinates and preserve a
-predictable selection origin so applying layout does not unnecessarily move the
-entire selection across the canvas.
+The Inkfinite graph layout contract contains stable shape IDs, node dimensions,
+structured edges, layout options, and returned positions. Normalize returned
+coordinates into Inkfinite world coordinates and preserve a predictable
+selection origin so applying layout does not unnecessarily move the selection
+across the canvas.
 
-Native builds should access Graphviz through a narrow integration boundary.
-`graphviz-sys` may be used for `libgvc` bindings, but any required unsafe FFI
-must remain isolated from `inkfinite-core`; do not weaken the core workspace's
-safe-Rust policy to accommodate the binding. Browser builds should use the
-maintained Graphviz WebAssembly distribution through
-`@hpcc-js/wasm-graphviz`. Keep Graphviz versions pinned where practical and
-verify that native and browser adapters produce equivalent normalized layouts
-for the same fixtures.
+Native and browser adapters must use the same graph contract and produce
+equivalent normalized layouts for the same fixtures. Do not add unsafe FFI or a
+separate browser engine for the initial implementation.
 
-Graph layout results must ultimately become ordinary Inkfinite transactions.
-Applying a layout must preserve object identity, hierarchy, semantic metadata,
-bindings, connector attachment, undo/redo behavior, CRDT merge behavior, and
-stale-head validation.
+Graph layout results must become ordinary Inkfinite transactions. Applying a
+layout must preserve object identity, hierarchy, semantic metadata, bindings,
+connector attachment, undo/redo behavior, CRDT merge behavior, and stale-head
+validation.
 
-Before considering additional layout engines, add deterministic fixtures
-covering chains, branching trees, multiple roots, diamonds, cycles,
-disconnected components, different node dimensions, nested shapes, and
-connection-heavy selections. Explicitly define behavior for locked shapes,
+Add deterministic fixtures covering chains, branching trees, multiple roots,
+diamonds, cycles, disconnected components, different node dimensions, nested
+shapes, and connection-heavy selections. Define behavior for locked shapes,
 cycles in tree mode, relationships crossing the selected subgraph, and
 unsupported graph structures.
 
 Treat force-directed, stress, circular, packing, and constraint-based layouts
-as later extensions. They may use other Graphviz engines where appropriate, but
-should reuse the same Inkfinite layout graph and transaction boundary rather
-than introducing engine-specific document concepts.
+as later extensions. They should reuse the Inkfinite graph layout contract and
+transaction boundary rather than introducing engine-specific document concepts.
 
 ### Agent proposal review
 

@@ -1333,6 +1333,15 @@ fn operation_preview(
             shape_ids.iter().cloned().map(RecordId::Shape).collect(),
             shape_ids.clone(),
         ),
+        Operation::GraphLayout { shape_ids, layout, .. } => (
+            format!(
+                "Apply {:?} graph layout to {} shapes",
+                layout.algorithm,
+                shape_ids.len()
+            ),
+            shape_ids.iter().cloned().map(RecordId::Shape).collect(),
+            shape_ids.clone(),
+        ),
     };
     let mut bounds = Vec::new();
     for shape_id in shape_ids {

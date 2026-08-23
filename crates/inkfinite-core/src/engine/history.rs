@@ -47,7 +47,8 @@ pub fn refresh_inverse_preconditions(operations: &mut [Operation], document: &Do
             | Operation::DistributeShapes { shape_ids, expected_versions, .. }
             | Operation::StackShapes { shape_ids, expected_versions, .. }
             | Operation::GridShapes { shape_ids, expected_versions, .. }
-            | Operation::TidyShapes { shape_ids, expected_versions, .. } => {
+            | Operation::TidyShapes { shape_ids, expected_versions, .. }
+            | Operation::GraphLayout { shape_ids, expected_versions, .. } => {
                 expected_versions.clear();
                 expected_versions.extend(shape_ids.iter().filter_map(|shape_id| {
                     document
@@ -103,7 +104,8 @@ pub fn capture_expected_records(operations: &[Operation], document: &Document) -
             | Operation::DistributeShapes { shape_ids, .. }
             | Operation::StackShapes { shape_ids, .. }
             | Operation::GridShapes { shape_ids, .. }
-            | Operation::TidyShapes { shape_ids, .. } => {
+            | Operation::TidyShapes { shape_ids, .. }
+            | Operation::GraphLayout { shape_ids, .. } => {
                 for shape_id in shape_ids {
                     if let Some(record) = document.shapes.get(shape_id) {
                         expected.shapes.insert(shape_id.clone(), record.clone());
@@ -314,7 +316,8 @@ pub fn prepare_compensation(entry: &HistoryEntry, current: &Document) -> Result<
             | Operation::DistributeShapes { .. }
             | Operation::StackShapes { .. }
             | Operation::GridShapes { .. }
-            | Operation::TidyShapes { .. } => {
+            | Operation::TidyShapes { .. }
+            | Operation::GraphLayout { .. } => {
                 return Err(history_conflict(
                     "history contains an unsupported aggregate layout operation",
                 ));

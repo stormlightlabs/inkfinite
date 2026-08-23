@@ -14,6 +14,9 @@ use super::{
     LayerPatch, LayoutAxis, Operation, PageId, RecordVersion, ShapeAlignment, ShapeId, ShapeParent, ShapePatch,
     ShapeProperties, SiblingAnchor, normalize_shape_properties,
 };
+use crate::ARROW_KIND;
+use crate::graph_layout::GraphLayoutOptions;
+use crate::graph_layout::{GraphLayoutEdge, GraphLayoutGraph, GraphLayoutNode, layout_graph};
 
 #[allow(clippy::too_many_lines)]
 pub fn apply_operation(document: &mut Document, operation: &Operation) -> Result<Vec<Operation>, EngineError> {
@@ -159,6 +162,9 @@ pub fn apply_operation(document: &mut Document, operation: &Operation) -> Result
         }
         Operation::TidyShapes { shape_ids, gap, expected_versions } => {
             tidy_shapes(document, shape_ids, *gap, expected_versions)
+        }
+        Operation::GraphLayout { shape_ids, layout, expected_versions } => {
+            graph_layout_shapes(document, shape_ids, *layout, expected_versions)
         }
     }
 }
@@ -714,6 +720,80 @@ pub fn tidy_shapes(
     let count = shape_ids.iter().collect::<BTreeSet<_>>().len();
     let columns = (count as f64).sqrt().ceil().max(1.0) as u32;
     grid_shapes(document, shape_ids, columns, gap, gap, expected_versions)
+}
+
+/// Applies a graph layout while keeping the graph itself out of document state.
+pub fn graph_layout_shapes(
+    document: &mut Document, shape_ids: &[ShapeId], options: GraphLayoutOptions,
+    expected_versions: &BTreeMap<ShapeId, RecordVersion>,
+) -> Result<Vec<Operation>, EngineError> {
+    let items = layout_items(document, shape_ids, 2, expected_versions)?;
+    let node_ids = items.iter().map(|item| item.id.clone()).collect::<BTreeSet<_>>();
+    let nodes = items
+        .iter()
+        .map(|item| GraphLayoutNode {
+            id: item.id.clone(),
+            width: item.bounds.width,
+            height: item.bounds.height,
+            locked: item.locked,
+        })
+        .collect::<Vec<_>>();
+    let mut edges = BTreeSet::new();
+    let mut arrow_endpoints: BTreeMap<ShapeId, BTreeMap<String, ShapeId>> = BTreeMap::new();
+    for binding in document.bindings.values() {
+        let is_relation = binding.kind.as_str() == "relation" || binding.relation_type.is_some();
+        if is_relation
+            && node_ids.contains(&binding.source_shape_id)
+            && node_ids.contains(&binding.target_shape_id)
+            && binding.source_shape_id != binding.target_shape_id
+        {
+            edges.insert(GraphLayoutEdge {
+                source: binding.source_shape_id.clone(),
+                target: binding.target_shape_id.clone(),
+            });
+        }
+        if binding.kind.as_str() == "arrow-end"
+            && document
+                .shapes
+                .get(&binding.source_shape_id)
+                .is_some_and(|shape| shape.kind.as_str() == ARROW_KIND)
+            && node_ids.contains(&binding.target_shape_id)
+        {
+            arrow_endpoints
+                .entry(binding.source_shape_id.clone())
+                .or_default()
+                .insert(binding.source_handle.clone(), binding.target_shape_id.clone());
+        }
+    }
+    for endpoints in arrow_endpoints.values() {
+        let (Some(source), Some(target)) = (endpoints.get("start"), endpoints.get("end")) else {
+            continue;
+        };
+        if source != target {
+            edges.insert(GraphLayoutEdge { source: source.clone(), target: target.clone() });
+        }
+    }
+    let graph = GraphLayoutGraph { nodes, edges: edges.into_iter().collect() };
+    let result = layout_graph(&graph, options).map_err(EngineError::Schema)?;
+    let origin_x = items.iter().map(|item| item.bounds.x).fold(f64::INFINITY, f64::min);
+    let origin_y = items.iter().map(|item| item.bounds.y).fold(f64::INFINITY, f64::min);
+    let deltas = items
+        .iter()
+        .map(|item| {
+            let position = result
+                .positions
+                .get(&item.id)
+                .ok_or_else(|| EngineError::Invariant(format!("graph layout returned no position for {}", item.id)))?;
+            Ok((
+                item.id.clone(),
+                (
+                    origin_x + position.x - item.bounds.x,
+                    origin_y + position.y - item.bounds.y,
+                ),
+            ))
+        })
+        .collect::<Result<BTreeMap<_, _>, EngineError>>()?;
+    apply_layout_translations(document, &items, &deltas)
 }
 
 fn layout_items(

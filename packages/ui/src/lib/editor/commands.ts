@@ -1,6 +1,7 @@
 import {
 	alignShapes,
 	distributeShapes,
+	graphLayout,
 	gridShapes,
 	stackShapes,
 	tidyShapes,
@@ -27,6 +28,11 @@ export type SelectionCommand =
 	| 'stack-vertical'
 	| 'arrange-grid'
 	| 'tidy'
+	| 'graph-flow-top-to-bottom'
+	| 'graph-flow-left-to-right'
+	| 'graph-tree-top-to-bottom'
+	| 'graph-tree-left-to-right'
+	| 'graph-radial'
 	| 'group'
 	| 'ungroup'
 	| 'forward'
@@ -53,6 +59,11 @@ export const SELECTION_COMMAND_LABELS: Record<SelectionCommand, string> = {
 	'stack-vertical': 'Stack Vertically',
 	'arrange-grid': 'Arrange in Grid',
 	tidy: 'Tidy Up',
+	'graph-flow-top-to-bottom': 'Flow Top to Bottom',
+	'graph-flow-left-to-right': 'Flow Left to Right',
+	'graph-tree-top-to-bottom': 'Tree Top to Bottom',
+	'graph-tree-left-to-right': 'Tree Left to Right',
+	'graph-radial': 'Radial Layout',
 	group: 'Group',
 	ungroup: 'Ungroup',
 	forward: 'Bring Forward',
@@ -107,6 +118,16 @@ export function applySelectionCommand(state: EditorState, command: SelectionComm
 			return gridShapes(state, ids);
 		case 'tidy':
 			return tidyShapes(state, ids);
+		case 'graph-flow-top-to-bottom':
+			return graphLayout(state, ids, 'flow', 'top-to-bottom');
+		case 'graph-flow-left-to-right':
+			return graphLayout(state, ids, 'flow', 'left-to-right');
+		case 'graph-tree-top-to-bottom':
+			return graphLayout(state, ids, 'tree', 'top-to-bottom');
+		case 'graph-tree-left-to-right':
+			return graphLayout(state, ids, 'tree', 'left-to-right');
+		case 'graph-radial':
+			return graphLayout(state, ids, 'radial');
 		default:
 			return alignShapes(state, ids, command.slice('align-'.length) as ShapeAlignment);
 	}
@@ -156,7 +177,12 @@ export function getCommandPaletteEntries(
 			'stack-horizontal',
 			'stack-vertical',
 			'arrange-grid',
-			'tidy'
+			'tidy',
+			'graph-flow-top-to-bottom',
+			'graph-flow-left-to-right',
+			'graph-tree-top-to-bottom',
+			'graph-tree-left-to-right',
+			'graph-radial'
 		] as SelectionCommand[]
 	).map((id) => ({
 		id,

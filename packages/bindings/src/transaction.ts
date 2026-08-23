@@ -149,6 +149,38 @@ export type LayoutAxis = 'horizontal' | 'vertical';
 export type ShapeAlignment = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
 
 /**
+ * Graph layout algorithm exposed by Inkfinite.
+ */
+export type GraphLayoutAlgorithm = 'flow' | 'tree' | 'radial';
+
+/**
+ * Direction of ranked graph layouts.
+ */
+export type GraphLayoutDirection = 'top_to_bottom' | 'left_to_right';
+
+/**
+ * Options shared by graph layout operations.
+ */
+export type GraphLayoutOptions = {
+	/**
+	 * Layout algorithm to use.
+	 */
+	algorithm: GraphLayoutAlgorithm;
+	/**
+	 * Direction for ranked layouts.
+	 */
+	direction: GraphLayoutDirection;
+	/**
+	 * Space between adjacent nodes in one rank or radial ring.
+	 */
+	node_gap: number;
+	/**
+	 * Space between ranked rows or radial rings.
+	 */
+	rank_gap: number;
+};
+
+/**
  * Durable document operation. Ordered insertions use sibling anchors only.
  */
 export type Operation =
@@ -457,6 +489,21 @@ export type Operation =
 			 * Space between grid cells.
 			 */
 			gap: number;
+			/**
+			 * Optional optimistic versions keyed by shape ID.
+			 */
+			expected_versions: { [key in ShapeId]: RecordVersion };
+	  }
+	| {
+			type: 'graph_layout';
+			/**
+			 * Shapes to arrange.
+			 */
+			shape_ids: Array<ShapeId>;
+			/**
+			 * Graph algorithm and spacing options.
+			 */
+			layout: GraphLayoutOptions;
 			/**
 			 * Optional optimistic versions keyed by shape ID.
 			 */

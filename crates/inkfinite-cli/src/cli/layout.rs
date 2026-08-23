@@ -1,5 +1,8 @@
 use super::mutation::{StructuredMutationTarget, select_layout_shapes};
-use super::{AlignmentArg, AxisArg, BTreeMap, CliError, LayoutAxis, LayoutCommand, Operation, ShapeAlignment, Write};
+use super::{
+    AlignmentArg, AxisArg, BTreeMap, CliError, GraphLayoutAlgorithm, GraphLayoutDirection, GraphLayoutOptions,
+    LayoutAxis, LayoutCommand, Operation, ShapeAlignment, Write,
+};
 
 pub fn run_layout_command(command: LayoutCommand, json_output: bool, stdout: &mut dyn Write) -> Result<(), CliError> {
     match command {
@@ -82,6 +85,36 @@ pub fn run_layout_command(command: LayoutCommand, json_output: bool, stdout: &mu
                 "layout:tidy".into(),
                 "tidy shapes".into(),
                 vec![Operation::TidyShapes { shape_ids, gap: args.gap, expected_versions: BTreeMap::new() }],
+            )?;
+            target.finish(transaction, &args.mutation, json_output, stdout)
+        }
+        LayoutCommand::Graph(args) => {
+            let mut target = StructuredMutationTarget::open(args.path.as_deref(), &args.mutation)?;
+            let snapshot = target.snapshot()?;
+            let shape_ids = select_layout_shapes(&snapshot.document, args.selection)?;
+            let algorithm = match args.algorithm {
+                super::GraphLayoutAlgorithmArg::Flow => GraphLayoutAlgorithm::Flow,
+                super::GraphLayoutAlgorithmArg::Tree => GraphLayoutAlgorithm::Tree,
+                super::GraphLayoutAlgorithmArg::Radial => GraphLayoutAlgorithm::Radial,
+            };
+            let direction = match args.direction {
+                super::GraphLayoutDirectionArg::TopToBottom => GraphLayoutDirection::TopToBottom,
+                super::GraphLayoutDirectionArg::LeftToRight => GraphLayoutDirection::LeftToRight,
+            };
+            let transaction = target.transaction(
+                args.mutation.transaction_id.clone(),
+                "layout:graph".into(),
+                format!("apply {algorithm:?} graph layout"),
+                vec![Operation::GraphLayout {
+                    shape_ids,
+                    layout: GraphLayoutOptions {
+                        algorithm,
+                        direction,
+                        node_gap: args.node_gap,
+                        rank_gap: args.rank_gap,
+                    },
+                    expected_versions: BTreeMap::new(),
+                }],
             )?;
             target.finish(transaction, &args.mutation, json_output, stdout)
         }

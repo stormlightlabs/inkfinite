@@ -29,6 +29,7 @@ pub fn validate_locks(document: &Document, operation: &Operation) -> Result<(), 
             | Operation::StackShapes { .. }
             | Operation::GridShapes { .. }
             | Operation::TidyShapes { .. }
+            | Operation::GraphLayout { .. }
     ) {
         return Ok(());
     }

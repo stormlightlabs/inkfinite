@@ -241,6 +241,9 @@ fn transaction_bindings() -> String {
     append_declaration::<AssetPatch>(&mut output, &config);
     append_declaration::<LayoutAxis>(&mut output, &config);
     append_declaration::<ShapeAlignment>(&mut output, &config);
+    append_declaration::<GraphLayoutAlgorithm>(&mut output, &config);
+    append_declaration::<GraphLayoutDirection>(&mut output, &config);
+    append_declaration::<GraphLayoutOptions>(&mut output, &config);
     append_declaration::<Operation>(&mut output, &config);
     append_declaration::<RecordId>(&mut output, &config);
     append_clean_declaration::<QueryRecord>(&mut output, &config);

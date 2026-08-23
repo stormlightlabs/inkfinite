@@ -112,10 +112,13 @@ inkfinite import svg architecture.inkfinite \
   --input icon.svg --dry-run --json
 ```
 
-`layout` supports `align`, `distribute`, `stack`, `grid`, and `tidy`. Select
+`layout` supports `align`, `distribute`, `stack`, `grid`, `tidy`, and `graph`. Select
 shapes with repeated `--shape` flags or one `--role` selector; stack accepts
 `--axis` and `--gap`, grid accepts `--columns`, `--column-gap`, and
-`--row-gap`, and tidy accepts `--gap`.
+`--row-gap`, tidy accepts `--gap`, and graph accepts `--algorithm flow|tree|radial`,
+`--direction top-to-bottom|left-to-right`, `--node-gap`, and `--rank-gap`.
+Graph edges come from selected-to-selected relation bindings or the two endpoints
+of a selected connector; proximity and unselected endpoints are ignored.
 
 `import svg` creates the retained source asset, native group containers, and
 supported shapes in one validated transaction. Use `--page` or `--layer` to

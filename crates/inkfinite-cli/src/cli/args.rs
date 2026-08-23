@@ -423,6 +423,8 @@ pub enum LayoutCommand {
     Grid(LayoutGridArgs),
     /// Tidy two or more selected shapes into a balanced grid.
     Tidy(LayoutTidyArgs),
+    /// Arrange selected shapes from their structured connections.
+    Graph(GraphLayoutArgs),
 }
 
 #[derive(Debug, Args)]
@@ -512,6 +514,44 @@ pub struct LayoutTidyArgs {
     pub selection: LayoutSelectionArgs,
     #[command(flatten)]
     pub mutation: MutationOptions,
+}
+
+#[derive(Debug, Args)]
+pub struct GraphLayoutArgs {
+    /// Canonical document to change. Omit when using --app.
+    #[arg(value_name = "FILE")]
+    pub path: Option<PathBuf>,
+    /// Graph layout algorithm.
+    #[arg(long, value_enum, default_value_t = GraphLayoutAlgorithmArg::Flow)]
+    pub algorithm: GraphLayoutAlgorithmArg,
+    /// Direction for ranked layouts.
+    #[arg(long, value_enum, default_value_t = GraphLayoutDirectionArg::TopToBottom)]
+    pub direction: GraphLayoutDirectionArg,
+    /// Space between nodes in a rank or radial ring.
+    #[arg(long, default_value_t = 64.0)]
+    pub node_gap: f64,
+    /// Space between ranks or radial rings.
+    #[arg(long, default_value_t = 96.0)]
+    pub rank_gap: f64,
+    #[command(flatten)]
+    pub selection: LayoutSelectionArgs,
+    #[command(flatten)]
+    pub mutation: MutationOptions,
+}
+
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
+pub enum GraphLayoutAlgorithmArg {
+    #[default]
+    Flow,
+    Tree,
+    Radial,
+}
+
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
+pub enum GraphLayoutDirectionArg {
+    #[default]
+    TopToBottom,
+    LeftToRight,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]

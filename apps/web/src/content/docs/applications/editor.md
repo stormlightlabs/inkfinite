@@ -29,8 +29,10 @@ content. The canvas draws guides for each active snap. Hold Shift to constrain m
 to 15-degree angles. Hold Alt/Option while dragging to duplicate a selection. During resize, Shift
 preserves the aspect ratio and Alt/Option resizes around the center.
 
-The **Layout** menu aligns and distributes selected shapes, changes their stacking order, groups
-or ungroups them, and controls locks. The **Object metadata** section edits names, roles, tags,
+The **Layout** menu aligns and distributes selected shapes, stacks and grids them, lays out
+connected graphs, changes their stacking order, groups or ungroups them, and controls locks.
+Graph layouts use relation bindings and both endpoints of bound arrows; they do not infer edges
+from nearby objects. The **Object metadata** section edits names, roles, tags,
 descriptions, sources, links, and structured metadata for any selection. A single selected object
 also shows its provenance. Right-click the canvas or a selection for commands relevant to that
 location.

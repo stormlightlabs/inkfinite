@@ -717,6 +717,21 @@ fn structured_commands_use_semantic_selectors_for_layout_and_connections() {
     ]);
     assert_success(&relation);
 
+    let graph = run([
+        "layout",
+        "graph",
+        path(&document_path),
+        "--algorithm",
+        "flow",
+        "--direction",
+        "top-to-bottom",
+        "--role",
+        "architecture.service",
+        "--json",
+    ]);
+    assert_success(&graph);
+    assert_eq!(parse_stdout(&graph)["updated"].as_array().unwrap().len(), 3);
+
     let outgoing = run([
         "query",
         path(&document_path),

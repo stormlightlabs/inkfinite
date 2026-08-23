@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 
+use crate::graph_layout::GraphLayoutOptions;
 use crate::{
     ActorId, AssetId, AssetRecord, BindingId, BindingRecord, ChangeHash, ContainerLayout, DocumentId, DocumentSnapshot,
     LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord, RecordVersion, SemanticMetadata, ShapeId, ShapeParent,
@@ -325,6 +326,15 @@ pub enum Operation {
         shape_ids: Vec<ShapeId>,
         /// Space between grid cells.
         gap: f64,
+        /// Optional optimistic versions keyed by shape ID.
+        expected_versions: BTreeMap<ShapeId, RecordVersion>,
+    },
+    /// Arrange selected shapes from their structured connections.
+    GraphLayout {
+        /// Shapes to arrange.
+        shape_ids: Vec<ShapeId>,
+        /// Graph algorithm and spacing options.
+        layout: GraphLayoutOptions,
         /// Optional optimistic versions keyed by shape ID.
         expected_versions: BTreeMap<ShapeId, RecordVersion>,
     },

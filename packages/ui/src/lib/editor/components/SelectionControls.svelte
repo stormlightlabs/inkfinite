@@ -675,6 +675,38 @@
 				icon: 'grid-dots',
 				disabled: selectionCount < 2
 			},
+			{ type: 'separator' },
+			{
+				id: 'graph-flow-top-to-bottom',
+				label: SELECTION_COMMAND_LABELS['graph-flow-top-to-bottom'],
+				icon: 'arrow-down',
+				disabled: selectionCount < 2
+			},
+			{
+				id: 'graph-flow-left-to-right',
+				label: SELECTION_COMMAND_LABELS['graph-flow-left-to-right'],
+				icon: 'arrow-right',
+				disabled: selectionCount < 2
+			},
+			{
+				id: 'graph-tree-top-to-bottom',
+				label: SELECTION_COMMAND_LABELS['graph-tree-top-to-bottom'],
+				icon: 'arrow-down',
+				disabled: selectionCount < 2
+			},
+			{
+				id: 'graph-tree-left-to-right',
+				label: SELECTION_COMMAND_LABELS['graph-tree-left-to-right'],
+				icon: 'arrow-right',
+				disabled: selectionCount < 2
+			},
+			{
+				id: 'graph-radial',
+				label: SELECTION_COMMAND_LABELS['graph-radial'],
+				icon: 'select',
+				disabled: selectionCount < 2
+			},
+			{ type: 'separator' },
 			{
 				id: 'stack-horizontal',
 				label: SELECTION_COMMAND_LABELS['stack-horizontal'],

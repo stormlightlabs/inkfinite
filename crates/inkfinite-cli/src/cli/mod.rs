@@ -20,6 +20,7 @@ use inkfinite_core::{
     SemanticMetadata, ShapeId, ShapeKind, ShapeParent, ShapeRecord, ShapeStyle, SiblingAnchor, Timestamp, Transform,
     Vec2, blank_document, builtin_shape_kinds,
 };
+use inkfinite_core::{GraphLayoutAlgorithm, GraphLayoutDirection, GraphLayoutOptions};
 use serde::Serialize;
 use serde_json::{Value, json};
 
@@ -117,9 +118,10 @@ mod support;
 mod svg;
 
 use args::{
-    AlignmentArg, ApplyArgs, AxisArg, ConnectArgs, FileOutputArgs, ImportCommand, InspectArgs, LayoutCommand,
-    LayoutSelectionArgs, MutationOptions, NewArgs, PlacementArg, QueryArgs, RenderArgs, SchemaKind, ShapeCommand,
-    ShapeCreateArgs, ShapeDeleteArgs, ShapeDescribeArgs, ShapePatchArgs, SvgImportArgs,
+    AlignmentArg, ApplyArgs, AxisArg, ConnectArgs, FileOutputArgs, GraphLayoutAlgorithmArg, GraphLayoutDirectionArg,
+    ImportCommand, InspectArgs, LayoutCommand, LayoutSelectionArgs, MutationOptions, NewArgs, PlacementArg, QueryArgs,
+    RenderArgs, SchemaKind, ShapeCommand, ShapeCreateArgs, ShapeDeleteArgs, ShapeDescribeArgs, ShapePatchArgs,
+    SvgImportArgs,
 };
 use support::parse_bounds;
 

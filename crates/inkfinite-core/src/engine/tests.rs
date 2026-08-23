@@ -785,6 +785,137 @@ fn selection_layout_operations_are_deterministic_and_undoable() {
 }
 
 #[test]
+fn graph_layout_uses_structured_connections_and_is_undoable() {
+    let mut document = document();
+    document.bindings.insert(
+        BindingId::from("binding:a-b"),
+        BindingRecord {
+            id: BindingId::from("binding:a-b"),
+            kind: BindingKind::from("relation"),
+            source_shape_id: ShapeId::from("shape:a"),
+            target_shape_id: ShapeId::from("shape:b"),
+            source_handle: "end".into(),
+            anchor: BindingAnchor::Center,
+            relation_type: Some("depends_on".into()),
+            version: RecordVersion(1),
+        },
+    );
+    document.bindings.insert(
+        BindingId::from("binding:b-c"),
+        BindingRecord {
+            id: BindingId::from("binding:b-c"),
+            kind: BindingKind::from("relation"),
+            source_shape_id: ShapeId::from("shape:b"),
+            target_shape_id: ShapeId::from("shape:c"),
+            source_handle: "end".into(),
+            anchor: BindingAnchor::Center,
+            relation_type: Some("depends_on".into()),
+            version: RecordVersion(1),
+        },
+    );
+    let mut engine = TransactionEngine::create(
+        DocumentId::from("document:graph-layout"),
+        ActorId::from("actor:graph-layout"),
+        document,
+    )
+    .unwrap();
+    let ids = vec![
+        ShapeId::from("shape:a"),
+        ShapeId::from("shape:b"),
+        ShapeId::from("shape:c"),
+    ];
+    let base_heads = engine.snapshot().unwrap().heads;
+    let base_bytes = engine.save().unwrap();
+    let mut remote = TransactionEngine::load(&base_bytes, ActorId::from("actor:graph-remote")).unwrap();
+    let before = engine.snapshot().unwrap().document;
+    let stale_transaction = transaction(
+        &mut engine,
+        "actor:graph-layout",
+        "graph-flow-stale",
+        vec![Operation::GraphLayout {
+            shape_ids: ids.clone(),
+            layout: crate::GraphLayoutOptions::default(),
+            expected_versions: BTreeMap::new(),
+        }],
+    );
+    let mut transaction = stale_transaction.clone();
+    transaction.id = TransactionId("graph-flow".into());
+    engine.commit(transaction).unwrap();
+    assert!(matches!(engine.commit(stale_transaction), Err(EngineError::StaleHeads)));
+    let after = engine.snapshot().unwrap().document;
+    assert!(after.shapes[&ids[0]].transform.translation.y < after.shapes[&ids[1]].transform.translation.y);
+    assert!(after.shapes[&ids[1]].transform.translation.y < after.shapes[&ids[2]].transform.translation.y);
+    assert_eq!(after.bindings, before.bindings);
+    let changes = engine.changes_since(&base_heads).unwrap();
+    remote.merge_changes(&changes).unwrap();
+    assert_eq!(
+        remote.snapshot().unwrap().document.shapes[&ids[1]].transform,
+        after.shapes[&ids[1]].transform
+    );
+
+    engine.undo(&ActorId::from("actor:graph-layout")).unwrap();
+    let restored = engine.snapshot().unwrap().document;
+    for id in &ids {
+        assert_eq!(restored.shapes[id].transform, before.shapes[id].transform);
+    }
+    assert_eq!(restored.bindings, before.bindings);
+    engine.redo(&ActorId::from("actor:graph-layout")).unwrap();
+    let redone = engine.snapshot().unwrap().document;
+    assert!(redone.shapes[&ids[1]].transform.translation.y > redone.shapes[&ids[0]].transform.translation.y);
+    let bytes = engine.save().unwrap();
+    let mut reopened = TransactionEngine::load(&bytes, ActorId::from("actor:reopened")).unwrap();
+    assert_eq!(
+        reopened.snapshot().unwrap().document.shapes[&ids[2]].transform,
+        redone.shapes[&ids[2]].transform
+    );
+}
+
+#[test]
+fn graph_layout_keeps_locked_nodes_fixed() {
+    let mut document = document();
+    let locked_id = ShapeId::from("shape:b");
+    document.shapes.get_mut(&locked_id).unwrap().metadata.locked = true;
+    document.bindings.insert(
+        BindingId::from("binding:a-b"),
+        BindingRecord {
+            id: BindingId::from("binding:a-b"),
+            kind: BindingKind::from("relation"),
+            source_shape_id: ShapeId::from("shape:a"),
+            target_shape_id: locked_id.clone(),
+            source_handle: "end".into(),
+            anchor: BindingAnchor::Center,
+            relation_type: None,
+            version: RecordVersion(1),
+        },
+    );
+    let mut engine = TransactionEngine::create(
+        DocumentId::from("document:graph-locked"),
+        ActorId::from("actor:graph-locked"),
+        document,
+    )
+    .unwrap();
+    let locked_before = engine.snapshot().unwrap().document.shapes[&locked_id].transform;
+    let transaction = transaction(
+        &mut engine,
+        "actor:graph-locked",
+        "graph-tree",
+        vec![Operation::GraphLayout {
+            shape_ids: vec![ShapeId::from("shape:a"), locked_id.clone(), ShapeId::from("shape:c")],
+            layout: crate::GraphLayoutOptions {
+                algorithm: crate::GraphLayoutAlgorithm::Tree,
+                ..crate::GraphLayoutOptions::default()
+            },
+            expected_versions: BTreeMap::new(),
+        }],
+    );
+    engine.commit(transaction).unwrap();
+    assert_eq!(
+        engine.snapshot().unwrap().document.shapes[&locked_id].transform,
+        locked_before
+    );
+}
+
+#[test]
 fn mixed_nested_locked_layout_preserves_bindings_and_world_geometry() {
     let mut document = document();
     let container_id = ShapeId::from("shape:a");

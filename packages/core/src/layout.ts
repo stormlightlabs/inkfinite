@@ -44,6 +44,82 @@ export function tidyShapes(state: EditorState, shapeIds: readonly string[], gap 
 	return gridShapes(state, shapeIds, gap);
 }
 
+/** Graph algorithm used by tree, flow, and radial selection layout. */
+export type GraphLayoutAlgorithm = 'flow' | 'tree' | 'radial';
+
+/** Direction used by ranked graph layouts. */
+export type GraphLayoutDirection = 'top-to-bottom' | 'left-to-right';
+
+/**
+ * Places selected shapes from explicit relationship or connector bindings.
+ * Visual proximity is never used to infer an edge.
+ */
+export function graphLayout(
+	state: EditorState,
+	shapeIds: readonly string[],
+	algorithm: GraphLayoutAlgorithm = 'flow',
+	direction: GraphLayoutDirection = 'top-to-bottom',
+	nodeGap = 64,
+	rankGap = 96
+): EditorState {
+	const items = layoutItems(state, shapeIds, 2);
+	if (items.length === 0) return state;
+	const ids = new Set(items.map((item) => item.shape.id));
+	const edges = new Set<string>();
+	const arrowEndpoints = new Map<string, Map<string, string>>();
+	for (const binding of Object.values(state.doc.bindings)) {
+		const isRelation = binding.type === 'relation' || binding.relationType !== undefined;
+		if (
+			isRelation &&
+			ids.has(binding.fromShapeId) &&
+			ids.has(binding.toShapeId) &&
+			binding.fromShapeId !== binding.toShapeId
+		) {
+			edges.add(`${binding.fromShapeId}\\u0000${binding.toShapeId}`);
+		}
+		const source = state.doc.shapes[binding.fromShapeId];
+		if (binding.type === 'arrow-end' && source?.type === 'arrow' && ids.has(binding.toShapeId)) {
+			const endpoints = arrowEndpoints.get(binding.fromShapeId) ?? new Map<string, string>();
+			endpoints.set(binding.handle, binding.toShapeId);
+			arrowEndpoints.set(binding.fromShapeId, endpoints);
+		}
+	}
+	for (const endpoints of arrowEndpoints.values()) {
+		const source = endpoints.get('start');
+		const target = endpoints.get('end');
+		if (source && target && source !== target) edges.add(`${source}\\u0000${target}`);
+	}
+	const positions = layoutGraphPositions(
+		items.map(({ shape, bounds }) => ({
+			id: shape.id,
+			width: Box2.width(bounds),
+			height: Box2.height(bounds)
+		})),
+		[...edges].map((edge) => {
+			const [source, target] = edge.split('\\u0000');
+			return { source: source!, target: target! };
+		}),
+		algorithm,
+		direction,
+		nodeGap,
+		rankGap
+	);
+	const origin = {
+		x: Math.min(...items.map((item) => item.bounds.min.x)),
+		y: Math.min(...items.map((item) => item.bounds.min.y))
+	};
+	const deltas = new Map<string, Vec2>();
+	for (const item of items) {
+		const position = positions.get(item.shape.id);
+		if (!position) return state;
+		deltas.set(item.shape.id, {
+			x: origin.x + position.x - item.bounds.min.x,
+			y: origin.y + position.y - item.bounds.min.y
+		});
+	}
+	return translateSelectedRoots(state, items.map((item) => item.shape), deltas);
+}
+
 /** Stacks at least two selected shapes along one axis and centers the cross-axis bounds. */
 export function stackShapes(
 	state: EditorState,
@@ -475,6 +551,147 @@ function patchSelectedShapes(
 		}
 	}
 	return changed ? { ...state, doc: { ...state.doc, shapes } } : state;
+}
+
+type GraphLayoutNode = { id: string; width: number; height: number };
+type GraphLayoutEdge = { source: string; target: string };
+
+function layoutGraphPositions(
+	nodes: GraphLayoutNode[],
+	edges: GraphLayoutEdge[],
+	algorithm: GraphLayoutAlgorithm,
+	direction: GraphLayoutDirection,
+	nodeGap: number,
+	rankGap: number
+): Map<string, Vec2> {
+	const gap = spacing(nodeGap);
+	const rankSpacing = spacing(rankGap);
+	const ordered = nodes.slice().sort((left, right) => left.id.localeCompare(right.id));
+	const indices = new Map(ordered.map((node, index) => [node.id, index]));
+	const outgoing = ordered.map(() => [] as number[]);
+	for (const edge of edges) {
+		const source = indices.get(edge.source);
+		const target = indices.get(edge.target);
+		if (source === undefined || target === undefined || source === target) continue;
+		if (!outgoing[source].includes(target)) outgoing[source].push(target);
+	}
+	for (const targets of outgoing) targets.sort((left, right) => ordered[left]!.id.localeCompare(ordered[right]!.id));
+	const ranks = graphRanks(outgoing);
+	const result = new Map<string, Vec2>();
+	if (algorithm === 'radial') {
+		const rings = new Map<number, number[]>();
+		for (const [index, rank] of ranks.entries()) {
+			const ring = rings.get(rank) ?? [];
+			ring.push(index);
+			rings.set(rank, ring);
+		}
+		const radiusStep = Math.max(
+			ordered.reduce((maximum, node) => Math.max(maximum, node.width, node.height), 0) + rankSpacing,
+			gap + 1
+		);
+		for (const [depth, ring] of [...rings.entries()].sort(([left], [right]) => left - right)) {
+			ring.sort((left, right) => ordered[left]!.id.localeCompare(ordered[right]!.id));
+			const radius = radiusStep * (depth + (ring.length > 1 ? 1 : 0));
+			for (const [offset, index] of ring.entries()) {
+				const angle = -Math.PI / 2 + (Math.PI * 2 * offset) / ring.length;
+				result.set(ordered[index]!.id, {
+					x: radius * Math.cos(angle) - ordered[index]!.width / 2,
+					y: radius * Math.sin(angle) - ordered[index]!.height / 2
+				});
+			}
+		}
+	} else {
+		const grouped = new Map<number, number[]>();
+		for (const [index, rank] of ranks.entries()) {
+			const group = grouped.get(rank) ?? [];
+			group.push(index);
+			grouped.set(rank, group);
+		}
+		let rankCursor = 0;
+		for (const rank of [...grouped.keys()].sort((left, right) => left - right)) {
+			const group = grouped.get(rank)!;
+			group.sort((left, right) => ordered[left]!.id.localeCompare(ordered[right]!.id));
+			const rankExtent = Math.max(
+				...group.map((index) => (direction === 'top-to-bottom' ? ordered[index]!.height : ordered[index]!.width)),
+				0
+			);
+			let crossCursor = 0;
+			for (const index of group) {
+				const node = ordered[index]!;
+				result.set(node.id, {
+					x: direction === 'top-to-bottom' ? crossCursor : rankCursor,
+					y: direction === 'top-to-bottom' ? rankCursor : crossCursor
+				});
+				crossCursor += (direction === 'top-to-bottom' ? node.width : node.height) + gap;
+			}
+			rankCursor += rankExtent + rankSpacing;
+		}
+	}
+	const minX = Math.min(...[...result.values()].map((position) => position.x));
+	const minY = Math.min(...[...result.values()].map((position) => position.y));
+	for (const position of result.values()) {
+		position.x -= minX;
+		position.y -= minY;
+	}
+	return result;
+}
+
+function graphRanks(outgoing: number[][]): Map<number, number> {
+	const components = graphComponents(outgoing);
+	const componentCount = Math.max(...components) + 1;
+	const componentEdges = Array.from({ length: componentCount }, () => new Set<number>());
+	const indegree = Array.from({ length: componentCount }, () => 0);
+	for (const [source, targets] of outgoing.entries()) {
+		for (const target of targets) {
+			const from = components[source]!;
+			const to = components[target]!;
+			if (from !== to && !componentEdges[from]!.has(to)) {
+				componentEdges[from]!.add(to);
+				indegree[to] = indegree[to]! + 1;
+			}
+		}
+	}
+	const queue = indegree.flatMap((degree, component) => (degree === 0 ? [component] : []));
+	const componentRanks = Array.from({ length: componentCount }, () => 0);
+	while (queue.length > 0) {
+		queue.sort((left, right) => left - right);
+		const component = queue.shift()!;
+		for (const target of [...componentEdges[component]!].sort((left, right) => left - right)) {
+			componentRanks[target] = Math.max(componentRanks[target]!, componentRanks[component]! + 1);
+			indegree[target] = indegree[target]! - 1;
+			if (indegree[target] === 0) queue.push(target);
+		}
+	}
+	return new Map(components.map((component, index) => [index, componentRanks[component]!]));
+}
+
+function graphComponents(outgoing: number[][]): number[] {
+	const reverse = outgoing.map(() => [] as number[]);
+	for (const [source, targets] of outgoing.entries()) for (const target of targets) reverse[target]!.push(source);
+	for (const targets of reverse) targets.sort((left, right) => left - right);
+	const visited = outgoing.map(() => false);
+	const order: number[] = [];
+	const visit = (node: number, graph: number[][]) => {
+		if (visited[node]) return;
+		visited[node] = true;
+		for (const target of graph[node]!) visit(target, graph);
+		order.push(node);
+	};
+	for (let node = 0; node < outgoing.length; node++) visit(node, outgoing);
+	const components = outgoing.map(() => -1);
+	const assign = (node: number, component: number) => {
+		if (components[node] !== -1) return;
+		components[node] = component;
+		for (const target of reverse[node]!) assign(target, component);
+	};
+	let component = 0;
+	for (const node of order.reverse()) {
+		if (components[node] === -1) {
+			assign(node, component);
+			component++;
+		}
+	}
+	return components;
 }
 
 function alignmentTarget(bounds: Box2Type[], alignment: ShapeAlignment): number {
