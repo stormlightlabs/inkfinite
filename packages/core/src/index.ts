@@ -33,5 +33,6 @@ export * from './snapping';
 export * from './style-policy';
 export * as stencils from './stencils';
 export * from './tools';
+export * from './vector-effects';
 export * from './ui/filebrowser';
 export * from './ui/statusbar';

@@ -625,6 +625,9 @@ export function hitTestPoint(state: EditorState, worldPoint: Vec2, tolerance = 5
 }
 
 function hitTestShape(state: EditorState, shape: ShapeRecord, worldPoint: Vec2, tolerance: number): boolean {
+	const localPoint = worldToLocal(worldPoint, shape);
+	if (shape.props.clipPath && !pointInPath(localPoint, shape.props.clipPath)) return false;
+	if (shape.props.maskEffect && !pointInPath(localPoint, shape.props.maskEffect.geometry)) return false;
 	switch (shape.type) {
 		case 'rect':
 			return pointInRect(worldPoint, shape);

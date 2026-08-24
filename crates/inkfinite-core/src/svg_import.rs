@@ -7,7 +7,7 @@
 //! as image nodes backed by embedded assets. The exact source is retained as a
 //! content-addressed SVG asset.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::str::FromStr;
 
@@ -23,9 +23,9 @@ use ts_rs::TS;
 use crate::engine::geometry::{Affine, path_bounds, union};
 use crate::proto::Bounds;
 use crate::{
-    AssetId, AssetRecord, AssetSource, GradientSpread, GradientStop, GradientTransform, GradientUnits, Opacity, Paint,
-    PathFillRule, PathGeometry, PathSegment as NativePathSegment, PathSubpath, Provenance, ShapeKind, ShapeProperties,
-    ShapeStyle, Timestamp, Transform, Vec2,
+    AssetId, AssetRecord, AssetSource, FilterEffect, FilterPrimitive, GradientSpread, GradientStop, GradientTransform,
+    GradientUnits, MaskEffect, MaskMode, Opacity, Paint, PathFillRule, PathGeometry, PathSegment as NativePathSegment,
+    PathSubpath, Provenance, ShapeKind, ShapeProperties, ShapeStyle, Timestamp, Transform, Vec2,
 };
 
 /// Maximum UTF-8 input accepted by the SVG parser.
@@ -362,6 +362,9 @@ struct SvgStyle {
     font_size: f64,
     font_family: String,
     visible: bool,
+    clip_path: Option<PathGeometry>,
+    mask_effect: Option<MaskEffect>,
+    filter: Option<FilterEffect>,
 }
 
 impl Default for SvgStyle {
@@ -378,6 +381,9 @@ impl Default for SvgStyle {
             font_size: 16.0,
             font_family: "sans-serif".into(),
             visible: true,
+            clip_path: None,
+            mask_effect: None,
+            filter: None,
         }
     }
 }
@@ -397,11 +403,22 @@ impl SvgStyle {
     }
 }
 
+#[derive(Default)]
+struct SvgEffects {
+    clip_paths: BTreeMap<String, PathGeometry>,
+    masks: BTreeMap<String, MaskEffect>,
+    filters: BTreeMap<String, FilterEffect>,
+    unsupported_clip_paths: BTreeSet<String>,
+    unsupported_masks: BTreeSet<String>,
+    unsupported_filters: BTreeSet<String>,
+}
+
 struct ImportParser {
     assets: Vec<SvgAsset>,
     warnings: Vec<SvgImportWarning>,
     view_box: Option<SvgViewBox>,
     gradients: BTreeMap<String, Paint>,
+    effects: SvgEffects,
 }
 
 impl ImportParser {
@@ -419,7 +436,7 @@ impl ImportParser {
     ) -> Result<Option<SvgImportNode>, SvgImportError> {
         let element = local_name(node).to_owned();
         self.warn_event_handlers(node);
-        let style = resolve_style(parent_style, node, &mut self.warnings, &self.gradients)?;
+        let style = resolve_style(parent_style, node, &mut self.warnings, &self.gradients, &self.effects)?;
         if !style.visible {
             return Ok(None);
         }
@@ -431,7 +448,7 @@ impl ImportParser {
                     source_id,
                     transform: self.transform(node)?,
                     style: style.native_style()?,
-                    properties: group_properties(&children),
+                    properties: styled_group_properties(&style, &children),
                     children,
                 };
                 Ok(Some(SvgImportNode::Group(Box::new(group))))
@@ -510,13 +527,16 @@ impl ImportParser {
             source_id: source_id(node),
             kind: ShapeKind::from(crate::RECTANGLE_KIND),
             transform,
-            properties: properties([
-                ("width", json!(width)),
-                ("height", json!(height)),
-                ("radius", json!(radius.min(width / 2.0).min(height / 2.0).max(0.0))),
-                ("fill", paint_value(style.fill.clone())),
-                ("stroke", paint_value(style.stroke.clone())),
-            ]),
+            properties: styled_properties(
+                style,
+                [
+                    ("width", json!(width)),
+                    ("height", json!(height)),
+                    ("radius", json!(radius.min(width / 2.0).min(height / 2.0).max(0.0))),
+                    ("fill", paint_value(style.fill.clone())),
+                    ("stroke", paint_value(style.stroke.clone())),
+                ],
+            ),
             style: style.native_style()?,
         })
     }
@@ -531,12 +551,15 @@ impl ImportParser {
             source_id: source_id(node),
             kind: ShapeKind::from(crate::ELLIPSE_KIND),
             transform,
-            properties: properties([
-                ("width", json!(radius * 2.0)),
-                ("height", json!(radius * 2.0)),
-                ("fill", paint_value(style.fill.clone())),
-                ("stroke", paint_value(style.stroke.clone())),
-            ]),
+            properties: styled_properties(
+                style,
+                [
+                    ("width", json!(radius * 2.0)),
+                    ("height", json!(radius * 2.0)),
+                    ("fill", paint_value(style.fill.clone())),
+                    ("stroke", paint_value(style.stroke.clone())),
+                ],
+            ),
             style: style.native_style()?,
         })
     }
@@ -553,12 +576,15 @@ impl ImportParser {
             source_id: source_id(node),
             kind: ShapeKind::from(crate::ELLIPSE_KIND),
             transform,
-            properties: properties([
-                ("width", json!(rx * 2.0)),
-                ("height", json!(ry * 2.0)),
-                ("fill", paint_value(style.fill.clone())),
-                ("stroke", paint_value(style.stroke.clone())),
-            ]),
+            properties: styled_properties(
+                style,
+                [
+                    ("width", json!(rx * 2.0)),
+                    ("height", json!(ry * 2.0)),
+                    ("fill", paint_value(style.fill.clone())),
+                    ("stroke", paint_value(style.stroke.clone())),
+                ],
+            ),
             style: style.native_style()?,
         })
     }
@@ -573,20 +599,23 @@ impl ImportParser {
             source_id: source_id(node),
             kind: ShapeKind::from(crate::LINE_KIND),
             transform,
-            properties: properties([
-                ("a", json!(Vec2 { x: 0.0, y: 0.0 })),
-                ("b", json!(Vec2 { x: x2 - x1, y: y2 - y1 })),
-                (
-                    "stroke",
-                    paint_value(
-                        style
-                            .stroke
-                            .clone()
-                            .or_else(|| Some(Paint::Solid { color: "none".into() })),
+            properties: styled_properties(
+                style,
+                [
+                    ("a", json!(Vec2 { x: 0.0, y: 0.0 })),
+                    ("b", json!(Vec2 { x: x2 - x1, y: y2 - y1 })),
+                    (
+                        "stroke",
+                        paint_value(
+                            style
+                                .stroke
+                                .clone()
+                                .or_else(|| Some(Paint::Solid { color: "none".into() })),
+                        ),
                     ),
-                ),
-                ("width", json!(style.stroke_width)),
-            ]),
+                    ("width", json!(style.stroke_width)),
+                ],
+            ),
             style: style.native_style()?,
         })
     }
@@ -643,13 +672,16 @@ impl ImportParser {
             source_id: source_id(node),
             kind: ShapeKind::from(crate::PATH_KIND),
             transform,
-            properties: properties([
-                ("subpaths", subpaths),
-                ("fill_rule", fill_rule),
-                ("fill", paint_value(style.fill.clone())),
-                ("stroke", paint_value(style.stroke.clone())),
-                ("stroke_width", json!(style.stroke_width)),
-            ]),
+            properties: styled_properties(
+                style,
+                [
+                    ("subpaths", subpaths),
+                    ("fill_rule", fill_rule),
+                    ("fill", paint_value(style.fill.clone())),
+                    ("stroke", paint_value(style.stroke.clone())),
+                    ("stroke_width", json!(style.stroke_width)),
+                ],
+            ),
             style: style.native_style()?,
         })
     }
@@ -674,12 +706,15 @@ impl ImportParser {
             source_id: source_id(node),
             kind: ShapeKind::from(crate::TEXT_KIND),
             transform,
-            properties: properties([
-                ("text", json!(text)),
-                ("font_size", json!(style.font_size)),
-                ("font_family", json!(style.font_family.clone())),
-                ("color", paint_value(Some(color))),
-            ]),
+            properties: styled_properties(
+                style,
+                [
+                    ("text", json!(text)),
+                    ("font_size", json!(style.font_size)),
+                    ("font_family", json!(style.font_family.clone())),
+                    ("color", paint_value(Some(color))),
+                ],
+            ),
             style: style.native_style()?,
         })
     }
@@ -720,7 +755,7 @@ impl ImportParser {
             source_id: source_id(node),
             asset_id,
             transform: self.transformed_geometry(node, x, y)?,
-            properties: properties([("width", json!(width)), ("height", json!(height))]),
+            properties: styled_properties(style, [("width", json!(width)), ("height", json!(height))]),
             style: style.native_style()?,
         }))
     }
@@ -807,9 +842,27 @@ impl ImportParser {
             let feature = match local_name(descendant) {
                 "meshgradient" => Some(SvgUnsupportedFeature::Gradient),
                 "pattern" => Some(SvgUnsupportedFeature::Pattern),
-                "clipPath" => Some(SvgUnsupportedFeature::ClipPath),
-                "mask" => Some(SvgUnsupportedFeature::Mask),
-                "filter" => Some(SvgUnsupportedFeature::Filter),
+                "clipPath"
+                    if descendant
+                        .attribute("id")
+                        .is_some_and(|id| self.effects.unsupported_clip_paths.contains(id)) =>
+                {
+                    Some(SvgUnsupportedFeature::ClipPath)
+                }
+                "mask"
+                    if descendant
+                        .attribute("id")
+                        .is_some_and(|id| self.effects.unsupported_masks.contains(id)) =>
+                {
+                    Some(SvgUnsupportedFeature::Mask)
+                }
+                "filter"
+                    if descendant
+                        .attribute("id")
+                        .is_some_and(|id| self.effects.unsupported_filters.contains(id)) =>
+                {
+                    Some(SvgUnsupportedFeature::Filter)
+                }
                 "script" => Some(SvgUnsupportedFeature::Script),
                 "animate" | "animateMotion" | "animateTransform" | "set" | "discard" => {
                     Some(SvgUnsupportedFeature::Animation)
@@ -870,9 +923,16 @@ pub fn parse_svg(source: &str) -> Result<SvgImport, SvgImportError> {
         .transpose()?;
     let source_asset = make_source_asset(source.as_bytes());
     let gradients = collect_gradients(root, view_box)?;
-    let mut parser = ImportParser { assets: Vec::new(), warnings: Vec::new(), view_box, gradients };
+    let effects = collect_svg_effects(root, view_box)?;
+    let mut parser = ImportParser { assets: Vec::new(), warnings: Vec::new(), view_box, gradients, effects };
     parser.warn_event_handlers(root);
-    let root_style = resolve_style(&SvgStyle::default(), root, &mut parser.warnings, &parser.gradients)?;
+    let root_style = resolve_style(
+        &SvgStyle::default(),
+        root,
+        &mut parser.warnings,
+        &parser.gradients,
+        &parser.effects,
+    )?;
     let mut children = parser.children(root, &root_style)?;
     let root_transform = parser.transform(root)?;
     if requires_static_fallback(&parser.warnings) {
@@ -922,6 +982,354 @@ pub fn import_svg(source: impl AsRef<[u8]>) -> Result<SvgImport, SvgImportError>
     }
     let source = std::str::from_utf8(bytes).map_err(|error| SvgImportError::InvalidUtf8(error.to_string()))?;
     parse_svg(source)
+}
+
+fn collect_svg_effects(root: Node<'_, '_>, view_box: Option<SvgViewBox>) -> Result<SvgEffects, SvgImportError> {
+    let mut effects = SvgEffects::default();
+    for node in root.descendants().filter(|node| node.is_element()) {
+        let Some(id) = node.attribute("id").filter(|id| !id.trim().is_empty()) else { continue };
+        match local_name(node) {
+            "clipPath" => {
+                if node
+                    .attribute("clipPathUnits")
+                    .is_some_and(|value| value != "userSpaceOnUse")
+                {
+                    effects.unsupported_clip_paths.insert(id.into());
+                    continue;
+                }
+                let (mut geometry, supported) = effect_geometry(node, view_box)?;
+                if let Some(geometry) = &mut geometry {
+                    apply_effect_definition_transform(node, geometry)?;
+                }
+                if supported {
+                    if let Some(geometry) = geometry {
+                        effects.clip_paths.insert(id.into(), geometry);
+                    } else {
+                        effects.unsupported_clip_paths.insert(id.into());
+                    }
+                } else {
+                    effects.unsupported_clip_paths.insert(id.into());
+                }
+            }
+            "mask" => {
+                if node.attribute("maskUnits") != Some("userSpaceOnUse") {
+                    effects.unsupported_masks.insert(id.into());
+                    continue;
+                }
+                let (mut geometry, supported) = effect_geometry(node, view_box)?;
+                if let Some(geometry) = &mut geometry {
+                    apply_effect_definition_transform(node, geometry)?;
+                }
+                if !supported {
+                    effects.unsupported_masks.insert(id.into());
+                    continue;
+                }
+                let Some(geometry) = geometry else {
+                    effects.unsupported_masks.insert(id.into());
+                    continue;
+                };
+                let mode = match node.attribute("mask-type").unwrap_or("luminance") {
+                    "alpha" => MaskMode::Alpha,
+                    "luminance" => MaskMode::Luminance,
+                    _ => {
+                        effects.unsupported_masks.insert(id.into());
+                        continue;
+                    }
+                };
+                effects
+                    .masks
+                    .insert(id.into(), MaskEffect { mode, geometry, opacity: 1.0 });
+            }
+            "filter" => {
+                let (filter, supported) = filter_effect(node)?;
+                if supported && !filter.primitives.is_empty() {
+                    effects.filters.insert(id.into(), filter);
+                } else {
+                    effects.unsupported_filters.insert(id.into());
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(effects)
+}
+
+fn effect_geometry(
+    node: Node<'_, '_>, view_box: Option<SvgViewBox>,
+) -> Result<(Option<PathGeometry>, bool), SvgImportError> {
+    let mut geometry = PathGeometry { subpaths: Vec::new(), fill_rule: PathFillRule::NonZero };
+    let mut supported = true;
+    for child in node.children().filter(|child| child.is_element()) {
+        let Some(child_geometry) = effect_geometry_node(child, view_box)? else {
+            supported = false;
+            continue;
+        };
+        geometry.subpaths.extend(child_geometry.subpaths);
+    }
+    Ok(((!geometry.subpaths.is_empty()).then_some(geometry), supported))
+}
+
+fn effect_geometry_node(
+    node: Node<'_, '_>, view_box: Option<SvgViewBox>,
+) -> Result<Option<PathGeometry>, SvgImportError> {
+    let Some(mut geometry) = (match local_name(node) {
+        "g" => {
+            let (nested, supported) = effect_geometry(node, view_box)?;
+            if !supported {
+                return Ok(None);
+            }
+            nested
+        }
+        "rect" => {
+            let x = effect_length(node, "x", 0.0, Axis::Horizontal, view_box)?;
+            let y = effect_length(node, "y", 0.0, Axis::Vertical, view_box)?;
+            let width = effect_length(node, "width", 0.0, Axis::Horizontal, view_box)?;
+            let height = effect_length(node, "height", 0.0, Axis::Vertical, view_box)?;
+            if width < 0.0 || height < 0.0 {
+                return Err(invalid_attribute(node, "width", width.to_string()));
+            }
+            let rx = effect_length(node, "rx", 0.0, Axis::Horizontal, view_box)?
+                .max(0.0)
+                .min(width / 2.0);
+            let ry = effect_length(node, "ry", 0.0, Axis::Vertical, view_box)?
+                .max(0.0)
+                .min(height / 2.0);
+            Some(rect_geometry(x, y, width, height, rx, ry))
+        }
+        "circle" => {
+            let cx = effect_length(node, "cx", 0.0, Axis::Horizontal, view_box)?;
+            let cy = effect_length(node, "cy", 0.0, Axis::Vertical, view_box)?;
+            let radius = effect_length(node, "r", 0.0, Axis::Horizontal, view_box)?;
+            (radius >= 0.0).then(|| ellipse_geometry(cx, cy, radius, radius))
+        }
+        "ellipse" => {
+            let cx = effect_length(node, "cx", 0.0, Axis::Horizontal, view_box)?;
+            let cy = effect_length(node, "cy", 0.0, Axis::Vertical, view_box)?;
+            let rx = effect_length(node, "rx", 0.0, Axis::Horizontal, view_box)?;
+            let ry = effect_length(node, "ry", 0.0, Axis::Vertical, view_box)?;
+            (rx >= 0.0 && ry >= 0.0).then(|| ellipse_geometry(cx, cy, rx, ry))
+        }
+        "path" => {
+            let Some(value) = node.attribute("d") else {
+                return Ok(None);
+            };
+            Some(
+                normalize_path(value, PathFillRule::NonZero)
+                    .map_err(|message| SvgImportError::InvalidPath { element: "path".into(), message })?,
+            )
+        }
+        "polygon" | "polyline" => {
+            let Some(value) = node.attribute("points") else {
+                return Ok(None);
+            };
+            let points = parse_number_pairs(value).map_err(|message| invalid_attribute(node, "points", message))?;
+            if points.len() < if local_name(node) == "polygon" { 3 } else { 2 } {
+                return Ok(None);
+            }
+            let mut segments = vec![NativePathSegment::Move { to: points[0] }];
+            segments.extend(points.iter().skip(1).copied().map(|to| NativePathSegment::Line { to }));
+            Some(PathGeometry {
+                subpaths: vec![PathSubpath { segments, closed: local_name(node) == "polygon", handle_modes: None }],
+                fill_rule: PathFillRule::NonZero,
+            })
+        }
+        _ => return Ok(None),
+    }) else {
+        return Ok(None);
+    };
+    let transform = node
+        .attribute("transform")
+        .map(parse_transform)
+        .transpose()
+        .map_err(|message| SvgImportError::UnsupportedTransform { element: local_name(node).into(), message })?
+        .unwrap_or(Affine::IDENTITY);
+    transform_geometry(&mut geometry, transform);
+    Ok(Some(geometry))
+}
+
+fn apply_effect_definition_transform(node: Node<'_, '_>, geometry: &mut PathGeometry) -> Result<(), SvgImportError> {
+    let transform = node
+        .attribute("transform")
+        .map(parse_transform)
+        .transpose()
+        .map_err(|message| SvgImportError::UnsupportedTransform { element: local_name(node).into(), message })?
+        .unwrap_or(Affine::IDENTITY);
+    transform_geometry(geometry, transform);
+    Ok(())
+}
+
+fn effect_length(
+    node: Node<'_, '_>, attribute: &str, default: f64, axis: Axis, view_box: Option<SvgViewBox>,
+) -> Result<f64, SvgImportError> {
+    let Some(value) = node.attribute(attribute) else {
+        return Ok(default);
+    };
+    let reference = view_box.map(|value| match axis {
+        Axis::Horizontal => value.width,
+        Axis::Vertical => value.height,
+    });
+    parse_length(value, reference).map_err(|_| invalid_attribute(node, attribute, value))
+}
+
+fn rect_geometry(x: f64, y: f64, width: f64, height: f64, rx: f64, ry: f64) -> PathGeometry {
+    if rx <= 0.0 || ry <= 0.0 {
+        return PathGeometry {
+            subpaths: vec![PathSubpath {
+                segments: vec![
+                    NativePathSegment::Move { to: Vec2 { x, y } },
+                    NativePathSegment::Line { to: Vec2 { x: x + width, y } },
+                    NativePathSegment::Line { to: Vec2 { x: x + width, y: y + height } },
+                    NativePathSegment::Line { to: Vec2 { x, y: y + height } },
+                ],
+                closed: true,
+                handle_modes: None,
+            }],
+            fill_rule: PathFillRule::NonZero,
+        };
+    }
+    let k = 0.5522847498307936;
+    let mut segments = vec![NativePathSegment::Move { to: Vec2 { x: x + rx, y } }];
+    segments.push(NativePathSegment::Line { to: Vec2 { x: x + width - rx, y } });
+    segments.push(NativePathSegment::Cubic {
+        control_1: Vec2 { x: x + width - rx + k * rx, y },
+        control_2: Vec2 { x: x + width, y: y + ry - k * ry },
+        to: Vec2 { x: x + width, y: y + ry },
+    });
+    segments.push(NativePathSegment::Line { to: Vec2 { x: x + width, y: y + height - ry } });
+    segments.push(NativePathSegment::Cubic {
+        control_1: Vec2 { x: x + width, y: y + height - ry + k * ry },
+        control_2: Vec2 { x: x + width - rx + k * rx, y: y + height },
+        to: Vec2 { x: x + width - rx, y: y + height },
+    });
+    segments.push(NativePathSegment::Line { to: Vec2 { x: x + rx, y: y + height } });
+    segments.push(NativePathSegment::Cubic {
+        control_1: Vec2 { x: x + rx - k * rx, y: y + height },
+        control_2: Vec2 { x, y: y + height - ry + k * ry },
+        to: Vec2 { x, y: y + height - ry },
+    });
+    segments.push(NativePathSegment::Line { to: Vec2 { x, y: y + ry } });
+    segments.push(NativePathSegment::Cubic {
+        control_1: Vec2 { x, y: y + ry - k * ry },
+        control_2: Vec2 { x: x + rx - k * rx, y },
+        to: Vec2 { x: x + rx, y },
+    });
+    PathGeometry {
+        subpaths: vec![PathSubpath { segments, closed: true, handle_modes: None }],
+        fill_rule: PathFillRule::NonZero,
+    }
+}
+
+fn ellipse_geometry(cx: f64, cy: f64, rx: f64, ry: f64) -> PathGeometry {
+    let k = 0.5522847498307936;
+    PathGeometry {
+        subpaths: vec![PathSubpath {
+            segments: vec![
+                NativePathSegment::Move { to: Vec2 { x: cx + rx, y: cy } },
+                NativePathSegment::Cubic {
+                    control_1: Vec2 { x: cx + rx, y: cy + k * ry },
+                    control_2: Vec2 { x: cx + k * rx, y: cy + ry },
+                    to: Vec2 { x: cx, y: cy + ry },
+                },
+                NativePathSegment::Cubic {
+                    control_1: Vec2 { x: cx - k * rx, y: cy + ry },
+                    control_2: Vec2 { x: cx - rx, y: cy + k * ry },
+                    to: Vec2 { x: cx - rx, y: cy },
+                },
+                NativePathSegment::Cubic {
+                    control_1: Vec2 { x: cx - rx, y: cy - k * ry },
+                    control_2: Vec2 { x: cx - k * rx, y: cy - ry },
+                    to: Vec2 { x: cx, y: cy - ry },
+                },
+                NativePathSegment::Cubic {
+                    control_1: Vec2 { x: cx + k * rx, y: cy - ry },
+                    control_2: Vec2 { x: cx + rx, y: cy - k * ry },
+                    to: Vec2 { x: cx + rx, y: cy },
+                },
+            ],
+            closed: true,
+            handle_modes: None,
+        }],
+        fill_rule: PathFillRule::NonZero,
+    }
+}
+
+fn transform_geometry(geometry: &mut PathGeometry, transform: Affine) {
+    for subpath in &mut geometry.subpaths {
+        for segment in &mut subpath.segments {
+            match segment {
+                NativePathSegment::Move { to } | NativePathSegment::Line { to } => *to = transform.point(*to),
+                NativePathSegment::Quadratic { control, to } => {
+                    *control = transform.point(*control);
+                    *to = transform.point(*to);
+                }
+                NativePathSegment::Cubic { to, control_1, control_2 } => {
+                    *to = transform.point(*to);
+                    *control_1 = transform.point(*control_1);
+                    *control_2 = transform.point(*control_2);
+                }
+            }
+        }
+    }
+}
+
+fn filter_effect(node: Node<'_, '_>) -> Result<(FilterEffect, bool), SvgImportError> {
+    let mut primitives = Vec::new();
+    let mut supported = true;
+    for child in node.children().filter(|child| child.is_element()) {
+        let primitive = match local_name(child) {
+            "feGaussianBlur" => {
+                let value = child.attribute("stdDeviation").unwrap_or("0");
+                let radius = value
+                    .split_ascii_whitespace()
+                    .next()
+                    .unwrap_or("0")
+                    .parse::<f64>()
+                    .map_err(|_| invalid_attribute(child, "stdDeviation", value))?;
+                Some(FilterPrimitive::Blur { radius })
+            }
+            "feDropShadow" => {
+                let dx = child
+                    .attribute("dx")
+                    .unwrap_or("0")
+                    .parse::<f64>()
+                    .map_err(|_| invalid_attribute(child, "dx", "invalid"))?;
+                let dy = child
+                    .attribute("dy")
+                    .unwrap_or("0")
+                    .parse::<f64>()
+                    .map_err(|_| invalid_attribute(child, "dy", "invalid"))?;
+                let radius = child
+                    .attribute("stdDeviation")
+                    .unwrap_or("0")
+                    .split_ascii_whitespace()
+                    .next()
+                    .unwrap_or("0")
+                    .parse::<f64>()
+                    .map_err(|_| invalid_attribute(child, "stdDeviation", "invalid"))?;
+                let color = child.attribute("flood-color").unwrap_or("#000000").to_owned();
+                let opacity = child
+                    .attribute("flood-opacity")
+                    .map_or(Ok(1.0), |value| parse_opacity(value, "flood-opacity", child))?;
+                Some(FilterPrimitive::DropShadow { dx, dy, radius, color, opacity: f64::from(opacity) })
+            }
+            "feColorMatrix" if child.attribute("type") == Some("saturate") => {
+                let amount = child
+                    .attribute("values")
+                    .unwrap_or("1")
+                    .parse::<f64>()
+                    .map_err(|_| invalid_attribute(child, "values", "invalid"))?;
+                Some(FilterPrimitive::Saturate { amount })
+            }
+            _ => {
+                supported = false;
+                None
+            }
+        };
+        if let Some(primitive) = primitive {
+            primitives.push(primitive);
+        }
+    }
+    Ok((FilterEffect { primitives }, supported))
 }
 
 #[derive(Clone)]
@@ -1311,10 +1719,13 @@ fn escape_svg_attribute(value: &str, output: &mut String) {
 
 fn resolve_style<'a, 'input>(
     parent: &SvgStyle, node: Node<'a, 'input>, warnings: &mut Vec<SvgImportWarning>,
-    gradients: &BTreeMap<String, Paint>,
+    gradients: &BTreeMap<String, Paint>, effects: &SvgEffects,
 ) -> Result<SvgStyle, SvgImportError> {
     let mut style = parent.clone();
     style.opacity = 1.0;
+    style.clip_path = None;
+    style.mask_effect = None;
+    style.filter = None;
     let mut declarations = BTreeMap::new();
     for attribute in node.attributes() {
         declarations.insert(attribute.name(), attribute.value());
@@ -1360,28 +1771,37 @@ fn resolve_style<'a, 'input>(
             }
             "font-family" => style.font_family = first_font_family(value),
             "clip-path" if value.trim_start().starts_with("url(") => {
-                warnings.push(SvgImportWarning::UnsupportedFeature {
-                    feature: SvgUnsupportedFeature::ClipPath,
-                    element: local_name(node).into(),
-                    source_id: source_id(node),
-                    action: SvgUnsupportedAction::Omitted,
-                });
+                let id = value
+                    .trim()
+                    .strip_prefix("url(#")
+                    .and_then(|value| value.strip_suffix(')'));
+                if let Some(id) = id.and_then(|id| effects.clip_paths.get(id)) {
+                    style.clip_path = Some(id.clone());
+                } else {
+                    warn_effect_reference(node, SvgUnsupportedFeature::ClipPath, warnings);
+                }
             }
             "mask" if value.trim_start().starts_with("url(") => {
-                warnings.push(SvgImportWarning::UnsupportedFeature {
-                    feature: SvgUnsupportedFeature::Mask,
-                    element: local_name(node).into(),
-                    source_id: source_id(node),
-                    action: SvgUnsupportedAction::Omitted,
-                });
+                let id = value
+                    .trim()
+                    .strip_prefix("url(#")
+                    .and_then(|value| value.strip_suffix(')'));
+                if let Some(id) = id.and_then(|id| effects.masks.get(id)) {
+                    style.mask_effect = Some(id.clone());
+                } else {
+                    warn_effect_reference(node, SvgUnsupportedFeature::Mask, warnings);
+                }
             }
             "filter" if value.trim_start().starts_with("url(") => {
-                warnings.push(SvgImportWarning::UnsupportedFeature {
-                    feature: SvgUnsupportedFeature::Filter,
-                    element: local_name(node).into(),
-                    source_id: source_id(node),
-                    action: SvgUnsupportedAction::Omitted,
-                });
+                let id = value
+                    .trim()
+                    .strip_prefix("url(#")
+                    .and_then(|value| value.strip_suffix(')'));
+                if let Some(id) = id.and_then(|id| effects.filters.get(id)) {
+                    style.filter = Some(id.clone());
+                } else {
+                    warn_effect_reference(node, SvgUnsupportedFeature::Filter, warnings);
+                }
             }
             "display" if value.trim() == "none" => style.visible = false,
             "visibility" if matches!(value.trim(), "hidden" | "collapse") => style.visible = false,
@@ -1389,6 +1809,17 @@ fn resolve_style<'a, 'input>(
         }
     }
     Ok(style)
+}
+
+fn warn_effect_reference<'a, 'input>(
+    node: Node<'a, 'input>, feature: SvgUnsupportedFeature, warnings: &mut Vec<SvgImportWarning>,
+) {
+    warnings.push(SvgImportWarning::UnsupportedFeature {
+        feature,
+        element: local_name(node).into(),
+        source_id: source_id(node),
+        action: SvgUnsupportedAction::Omitted,
+    });
 }
 
 fn parse_paint<'a, 'input>(
@@ -1555,6 +1986,39 @@ fn parse_number_list(value: &str) -> Result<Vec<f64>, ()> {
 
 fn properties(entries: impl IntoIterator<Item = (&'static str, Value)>) -> ShapeProperties {
     entries.into_iter().map(|(key, value)| (key.into(), value)).collect()
+}
+
+fn styled_properties(style: &SvgStyle, entries: impl IntoIterator<Item = (&'static str, Value)>) -> ShapeProperties {
+    let mut result = properties(entries);
+    insert_style_effects(&mut result, style);
+    result
+}
+
+fn styled_group_properties(style: &SvgStyle, children: &[SvgImportNode]) -> ShapeProperties {
+    let mut result = group_properties(children);
+    insert_style_effects(&mut result, style);
+    result
+}
+
+fn insert_style_effects(properties: &mut ShapeProperties, style: &SvgStyle) {
+    if let Some(clip_path) = &style.clip_path {
+        properties.insert(
+            "clip_path".into(),
+            serde_json::to_value(clip_path).expect("path geometry is serializable"),
+        );
+    }
+    if let Some(mask) = &style.mask_effect {
+        properties.insert(
+            "mask_effect".into(),
+            serde_json::to_value(mask).expect("mask effect is serializable"),
+        );
+    }
+    if let Some(filter) = &style.filter {
+        properties.insert(
+            "filter".into(),
+            serde_json::to_value(filter).expect("filter effect is serializable"),
+        );
+    }
 }
 
 fn paint_value(value: Option<Paint>) -> Value {
@@ -2133,6 +2597,49 @@ mod tests {
                 .subpaths[0]
                 .closed
         );
+    }
+
+    #[test]
+    fn imports_native_clip_masks_and_supported_filters_without_fallback() {
+        let import = parse_svg(
+            r##"<svg viewBox="0 0 100 80">
+                <defs>
+                    <clipPath id="clip"><circle cx="50" cy="40" r="30"/></clipPath>
+                    <mask id="mask" maskUnits="userSpaceOnUse" mask-type="alpha"><rect x="10" y="10" width="80" height="60"/></mask>
+                    <filter id="effects"><feGaussianBlur stdDeviation="2"/><feDropShadow dx="3" dy="4" stdDeviation="1" flood-color="#123456" flood-opacity=".5"/></filter>
+                </defs>
+                <rect id="native" width="100" height="80" clip-path="url(#clip)" mask="url(#mask)" filter="url(#effects)"/>
+            </svg>"##,
+        )
+        .expect("supported effects should import");
+        let native = shape(&import, 0);
+        assert!(native.properties.contains_key("clip_path"));
+        assert_eq!(native.properties["mask_effect"]["mode"], json!("alpha"));
+        assert_eq!(native.properties["filter"]["primitives"].as_array().unwrap().len(), 2);
+        assert!(!import.warnings.iter().any(|warning| matches!(
+            warning,
+            SvgImportWarning::UnsupportedFeature {
+                feature: SvgUnsupportedFeature::ClipPath | SvgUnsupportedFeature::Mask | SvgUnsupportedFeature::Filter,
+                ..
+            }
+        )));
+    }
+
+    #[test]
+    fn preserves_unsupported_filter_visuals_as_a_sanitized_fallback() {
+        let import = parse_svg(
+            r##"<svg><defs><filter id="f"><feTurbulence baseFrequency=".2"/></filter></defs><rect width="20" height="20" filter="url(#f)"/></svg>"##,
+        )
+        .expect("unsupported effects should fall back");
+        assert!(matches!(import.root.children.first(), Some(SvgImportNode::Image(_))));
+        assert!(import.warnings.iter().any(|warning| matches!(
+            warning,
+            SvgImportWarning::UnsupportedFeature {
+                feature: SvgUnsupportedFeature::Filter,
+                action: SvgUnsupportedAction::PreservedStaticFallback,
+                ..
+            }
+        )));
     }
 
     #[test]

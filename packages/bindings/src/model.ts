@@ -248,6 +248,130 @@ export type Paint =
 export type PaintValue = string | Paint;
 
 /**
+ * Whether a native mask reads source alpha or source luminance.
+ */
+export type MaskMode = 'alpha' | 'luminance';
+
+/**
+ * A native non-destructive mask based on editable path geometry.
+ */
+export type MaskEffect = {
+	/**
+	 * How the mask contributes opacity.
+	 */
+	mode: MaskMode;
+	/**
+	 * Mask geometry in the target shape's local coordinates.
+	 */
+	geometry: PathGeometry;
+	/**
+	 * Overall mask opacity.
+	 */
+	opacity: number;
+};
+
+/**
+ * One supported, editable SVG filter primitive.
+ */
+export type FilterPrimitive =
+	| {
+			type: 'blur';
+			/**
+			 * Standard deviation used by the blur.
+			 */
+			radius: number;
+	  }
+	| {
+			type: 'brightness';
+			/**
+			 * Multiplier where `1` leaves the source unchanged.
+			 */
+			amount: number;
+	  }
+	| {
+			type: 'contrast';
+			/**
+			 * Multiplier where `1` leaves the source unchanged.
+			 */
+			amount: number;
+	  }
+	| {
+			type: 'grayscale';
+			/**
+			 * Amount from zero to one.
+			 */
+			amount: number;
+	  }
+	| {
+			type: 'hue_rotate';
+			/**
+			 * Hue rotation in degrees.
+			 */
+			degrees: number;
+	  }
+	| {
+			type: 'invert';
+			/**
+			 * Amount from zero to one.
+			 */
+			amount: number;
+	  }
+	| {
+			type: 'saturate';
+			/**
+			 * Multiplier where `1` leaves the source unchanged.
+			 */
+			amount: number;
+	  }
+	| {
+			type: 'sepia';
+			/**
+			 * Amount from zero to one.
+			 */
+			amount: number;
+	  }
+	| {
+			type: 'opacity';
+			/**
+			 * Multiplier from zero to one.
+			 */
+			amount: number;
+	  }
+	| {
+			type: 'drop_shadow';
+			/**
+			 * Horizontal offset.
+			 */
+			dx: number;
+			/**
+			 * Vertical offset.
+			 */
+			dy: number;
+			/**
+			 * Blur radius.
+			 */
+			radius: number;
+			/**
+			 * Shadow colour.
+			 */
+			color: string;
+			/**
+			 * Shadow opacity.
+			 */
+			opacity: number;
+	  };
+
+/**
+ * An ordered list of supported filter primitives.
+ */
+export type FilterEffect = {
+	/**
+	 * Filter primitives in application order.
+	 */
+	primitives: Array<FilterPrimitive>;
+};
+
+/**
  * Fill rule used to determine the interior of a compound path.
  */
 export type PathFillRule = 'nonzero' | 'evenodd';

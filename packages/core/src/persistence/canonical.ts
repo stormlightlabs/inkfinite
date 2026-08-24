@@ -607,7 +607,9 @@ function editorProperties(properties: ShapeProperties): ShapeProperties {
 		['font_size', 'fontSize'],
 		['font_family', 'fontFamily'],
 		['asset_id', 'assetId'],
-		['reference_type', 'referenceType']
+		['reference_type', 'referenceType'],
+		['clip_path', 'clipPath'],
+		['mask_effect', 'maskEffect']
 	] as const) {
 		if (native in result && !(editor in result)) result[editor] = result[native];
 		delete result[native];
@@ -794,6 +796,14 @@ function orderAnchor(shapeId: string, parent: ShapeParent, document: Document) {
 
 function nativePropertiesForShape(shape: ShapeRecord): ShapeProperties {
 	const properties = JSON.parse(JSON.stringify(shape.props)) as ShapeProperties;
+	if ('clipPath' in properties) {
+		properties.clip_path = properties.clipPath;
+		delete properties.clipPath;
+	}
+	if ('maskEffect' in properties) {
+		properties.mask_effect = properties.maskEffect;
+		delete properties.maskEffect;
+	}
 	if (shape.type !== 'container' && !shape.groupId) return properties;
 	if ('w' in properties) {
 		properties.width = properties.w;

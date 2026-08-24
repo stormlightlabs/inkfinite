@@ -4,6 +4,10 @@ import type {
 	PathTopologyOperation
 } from '@inkfinite/bindings/editor';
 import type {
+	FilterEffect as NativeFilterEffect,
+	FilterPrimitive as NativeFilterPrimitive,
+	MaskEffect as NativeMaskEffect,
+	MaskMode as NativeMaskMode,
 	PaintValue as NativePaintValue,
 	PathFillRule as NativePathFillRule,
 	PathGeometry as NativePathGeometry,
@@ -79,9 +83,9 @@ export const LayerRecord = {
 };
 
 export type PaintValue = NativePaintValue;
-export type RectProps = { w: number; h: number; fill: PaintValue; stroke: PaintValue; radius: number };
-export type EllipseProps = { w: number; h: number; fill: PaintValue; stroke: PaintValue };
-export type LineProps = { a: Vec2; b: Vec2; stroke: PaintValue; width: number };
+export type RectProps = { w: number; h: number; fill: PaintValue; stroke: PaintValue; radius: number } & ShapeEffects;
+export type EllipseProps = { w: number; h: number; fill: PaintValue; stroke: PaintValue } & ShapeEffects;
+export type LineProps = { a: Vec2; b: Vec2; stroke: PaintValue; width: number } & ShapeEffects;
 
 /** Fill rule for compound native paths. */
 export type PathFillRule = NativePathFillRule;
@@ -116,8 +120,38 @@ export type PathControlRef = PathAnchorRef & { control: 'quadratic' | 'control_1
 /** Topology operations staged for one path commit. */
 export type PathTopologyEdit = { shapeId: string; operations: PathTopologyOperation[] };
 
+/** Native filter definition shared by canvas and SVG rendering. */
+export type FilterEffect = NativeFilterEffect;
+
+/** One primitive in the editable filter subset. */
+export type FilterPrimitive = NativeFilterPrimitive;
+
+/** Mask source mode. */
+export type MaskMode = NativeMaskMode;
+
+/** Native path-based mask shared by canvas and SVG rendering. */
+export type MaskEffect = NativeMaskEffect;
+
+/** Non-destructive effects accepted by drawable shape properties. */
+export type ShapeEffects = {
+	/** Editable path used as a local clip region. */
+	clipPath?: PathGeometry;
+	/** Editable alpha or luminance mask. */
+	maskEffect?: MaskEffect;
+	/** Ordered subset of SVG filter primitives. */
+	filter?: FilterEffect;
+};
+
+function cloneShapeEffects(props: ShapeEffects): ShapeEffects {
+	return {
+		clipPath: props.clipPath ? (JSON.parse(JSON.stringify(props.clipPath)) as PathGeometry) : undefined,
+		maskEffect: props.maskEffect ? (JSON.parse(JSON.stringify(props.maskEffect)) as MaskEffect) : undefined,
+		filter: props.filter ? (JSON.parse(JSON.stringify(props.filter)) as FilterEffect) : undefined
+	};
+}
+
 /** Native path painting properties stored alongside its geometry. */
-export type PathProps = PathGeometry & { fill?: PaintValue; stroke?: PaintValue; stroke_width?: number };
+export type PathProps = PathGeometry & ShapeEffects & { fill?: PaintValue; stroke?: PaintValue; stroke_width?: number };
 
 /** Rust-resolved arrow shaft geometry projected for interactive consumers. */
 export type ResolvedArrowGeometry = NativeResolvedArrowGeometry;
@@ -166,7 +200,7 @@ export type ArrowLabel = { text: string; align: 'center' | 'start' | 'end'; offs
  * Arrow properties using modern format
  * Modern format: { points, start, end, style, routing?, label? }
  */
-export type ArrowProps = {
+export type ArrowProps = ShapeEffects & {
 	points: Vec2[];
 	start: ArrowEndpoint;
 	end: ArrowEndpoint;
@@ -175,13 +209,19 @@ export type ArrowProps = {
 	label?: ArrowLabel;
 };
 
-export type TextProps = { text: string; fontSize: number; fontFamily: string; color: PaintValue; w?: number };
+export type TextProps = ShapeEffects & {
+	text: string;
+	fontSize: number;
+	fontFamily: string;
+	color: PaintValue;
+	w?: number;
+};
 
 /** Shape used to clip an image while it is rendered. */
 export type ImageMask = { kind: 'rectangle' | 'ellipse' | 'rounded'; radius?: number };
 
 /** Embedded image geometry and the asset it displays. */
-export type ImageProps = {
+export type ImageProps = ShapeEffects & {
 	w: number;
 	h: number;
 	assetId: string;
@@ -194,7 +234,7 @@ export type ImageProps = {
 };
 
 /** A native link to a web URL, file, or page in the current document. */
-export type ReferenceProps = {
+export type ReferenceProps = ShapeEffects & {
 	w: number;
 	h: number;
 	referenceType: 'url' | 'file' | 'page';
@@ -203,7 +243,7 @@ export type ReferenceProps = {
 };
 
 /** Native frame dimensions and title used for hierarchy selection and overlays. */
-export type ContainerProps = {
+export type ContainerProps = ShapeEffects & {
 	w?: number;
 	h?: number;
 	title?: string;
@@ -219,7 +259,7 @@ export type ContainerProps = {
  * - h: auto-computed height from layout (optional override)
  * - style: font and color settings
  */
-export type MarkdownProps = {
+export type MarkdownProps = ShapeEffects & {
 	md: string;
 	w: number;
 	h?: number;
@@ -258,7 +298,7 @@ export type StrokeStyle = { color: PaintValue; opacity: number };
  * Points are in world coordinates
  * Outline and bounds are computed lazily and not persisted
  */
-export type StrokeProps = { points: StrokePoint[]; style: StrokeStyle; brush: BrushConfig };
+export type StrokeProps = ShapeEffects & { points: StrokePoint[]; style: StrokeStyle; brush: BrushConfig };
 
 /** Semantic fields shared by native shapes and card containers. */
 export type ShapeMetadata = {
@@ -443,6 +483,7 @@ export const ShapeRecord = {
 				...(metadata ? { metadata } : {}),
 				props: {
 					...shape.props,
+					...cloneShapeEffects(shape.props),
 					points: shape.props.points.map((p) => [...p] as StrokePoint),
 					style: { ...shape.props.style },
 					brush: { ...shape.props.brush }
@@ -451,12 +492,18 @@ export const ShapeRecord = {
 		}
 		if (shape.type === 'arrow') {
 			if (!Array.isArray(shape.props.points)) {
-				return { ...shape, ...(metadata ? { metadata } : {}), props: { ...shape.props } } as ArrowShape;
+				return {
+					...shape,
+					...(metadata ? { metadata } : {}),
+					props: { ...shape.props, ...cloneShapeEffects(shape.props) }
+				} as ArrowShape;
 			}
 			return {
 				...shape,
 				...(metadata ? { metadata } : {}),
 				props: {
+					...shape.props,
+					...cloneShapeEffects(shape.props),
 					points: shape.props.points.map((p) => ({ ...p })),
 					start: { ...shape.props.start },
 					end: { ...shape.props.end },
@@ -470,7 +517,11 @@ export const ShapeRecord = {
 			};
 		}
 		if (shape.type === 'markdown') {
-			return { ...shape, ...(metadata ? { metadata } : {}), props: { ...shape.props } };
+			return {
+				...shape,
+				...(metadata ? { metadata } : {}),
+				props: { ...shape.props, ...cloneShapeEffects(shape.props) }
+			};
 		}
 		if (shape.type === 'image') {
 			return {
@@ -478,13 +529,18 @@ export const ShapeRecord = {
 				...(metadata ? { metadata } : {}),
 				props: {
 					...shape.props,
+					...cloneShapeEffects(shape.props),
 					crop: shape.props.crop ? { ...shape.props.crop } : undefined,
 					mask: shape.props.mask ? { ...shape.props.mask } : undefined
 				}
 			};
 		}
 		if (shape.type === 'reference') {
-			return { ...shape, ...(metadata ? { metadata } : {}), props: { ...shape.props } };
+			return {
+				...shape,
+				...(metadata ? { metadata } : {}),
+				props: { ...shape.props, ...cloneShapeEffects(shape.props) }
+			};
 		}
 		if (shape.type === 'path') {
 			return {
@@ -492,6 +548,7 @@ export const ShapeRecord = {
 				...(metadata ? { metadata } : {}),
 				props: {
 					...shape.props,
+					...cloneShapeEffects(shape.props),
 					subpaths: shape.props.subpaths.map((subpath) => ({
 						...subpath,
 						handle_modes: subpath.handle_modes ? [...subpath.handle_modes] : subpath.handle_modes,
@@ -507,7 +564,11 @@ export const ShapeRecord = {
 				}
 			} as PathShape;
 		}
-		return { ...shape, ...(metadata ? { metadata } : {}), props: { ...shape.props } } as ShapeRecord;
+		return {
+			...shape,
+			...(metadata ? { metadata } : {}),
+			props: { ...shape.props, ...cloneShapeEffects(shape.props) }
+		} as ShapeRecord;
 	}
 };
 

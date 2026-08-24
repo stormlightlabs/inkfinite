@@ -97,14 +97,16 @@ values. SVG defaults are a black fill and no stroke. `none` and `transparent`
 become absent native paint values.
 
 Supported linear and radial gradients are converted to native paint properties
-and remain editable after import. Patterns, clip paths, masks, and filters
-remain visible through the sanitized static fallback when they affect the
-visual result. Stylesheet blocks, event-handler attributes, scripts, and SVG
-animation elements are removed with warnings. External image URLs and other
-resource references are also omitted. No script, animation, stylesheet, or
-resource is executed, inserted into a live DOM, or fetched during import. The
-retained source asset is input data for provenance and future re-import, not
-executable document content.
+and remain editable after import. Basic user-space clip paths, path-based alpha
+and luminance masks, and the initial filter subset (blur, colour adjustments,
+opacity, and drop shadows) are stored as native effect properties. Unsupported
+clip units, mask content, and filter primitives remain visible through the
+sanitized static fallback when they affect the visual result. Stylesheet blocks,
+event-handler attributes, scripts, and SVG animation elements are removed with
+warnings. External image URLs and other resource references are also omitted.
+No script, animation, stylesheet, or resource is executed, inserted into a live
+DOM, or fetched during import. The retained source asset is input data for
+provenance and future re-import, not executable document content.
 
 ## Text
 
@@ -149,15 +151,6 @@ path. The web build runs `scripts/build-wasm.mjs` before Vite packages the worke
 It requires the matching `wasm-bindgen` CLI. The CLI accepts
 `inkfinite import svg FILE --input ARTWORK.svg` and can validate the transaction
 with `--dry-run` before saving.
-
-Patterns, clip paths, masks, and filters are not converted to native shape
-properties. They remain visible through the sanitized static fallback when they
-affect the visual result. Supported gradients remain native and editable.
-Stylesheet blocks, event-handler attributes, scripts, and SVG animation elements
-are removed with warnings. External image URLs and other resource references are
-also omitted. No script, animation, stylesheet, or resource is executed,
-inserted into a live DOM, or fetched during import. The retained source asset is
-input data for provenance and future re-import, not executable document content.
 
 ## Browser WASM facade
 

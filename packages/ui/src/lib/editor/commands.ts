@@ -14,14 +14,12 @@ import {
 	setShapesLocked,
 	SnapshotCommand,
 	ungroupShapes,
-	convertSelectedShapes
+	convertSelectedShapes,
+	canClipSelection,
+	clipSelection,
+	removeClipFromSelection
 } from '@inkfinite/core';
-import type {
-	SelectionConversionTarget,
-	EditorState,
-	ShapeAlignment,
-	Store
-} from '@inkfinite/core';
+import type { SelectionConversionTarget, EditorState, ShapeAlignment, Store } from '@inkfinite/core';
 
 /** Commands shared by the selection toolbar and canvas context menu. */
 export type SelectionCommand =
@@ -30,6 +28,8 @@ export type SelectionCommand =
 	| 'boolean-intersection'
 	| 'boolean-difference'
 	| 'boolean-exclusion'
+	| 'clip-selection'
+	| 'remove-clip'
 	| 'distribute-horizontal'
 	| 'distribute-vertical'
 	| 'stack-horizontal'
@@ -59,6 +59,8 @@ export const SELECTION_COMMAND_LABELS: Record<SelectionCommand, string> = {
 	'boolean-intersection': 'Intersect Paths',
 	'boolean-difference': 'Subtract Paths',
 	'boolean-exclusion': 'Exclude Paths',
+	'clip-selection': 'Use Path as Clip',
+	'remove-clip': 'Remove Clip Path',
 	'align-left': 'Align Left',
 	'align-center': 'Align Center',
 	'align-right': 'Align Right',
@@ -102,6 +104,10 @@ export function applySelectionCommand(state: EditorState, command: SelectionComm
 			return booleanPathSelection(state, 'difference') ?? state;
 		case 'boolean-exclusion':
 			return booleanPathSelection(state, 'exclusion') ?? state;
+		case 'clip-selection':
+			return clipSelection(state) ?? state;
+		case 'remove-clip':
+			return removeClipFromSelection(state) ?? state;
 		case 'group':
 			return groupShapes(state, ids);
 		case 'ungroup':
@@ -158,9 +164,7 @@ export function executeSelectionCommand(store: Store, command: SelectionCommand)
 	const before = store.getState();
 	const after = applySelectionCommand(before, command);
 	if (after === before) return false;
-	store.executeCommand(
-		new SnapshotCommand(SELECTION_COMMAND_LABELS[command], 'doc', before, after)
-	);
+	store.executeCommand(new SnapshotCommand(SELECTION_COMMAND_LABELS[command], 'doc', before, after));
 	return true;
 }
 
@@ -212,12 +216,7 @@ export function getCommandPaletteEntries(
 		keywords: 'align distribute layout'
 	}));
 	const booleanEntries: CommandPaletteEntry[] = (
-		[
-			'boolean-union',
-			'boolean-intersection',
-			'boolean-difference',
-			'boolean-exclusion'
-		] as SelectionCommand[]
+		['boolean-union', 'boolean-intersection', 'boolean-difference', 'boolean-exclusion'] as SelectionCommand[]
 	).map((id) => ({
 		id,
 		label: SELECTION_COMMAND_LABELS[id],
@@ -225,14 +224,16 @@ export function getCommandPaletteEntries(
 		disabled: !canBooleanPathSelection(state),
 		keywords: 'boolean path vector'
 	}));
+	const clipEntries: CommandPaletteEntry[] = ['clip-selection', 'remove-clip'].map((id) => ({
+		id,
+		label: SELECTION_COMMAND_LABELS[id as SelectionCommand],
+		group: 'Selection' as const,
+		disabled: id === 'clip-selection' ? !canClipSelection(state) : selectedCount === 0,
+		keywords: 'clip path mask vector'
+	}));
 	const entries: CommandPaletteEntry[] = [
 		{ id: 'select-all', label: 'Select all shapes', group: 'Selection', shortcut: '⌘/Ctrl A' },
-		{
-			id: 'clear-selection',
-			label: 'Clear selection',
-			group: 'Selection',
-			shortcut: 'Escape'
-		},
+		{ id: 'clear-selection', label: 'Clear selection', group: 'Selection', shortcut: 'Escape' },
 		{
 			id: 'duplicate',
 			label: 'Duplicate selection',
@@ -251,6 +252,7 @@ export function getCommandPaletteEntries(
 		},
 		...alignmentEntries,
 		...booleanEntries,
+		...clipEntries,
 		{
 			id: 'convert-to-rect',
 			label: SELECTION_COMMAND_LABELS['convert-to-rect'],
@@ -265,18 +267,8 @@ export function getCommandPaletteEntries(
 			disabled: selectedCount === 0,
 			keywords: 'shape convert ellipse oval'
 		},
-		{
-			id: 'group',
-			label: SELECTION_COMMAND_LABELS.group,
-			group: 'Selection',
-			disabled: selectedCount < 2
-		},
-		{
-			id: 'ungroup',
-			label: SELECTION_COMMAND_LABELS.ungroup,
-			group: 'Selection',
-			disabled: selectedCount === 0
-		},
+		{ id: 'group', label: SELECTION_COMMAND_LABELS.group, group: 'Selection', disabled: selectedCount < 2 },
+		{ id: 'ungroup', label: SELECTION_COMMAND_LABELS.ungroup, group: 'Selection', disabled: selectedCount === 0 },
 		{
 			id: 'forward',
 			label: SELECTION_COMMAND_LABELS.forward,
@@ -305,18 +297,8 @@ export function getCommandPaletteEntries(
 			disabled: selectedCount === 0,
 			shortcut: '⇧⌘/Ctrl ['
 		},
-		{
-			id: 'lock',
-			label: SELECTION_COMMAND_LABELS.lock,
-			group: 'Selection',
-			disabled: selectedCount === 0
-		},
-		{
-			id: 'unlock',
-			label: SELECTION_COMMAND_LABELS.unlock,
-			group: 'Selection',
-			disabled: selectedCount === 0
-		},
+		{ id: 'lock', label: SELECTION_COMMAND_LABELS.lock, group: 'Selection', disabled: selectedCount === 0 },
+		{ id: 'unlock', label: SELECTION_COMMAND_LABELS.unlock, group: 'Selection', disabled: selectedCount === 0 },
 		...(platform === 'desktop'
 			? [
 					{

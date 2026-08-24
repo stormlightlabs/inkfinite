@@ -16,8 +16,9 @@ use crate::engine::geometry::{
 use crate::path_metrics::{DEFAULT_PATH_METRIC_TOLERANCE, path_length, trim_path};
 use crate::proto::Bounds;
 use crate::{
-    AssetId, AssetSource, BuiltinShapeKind, Document, DocumentSnapshot, GradientSpread, GradientUnits, LayerId, PageId,
-    Paint, PaintValue, PathFillRule, PathGeometry, PathSegment, PathSubpath, ShapeId, ShapeRecord, Vec2,
+    AssetId, AssetSource, BuiltinShapeKind, Document, DocumentSnapshot, FilterEffect, FilterPrimitive, GradientSpread,
+    GradientUnits, LayerId, MaskEffect, MaskMode, PageId, Paint, PaintValue, PathFillRule, PathGeometry, PathSegment,
+    PathSubpath, ShapeId, ShapeRecord, Vec2,
 };
 
 const DEFAULT_PADDING: f64 = 20.0;
@@ -172,6 +173,19 @@ impl Renderer<'_> {
         }
         for child_id in &shape.child_ids {
             self.render_shape(child_id, matrix, selected, &mut inner)?;
+        }
+        if !inner.is_empty() {
+            let mut effect_defs = String::new();
+            apply_shape_effects(shape, matrix, &mut inner, &mut effect_defs).map_err(|message| {
+                SvgRenderError::InvalidShapeProperties {
+                    shape_id: shape.id.clone(),
+                    kind: shape.kind.to_string(),
+                    message,
+                }
+            })?;
+            if !effect_defs.is_empty() {
+                inner = format!("      <defs>{effect_defs}</defs>\n{inner}");
+            }
         }
         if inner.is_empty() {
             return Ok(());
@@ -970,6 +984,83 @@ fn shape_local_bounds(document: &Document, shape: &ShapeRecord) -> Result<Bounds
         None => Bounds { x: 0.0, y: 0.0, width: 0.0, height: 0.0 },
     };
     Ok(bounds)
+}
+
+fn apply_shape_effects(
+    shape: &ShapeRecord, matrix: Affine, output: &mut String, defs: &mut String,
+) -> Result<(), String> {
+    let clip = shape
+        .properties
+        .get("clip_path")
+        .map(|value| serde_json::from_value::<PathGeometry>(value.clone()))
+        .transpose()
+        .map_err(|error| format!("clip_path could not be decoded: {error}"))?;
+    let mask = shape
+        .properties
+        .get("mask_effect")
+        .map(|value| serde_json::from_value::<MaskEffect>(value.clone()))
+        .transpose()
+        .map_err(|error| format!("mask_effect could not be decoded: {error}"))?;
+    let filter = shape
+        .properties
+        .get("filter")
+        .map(|value| serde_json::from_value::<FilterEffect>(value.clone()))
+        .transpose()
+        .map_err(|error| format!("filter could not be decoded: {error}"))?;
+    let safe_id = shape
+        .id
+        .as_str()
+        .replace(|character: char| !character.is_ascii_alphanumeric(), "-");
+    let mut attributes = Vec::new();
+    if let Some(geometry) = clip {
+        let id = format!("inkfinite-clip-{safe_id}");
+        writeln!(defs, "<clipPath id=\"{id}\" clipPathUnits=\"userSpaceOnUse\"><path d=\"{}\" transform=\"{}\" fill-rule=\"{}\"/></clipPath>", path_data(&geometry), affine_svg(matrix), path_fill_rule(geometry.fill_rule)).map_err(|error| error.to_string())?;
+        attributes.push(format!("clip-path=\"url(#{id})\""));
+    }
+    if let Some(mask) = mask {
+        crate::validate_path_geometry(&mask.geometry).map_err(|error| error.to_string())?;
+        let id = format!("inkfinite-mask-{safe_id}");
+        let mode = match mask.mode {
+            MaskMode::Alpha => "alpha",
+            MaskMode::Luminance => "luminance",
+        };
+        writeln!(defs, "<mask id=\"{id}\" maskUnits=\"userSpaceOnUse\" mask-type=\"{mode}\"><path d=\"{}\" transform=\"{}\" fill=\"white\" fill-opacity=\"{}\" fill-rule=\"{}\"/></mask>", path_data(&mask.geometry), affine_svg(matrix), number(mask.opacity), path_fill_rule(mask.geometry.fill_rule)).map_err(|error| error.to_string())?;
+        attributes.push(format!("mask=\"url(#{id})\""));
+    }
+    if let Some(filter) = filter {
+        let id = format!("inkfinite-filter-{safe_id}");
+        write_filter(defs, &id, &filter)?;
+        attributes.push(format!("filter=\"url(#{id})\""));
+    }
+    if !attributes.is_empty() {
+        *output = format!("<g {}>{output}</g>", attributes.join(" "));
+    }
+    Ok(())
+}
+
+fn write_filter(defs: &mut String, id: &str, filter: &FilterEffect) -> Result<(), String> {
+    write!(
+        defs,
+        "<filter id=\"{id}\" x=\"-50%\" y=\"-50%\" width=\"200%\" height=\"200%\">"
+    )
+    .map_err(|error| error.to_string())?;
+    for (index, primitive) in filter.primitives.iter().enumerate() {
+        let input = if index == 0 { "SourceGraphic".to_owned() } else { format!("inkfinite-filter-{id}-{index}") };
+        let result = format!("inkfinite-filter-{id}-{}", index + 1);
+        match primitive {
+            FilterPrimitive::Blur { radius } => write!(defs, "<feGaussianBlur in=\"{input}\" stdDeviation=\"{}\" result=\"{result}\"/>", number(*radius)),
+            FilterPrimitive::DropShadow { dx, dy, radius, color, opacity } => write!(defs, "<feDropShadow in=\"{input}\" dx=\"{}\" dy=\"{}\" stdDeviation=\"{}\" flood-color=\"{}\" flood-opacity=\"{}\" result=\"{result}\"/>", number(*dx), number(*dy), number(*radius), escape_xml(color), number(*opacity)),
+            FilterPrimitive::Saturate { amount } => write!(defs, "<feColorMatrix in=\"{input}\" type=\"saturate\" values=\"{}\" result=\"{result}\"/>", number(*amount)),
+            FilterPrimitive::HueRotate { degrees } => write!(defs, "<feColorMatrix in=\"{input}\" type=\"hueRotate\" values=\"{}\" result=\"{result}\"/>", number(*degrees)),
+            FilterPrimitive::Grayscale { amount } => write!(defs, "<feColorMatrix in=\"{input}\" type=\"saturate\" values=\"{}\" result=\"{result}\"/>", number(1.0 - amount)),
+            FilterPrimitive::Invert { amount } => write!(defs, "<feComponentTransfer in=\"{input}\" result=\"{result}\"><feFuncR type=\"table\" tableValues=\"{} {}\"/><feFuncG type=\"table\" tableValues=\"{} {}\"/><feFuncB type=\"table\" tableValues=\"{} {}\"/></feComponentTransfer>", number(*amount), number(1.0 - amount), number(*amount), number(1.0 - amount), number(*amount), number(1.0 - amount)),
+            FilterPrimitive::Brightness { amount } => write!(defs, "<feComponentTransfer in=\"{input}\" result=\"{result}\"><feFuncR type=\"linear\" slope=\"{}\"/><feFuncG type=\"linear\" slope=\"{}\"/><feFuncB type=\"linear\" slope=\"{}\"/></feComponentTransfer>", number(*amount), number(*amount), number(*amount)),
+            FilterPrimitive::Contrast { amount } => { let intercept = 0.5 - 0.5 * amount; write!(defs, "<feComponentTransfer in=\"{input}\" result=\"{result}\"><feFuncR type=\"linear\" slope=\"{}\" intercept=\"{}\"/><feFuncG type=\"linear\" slope=\"{}\" intercept=\"{}\"/><feFuncB type=\"linear\" slope=\"{}\" intercept=\"{}\"/></feComponentTransfer>", number(*amount), number(intercept), number(*amount), number(intercept), number(*amount), number(intercept)) },
+            FilterPrimitive::Sepia { amount } => write!(defs, "<feColorMatrix in=\"{input}\" type=\"matrix\" values=\"{} {} {} 0 0 {} {} {} 0 0 {} {} {} 0 0 0 0 0 1 0\" result=\"{result}\"/>", number(0.393 + 0.607 * (1.0 - amount)), number(0.769 - 0.769 * (1.0 - amount)), number(0.189 - 0.189 * (1.0 - amount)), number(0.349 - 0.349 * (1.0 - amount)), number(0.686 + 0.314 * (1.0 - amount)), number(0.168 - 0.168 * (1.0 - amount)), number(0.272 - 0.272 * (1.0 - amount)), number(0.534 - 0.534 * (1.0 - amount)), number(0.131 + 0.869 * (1.0 - amount))),
+            FilterPrimitive::Opacity { amount } => write!(defs, "<feComponentTransfer in=\"{input}\" result=\"{result}\"><feFuncA type=\"linear\" slope=\"{}\"/></feComponentTransfer>", number(*amount)),
+        }.map_err(|error| error.to_string())?;
+    }
+    writeln!(defs, "</filter>").map_err(|error| error.to_string())
 }
 
 fn image_mask_path(mask: &ImageMask, width: f64, height: f64) -> String {

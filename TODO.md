@@ -156,15 +156,15 @@ selection, labels, and arrowheads.
 
 ### Clips, masks, and filters
 
-- [ ] Define which SVG clip, mask, and filter constructs Inkfinite can represent
+- [x] Define which SVG clip, mask, and filter constructs Inkfinite can represent
       natively
-- [ ] Preserve unsupported constructs as sanitized fallback content instead of
+- [x] Preserve unsupported constructs as sanitized fallback content instead of
       silently discarding them
-- [ ] Add native clip-path editing before exposing more general mask editing
-- [ ] Add basic mask composition once clip-path behavior is stable
-- [ ] Define the initial editable filter subset rather than attempting the full
+- [x] Add native clip-path editing before exposing more general mask editing
+- [x] Add basic mask composition once clip-path behavior is stable
+- [x] Define the initial editable filter subset rather than attempting the full
       SVG filter graph at once
-- [ ] Verify deterministic import, editing, save/reopen, and SVG export
+- [x] Verify deterministic import, editing, save/reopen, and SVG export
 
 ### Variable-width strokes
 

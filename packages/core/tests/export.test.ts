@@ -71,6 +71,54 @@ describe("exportToSVG", () => {
     expect(svg).toContain("fill=\"url(#inkfinite-gradient-");
   });
 
+  it("should export native clipping, masks, and filters", () => {
+    const { state, pageId } = createTestState();
+    const rect = ShapeRecord.createRect(pageId, 10, 20, {
+      w: 100,
+      h: 50,
+      fill: "red",
+      stroke: "none",
+      radius: 0,
+      clipPath: {
+        subpaths: [{
+          segments: [
+            { type: "move", to: { x: 0, y: 0 } },
+            { type: "line", to: { x: 100, y: 0 } },
+            { type: "line", to: { x: 50, y: 50 } }
+          ],
+          closed: true
+        }],
+        fill_rule: "nonzero"
+      },
+      maskEffect: {
+        mode: "alpha",
+        geometry: {
+          subpaths: [{
+            segments: [
+              { type: "move", to: { x: 0, y: 0 } },
+              { type: "line", to: { x: 100, y: 0 } },
+              { type: "line", to: { x: 100, y: 50 } },
+              { type: "line", to: { x: 0, y: 50 } }
+            ],
+            closed: true
+          }],
+          fill_rule: "nonzero"
+        },
+        opacity: 0.8
+      },
+      filter: { primitives: [{ type: "blur", radius: 2 }, { type: "sepia", amount: 1 }] }
+    });
+    state.doc.shapes[rect.id] = rect;
+    state.doc.pages[pageId].shapeIds.push(rect.id);
+
+    const svg = exportToSVG(state);
+    expect(svg).toContain("<clipPath");
+    expect(svg).toContain("<mask");
+    expect(svg).toContain("<filter");
+    expect(svg).toContain("feGaussianBlur");
+    expect(svg).toContain("type=\"matrix\"");
+  });
+
   it("should export semantic metadata for ordinary shapes", () => {
     const { state, pageId } = createTestState();
     const rect = ShapeRecord.createRect(pageId, 10, 20, { w: 100, h: 50, fill: "red", stroke: "black", radius: 0 });

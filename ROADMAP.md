@@ -107,10 +107,12 @@ interoperability, editing, CLI inspection, and export.
 
 ### Clipping, masks, and effects
 
-Add editable clipping first, then masks, then a deliberately bounded subset of
-SVG filters. Unsupported SVG constructs should remain preserved through a safe
-visual fallback rather than forcing the editor to implement the entire SVG
-effects model.
+Inkfinite supports editable path clipping, alpha and luminance masks composed
+from path subpaths, and an initial SVG filter subset: blur, colour adjustments,
+opacity, and drop shadows. The editor, canvas renderer, deterministic SVG
+exporter, and canonical document projection use the same effect properties.
+Unsupported SVG effect primitives remain available as sanitized static fallback
+content rather than being discarded.
 
 ### Expressive strokes
 

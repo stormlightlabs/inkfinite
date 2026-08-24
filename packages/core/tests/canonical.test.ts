@@ -40,6 +40,45 @@ describe('toCanonicalDocumentSnapshot', () => {
 		});
 	});
 
+	it('round-trips native clip paths and filters through the canonical projection', () => {
+		const page = PageRecord.create('Page 1', 'page:effects');
+		const rect = ShapeRecord.createRect(
+			page.id,
+			0,
+			0,
+			{ w: 80, h: 60, fill: 'red', stroke: 'none', radius: 0 },
+			'shape:effects'
+		);
+		rect.props.clipPath = {
+			subpaths: [
+				{
+					segments: [
+						{ type: 'move', to: { x: 0, y: 0 } },
+						{ type: 'line', to: { x: 80, y: 0 } },
+						{ type: 'line', to: { x: 40, y: 60 } }
+					],
+					closed: true
+				}
+			],
+			fill_rule: 'nonzero'
+		};
+		rect.props.filter = { primitives: [{ type: 'blur', radius: 2 }] };
+		page.shapeIds.push(rect.id);
+		const snapshot = toCanonicalDocumentSnapshot(
+			{ pages: { [page.id]: page }, shapes: { [rect.id]: rect }, bindings: {} },
+			{ documentId: 'document:effects' }
+		);
+		expect(snapshot.document.shapes[rect.id]?.properties).toMatchObject({
+			clip_path: rect.props.clipPath,
+			filter: rect.props.filter
+		});
+		const roundTripped = fromCanonicalDocumentSnapshot(snapshot);
+		expect(roundTripped.shapes[rect.id]?.props).toMatchObject({
+			clipPath: rect.props.clipPath,
+			filter: rect.props.filter
+		});
+	});
+
 	it('round-trips typed relationships through the native projection', () => {
 		const page = PageRecord.create('Page 1', 'page:one');
 		const source = ShapeRecord.createRect(

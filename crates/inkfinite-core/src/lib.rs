@@ -363,6 +363,9 @@ pub enum ShapePropertyError {
     /// Image properties do not decode or fail image validation.
     #[error("shape kind {kind} has invalid image properties: {message}")]
     InvalidImage { kind: String, message: String },
+    /// Clip, mask, or filter properties do not decode or fail effect validation.
+    #[error("shape kind {kind} has invalid vector effects: {message}")]
+    InvalidEffects { kind: String, message: String },
     /// Reference properties do not decode or fail reference validation.
     #[error("shape kind {kind} has invalid reference properties: {message}")]
     InvalidReference { kind: String, message: String },
@@ -683,6 +686,107 @@ pub struct PathGeometry {
     pub subpaths: Vec<PathSubpath>,
     /// Rule used when filling the compound path.
     pub fill_rule: PathFillRule,
+}
+
+/// Whether a native mask reads source alpha or source luminance.
+#[derive(Clone, Copy, Debug, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(rename_all = "snake_case")]
+pub enum MaskMode {
+    /// Use the mask geometry as an alpha mask.
+    Alpha,
+    /// Use the rendered luminance of the mask geometry.
+    Luminance,
+}
+
+/// A native non-destructive mask based on editable path geometry.
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct MaskEffect {
+    /// How the mask contributes opacity.
+    pub mode: MaskMode,
+    /// Mask geometry in the target shape's local coordinates.
+    pub geometry: PathGeometry,
+    /// Overall mask opacity.
+    #[serde(default = "default_mask_opacity")]
+    pub opacity: f64,
+}
+
+/// One supported, editable SVG filter primitive.
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[ts(rename_all = "snake_case")]
+pub enum FilterPrimitive {
+    /// Gaussian blur radius in local user units.
+    Blur {
+        /// Standard deviation used by the blur.
+        radius: f64,
+    },
+    /// CSS/SVG brightness multiplier.
+    Brightness {
+        /// Multiplier where `1` leaves the source unchanged.
+        amount: f64,
+    },
+    /// CSS/SVG contrast multiplier.
+    Contrast {
+        /// Multiplier where `1` leaves the source unchanged.
+        amount: f64,
+    },
+    /// Desaturate the source by the supplied amount.
+    Grayscale {
+        /// Amount from zero to one.
+        amount: f64,
+    },
+    /// Rotate source hue in degrees.
+    HueRotate {
+        /// Hue rotation in degrees.
+        degrees: f64,
+    },
+    /// Invert source colours by the supplied amount.
+    Invert {
+        /// Amount from zero to one.
+        amount: f64,
+    },
+    /// Adjust colour saturation.
+    Saturate {
+        /// Multiplier where `1` leaves the source unchanged.
+        amount: f64,
+    },
+    /// Convert source colours toward sepia.
+    Sepia {
+        /// Amount from zero to one.
+        amount: f64,
+    },
+    /// Adjust source opacity.
+    Opacity {
+        /// Multiplier from zero to one.
+        amount: f64,
+    },
+    /// Draw a blurred coloured shadow behind the source.
+    DropShadow {
+        /// Horizontal offset.
+        dx: f64,
+        /// Vertical offset.
+        dy: f64,
+        /// Blur radius.
+        radius: f64,
+        /// Shadow colour.
+        color: String,
+        /// Shadow opacity.
+        opacity: f64,
+    },
+}
+
+/// An ordered list of supported filter primitives.
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct FilterEffect {
+    /// Filter primitives in application order.
+    pub primitives: Vec<FilterPrimitive>,
+}
+
+fn default_mask_opacity() -> f64 {
+    1.0
 }
 
 /// Error returned when normalized path geometry violates its representation.
@@ -1324,7 +1428,10 @@ pub fn validate_shape_properties(kind: &str, properties: &ShapeProperties) -> Re
     } else if kind == IMAGE_KIND {
         validate_image_properties(properties)
             .map_err(|message| ShapePropertyError::InvalidImage { kind: kind.to_owned(), message })?;
-    } else if kind == REFERENCE_KIND {
+    }
+    validate_vector_effects(properties)
+        .map_err(|message| ShapePropertyError::InvalidEffects { kind: kind.to_owned(), message })?;
+    if kind == REFERENCE_KIND {
         validate_reference_properties(properties)
             .map_err(|message| ShapePropertyError::InvalidReference { kind: kind.to_owned(), message })?;
     }
@@ -1390,6 +1497,55 @@ pub fn normalize_shape_properties(
         );
     }
     Ok(normalized)
+}
+
+fn validate_vector_effects(properties: &ShapeProperties) -> Result<(), String> {
+    if let Some(value) = properties.get("clip_path") {
+        let geometry: PathGeometry = serde_json::from_value(value.clone())
+            .map_err(|error| format!("clip_path could not be decoded: {error}"))?;
+        validate_path_geometry(&geometry).map_err(|error| format!("clip_path is invalid: {error}"))?;
+    }
+    if let Some(value) = properties.get("mask_effect") {
+        let mask: MaskEffect = serde_json::from_value(value.clone())
+            .map_err(|error| format!("mask_effect could not be decoded: {error}"))?;
+        validate_path_geometry(&mask.geometry).map_err(|error| format!("mask geometry is invalid: {error}"))?;
+        if !mask.opacity.is_finite() || !(0.0..=1.0).contains(&mask.opacity) {
+            return Err("mask opacity must be finite and between 0 and 1".into());
+        }
+    }
+    if let Some(value) = properties.get("filter") {
+        let filter: FilterEffect =
+            serde_json::from_value(value.clone()).map_err(|error| format!("filter could not be decoded: {error}"))?;
+        if filter.primitives.is_empty() {
+            return Err("filter must contain at least one primitive".into());
+        }
+        for primitive in filter.primitives {
+            let valid = match primitive {
+                FilterPrimitive::Blur { radius } => radius.is_finite() && radius >= 0.0,
+                FilterPrimitive::Brightness { amount }
+                | FilterPrimitive::Contrast { amount }
+                | FilterPrimitive::Saturate { amount } => amount.is_finite() && amount >= 0.0,
+                FilterPrimitive::Grayscale { amount }
+                | FilterPrimitive::Invert { amount }
+                | FilterPrimitive::Sepia { amount }
+                | FilterPrimitive::Opacity { amount } => amount.is_finite() && (0.0..=1.0).contains(&amount),
+                FilterPrimitive::HueRotate { degrees } => degrees.is_finite(),
+                FilterPrimitive::DropShadow { dx, dy, radius, opacity, color } => {
+                    dx.is_finite()
+                        && dy.is_finite()
+                        && radius.is_finite()
+                        && radius >= 0.0
+                        && opacity.is_finite()
+                        && (0.0..=1.0).contains(&opacity)
+                        && !color.trim().is_empty()
+                }
+            };
+            if !valid {
+                return Err("filter primitive contains an invalid value".into());
+            }
+        }
+    }
+    Ok(())
 }
 
 fn validate_image_properties(properties: &ShapeProperties) -> Result<(), String> {

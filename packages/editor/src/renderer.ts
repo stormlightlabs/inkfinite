@@ -7,6 +7,7 @@ import type {
 	CursorState,
 	EditorState,
 	EllipseShape,
+	FilterEffect,
 	LineShape,
 	MarkdownShape,
 	PathGeometry,
@@ -542,6 +543,7 @@ function drawShape(
 	context.globalAlpha *= shape.opacity ?? 1;
 
 	applyShapeTransform(context, shape);
+	applyShapeEffects(context, shape);
 
 	switch (shape.type) {
 		case 'rect': {
@@ -591,6 +593,67 @@ function drawShape(
 	}
 
 	context.restore();
+}
+
+/** Apply the native clip, mask, and filter subset before drawing one shape. */
+function applyShapeEffects(context: CanvasRenderingContext2D, shape: ShapeRecord) {
+	const props = shape.props as ShapeRecord['props'] & {
+		clipPath?: PathGeometry;
+		maskEffect?: { geometry: PathGeometry; opacity?: number };
+		filter?: {
+			primitives: Array<
+				| { type: 'blur'; radius: number }
+				| { type: 'brightness'; amount: number }
+				| { type: 'contrast'; amount: number }
+				| { type: 'grayscale'; amount: number }
+				| { type: 'hue_rotate'; degrees: number }
+				| { type: 'invert'; amount: number }
+				| { type: 'saturate'; amount: number }
+				| { type: 'sepia'; amount: number }
+				| { type: 'opacity'; amount: number }
+				| { type: 'drop_shadow'; dx: number; dy: number; radius: number; color: string; opacity: number }
+			>;
+		};
+	};
+	if (props.filter) context.filter = filterToCanvas(props.filter);
+	if (props.clipPath) {
+		drawNativePath(context, props.clipPath);
+		context.clip(props.clipPath.fill_rule === 'evenodd' ? 'evenodd' : 'nonzero');
+	}
+	if (props.maskEffect) {
+		context.globalAlpha *= props.maskEffect.opacity ?? 1;
+		drawNativePath(context, props.maskEffect.geometry);
+		context.clip(props.maskEffect.geometry.fill_rule === 'evenodd' ? 'evenodd' : 'nonzero');
+	}
+}
+
+function filterToCanvas(filter: FilterEffect): string {
+	return filter.primitives
+		.map((primitive) => {
+			switch (primitive.type) {
+				case 'blur':
+					return `blur(${Math.max(0, primitive.radius)}px)`;
+				case 'brightness':
+					return `brightness(${Math.max(0, primitive.amount)})`;
+				case 'contrast':
+					return `contrast(${Math.max(0, primitive.amount)})`;
+				case 'grayscale':
+					return `grayscale(${Math.max(0, Math.min(1, primitive.amount))})`;
+				case 'hue_rotate':
+					return `hue-rotate(${primitive.degrees}deg)`;
+				case 'invert':
+					return `invert(${Math.max(0, Math.min(1, primitive.amount))})`;
+				case 'saturate':
+					return `saturate(${Math.max(0, primitive.amount)})`;
+				case 'sepia':
+					return `sepia(${Math.max(0, Math.min(1, primitive.amount))})`;
+				case 'opacity':
+					return `opacity(${Math.max(0, Math.min(1, primitive.amount))})`;
+				case 'drop_shadow':
+					return `drop-shadow(${primitive.dx}px ${primitive.dy}px ${Math.max(0, primitive.radius)}px ${primitive.color})`;
+			}
+		})
+		.join(' ');
 }
 
 /** Draw an embedded image, preserving its crop window when one is set. */

@@ -163,25 +163,25 @@ function shapeToSVG(shape: ShapeRecord, state: EditorState, definitions: string[
 
   switch (shape.type) {
     case "rect": {
-      return rectToSVG(shape, transform, definitions);
+      return withSvgEffects(shape, rectToSVG(shape, transform, definitions), transform, definitions);
     }
     case "ellipse": {
-      return ellipseToSVG(shape, transform, definitions);
+      return withSvgEffects(shape, ellipseToSVG(shape, transform, definitions), transform, definitions);
     }
     case "line": {
-      return lineToSVG(shape, transform, definitions);
+      return withSvgEffects(shape, lineToSVG(shape, transform, definitions), transform, definitions);
     }
     case "arrow": {
-      return arrowToSVG(shape, transform, state, definitions);
+      return withSvgEffects(shape, arrowToSVG(shape, transform, state, definitions), transform, definitions);
     }
     case "container": {
-      return containerToSVG(shape, transform, definitions);
+      return withSvgEffects(shape, containerToSVG(shape, transform, definitions), transform, definitions);
     }
     case "text": {
-      return textToSVG(shape, transform, definitions);
+      return withSvgEffects(shape, textToSVG(shape, transform, definitions), transform, definitions);
     }
     case "path": {
-      return pathToSVG(shape, transform, definitions);
+      return withSvgEffects(shape, pathToSVG(shape, transform, definitions), transform, definitions);
     }
     case "image": {
       const asset = state.doc.assets?.[shape.props.assetId];
@@ -199,19 +199,69 @@ function shapeToSVG(shape: ShapeRecord, state: EditorState, definitions: string[
       const captionMarkup = caption?.trim()
         ? `<text x="8" y="${Math.max(12, h - 6)}" font-family="sans-serif" font-size="12" fill="#ffffff" stroke="#000000" stroke-opacity="0.35">${escapeXML(caption)}</text>`
         : '';
-      return `<g transform="${transform}" opacity="${shape.opacity ?? 1}">${maskMarkup}${image}${captionMarkup}</g>`;
+      return withSvgEffects(shape, `<g transform="${transform}" opacity="${shape.opacity ?? 1}">${maskMarkup}${image}${captionMarkup}</g>`, transform, definitions);
     }
     case "reference": {
       const { w, h, referenceType, value, label } = shape.props;
       const accent = referenceType === 'url' ? '#2563eb' : referenceType === 'file' ? '#16a34a' : '#7c3aed';
-      return `<g transform="${transform}" opacity="${shape.opacity ?? 1}"><rect width="${w}" height="${h}" rx="8" fill="#f8fafc" stroke="${accent}" stroke-width="2"/><text x="12" y="20" font-family="sans-serif" font-size="12" font-weight="600" fill="${accent}">${referenceType.toUpperCase()}</text><text x="12" y="42" font-family="sans-serif" font-size="13" fill="#1f2937">${escapeXML(label || value)}</text></g>`;
+      return withSvgEffects(shape, `<g transform="${transform}" opacity="${shape.opacity ?? 1}"><rect width="${w}" height="${h}" rx="8" fill="#f8fafc" stroke="${accent}" stroke-width="2"/><text x="12" y="20" font-family="sans-serif" font-size="12" font-weight="600" fill="${accent}">${referenceType.toUpperCase()}</text><text x="12" y="42" font-family="sans-serif" font-size="13" fill="#1f2937">${escapeXML(label || value)}</text></g>`, transform, definitions);
     }
     case "markdown": {
-      return markdownToSVG(shape, transform, definitions);
+      return withSvgEffects(shape, markdownToSVG(shape, transform, definitions), transform, definitions);
     }
     default: {
       return null;
     }
+  }
+}
+
+function withSvgEffects(shape: ShapeRecord, content: string, transform: string, definitions: string[]): string {
+  const props = shape.props;
+  const safeId = shape.id.replace(/[^a-zA-Z0-9_-]/g, '-');
+  const attributes: string[] = [];
+  if (props.clipPath) {
+    const id = `inkfinite-clip-${safeId}`;
+    definitions.push(`<clipPath id="${id}" clipPathUnits="userSpaceOnUse"><path d="${pathGeometryToSVG(props.clipPath)}" transform="${transform}" fill-rule="${props.clipPath.fill_rule}"/></clipPath>`);
+    attributes.push(`clip-path="url(#${id})"`);
+  }
+  if (props.maskEffect) {
+    const id = `inkfinite-mask-${safeId}`;
+    definitions.push(`<mask id="${id}" maskUnits="userSpaceOnUse" mask-type="${props.maskEffect.mode}"><path d="${pathGeometryToSVG(props.maskEffect.geometry)}" transform="${transform}" fill="white" fill-opacity="${svgNumber(props.maskEffect.opacity ?? 1)}" fill-rule="${props.maskEffect.geometry.fill_rule}"/></mask>`);
+    attributes.push(`mask="url(#${id})"`);
+  }
+  if (props.filter) {
+    const id = `inkfinite-filter-${safeId}`;
+    const primitives = props.filter.primitives.map((primitive, index) => filterPrimitiveToSvg(primitive, index, id)).join('');
+    definitions.push(`<filter id="${id}" x="-50%" y="-50%" width="200%" height="200%">${primitives}</filter>`);
+    attributes.push(`filter="url(#${id})"`);
+  }
+  return attributes.length > 0 ? `<g ${attributes.join(' ')}>${content}</g>` : content;
+}
+
+function filterPrimitiveToSvg(
+  primitive: NonNullable<ShapeRecord['props']['filter']>['primitives'][number],
+  index: number,
+  filterId: string
+): string {
+  const input = index === 0 ? 'SourceGraphic' : `${filterId}-${index}`;
+  const result = `${filterId}-${index + 1}`;
+  switch (primitive.type) {
+    case 'blur': return `<feGaussianBlur in="${input}" stdDeviation="${svgNumber(primitive.radius)}" result="${result}"/>`;
+    case 'drop_shadow': return `<feDropShadow in="${input}" dx="${svgNumber(primitive.dx)}" dy="${svgNumber(primitive.dy)}" stdDeviation="${svgNumber(primitive.radius)}" flood-color="${escapeXML(primitive.color)}" flood-opacity="${svgNumber(primitive.opacity)}" result="${result}"/>`;
+    case 'saturate': return `<feColorMatrix in="${input}" type="saturate" values="${svgNumber(primitive.amount)}" result="${result}"/>`;
+    case 'hue_rotate': return `<feColorMatrix in="${input}" type="hueRotate" values="${svgNumber(primitive.degrees)}" result="${result}"/>`;
+    case 'grayscale': return `<feColorMatrix in="${input}" type="saturate" values="${svgNumber(1 - primitive.amount)}" result="${result}"/>`;
+    case 'brightness': return `<feComponentTransfer in="${input}" result="${result}"><feFuncR type="linear" slope="${svgNumber(primitive.amount)}"/><feFuncG type="linear" slope="${svgNumber(primitive.amount)}"/><feFuncB type="linear" slope="${svgNumber(primitive.amount)}"/></feComponentTransfer>`;
+    case 'contrast': {
+      const intercept = 0.5 - 0.5 * primitive.amount;
+      return `<feComponentTransfer in="${input}" result="${result}"><feFuncR type="linear" slope="${svgNumber(primitive.amount)}" intercept="${svgNumber(intercept)}"/><feFuncG type="linear" slope="${svgNumber(primitive.amount)}" intercept="${svgNumber(intercept)}"/><feFuncB type="linear" slope="${svgNumber(primitive.amount)}" intercept="${svgNumber(intercept)}"/></feComponentTransfer>`;
+    }
+    case 'invert': return `<feComponentTransfer in="${input}" result="${result}"><feFuncR type="table" tableValues="${svgNumber(primitive.amount)} ${svgNumber(1 - primitive.amount)}"/><feFuncG type="table" tableValues="${svgNumber(primitive.amount)} ${svgNumber(1 - primitive.amount)}"/><feFuncB type="table" tableValues="${svgNumber(primitive.amount)} ${svgNumber(1 - primitive.amount)}"/></feComponentTransfer>`;
+    case 'sepia': {
+      const amount = primitive.amount;
+      return `<feColorMatrix in="${input}" type="matrix" values="${svgNumber(0.393 + 0.607 * (1 - amount))} ${svgNumber(0.769 - 0.769 * (1 - amount))} ${svgNumber(0.189 - 0.189 * (1 - amount))} 0 0 ${svgNumber(0.349 - 0.349 * (1 - amount))} ${svgNumber(0.686 + 0.314 * (1 - amount))} ${svgNumber(0.168 - 0.168 * (1 - amount))} 0 0 ${svgNumber(0.272 - 0.272 * (1 - amount))} ${svgNumber(0.534 - 0.534 * (1 - amount))} ${svgNumber(0.131 + 0.869 * (1 - amount))} 0 0 0 0 0 1 0" result="${result}"/>`;
+    }
+    case 'opacity': return `<feComponentTransfer in="${input}" result="${result}"><feFuncA type="linear" slope="${svgNumber(primitive.amount)}"/></feComponentTransfer>`;
   }
 }
 

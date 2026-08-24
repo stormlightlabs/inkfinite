@@ -2,6 +2,7 @@
 	import type {
 		ArrowShape,
 		EditorState as EditorStateType,
+		FilterEffect,
 		MarkdownShape,
 		PaintValue,
 		ShapeMetadata,
@@ -12,6 +13,7 @@
 	} from '@inkfinite/core';
 	import {
 		canBooleanPathSelection,
+		canClipSelection,
 		cardChildren,
 		EditorState,
 		getSelectedShapes,
@@ -203,6 +205,11 @@
 		selectionCount > 0 && selectedShapes.every((shape) => shape.locked)
 	);
 	let booleanPathSelection = $derived(canBooleanPathSelection(editorState));
+	let clipSelectionAvailable = $derived(canClipSelection(editorState));
+	let selectedClipCount = $derived(
+		selectedShapes.filter((shape) => Boolean('clipPath' in shape.props && shape.props.clipPath)).length
+	);
+	let effectTarget = $derived(selectionCount === 1 ? selectedShapes[0] : undefined);
 
 	let fillColorState = $derived.by(() => {
 		const shared = getSharedPaintValue(fillTargets.map(getFillPaint));
@@ -274,6 +281,43 @@
 	function getBooleanState(values: boolean[]) {
 		const shared = getSharedValue(values);
 		return { value: shared ?? true, mixed: values.length > 1 && shared === null };
+	}
+
+	function filterPreset(shape: ShapeRecord | undefined): string {
+		const primitive = shape?.props.filter?.primitives[0];
+		return primitive?.type ?? 'none';
+	}
+
+	function applyMaskMode(event: Event) {
+		const mode = (event.currentTarget as HTMLSelectElement).value as 'alpha' | 'luminance';
+		updateSelectedShapes('Set mask mode', (shape) =>
+			shape.props.maskEffect
+				? ({
+						...shape,
+						props: { ...shape.props, maskEffect: { ...shape.props.maskEffect, mode } }
+					} as ShapeRecord)
+				: shape
+		);
+	}
+
+	function applyFilterPreset(event: Event) {
+		const preset = (event.currentTarget as HTMLSelectElement).value;
+		const filter: FilterEffect | undefined =
+			preset === 'blur'
+				? { primitives: [{ type: 'blur', radius: 4 }] }
+			: preset === 'grayscale'
+				? { primitives: [{ type: 'grayscale', amount: 1 }] }
+				: preset === 'drop_shadow'
+					? {
+							primitives: [
+								{ type: 'drop_shadow', dx: 3, dy: 3, radius: 4, color: '#000000', opacity: 0.35 }
+							]
+						}
+					: undefined;
+		updateSelectedShapes('Set filter', (shape) => ({
+			...shape,
+			props: { ...shape.props, filter }
+		}) as ShapeRecord);
 	}
 
 	function metadataForShape(shape: ShapeRecord): ShapeMetadata {
@@ -1340,6 +1384,56 @@
 					aria-labelledby="selection-arrow-label">
 					<h2 id="selection-arrow-label">Arrow</h2>
 					<ArrowPopover {store} />
+				</section>
+			{/if}
+
+			{#if effectTarget}
+				<section
+					class="selection-controls__section"
+					aria-labelledby="selection-effects-label">
+					<h2 id="selection-effects-label">Effects</h2>
+					<div class="selection-controls__fields">
+						{#if effectTarget.props.maskEffect}
+							<label class="selection-controls__field">
+								<span>Mask mode</span>
+								<select value={effectTarget.props.maskEffect.mode} onchange={applyMaskMode} aria-label="Mask mode">
+									<option value="alpha">Alpha</option>
+									<option value="luminance">Luminance</option>
+								</select>
+							</label>
+						{/if}
+						<label class="selection-controls__field">
+							<span>Filter</span>
+							<select value={filterPreset(effectTarget)} onchange={applyFilterPreset} aria-label="Filter">
+								<option value="none">None</option>
+								<option value="blur">Blur</option>
+								<option value="grayscale">Grayscale</option>
+								<option value="drop_shadow">Drop shadow</option>
+							</select>
+						</label>
+					</div>
+				</section>
+			{/if}
+
+			{#if clipSelectionAvailable || selectedClipCount > 0}
+				<section
+					class="selection-controls__section"
+					aria-labelledby="selection-clip-label">
+					<h2 id="selection-clip-label">Clipping</h2>
+					<div class="selection-controls__actions">
+						{#if clipSelectionAvailable}
+							<button
+								class="selection-controls__action"
+								type="button"
+								onclick={() => executeSelectionCommand(store, 'clip-selection')}>Use path as clip</button>
+						{/if}
+						{#if selectedClipCount > 0}
+							<button
+								class="selection-controls__action"
+								type="button"
+								onclick={() => executeSelectionCommand(store, 'remove-clip')}>Remove clip</button>
+						{/if}
+					</div>
 				</section>
 			{/if}
 

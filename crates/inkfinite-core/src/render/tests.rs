@@ -952,6 +952,43 @@ fn renders_gradient_paints_with_stop_opacity_transform_and_spread() {
 }
 
 #[test]
+fn renders_clip_masks_and_filters_deterministically() {
+    let mut snapshot = fixture_snapshot();
+    let shape = snapshot
+        .document
+        .shapes
+        .get_mut(&ShapeId::from("shape:stencil-process"))
+        .expect("shape");
+    shape.properties.insert(
+        "clip_path".into(),
+        serde_json::json!({
+            "subpaths": [{ "segments": [{ "type": "move", "to": { "x": 0, "y": 0 } }, { "type": "line", "to": { "x": 80, "y": 0 } }, { "type": "line", "to": { "x": 40, "y": 80 } }], "closed": true }],
+            "fill_rule": "nonzero"
+        }),
+    );
+    shape.properties.insert(
+        "mask_effect".into(),
+        serde_json::json!({
+            "mode": "alpha",
+            "geometry": { "subpaths": [{ "segments": [{ "type": "move", "to": { "x": 0, "y": 0 } }, { "type": "line", "to": { "x": 120, "y": 0 } }, { "type": "line", "to": { "x": 120, "y": 80 } }, { "type": "line", "to": { "x": 0, "y": 80 } }], "closed": true }], "fill_rule": "nonzero" },
+            "opacity": 0.75
+        }),
+    );
+    shape.properties.insert(
+        "filter".into(),
+        serde_json::json!({ "primitives": [{ "type": "blur", "radius": 2 }, { "type": "brightness", "amount": 1.1 }] }),
+    );
+    let options = SvgRenderOptions { page_id: Some(PageId::from("page:fixtures")), ..SvgRenderOptions::default() };
+    let first = render_svg(&snapshot, &options).expect("effects render");
+    let second = render_svg(&snapshot, &options).expect("effects render twice");
+    assert_eq!(first.svg, second.svg);
+    assert!(first.svg.contains("inkfinite-clip-shape-stencil-process"));
+    assert!(first.svg.contains("inkfinite-mask-shape-stencil-process"));
+    assert!(first.svg.contains("inkfinite-filter-shape-stencil-process"));
+    assert!(first.svg.contains("feGaussianBlur"));
+}
+
+#[test]
 fn invalid_page_and_region_are_typed_errors() {
     let snapshot = fixture_snapshot();
     assert_eq!(

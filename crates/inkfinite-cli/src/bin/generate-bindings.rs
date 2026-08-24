@@ -196,6 +196,10 @@ fn model_bindings() -> String {
     append_declaration::<GradientStop>(&mut output, &config);
     append_declaration::<Paint>(&mut output, &config);
     append_declaration::<PaintValue>(&mut output, &config);
+    append_declaration::<MaskMode>(&mut output, &config);
+    append_declaration::<MaskEffect>(&mut output, &config);
+    append_declaration::<FilterPrimitive>(&mut output, &config);
+    append_declaration::<FilterEffect>(&mut output, &config);
     append_clean_declaration::<PathFillRule>(&mut output, &config);
     append_clean_declaration::<PathHandleMode>(&mut output, &config);
     append_clean_declaration::<PathSegment>(&mut output, &config);
