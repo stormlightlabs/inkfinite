@@ -29,8 +29,8 @@ closing segment. Split creates a new anchor on a segment. Join connects compatib
 ## Imported SVG paths
 
 SVG paths and supported vector primitives become native Inkfinite geometry during import. Their
-anchors and segments can then be edited with Direct Select. Unsupported visual content may remain
-as opaque fallback content and cannot expose native anchors.
+anchors and segments can then be edited with Direct Select. Inkfinite reports and omits unsupported
+visual content.
 
 Read [Import and export](/docs/guide/import-and-export/) for the supported workflow. Maintainers can
 read [Native path geometry](/docs/development/native-path-geometry/) for the stored representation

@@ -14,21 +14,21 @@ each workflow.
 
 ### SVG round-trip
 
-Inkfinite has one validated Rust SVG pipeline across desktop, web, and CLI. It
-maps supported geometry into native shapes, preserves hierarchy, transforms,
-and compound fills, retains source assets, and reports unsupported content.
+Inkfinite has one validated Rust SVG pipeline across desktop, web, CLI, and
+MCP. It maps supported geometry and embedded images into native shapes,
+preserves hierarchy, transforms, and compound fills, retains source assets, and
+reports unsupported content. Web SVG files, dropped files, and pasted markup
+commit to the active document through the Rust browser session.
 
-The native transaction already creates a root container and separate records
-for supported SVG descendants. The remaining editor work must expose those
-children through normal nested selection and ungrouping. Web SVG files and
-pasted markup should add content to the active document by default, matching
-desktop and CLI behavior. Creating a document from SVG should become a separate
-explicit action.
+The native transaction creates a root container and separate records for
+supported SVG descendants. The remaining editor work must expose those children
+through normal nested selection and ungrouping. Creating a document from SVG
+should be a separate explicit action.
 
 The remaining work proves complete document workflows: save and reopen, edit
 and export, undo and redo, CRDT merge, and CLI access. Interchange work should
 favor deterministic native representation where Inkfinite understands the
-content and stable visual fallback where it does not.
+content and a static visual fallback where it does not.
 
 See [SVG import](apps/web/src/content/docs/development/svg-import.md) and
 [native path geometry](apps/web/src/content/docs/development/native-path-geometry.md).
@@ -59,43 +59,6 @@ Once the core workflows are reliable, starter boards can demonstrate system
 design, brainstorming, project planning, moodboards, research maps, and
 wireframes. They should be standard documents that users can inspect, edit,
 export, and repurpose, not substitutes for missing editor behavior.
-
-### Performance profiling
-
-Performance characterization is part of the initial web release path. Replace
-July 2026 prototype results with repeatable measurements across shared fixture
-sizes and representative document structures.
-
-Use Criterion for native algorithms, `samply` for confirmed Rust hotspots,
-`hyperfine` and coarse `tracing` spans for complete CLI, IPC, and MCP paths,
-and Playwright with Chrome DevTools Protocol for actual browser frames and
-memory. The native and process harnesses now cover validation, transactions,
-merge, queries, layout, SVG, complete CLI commands, and MCP startup over the
-shared corpus. Keep the no-op Canvas harness only as a renderer traversal
-benchmark; it does not measure rasterization, compositing, text, GPU work, or
-browser GC.
-
-The browser command in `@inkfinite/perf` drives the production web editor
-against the shared corpus. It records Chrome frame, paint, raster,
-compositor, long-task, GC, heap, JS-to-WASM, and projection/store measurements
-for load and representative editing gestures. It also checks heap retention
-through sustained editing and active-document replacement. Compact summaries
-and gzipped diagnostic traces are written under
-`fixtures/native/performance/` without enabling Playwright interaction
-tracing.
-
-The August 2026 native, process, renderer-traversal, and browser baselines now
-record machine-specific regression ceilings. Routine process and browser runs
-use the flat 1,000-shape fixture; full size and profile sweeps are explicit.
-Exact Criterion filters are anchored so a 1,000-shape investigation does not
-also run the 10,000-shape case.
-
-Document loading is the first confirmed scaling concern: the flat 10,000-shape
-Criterion case takes about 6.8 seconds per load on the reference Apple M1. The
-10,000-shape browser heap-retention edit sequence also needs a reliable
-completion path before it can serve as a baseline. Profile those paths before
-adding indexes, caches, incremental materialization, alternate rendering, or
-specialized allocation tooling.
 
 ## Later
 

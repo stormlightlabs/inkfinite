@@ -39,9 +39,8 @@ create the import transaction.
 
 `source_asset` is the exact UTF-8 input as an `image/svg+xml` asset with a
 content-addressed ID. `assets` contains the embedded raster assets referenced
-by image nodes. The source asset is retained even when the native tree omits
-unsupported content, so a later transaction can re-import it or attach an
-opaque fallback when that shape kind exists.
+by image nodes. The source asset remains available for provenance and re-import
+even when the native tree omits unsupported content.
 
 ## Native mappings
 
@@ -122,8 +121,8 @@ External URLs and unsupported media types are skipped with warnings. The parser
 does not fetch resources.
 
 `SvgImage` nodes retain the source element's position, size, transform,
-opacity, and asset ID. The current native shape registry has no image kind, so
-these nodes remain in the import result until image shape support is added.
+opacity, and asset ID. The SVG transaction maps each node to a native `image`
+shape that references the extracted asset.
 
 ## Unsupported content and security
 
@@ -131,10 +130,8 @@ The importer is a static parser. Named unsupported visual features are omitted
 from the normalized native tree and reported through typed
 `SvgImportWarning::UnsupportedFeature` values. Other unsupported elements use
 `SvgImportWarning::UnsupportedElement`. Their bytes remain in
-`source_asset`. The importer does not create a live opaque fallback because the
-native document model does not yet have an SVG-backed shape. A future fallback
-must render only a sanitized, static projection of the retained source and keep
-the imported subtree movable as one object.
+`source_asset`. The importer does not create a live fallback for omitted
+content.
 
 Desktop imports use the native Tauri dialog plugin to select a path, then Rust
 reads, parses, and commits the file through the active session. The browser adapter

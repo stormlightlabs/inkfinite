@@ -145,12 +145,12 @@ function safeName(value) {
 }
 
 function startWebServer(port) {
-	const server = spawn(
-		'pnpm',
-		['--filter', '@inkfinite/web', 'dev:plain', '--host', '127.0.0.1', '--port', String(port)],
-		{ cwd: root, stdio: 'ignore', env: { ...process.env, BROWSER: 'none' } }
-	);
-	return server;
+	const vite = resolve(root, 'apps/web/node_modules/vite/bin/vite.js');
+	return spawn(process.execPath, [vite, 'dev', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
+		cwd: resolve(root, 'apps/web'),
+		stdio: 'ignore',
+		env: { ...process.env, BROWSER: 'none' }
+	});
 }
 
 async function waitForServer(port, server) {
@@ -271,7 +271,17 @@ async function prepareFixture(page, baseUrl, documents) {
 }
 
 async function waitForEditor(page) {
-	await page.locator('canvas[aria-label="Infinite canvas"]').waitFor({ state: 'visible', timeout: 60_000 });
+	try {
+		await page.locator('canvas[aria-label="Infinite canvas"]').waitFor({ state: 'visible', timeout: 60_000 });
+	} catch (error) {
+		const body = (
+			await page
+				.locator('body')
+				.innerText()
+				.catch(() => '')
+		).slice(0, 500);
+		throw new Error(`Editor canvas did not become visible at ${page.url()}. Page text: ${body}`, { cause: error });
+	}
 	await page.getByRole('button', { name: 'Shapes', exact: true }).waitFor({ state: 'visible' });
 	await page.waitForFunction(
 		() =>
@@ -516,15 +526,26 @@ async function markEnd(page, name) {
 	}, name);
 }
 
+async function wasmMeasureCount(page) {
+	return page.evaluate(
+		() => performance.getEntriesByType('measure').filter((entry) => entry.name.startsWith('inkfinite:wasm:')).length
+	);
+}
+
+async function waitForWasmOperations(page, count, expected, timeout = 60_000) {
+	await page.waitForFunction(
+		({ initialCount, expectedCount }) =>
+			performance.getEntriesByType('measure').filter((entry) => entry.name.startsWith('inkfinite:wasm:'))
+				.length >=
+			initialCount + expectedCount,
+		{ initialCount: count, expectedCount: expected },
+		{ timeout }
+	);
+}
+
 async function measureAction(page, cdp, label, action, options) {
 	const benchmarkName = `inkfinite:benchmark:${safeName(label)}:${options.sequence}`;
-	const wasmMeasureCount = options.expectedWasmOperations
-		? await page.evaluate(
-				() =>
-					performance.getEntriesByType('measure').filter((entry) => entry.name.startsWith('inkfinite:wasm:'))
-						.length
-			)
-		: 0;
+	const initialWasmMeasureCount = options.expectedWasmOperations ? await wasmMeasureCount(page) : 0;
 	const stopTrace = options.trace ? await beginTrace(cdp) : null;
 	const before = await readMetrics(cdp);
 	const startTime = await markStart(page, benchmarkName);
@@ -533,14 +554,7 @@ async function measureAction(page, cdp, label, action, options) {
 		await action();
 		await settleFrames(page, 4);
 		if (options.expectedWasmOperations) {
-			await page.waitForFunction(
-				({ count, expected }) =>
-					performance.getEntriesByType('measure').filter((entry) => entry.name.startsWith('inkfinite:wasm:'))
-						.length >=
-					count + expected,
-				{ count: wasmMeasureCount, expected: options.expectedWasmOperations },
-				{ timeout: 60_000 }
-			);
+			await waitForWasmOperations(page, initialWasmMeasureCount, options.expectedWasmOperations);
 		}
 	} finally {
 		await markEnd(page, benchmarkName);
@@ -797,12 +811,14 @@ async function measureMemory(page, cdp, baseUrl, fixture, options, sequenceState
 		`${fixture.profile}-${fixture.size}-sustained-editing`,
 		async () => {
 			const points = await canvasPoints(page);
+			await page.getByRole('button', { name: 'Select', exact: true }).click();
 			for (let index = 0; index < 20; index += 1) {
-				const offset = index % 2 === 0 ? 0 : 80;
+				const offset = index % 2 === 0 ? 0 : 40;
 				const start = { x: points.shape.x + offset, y: points.shape.y };
-				await page.getByRole('button', { name: 'Select', exact: true }).click();
-				await page.mouse.click(start.x, start.y);
-				await drag(page, start, { x: start.x + (offset === 0 ? 80 : -80), y: start.y + 40 });
+				const count = await wasmMeasureCount(page);
+				await drag(page, start, { x: start.x + (offset === 0 ? 40 : -40), y: start.y });
+				await waitForWasmOperations(page, count, 1);
+				await settleFrames(page);
 			}
 		},
 		{ trace: false, sequence: sequenceState.value++, expectedWasmOperations: 20 }
@@ -813,21 +829,13 @@ async function measureMemory(page, cdp, baseUrl, fixture, options, sequenceState
 	await page.getByRole('button', { name: 'Browse boards' }).click();
 	await browser.waitFor({ state: 'visible' });
 	const rows = browser.locator('[data-board-row]');
-	const wasmMeasureCount = await page.evaluate(
-		() => performance.getEntriesByType('measure').filter((entry) => entry.name.startsWith('inkfinite:wasm:')).length
-	);
+	const replacementWasmMeasureCount = await wasmMeasureCount(page);
 	await rows
 		.nth(1)
 		.getByRole('button', { name: /^Open / })
 		.click();
-	await browser.waitFor({ state: 'hidden' });
-	await page.waitForFunction(
-		(count) =>
-			performance.getEntriesByType('measure').filter((entry) => entry.name.startsWith('inkfinite:wasm:')).length >
-			count,
-		wasmMeasureCount,
-		{ timeout: 60_000 }
-	);
+	await browser.waitFor({ state: 'hidden', timeout: 120_000 });
+	await waitForWasmOperations(page, replacementWasmMeasureCount, 1, 120_000);
 	await settleFrames(page, 5);
 	const afterReplacement = await readMemory(cdp);
 

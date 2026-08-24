@@ -98,6 +98,8 @@ geometry guide](/docs/development/native-path-geometry/) documents the path repr
 SVG interoperability and vector editing. The [SVG import guide](/docs/development/svg-import/)
 documents the parser's native mappings, transform rules, styles, text behavior, and asset handling.
 The [testing guide](/docs/development/testing/) documents shared fixtures and focused verification.
+[Performance corpus and profiling](/docs/development/performance-corpus/) describes the native,
+process, renderer, and browser measurement layers.
 
 ## Edit flow
 

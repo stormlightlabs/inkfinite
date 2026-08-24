@@ -2,6 +2,9 @@ packages:
     - packages/*
     - apps/*
 
+overrides:
+    jsdom: 27.3.0
+
 allowBuilds:
     esbuild: true
 

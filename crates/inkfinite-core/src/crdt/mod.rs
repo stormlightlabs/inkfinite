@@ -88,7 +88,7 @@ impl From<automerge::AutomergeError> for CrdtError {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct StoredSnapshot {
     format: FormatId,
     format_version: u32,
@@ -100,11 +100,17 @@ struct StoredSnapshot {
 pub struct AutomergeDocument {
     document: AutoCommit,
     actor_id: ActorId,
+    // Invalidated whenever Automerge adopts or commits a change.
+    cached_snapshot: Option<StoredSnapshot>,
 }
 
 impl Clone for AutomergeDocument {
     fn clone(&self) -> Self {
-        Self { document: self.document.clone(), actor_id: self.actor_id.clone() }
+        Self {
+            document: self.document.clone(),
+            actor_id: self.actor_id.clone(),
+            cached_snapshot: self.cached_snapshot.clone(),
+        }
     }
 }
 
@@ -135,13 +141,15 @@ impl AutomergeDocument {
             document_id: current.document_id,
             document: document.clone(),
         };
-        let value = serde_json::to_value(stored)?;
+        let value = serde_json::to_value(&stored)?;
+        self.cached_snapshot = None;
         reconcile_root(&mut self.document, &value)?;
         let hash = self
             .document
             .commit_with(CommitOptions::default().with_message(message))
             .ok_or(CrdtError::EmptyChange)?;
         let patch_count = self.document.diff_incremental().len();
+        self.cached_snapshot = Some(stored);
         Ok(ChangeOutcome {
             heads: hashes(self.document.get_heads()),
             change: ChangeHash::new(hash.to_string()),
@@ -149,9 +157,14 @@ impl AutomergeDocument {
         })
     }
 
-    fn stored_snapshot(&self) -> Result<StoredSnapshot, CrdtError> {
+    fn stored_snapshot(&mut self) -> Result<StoredSnapshot, CrdtError> {
+        if let Some(snapshot) = &self.cached_snapshot {
+            return Ok(snapshot.clone());
+        }
         let value = serde_json::to_value(AutoSerde::from(&self.document))?;
-        Ok(serde_json::from_value(value)?)
+        let snapshot: StoredSnapshot = serde_json::from_value(value)?;
+        self.cached_snapshot = Some(snapshot.clone());
+        Ok(snapshot)
     }
 }
 
@@ -229,16 +242,16 @@ impl CrdtDocument for AutomergeDocument {
             document_id,
             document,
         };
-        insert_root(&mut automerge, &serde_json::to_value(stored)?)?;
+        insert_root(&mut automerge, &serde_json::to_value(&stored)?)?;
         automerge.commit_with(CommitOptions::default().with_message("create document"));
         automerge.update_diff_cursor();
-        Ok(Self { document: automerge, actor_id })
+        Ok(Self { document: automerge, actor_id, cached_snapshot: Some(stored) })
     }
 
     fn load(bytes: &[u8], actor_id: ActorId) -> Result<Self, Self::Error> {
         let mut document = AutoCommit::load(bytes)?.with_actor(automerge_actor(&actor_id));
         document.update_diff_cursor();
-        let loaded = Self { document, actor_id };
+        let mut loaded = Self { document, actor_id, cached_snapshot: None };
         loaded.stored_snapshot()?;
         Ok(loaded)
     }
@@ -248,7 +261,9 @@ impl CrdtDocument for AutomergeDocument {
     }
 
     fn snapshot(&mut self) -> Result<DocumentSnapshot, Self::Error> {
-        self.document.commit();
+        if self.document.commit().is_some() {
+            self.cached_snapshot = None;
+        }
         let stored = self.stored_snapshot()?;
         Ok(DocumentSnapshot {
             format: stored.format,
@@ -287,6 +302,7 @@ impl CrdtDocument for AutomergeDocument {
             .map(|change| ChangeHash::new(change.hash().to_string()))
             .collect();
         self.document.apply_changes(decoded)?;
+        self.cached_snapshot = None;
         let heads = self.heads();
         Ok(MergeOutcome { heads, adopted_changes })
     }
@@ -370,6 +386,7 @@ impl AutomergeSyncSession {
             .document
             .sync()
             .receive_sync_message(&mut self.state, message)?;
+        document.cached_snapshot = None;
         let after_heads = document.document.get_heads();
         let document_advanced = after_heads.iter().any(|head| !before_heads.contains(head));
         Ok(!has_unavailable_head || document_advanced)

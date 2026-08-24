@@ -29,9 +29,9 @@ Choose **Import**, paste content, or drop a supported file on the canvas. Import
 Obsidian Canvas file creates an Inkfinite document and leaves the source unchanged. SVG import maps
 supported static elements to native shapes and assets.
 
-An import report lists omitted content, conversions, and fallback content. Keep the source until you
-have checked the imported board. Unsupported SVG visuals may be retained as opaque fallback content
-rather than editable geometry.
+An import report lists conversions, warnings, and omitted content. Keep the source until you have
+checked the imported board. Inkfinite retains the original SVG as a source asset, but unsupported
+visuals do not appear on the canvas.
 
 ## Export a board
 

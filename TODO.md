@@ -6,8 +6,6 @@ Run representative native and fallback SVG fixtures through each complete
 document workflow. Compare normalized structure where representation matters
 and rendered output where visual fidelity matters.
 
-- [ ] Make the TypeScript browser adapter import SVG files and pasted markup
-      through the active Rust document session, page, and layer by default
 - [ ] Offer creation of a new document from SVG as a separate editor action
 - [ ] Verify and fix TypeScript editor traversal of imported root containers so
       existing child records can be selected, edited, reparented, and deleted independently
@@ -18,7 +16,8 @@ and rendered output where visual fidelity matters.
 - [ ] Verify native vectors export without rasterization
 - [ ] Verify nested transforms export deterministically
 - [ ] Verify compound fill rules survive import and export
-- [ ] Verify opaque fallback content remains visually stable
+- [ ] Add sanitized static fallback content for unsupported visuals and verify
+      that it remains visually stable
 - [ ] Add deterministic round-trip fixtures for these workflows
 
 ## Richer interoperability and embeds
@@ -52,66 +51,6 @@ and rendered output where visual fidelity matters.
 - [ ] Add the starter picker and new-board workflow in TypeScript
 - [ ] Verify every starter through open, edit, save, reopen, inspect, and export
 - [ ] Add end-to-end tests for opening and editing each starter
-
-## Performance profiling
-
-### Corpus and harnesses
-
-- [x] Build shared 100, 1,000, 5,000, and 10,000-shape fixtures for flat,
-      vector-heavy, deeply nested, imported-SVG, connection-heavy, and
-      semantic/binding-heavy documents
-- [x] Replace the stale Node capture with a traversal-only benchmark against
-      the current editor renderer; keep its no-op canvas scope explicit
-- [x] Add Criterion benchmarks for document load/save/materialization,
-      transactions, queries, SVG, layout, and renderer algorithms
-- [x] Add a profiling Cargo profile with release optimizations and debug symbols
-- [x] Record reference hardware, tool versions, fixture seeds, warmups, and
-      sampling methodology
-
-### Native and process measurements
-
-- [x] Benchmark validation, commit, undo/redo, merge, query, layout, and SVG
-      operations across fixture sizes
-- [x] Use `samply` to attribute native CPU hotspots identified by benchmarks
-- [x] Use `hyperfine` to measure complete CLI inspect, query, validate, render,
-      and mutate commands plus MCP startup
-- [x] Add coarse `tracing` spans for document, IPC, and MCP operations so
-      end-to-end latency can be attributed without instrumenting hot geometry
-      loops
-
-### Browser measurements
-
-- [x] Add Playwright and CDP workloads for load, pan, zoom, box selection,
-      single- and multi-object drag, vector editing, connected-shape movement,
-      and nested selection
-- [x] Capture real Chrome frame, paint, raster, compositor, long-task, GC, and
-      memory data instead of treating the no-op canvas benchmark as browser
-      rendering performance
-- [x] Measure JS-to-WASM document operations and projection/store updates with
-      browser performance marks
-- [x] Test heap retention after opening a 10,000-shape board, sustained editing,
-      and replacing the active document
-- [x] Save compact summaries and diagnostic traces for representative browser
-      workloads without enabling full Playwright tracing during measurement
-
-### Baselines and optimization
-
-- [x] Refresh the July 2026 baseline and set regression budgets from current
-      native, process, and browser measurements
-- [x] Record dominant costs and use Criterion deltas, Chrome traces, and
-      `samply` profiles to investigate regressions
-- [x] Evaluate spatial indexes, path/render caches, incremental materialization,
-      alternate renderers, or allocation profilers only when a measured
-      bottleneck supports the change
-
-### Performance follow-up
-
-- [ ] Investigate native document load scaling: the flat 10,000-shape Criterion
-      case takes about 6.8 seconds per load on the reference Apple M1
-- [ ] Make the 10,000-shape browser heap-retention edit sequence finish reliably
-      before using it as a regression baseline
-- [ ] Profile the confirmed load and mutation costs before choosing indexes,
-      caches, incremental materialization, or allocation changes
 
 ## Backlog
 

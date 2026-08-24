@@ -11,7 +11,7 @@ order: 16
 | Format                     | Import      | Export | Editability                          | Main limits                                             |
 | -------------------------- | ----------- | ------ | ------------------------------------ | ------------------------------------------------------- |
 | `.inkfinite`               | Yes         | Yes    | Native                               | Use desktop or CLI for files                            |
-| SVG                        | Yes         | Yes    | Supported geometry is native         | Unsupported visuals may use fallback content            |
+| SVG                        | Yes         | Yes    | Supported geometry is native         | Unsupported visuals are omitted with warnings           |
 | PNG                        | As an image | Yes    | Raster                               | No individual vector objects                            |
 | Excalidraw v2              | Yes         | Yes    | Supported objects are mapped         | Rough styles, some shapes, and exact metrics differ     |
 | Obsidian / JSON Canvas 1.0 | Yes         | Yes    | Supported nodes and edges are mapped | General drawing shapes and rotation are not represented |
@@ -29,8 +29,9 @@ JSON Canvas conversion supports text, file, link, and group nodes plus edges bet
 format cannot represent Inkfinite's general drawing primitives, freehand strokes, layers, rotation,
 or free-floating arrows.
 
-SVG import maps the supported static subset to native shapes. SVG export produces vector output for
-the current page or selection. PNG captures the current viewport.
+SVG import maps the supported static subset and embedded raster images to native shapes and retains
+the original SVG as a source asset. It omits unsupported visuals with warnings. SVG export produces
+vector output for the current page or selection. PNG captures the current viewport.
 
 Read [Import and export](/docs/guide/import-and-export/) for the editor workflow and
 [File format](/docs/reference/file-format/) for native storage details.

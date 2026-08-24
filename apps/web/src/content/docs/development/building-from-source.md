@@ -70,4 +70,6 @@ pnpm check
 pnpm lint
 ```
 
-See [Testing](/docs/development/testing/) for focused package and Playwright commands.
+See [Testing](/docs/development/testing/) for focused package and Playwright commands. See
+[Performance corpus and profiling](/docs/development/performance-corpus/) for native, process,
+renderer, and browser measurements.

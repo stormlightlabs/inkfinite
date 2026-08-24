@@ -84,11 +84,16 @@ selected document profile are recorded as skipped.
 Chrome DevTools Protocol collects frame, paint, raster, compositor, long-task,
 GC, and heap data. Browser performance marks measure document-engine worker
 requests and editor projection/store updates. For a 10,000-shape selection, the
-memory workload opens the board, performs sustained edits, and replaces the
-active board before collecting heap measurements.
+memory workload opens the board, performs 20 alternating drags, and replaces
+the active board before collecting heap measurements. It waits for each
+WebAssembly operation and rendered frames before starting the next drag, then
+allows up to two minutes for document replacement.
 
 The summary is written to
-`fixtures/native/performance/browser-budget.json`. The first measured sample
+`fixtures/native/performance/browser-budget.json`. The August 2026 reference
+capture completed the edit sequence in 150 seconds. JavaScript heap use was 310
+MB above the pre-load reading after editing and 286 MB above it after document
+replacement; use these values to investigate retention, not as target limits. The first measured sample
 for each workload also writes a gzipped diagnostic trace to
 `fixtures/native/performance/browser-traces/`. Use `--all-profiles`,
 `--all-sizes`, `--samples`, `--warmups`, and `--no-traces` to control the
