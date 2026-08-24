@@ -1,14 +1,13 @@
 import {
   arrowGeometryForShape,
   arrowPathForShape,
-  computePolylineLength,
-  getPointAtDistance,
   localToWorld,
   pathGeometryBounds,
   shapeBounds,
 } from "./geom";
 import type { Box2 } from "./math";
 import { Box2 as Box2Ops } from "./math";
+import { pathLength, pointAtPathDistance } from "./path-metrics";
 import type { ArrowShape, ContainerShape, EllipseShape, LineShape, MarkdownShape, PathGeometry, PathShape, RectShape, ShapeRecord, TextShape } from "./model";
 import type { EditorState } from "./reactivity";
 import { getSelectedShapes, getShapesOnCurrentPage } from "./reactivity";
@@ -266,10 +265,10 @@ function arrowToSVG(shape: ArrowShape, transform: string, state: EditorState): s
   if (shape.props.style.headStart) elements.push(head(points[0], angle + Math.PI));
   const label = shape.props.label;
   if (label?.text) {
-    const length = computePolylineLength(points);
+    const length = pathLength(geometry.path);
     const distance = label.align === "start" ? label.offset : label.align === "end" ? length - label.offset : length / 2 + label.offset;
-    const at = getPointAtDistance(points, Math.max(0, Math.min(length, distance)));
-    elements.push(`<text x="${svgNumber(at.x)}" y="${svgNumber(at.y - 7)}" text-anchor="middle" font-family="sans-serif" font-size="14" fill="${stroke}">${escapeXML(label.text)}</text>`);
+    const at = pointAtPathDistance(geometry.path, Math.max(0, Math.min(length, distance)))?.point;
+    if (at) elements.push(`<text x="${svgNumber(at.x)}" y="${svgNumber(at.y - 7)}" text-anchor="middle" font-family="sans-serif" font-size="14" fill="${stroke}">${escapeXML(label.text)}</text>`);
   }
   return `<g transform="${transform}">${elements.join("")}</g>`;
 }

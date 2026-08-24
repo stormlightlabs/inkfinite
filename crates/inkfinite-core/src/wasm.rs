@@ -9,7 +9,7 @@ use ts_rs::TS;
 use crate::editor::EditorProjection;
 use crate::proto::{Bounds, CommitResult, TransactionDraft};
 use crate::svg_import::{SvgImport, SvgImportWarning};
-use crate::{AssetId, DocumentSnapshot, ResolvedArrowGeometry, ShapeId};
+use crate::{AssetId, DocumentSnapshot, FlattenedPath, ResolvedArrowGeometry, ShapeId};
 
 /// A structured failure returned by a browser document-engine operation.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -72,6 +72,31 @@ pub enum WasmArrowGeometryResponse {
         /// Resolution failure details.
         error: WasmArrowGeometryFailure,
     },
+}
+
+/// Result of measuring one native path through the Rust/WASM geometry boundary.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case", tag = "status")]
+pub enum WasmPathMetricsResponse {
+    /// Adaptively flattened path metrics.
+    Success {
+        /// Flattened path and its measured length.
+        metrics: FlattenedPath,
+    },
+    /// The path geometry could not be decoded or validated.
+    Error {
+        /// Measurement failure details.
+        error: WasmPathMetricsFailure,
+    },
+}
+
+/// A structured native path metrics failure.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+pub struct WasmPathMetricsFailure {
+    /// Machine-readable failure category.
+    pub code: String,
+    /// Human-readable failure detail.
+    pub message: String,
 }
 
 /// Options accepted by the deterministic browser SVG renderer.

@@ -196,6 +196,10 @@ fn model_bindings() -> String {
     append_clean_declaration::<PathSubpath>(&mut output, &config);
     append_clean_declaration::<PathGeometry>(&mut output, &config);
     append_declaration::<ResolvedArrowGeometry>(&mut output, &config);
+    append_declaration::<FlattenedPath>(&mut output, &config);
+    append_declaration::<FlattenedSubpath>(&mut output, &config);
+    append_declaration::<PathMetricPoint>(&mut output, &config);
+    append_declaration::<PathNearestPoint>(&mut output, &config);
     append_declaration::<Transform>(&mut output, &config);
     append_declaration::<Origin>(&mut output, &config);
     append_declaration::<Provenance>(&mut output, &config);
@@ -336,7 +340,9 @@ fn wasm_bindings() -> String {
     let config = ts_config();
     let mut output = GENERATED_TS_HEADER.to_owned();
     output.push_str("import type { Bounds, CommitResult, TransactionDraft } from './transaction.js';\n");
-    output.push_str("import type { AssetId, DocumentSnapshot, ResolvedArrowGeometry, ShapeId } from './model.js';\n");
+    output.push_str(
+        "import type { AssetId, DocumentSnapshot, FlattenedPath, ResolvedArrowGeometry, ShapeId } from './model.js';\n",
+    );
     output.push_str("import type { EditorProjection } from './editor.js';\n");
     output.push_str("import type { SvgImport, SvgImportWarning } from './svg-import.js';\n\n");
     append_declaration::<WasmDocumentSessionFailure>(&mut output, &config);
@@ -344,6 +350,8 @@ fn wasm_bindings() -> String {
     append_clean_declaration::<WasmDocumentMutationResponse>(&mut output, &config);
     append_declaration::<WasmArrowGeometryFailure>(&mut output, &config);
     append_clean_declaration::<WasmArrowGeometryResponse>(&mut output, &config);
+    append_declaration::<WasmPathMetricsFailure>(&mut output, &config);
+    append_clean_declaration::<WasmPathMetricsResponse>(&mut output, &config);
     append_declaration::<WasmSvgRenderOptions>(&mut output, &config);
     append_declaration::<WasmSvgImportFailure>(&mut output, &config);
     append_clean_declaration::<WasmSvgImportResponse>(&mut output, &config);

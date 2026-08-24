@@ -121,3 +121,15 @@ properties, and composed transforms.
 Rust and TypeScript consume shared valid and invalid path fixtures. The fixtures cover curve
 bounds, compound geometry, nested transforms, and validation errors for malformed paths. SVG
 parsing and direct path editing build on these services.
+
+## Path metrics
+
+`inkfinite-core` measures paths with adaptive Bézier flattening. A geometric tolerance controls
+maximum flattening error; it does not select a fixed sample count. The metrics service provides
+path length, point and tangent queries by distance, nearest-point queries with source segment
+locations, and trimming that keeps line, quadratic, and cubic commands.
+
+The browser editor mirrors these operations in `packages/core/src/path-metrics.ts` for pointer
+interaction. It transforms path control points before measuring them, so hit testing uses world
+geometry under rotation and non-uniform scale. Native paths and resolved arrows use the same
+nearest-point service instead of separate curve sample counts.

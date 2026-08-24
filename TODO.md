@@ -49,8 +49,15 @@ and rendered output where visual fidelity matters.
       relationship, frame, and asset fields where the format supports them
 - [ ] Add integration fixtures that combine native objects, imported SVG,
       raster assets, and external links
-- [ ] Evaluate Mermaid and D2 import against the shared object and relationship
-      model before adding a format-specific rendering path
+- [ ] Define the initial editable Mermaid and D2 import subset, mapping graph
+      nodes, edges, labels, groups, and supported styling to canonical shapes
+      and relationships
+- [ ] Import supported Mermaid and D2 diagrams as ordinary editable Inkfinite
+      objects and run them through the shared graph-layout pipeline
+- [ ] Define warning and fallback behavior for diagram constructs that cannot
+      be represented natively
+- [ ] Add Mermaid and D2 import fixtures covering representative flowcharts,
+      labels, edge directions, groups, and unsupported constructs
 - [ ] Add end-to-end import, edit, and export comparisons for representative
       mixed-format documents
 
@@ -79,16 +86,16 @@ selection, labels, and arrowheads.
 
 ### Path metrics
 
-- [ ] Add shared path flattening with a geometric tolerance rather than fixed
+- [x] Add shared path flattening with a geometric tolerance rather than fixed
       samples per curve
-- [ ] Add path length and point-at-distance queries
-- [ ] Add tangent-at-distance queries for line, quadratic, and cubic segments
-- [ ] Add nearest-point and distance-along-path queries for hit testing and
+- [x] Add path length and point-at-distance queries
+- [x] Add tangent-at-distance queries for line, quadratic, and cubic segments
+- [x] Add nearest-point and distance-along-path queries for hit testing and
       snapping
-- [ ] Add path trimming by start and end distance
-- [ ] Reuse the shared path metrics for native path and arrow hit testing
+- [x] Add path trimming by start and end distance
+- [x] Reuse the shared path metrics for native path and arrow hit testing
       instead of maintaining separate curve-sampling implementations
-- [ ] Add deterministic tests for lines, quadratic curves, cubic curves,
+- [x] Add deterministic tests for lines, quadratic curves, cubic curves,
       transformed paths, and degenerate segments
 
 ### Curved arrows

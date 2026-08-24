@@ -22,8 +22,8 @@ import type {
 import {
 	arrowGeometryForShape,
 	arrowPathForShape,
-	computePolylineLength,
-	getPointAtDistance,
+	pathLength,
+	pointAtPathDistance,
 	getLayersOnCurrentPage,
 	getStrokeOutline,
 	getShapesOnCurrentPage,
@@ -906,7 +906,7 @@ function drawArrow(
 	const label = shape.props.label;
 	if (label) {
 		context.globalAlpha = shapeAlpha * (shape.fillOpacity ?? 1);
-		drawArrowLabel(context, state, points, label);
+		drawArrowLabel(context, state, geometry.path, label);
 	}
 }
 
@@ -916,13 +916,13 @@ function drawArrow(
 function drawArrowLabel(
 	context: CanvasRenderingContext2D,
 	state: EditorState,
-	points: Vec2[],
+	geometry: PathGeometry,
 	label: { text: string; align: string; offset: number }
 ) {
 	if (!label.text) return;
 
 	let labelPos: Vec2;
-	const totalLength = computePolylineLength(points);
+	const totalLength = pathLength(geometry);
 	let targetDist: number;
 
 	if (label.align === 'start') {
@@ -933,7 +933,8 @@ function drawArrowLabel(
 		targetDist = totalLength / 2 + label.offset;
 	}
 
-	labelPos = getPointAtDistance(points, targetDist);
+	labelPos = pointAtPathDistance(geometry, targetDist)?.point ?? geometry.subpaths[0]?.segments[0]?.to;
+	if (!labelPos) return;
 
 	context.save();
 	context.font = '14px sans-serif';
@@ -1646,7 +1647,8 @@ function getHandlesForShape(state: EditorState, shape: ShapeRecord, bindingsBySo
 
 	if (shape.type === 'arrow') {
 		const resolved = resolveArrowEndpoints(state, shape.id, bindingsBySource);
-		if (resolved && shape.props.points && shape.props.points.length >= 2) {
+		const arrowGeometry = arrowGeometryForShape(state, shape, bindingsBySource);
+		if (resolved && arrowGeometry && shape.props.points && shape.props.points.length >= 2) {
 			handles.push({ id: 'line-start', position: resolved.a });
 
 			for (let i = 1; i < shape.props.points.length - 1; i++) {
@@ -1658,7 +1660,7 @@ function getHandlesForShape(state: EditorState, shape: ShapeRecord, bindingsBySo
 			handles.push({ id: 'line-end', position: resolved.b });
 
 			if (shape.props.label) {
-				const polylineLength = computePolylineLength(shape.props.points);
+				const polylineLength = pathLength(arrowGeometry.path);
 				const align = shape.props.label.align ?? 'center';
 				const offset = shape.props.label.offset ?? 0;
 
@@ -1672,7 +1674,8 @@ function getHandlesForShape(state: EditorState, shape: ShapeRecord, bindingsBySo
 				}
 
 				distance = Math.max(0, Math.min(distance, polylineLength));
-				const labelPos = getPointAtDistance(shape.props.points, distance);
+				const labelPos = pointAtPathDistance(arrowGeometry.path, distance)?.point;
+				if (!labelPos) return handles;
 				const worldLabelPos = localToWorld(shape, labelPos);
 				handles.push({ id: 'arrow-label', position: worldLabelPos });
 			}

@@ -1,9 +1,10 @@
 import {
 	type ArrowShape,
+	arrowGeometryForShape,
 	Camera,
-	computePolylineLength,
 	EditorState,
-	getPointAtDistance,
+	pathLength,
+	pointAtPathDistance,
 	SnapshotCommand,
 	type Store,
 	type Viewport
@@ -38,12 +39,10 @@ export class ArrowLabelEditorController {
 		}
 		const arrow = shape as ArrowShape;
 
-		const points = arrow.props.points;
-		if (points.length < 2) {
-			return null;
-		}
+		const geometry = arrowGeometryForShape(state, arrow);
+		if (!geometry) return null;
 
-		const polylineLength = computePolylineLength(points);
+		const polylineLength = pathLength(geometry.path);
 		const align = arrow.props.label?.align ?? 'center';
 		const offset = arrow.props.label?.offset ?? 0;
 
@@ -57,7 +56,8 @@ export class ArrowLabelEditorController {
 		}
 
 		distance = Math.max(0, Math.min(distance, polylineLength));
-		const labelPos = getPointAtDistance(points, distance);
+		const labelPos = pointAtPathDistance(geometry.path, distance)?.point;
+		if (!labelPos) return null;
 
 		const viewport = this.getViewport();
 		const screenPos = Camera.worldToScreen(state.camera, labelPos, viewport);

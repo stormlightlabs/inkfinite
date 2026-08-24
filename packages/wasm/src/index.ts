@@ -3,6 +3,7 @@ import type { EditorProjection, EditorReconciliationRequest } from '@inkfinite/b
 import type { CommitResult, TransactionDraft } from '@inkfinite/bindings/transaction';
 import type {
 	WasmArrowGeometryResponse,
+	WasmPathMetricsResponse,
 	WasmDocumentMutationResponse,
 	WasmDocumentSessionFailure,
 	WasmDocumentSessionState,
@@ -27,6 +28,7 @@ export type { TransactionDraft, CommitResult } from '@inkfinite/bindings/transac
 export type { SvgImport, SvgImportWarning } from '@inkfinite/bindings/svg-import';
 export type {
 	WasmArrowGeometryResponse,
+	WasmPathMetricsResponse,
 	WasmDocumentMutationResponse,
 	WasmDocumentSessionFailure,
 	WasmDocumentSessionState,
@@ -92,6 +94,7 @@ interface GeneratedWasmModule {
 	import_svg(source: Uint8Array): string;
 	project_editor(snapshotJson: string): string;
 	resolve_arrow_geometry(snapshotJson: string, arrowId: string): string;
+	measure_path_metrics(pathJson: string, tolerance: number): string;
 	reconcile_editor_patches(snapshotJson: string, requestJson: string): string;
 	render_svg(snapshotJson: string, optionsJson: string): string;
 	create_document(snapshotJson: string, actorId: string): GeneratedDocumentSession;
@@ -214,6 +217,15 @@ export async function resolveArrowGeometry(
 ): Promise<WasmArrowGeometryResponse> {
 	const module = await loadModule();
 	return JSON.parse(module.resolve_arrow_geometry(JSON.stringify(snapshot), arrowId)) as WasmArrowGeometryResponse;
+}
+
+/** Measures native path geometry through the Rust-owned metrics service. */
+export async function measurePathMetrics(
+	geometry: import('@inkfinite/bindings/model').PathGeometry,
+	tolerance = 0.25
+): Promise<WasmPathMetricsResponse> {
+	const module = await loadModule();
+	return JSON.parse(module.measure_path_metrics(JSON.stringify(geometry), tolerance)) as WasmPathMetricsResponse;
 }
 
 /** Reconciles semantic editor changes into one native transaction draft. */

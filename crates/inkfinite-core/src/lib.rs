@@ -14,6 +14,7 @@ pub use graph_layout::{
 };
 pub mod ipc;
 pub mod path;
+pub mod path_metrics;
 pub mod performance;
 pub mod proto;
 pub mod render;
@@ -25,6 +26,12 @@ pub mod sync;
 pub mod wasm;
 pub use connector::{
     ArrowGeometryError, ResolvedArrowGeometry, resolve_arrow_geometry, resolve_arrow_geometry_for_shape,
+};
+pub use path_metrics::{
+    DEFAULT_PATH_METRIC_TOLERANCE, FlattenedPath, FlattenedSubpath, PathMetricPoint, PathNearestPoint, flatten_path,
+    flatten_path_with_transform, nearest_point, nearest_point_with_transform, path_length, path_length_with_transform,
+    point_at_distance, point_at_distance_with_transform, tangent_at_distance, tangent_at_distance_with_transform,
+    trim_path,
 };
 
 use std::collections::BTreeMap;

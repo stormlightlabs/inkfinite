@@ -1,8 +1,7 @@
 import type { Action } from '../actions';
 import {
+	arrowGeometryForShape,
 	computeNormalizedAnchor,
-	computePolylineLength,
-	getPointAtDistance,
 	hitTestPoint,
 	hitTestPoints,
 	localToWorld,
@@ -12,6 +11,7 @@ import {
 	shapeTransform,
 	worldToLocal
 } from '../geom';
+import { nearestPointOnPath, pathLength, pointAtPathDistance, transformPathGeometry } from '../path-metrics';
 import { Box2, clamp, Mat3, type Vec2, Vec2 as Vec2Ops } from '../math';
 import { duplicateAndConnectSelection } from '../selection';
 import { BindingRecord, createId, ShapeRecord } from '../model';
@@ -420,7 +420,7 @@ export class SelectTool implements Tool {
 		if (this.toolState.activeHandle === 'rotate') {
 			updated = this.rotateShape(state, initialShape, snappedPoint, action.modifiers.shift);
 		} else if (this.toolState.activeHandle === 'arrow-label') {
-			updated = this.adjustArrowLabel(initialShape, snappedPoint);
+			updated = this.adjustArrowLabel(state, initialShape, snappedPoint);
 		} else if (
 			this.toolState.activeHandle === 'line-start' ||
 			this.toolState.activeHandle === 'line-end' ||
@@ -831,7 +831,8 @@ export class SelectTool implements Tool {
 			handles.push({ id: 'line-start', position: start }, { id: 'line-end', position: end });
 		} else if (shape.type === 'arrow') {
 			const resolved = resolveArrowEndpoints(state, shape.id);
-			if (resolved && shape.props.points && shape.props.points.length >= 2) {
+			const arrowGeometry = arrowGeometryForShape(state, shape);
+			if (resolved && arrowGeometry && shape.props.points && shape.props.points.length >= 2) {
 				handles.push({ id: 'line-start', position: resolved.a });
 
 				for (let i = 1; i < shape.props.points.length - 1; i++) {
@@ -843,7 +844,7 @@ export class SelectTool implements Tool {
 				handles.push({ id: 'line-end', position: resolved.b });
 
 				if (shape.props.label) {
-					const polylineLength = computePolylineLength(shape.props.points);
+					const polylineLength = pathLength(arrowGeometry.path);
 					const align = shape.props.label.align ?? 'center';
 					const offset = shape.props.label.offset ?? 0;
 
@@ -857,9 +858,11 @@ export class SelectTool implements Tool {
 					}
 
 					distance = Math.max(0, Math.min(distance, polylineLength));
-					const labelPos = getPointAtDistance(shape.props.points, distance);
-					const worldLabelPos = localToWorld(shape, labelPos);
-					handles.push({ id: 'arrow-label', position: worldLabelPos });
+					const labelPos = pointAtPathDistance(arrowGeometry.path, distance)?.point;
+					if (labelPos) {
+						const worldLabelPos = localToWorld(shape, labelPos);
+						handles.push({ id: 'arrow-label', position: worldLabelPos });
+					}
 				}
 			}
 		}
@@ -969,7 +972,7 @@ export class SelectTool implements Tool {
 		return updateShapeTransform(resized, translated);
 	}
 
-	private adjustArrowLabel(initial: ShapeRecord, pointer: Vec2): ShapeRecord | null {
+	private adjustArrowLabel(state: EditorState, initial: ShapeRecord, pointer: Vec2): ShapeRecord | null {
 		if (
 			initial.type !== 'arrow' ||
 			!initial.props.points ||
@@ -979,33 +982,13 @@ export class SelectTool implements Tool {
 			return null;
 		}
 
-		const localPointer = worldToLocal(pointer, initial);
-		const points = initial.props.points;
-		const polylineLength = computePolylineLength(points);
-
-		let closestDistance = 0;
-		let minDistToLine = Number.POSITIVE_INFINITY;
-
-		for (let i = 0; i < points.length - 1; i++) {
-			const a = points[i];
-			const b = points[i + 1];
-			const segmentLength = Vec2Ops.dist(a, b);
-
-			const ab = Vec2Ops.sub(b, a);
-			const ap = Vec2Ops.sub(localPointer, a);
-			const t = Math.max(0, Math.min(1, Vec2Ops.dot(ap, ab) / Vec2Ops.dot(ab, ab)));
-			const projection = Vec2Ops.add(a, Vec2Ops.mulScalar(ab, t));
-			const distToLine = Vec2Ops.dist(localPointer, projection);
-
-			if (distToLine < minDistToLine) {
-				minDistToLine = distToLine;
-				let distanceToSegmentStart = 0;
-				for (let j = 0; j < i; j++) {
-					distanceToSegmentStart += Vec2Ops.dist(points[j], points[j + 1]);
-				}
-				closestDistance = distanceToSegmentStart + t * segmentLength;
-			}
-		}
+		const geometry = arrowGeometryForShape(state, initial);
+		if (!geometry) return null;
+		const worldGeometry = transformPathGeometry(geometry.path, shapeTransform(initial));
+		const nearest = nearestPointOnPath(worldGeometry, pointer);
+		if (!nearest) return null;
+		const polylineLength = pathLength(geometry.path);
+		const closestDistance = nearest.distance;
 
 		const align = initial.props.label.align ?? 'center';
 		let newOffset: number;

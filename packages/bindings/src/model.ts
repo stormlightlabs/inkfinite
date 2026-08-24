@@ -209,6 +209,102 @@ export type ResolvedArrowGeometry = {
 };
 
 /**
+ * A flattened native path, retaining one polyline for each subpath.
+ */
+export type FlattenedPath = {
+	/**
+	 * Flattened points in each source subpath's order.
+	 */
+	subpaths: Array<FlattenedSubpath>;
+	/**
+	 * Sum of all flattened subpath lengths.
+	 */
+	length: number;
+};
+
+/**
+ * One flattened path subpath.
+ */
+export type FlattenedSubpath = {
+	/**
+	 * Points suitable for drawing or distance queries.
+	 */
+	points: Array<Vec2>;
+	/**
+	 * Whether the final point is connected to the first point.
+	 */
+	closed: boolean;
+	/**
+	 * Length of this flattened subpath.
+	 */
+	length: number;
+};
+
+/**
+ * A point and its source location on a native path.
+ */
+export type PathMetricPoint = {
+	/**
+	 * Point on the measured path.
+	 */
+	point: Vec2;
+	/**
+	 * Unit tangent at the point, or the zero vector for a fully degenerate path.
+	 */
+	tangent: Vec2;
+	/**
+	 * Distance from the beginning of the complete path.
+	 */
+	distance: number;
+	/**
+	 * Source subpath index.
+	 */
+	subpath_index: number;
+	/**
+	 * Source segment index. The subpath length is used for its implicit closing line.
+	 */
+	segment_index: number;
+	/**
+	 * Bézier parameter within the source segment.
+	 */
+	t: number;
+};
+
+/**
+ * The nearest measured point and its distance from the query point.
+ */
+export type PathNearestPoint = {
+	/**
+	 * Point on the measured path.
+	 */
+	point: Vec2;
+	/**
+	 * Unit tangent at the point, or the zero vector for a degenerate path.
+	 */
+	tangent: Vec2;
+	/**
+	 * Distance from the beginning of the complete path.
+	 */
+	distance: number;
+	/**
+	 * Euclidean distance from the query point to `point`.
+	 */
+	distance_to_path: number;
+	/**
+	 * Source subpath index.
+	 */
+	subpath_index: number;
+	/**
+	 * Source segment index. The subpath length is used for its implicit closing line.
+	 */
+	segment_index: number;
+	/**
+	 * Bézier parameter within the source segment.
+	 */
+	t: number;
+};
+
+/**
  * Transform relative to a shape's parent container or layer.
  */
 export type Transform = {

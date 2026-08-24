@@ -22,15 +22,16 @@ use inkfinite_core::wasm::{
     WasmDocumentSessionState as DocumentSessionState, WasmEditorProjectionFailure as EditorProjectionFailure,
     WasmEditorProjectionResponse as EditorProjectionResponse,
     WasmEditorReconciliationFailure as EditorReconciliationFailure,
-    WasmEditorReconciliationResponse as EditorReconciliationResponse,
-    WasmSvgImportCommitResponse as SvgImportCommitResponse, WasmSvgImportFailure as SvgImportFailure,
-    WasmSvgImportResponse as SvgImportResponse, WasmSvgRenderFailure as SvgRenderFailure,
-    WasmSvgRenderOptions as SvgRenderOptionsInput, WasmSvgRenderResponse as SvgRenderResponse,
-    WasmSvgRenderWarning as SvgRenderWarningResponse,
+    WasmEditorReconciliationResponse as EditorReconciliationResponse, WasmPathMetricsFailure as PathMetricsFailure,
+    WasmPathMetricsResponse as PathMetricsResponse, WasmSvgImportCommitResponse as SvgImportCommitResponse,
+    WasmSvgImportFailure as SvgImportFailure, WasmSvgImportResponse as SvgImportResponse,
+    WasmSvgRenderFailure as SvgRenderFailure, WasmSvgRenderOptions as SvgRenderOptionsInput,
+    WasmSvgRenderResponse as SvgRenderResponse, WasmSvgRenderWarning as SvgRenderWarningResponse,
 };
 use inkfinite_core::{
     ActorId, AssetId, DocumentId, DocumentSnapshot, INKFINITE_FORMAT_ID, INKFINITE_FORMAT_VERSION, LayerId, Origin,
-    PageId, ShapeId, Timestamp, resolve_arrow_geometry as resolve_native_arrow_geometry,
+    PageId, PathGeometry, ShapeId, Timestamp, flatten_path as flatten_native_path,
+    resolve_arrow_geometry as resolve_native_arrow_geometry, validate_path_geometry,
 };
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
@@ -392,6 +393,31 @@ pub fn resolve_arrow_geometry_json(snapshot_json: &str, arrow_id: &str) -> Strin
 #[wasm_bindgen]
 pub fn resolve_arrow_geometry(snapshot_json: &str, arrow_id: &str) -> String {
     resolve_arrow_geometry_json(snapshot_json, arrow_id)
+}
+
+/// Measures one native path geometry through the Rust-owned metrics service.
+#[must_use]
+pub fn measure_path_metrics_json(path_json: &str, tolerance: f64) -> String {
+    let geometry = match serde_json::from_str::<PathGeometry>(path_json) {
+        Ok(geometry) => geometry,
+        Err(error) => {
+            return serialize_response(PathMetricsResponse::Error {
+                error: PathMetricsFailure { code: "invalid_path".into(), message: error.to_string() },
+            });
+        }
+    };
+    if let Err(error) = validate_path_geometry(&geometry) {
+        return serialize_response(PathMetricsResponse::Error {
+            error: PathMetricsFailure { code: "invalid_path".into(), message: error.to_string() },
+        });
+    }
+    serialize_response(PathMetricsResponse::Success { metrics: flatten_native_path(&geometry, tolerance) })
+}
+
+/// Measures one native path geometry through the Rust-owned metrics service.
+#[wasm_bindgen]
+pub fn measure_path_metrics(path_json: &str, tolerance: f64) -> String {
+    measure_path_metrics_json(path_json, tolerance)
 }
 
 /// Projects a canonical snapshot without requiring a WASM runtime.
@@ -820,5 +846,27 @@ mod tests {
         assert_eq!(imported["status"], "success");
         assert_eq!(imported["shape_ids"].as_array().map(Vec::len), Some(3));
         assert!(imported["state"]["editor_projection"]["shapes"].is_object());
+    }
+
+    #[test]
+    fn measures_native_path_geometry_through_the_wasm_contract() {
+        let geometry = serde_json::json!({
+            "subpaths": [{
+                "segments": [
+                    { "type": "move", "to": { "x": 0, "y": 0 } },
+                    { "type": "line", "to": { "x": 30, "y": 40 } }
+                ],
+                "closed": false
+            }],
+            "fill_rule": "nonzero"
+        });
+        let response: Value = serde_json::from_str(&measure_path_metrics_json(&geometry.to_string(), 0.1))
+            .expect("metrics response should be JSON");
+        assert_eq!(response["status"], "success");
+        assert_eq!(response["metrics"]["length"], 50.0);
+        assert_eq!(
+            response["metrics"]["subpaths"][0]["points"].as_array().map(Vec::len),
+            Some(2)
+        );
     }
 }
