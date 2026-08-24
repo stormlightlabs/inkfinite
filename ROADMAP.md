@@ -100,9 +100,10 @@ geometry survives SVG export and import.
 
 ### Rich paint
 
-Extend flat colors with linear and radial gradients. Gradient data belongs in
-the canonical document representation and must work through rendering,
-serialization, SVG interoperability, editing, CLI inspection, and export.
+Linear and radial gradients extend flat colors. Gradient stops, opacity,
+coordinate units, transforms, and spread behavior live in the canonical
+document representation and work through rendering, serialization, SVG
+interoperability, editing, CLI inspection, and export.
 
 ### Clipping, masks, and effects
 

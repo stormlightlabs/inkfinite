@@ -18,6 +18,16 @@ strength of a curve.
 Whole-object selection still controls the path's transform, bounds, fill, stroke, and opacity. Use
 Direct Select only when you need to change the geometry inside those bounds.
 
+## Gradient fills and strokes
+
+The Fill and Stroke controls accept solid colours, linear gradients, and radial gradients. Open the
+small gradient control beside a colour control to choose a gradient type, change its spread mode,
+and edit its stops. Each stop exposes a colour, position from 0 to 1, and opacity. Add a stop or
+remove one when at least two stops remain.
+
+Gradient definitions stay in the document and are preserved when you save, reopen, import from SVG,
+or export to SVG. Interactive Canvas rendering uses the same stop data for previews.
+
 ## Path topology
 
 Path commands open or close a subpath, split a segment, join compatible endpoints, and change a

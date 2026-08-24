@@ -911,6 +911,47 @@ fn missing_assets_warn_in_stable_order() {
 }
 
 #[test]
+fn renders_gradient_paints_with_stop_opacity_transform_and_spread() {
+    let mut snapshot = fixture_snapshot();
+    let shape = snapshot
+        .document
+        .shapes
+        .get_mut(&ShapeId::from("shape:stencil-process"))
+        .expect("shape");
+    shape.properties.insert(
+        "fill".into(),
+        serde_json::json!({
+            "kind": "linear_gradient",
+            "x1": 0,
+            "y1": 0,
+            "x2": 1,
+            "y2": 0,
+            "units": "object_bounding_box",
+            "transform": { "a": 1, "b": 0, "c": 0, "d": 1, "e": 4, "f": 5 },
+            "spread": "reflect",
+            "stops": [
+                { "offset": 0, "color": "#111111", "opacity": 1 },
+                { "offset": 1, "color": "#ffffff", "opacity": 0.4 }
+            ]
+        }),
+    );
+    let output = render_svg(
+        &snapshot,
+        &SvgRenderOptions { page_id: Some(PageId::from("page:fixtures")), ..SvgRenderOptions::default() },
+    )
+    .expect("gradient renders");
+    assert!(output.svg.contains("<linearGradient"));
+    assert!(output.svg.contains("gradientTransform=\"matrix(1 0 0 1 4 5)\""));
+    assert!(output.svg.contains("spreadMethod=\"reflect\""));
+    assert!(output.svg.contains("stop-opacity=\"0.4\""));
+    assert!(
+        output
+            .svg
+            .contains("fill=\"url(#inkfinite-gradient-shape-stencil-process-fill)\"")
+    );
+}
+
+#[test]
 fn invalid_page_and_region_are_typed_errors() {
     let snapshot = fixture_snapshot();
     assert_eq!(

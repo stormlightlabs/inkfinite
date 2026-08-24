@@ -182,6 +182,29 @@ fn nested_and_compound_fixtures_preserve_geometry_semantics() {
 }
 
 #[test]
+fn gradient_fixture_preserves_transforms_inheritance_and_stop_opacity() {
+    let import = parse_svg(include_str!(
+        "../../../fixtures/svg-import/gradients/gradient-inheritance.svg"
+    ))
+    .expect("gradient fixture should parse");
+    let SvgImportNode::Shape(linear) = &import.root.children[0] else { panic!("linear shape") };
+    assert_eq!(linear.properties["fill"]["kind"], "linear_gradient");
+    assert_eq!(linear.properties["fill"]["spread"], "reflect");
+    assert_eq!(linear.properties["fill"]["stops"].as_array().map(Vec::len), Some(3));
+    assert!(linear.properties["fill"]["transform"]["a"].as_f64().is_some());
+    assert!(
+        (linear.properties["fill"]["stops"][1]["opacity"]
+            .as_f64()
+            .unwrap_or_default()
+            - 0.72)
+            .abs()
+            < 1e-6
+    );
+    assert_eq!(linear.properties["stroke"]["kind"], "radial_gradient");
+    assert_eq!(linear.properties["stroke"]["units"], "user_space_on_use");
+}
+
+#[test]
 fn unsupported_fixture_reports_features_without_importing_active_content() {
     let import = parse_svg(include_str!(
         "../../../fixtures/svg-import/unsupported/feature-matrix.svg"
@@ -196,7 +219,6 @@ fn unsupported_fixture_reports_features_without_importing_active_content() {
         })
         .collect::<Vec<_>>();
     for feature in [
-        SvgUnsupportedFeature::Gradient,
         SvgUnsupportedFeature::Pattern,
         SvgUnsupportedFeature::ClipPath,
         SvgUnsupportedFeature::Mask,

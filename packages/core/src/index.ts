@@ -12,8 +12,16 @@ export * from './layers';
 export * from './layout';
 export * from './math';
 export * from './model';
+export type {
+	GradientSpread,
+	GradientStop,
+	GradientTransform,
+	GradientUnits,
+	PaintValue
+} from '@inkfinite/bindings/model';
 export * from './path-topology';
 export * from './path-metrics';
+export * from './paint';
 export * from './persistence/desktop';
 export * from './persistence/canonical';
 export * from './persistence/document';

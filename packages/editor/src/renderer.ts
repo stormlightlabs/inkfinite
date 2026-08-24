@@ -21,6 +21,7 @@ import type {
 	SnapGuide
 } from '@inkfinite/core';
 import {
+	paintForCanvas,
 	arrowBendHandleForShape,
 	arrowGeometryForShape,
 	arrowHeadGeometry,
@@ -34,6 +35,7 @@ import {
 	localShapeBounds,
 	pathAnchorPosition,
 	pathAnchorRefs,
+	pathGeometryBounds,
 	pathControlHandles,
 	resolveArrowEndpoints,
 	shapeBounds,
@@ -702,15 +704,21 @@ function drawRect(context: CanvasRenderingContext2D, shape: RectShape) {
 
 	if (fill) {
 		context.globalAlpha = shapeAlpha * (shape.fillOpacity ?? 1);
-		context.fillStyle = fill;
-		context.fill();
+		const fillStyle = paintForCanvas(context, fill, { x: 0, y: 0, width: w, height: h });
+		if (fillStyle) {
+			context.fillStyle = fillStyle;
+			context.fill();
+		}
 	}
 
 	if (stroke) {
 		context.globalAlpha = shapeAlpha * (shape.strokeOpacity ?? 1);
-		context.strokeStyle = stroke;
-		context.lineWidth = 2;
-		context.stroke();
+		const strokeStyle = paintForCanvas(context, stroke, { x: 0, y: 0, width: w, height: h });
+		if (strokeStyle) {
+			context.strokeStyle = strokeStyle;
+			context.lineWidth = 2;
+			context.stroke();
+		}
 	}
 }
 
@@ -726,15 +734,21 @@ function drawEllipse(context: CanvasRenderingContext2D, shape: EllipseShape) {
 
 	if (fill) {
 		context.globalAlpha = shapeAlpha * (shape.fillOpacity ?? 1);
-		context.fillStyle = fill;
-		context.fill();
+		const fillStyle = paintForCanvas(context, fill, { x: 0, y: 0, width: w, height: h });
+		if (fillStyle) {
+			context.fillStyle = fillStyle;
+			context.fill();
+		}
 	}
 
 	if (stroke) {
 		context.globalAlpha = shapeAlpha * (shape.strokeOpacity ?? 1);
-		context.strokeStyle = stroke;
-		context.lineWidth = 2;
-		context.stroke();
+		const strokeStyle = paintForCanvas(context, stroke, { x: 0, y: 0, width: w, height: h });
+		if (strokeStyle) {
+			context.strokeStyle = strokeStyle;
+			context.lineWidth = 2;
+			context.stroke();
+		}
 	}
 }
 
@@ -749,9 +763,17 @@ function drawLine(context: CanvasRenderingContext2D, shape: LineShape) {
 	context.lineTo(b.x, b.y);
 
 	context.globalAlpha *= shape.strokeOpacity ?? 1;
-	context.strokeStyle = stroke;
-	context.lineWidth = width;
-	context.stroke();
+	const strokeStyle = paintForCanvas(context, stroke, {
+		x: Math.min(a.x, b.x),
+		y: Math.min(a.y, b.y),
+		width: Math.abs(b.x - a.x),
+		height: Math.abs(b.y - a.y)
+	});
+	if (strokeStyle) {
+		context.strokeStyle = strokeStyle;
+		context.lineWidth = width;
+		context.stroke();
+	}
 }
 
 function drawContainer(context: CanvasRenderingContext2D, shape: Extract<ShapeRecord, { type: 'container' }>) {
@@ -775,23 +797,30 @@ function drawContainer(context: CanvasRenderingContext2D, shape: Extract<ShapeRe
 	}
 	if (fill) {
 		context.globalAlpha = shapeAlpha * (shape.fillOpacity ?? 1);
-		context.fillStyle = fill;
-		context.fill();
+		const fillStyle = paintForCanvas(context, fill, { x: 0, y: 0, width: w, height: h });
+		if (fillStyle) {
+			context.fillStyle = fillStyle;
+			context.fill();
+		}
 	}
 	if (stroke) {
 		context.globalAlpha = shapeAlpha * (shape.strokeOpacity ?? 1);
-		context.strokeStyle = stroke;
-		context.lineWidth = 1.5;
-		context.stroke();
+		const strokeStyle = paintForCanvas(context, stroke, { x: 0, y: 0, width: w, height: h });
+		if (strokeStyle) {
+			context.strokeStyle = strokeStyle;
+			context.lineWidth = 1.5;
+			context.stroke();
+		}
 	}
 	if (title) {
 		context.globalAlpha = shapeAlpha * (shape.fillOpacity ?? 1);
-		context.fillStyle = stroke ?? '#69717d';
+		context.fillStyle = paintForCanvas(context, stroke, { x: 0, y: 0, width: w, height: h }) ?? '#69717d';
 		context.font = '600 14px sans-serif';
 		context.textBaseline = 'top';
 		context.fillText(title, 8, 6);
 		context.globalAlpha = shapeAlpha * (shape.strokeOpacity ?? 1);
-		context.strokeStyle = stroke ?? 'rgba(37, 99, 235, 0.45)';
+		context.strokeStyle =
+			paintForCanvas(context, stroke, { x: 0, y: 0, width: w, height: h }) ?? 'rgba(37, 99, 235, 0.45)';
 		context.lineWidth = 1;
 		context.beginPath();
 		context.moveTo(0, 26);
@@ -848,7 +877,9 @@ function drawArrow(
 	const shaft = arrowShaftGeometry(geometry.path, style);
 	drawNativePath(context, shaft);
 
-	context.strokeStyle = style.stroke;
+	const strokePaint = paintForCanvas(context, style.stroke, pathGeometryBounds(geometry.path));
+	if (!strokePaint) return;
+	context.strokeStyle = strokePaint;
 	context.globalAlpha = shapeAlpha * (shape.strokeOpacity ?? 1);
 	context.lineWidth = style.width;
 	if (style.dash) context.setLineDash(style.dash);
@@ -865,16 +896,22 @@ function drawArrow(
 			context.lineTo(head.left.x, head.left.y);
 			context.lineTo(head.right.x, head.right.y);
 			context.closePath();
-			context.fillStyle = style.stroke;
-			context.fill();
+			const headFill = paintForCanvas(context, style.stroke, pathGeometryBounds(geometry.path));
+			if (headFill) {
+				context.fillStyle = headFill;
+				context.fill();
+			}
 		} else {
 			context.lineTo(head.left.x, head.left.y);
 			context.moveTo(head.tip.x, head.tip.y);
 			context.lineTo(head.right.x, head.right.y);
 		}
-		context.strokeStyle = style.stroke;
-		context.lineWidth = style.width;
-		context.stroke();
+		const headStroke = paintForCanvas(context, style.stroke, pathGeometryBounds(geometry.path));
+		if (headStroke) {
+			context.strokeStyle = headStroke;
+			context.lineWidth = style.width;
+			context.stroke();
+		}
 	};
 
 	if (style.headEnd !== false) drawHead(false);
@@ -936,7 +973,8 @@ function drawText(
 
 	context.globalAlpha *= shape.fillOpacity ?? 1;
 	context.font = `${fontSize}px ${fontFamily}`;
-	context.fillStyle = color;
+	context.fillStyle =
+		paintForCanvas(context, color, { x: 0, y: 0, width: w ?? fontSize * 10, height: fontSize * 1.2 }) ?? '#000000';
 	context.textBaseline = 'top';
 
 	if (w === undefined) {
@@ -1023,18 +1061,18 @@ function drawMarkdown(
 	const shapeAlpha = context.globalAlpha;
 
 	context.globalAlpha = shapeAlpha * (shape.fillOpacity ?? 1);
-	context.fillStyle = bg ?? '#ffffff';
+	context.fillStyle = paintForCanvas(context, bg, { x: 0, y: 0, width, height }) ?? '#ffffff';
 	context.fillRect(0, 0, width, height);
 
 	if (border) {
 		context.globalAlpha = shapeAlpha * (shape.strokeOpacity ?? 1);
-		context.strokeStyle = border;
+		context.strokeStyle = paintForCanvas(context, border, { x: 0, y: 0, width, height }) ?? '#000000';
 		context.lineWidth = 1;
 		context.strokeRect(0, 0, width, height);
 	}
 
 	context.globalAlpha = shapeAlpha * (shape.fillOpacity ?? 1);
-	context.fillStyle = color;
+	context.fillStyle = paintForCanvas(context, color, { x: 0, y: 0, width, height }) ?? '#000000';
 	context.textBaseline = 'top';
 
 	const padding = 8;
@@ -1077,7 +1115,7 @@ function drawMarkdown(
 				yOffset += codeBlockHeight + padding;
 			}
 
-			context.fillStyle = color;
+			context.fillStyle = paintForCanvas(context, color, { x: 0, y: 0, width, height }) ?? '#000000';
 			context.font = `${currentWeight} ${currentStyle} ${currentFontSize}px ${fontFamily}`;
 			continue;
 		}
@@ -1112,7 +1150,7 @@ function drawMarkdown(
 					context.font = `normal normal ${currentFontSize * 0.9}px monospace`;
 					context.fillText(segmentText, xOffset + 2, yOffset);
 					xOffset += metrics.width + 4;
-					context.fillStyle = color;
+					context.fillStyle = paintForCanvas(context, color, { x: 0, y: 0, width, height }) ?? '#000000';
 					context.font = `${currentWeight} ${currentStyle} ${currentFontSize}px ${fontFamily}`;
 				} else {
 					const weight = bold ? 'bold' : currentWeight;
@@ -1237,14 +1275,20 @@ function drawPath(context: CanvasRenderingContext2D, shape: PathShape) {
 	}
 	if (fill && fill !== 'none' && fill !== 'transparent') {
 		context.globalAlpha = shapeAlpha * (shape.fillOpacity ?? 1);
-		context.fillStyle = fill;
-		context.fill(fillRule);
+		const fillStyle = paintForCanvas(context, fill, pathGeometryBounds(shape.props));
+		if (fillStyle) {
+			context.fillStyle = fillStyle;
+			context.fill(fillRule);
+		}
 	}
 	if (stroke && stroke !== 'none' && stroke !== 'transparent') {
 		context.globalAlpha = shapeAlpha * (shape.strokeOpacity ?? 1);
-		context.strokeStyle = stroke;
-		context.lineWidth = Math.max(0, strokeWidth ?? 2);
-		context.stroke();
+		const strokeStyle = paintForCanvas(context, stroke, pathGeometryBounds(shape.props));
+		if (strokeStyle) {
+			context.strokeStyle = strokeStyle;
+			context.lineWidth = Math.max(0, strokeWidth ?? 2);
+			context.stroke();
+		}
 	}
 }
 
@@ -1265,7 +1309,13 @@ function drawStroke(context: CanvasRenderingContext2D, shape: StrokeShape) {
 	}
 
 	context.globalAlpha *= shape.strokeOpacity ?? style.opacity;
-	context.fillStyle = style.color;
+	const outlineBounds = {
+		x: Math.min(...outline.map((point) => point.x)),
+		y: Math.min(...outline.map((point) => point.y)),
+		width: Math.max(...outline.map((point) => point.x)) - Math.min(...outline.map((point) => point.x)),
+		height: Math.max(...outline.map((point) => point.y)) - Math.min(...outline.map((point) => point.y))
+	};
+	context.fillStyle = paintForCanvas(context, style.color, outlineBounds) ?? '#000000';
 	context.beginPath();
 	context.moveTo(outline[0].x, outline[0].y);
 

@@ -5,6 +5,7 @@ import {
   shapeBounds,
 } from "./geom";
 import { arrowHeadGeometry, arrowLabelPlacement, arrowShaftGeometry } from "./arrow-geometry";
+import { paintToSvg } from "./paint";
 import type { Box2 } from "./math";
 import { Box2 as Box2Ops } from "./math";
 import type { ArrowShape, ContainerShape, EllipseShape, LineShape, MarkdownShape, PathGeometry, PathShape, RectShape, ShapeRecord, TextShape } from "./model";
@@ -133,9 +134,10 @@ export function exportToSVG(state: EditorState, options: ExportOptions = {}): st
   const offsetY = bounds.min.y - padding;
 
   const elements: string[] = [`<rect x="${offsetX}" y="${offsetY}" width="${width}" height="${height}" fill="white"/>`];
+  const definitions: string[] = [];
 
   for (const shape of shapes) {
-    const svg = shapeToSVG(shape, state);
+    const svg = shapeToSVG(shape, state, definitions);
     if (svg) {
       elements.push(wrapSemanticMetadata(shape, svg));
     }
@@ -145,6 +147,7 @@ export function exportToSVG(state: EditorState, options: ExportOptions = {}): st
 
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="${width}" height="${height}">`,
+    ...(definitions.length > 0 ? [`<defs>${definitions.join('')}</defs>`] : []),
     ...elements,
     `</svg>`,
   ].join("\n");
@@ -153,32 +156,32 @@ export function exportToSVG(state: EditorState, options: ExportOptions = {}): st
 /**
  * Convert a single shape to SVG markup.
  */
-function shapeToSVG(shape: ShapeRecord, state: EditorState): string | null {
+function shapeToSVG(shape: ShapeRecord, state: EditorState, definitions: string[]): string | null {
   const transform = `translate(${shape.x},${shape.y})${
     shape.rot === 0 ? "" : ` rotate(${(shape.rot * 180) / Math.PI})`
   }`;
 
   switch (shape.type) {
     case "rect": {
-      return rectToSVG(shape, transform);
+      return rectToSVG(shape, transform, definitions);
     }
     case "ellipse": {
-      return ellipseToSVG(shape, transform);
+      return ellipseToSVG(shape, transform, definitions);
     }
     case "line": {
-      return lineToSVG(shape, transform);
+      return lineToSVG(shape, transform, definitions);
     }
     case "arrow": {
-      return arrowToSVG(shape, transform, state);
+      return arrowToSVG(shape, transform, state, definitions);
     }
     case "container": {
-      return containerToSVG(shape, transform);
+      return containerToSVG(shape, transform, definitions);
     }
     case "text": {
-      return textToSVG(shape, transform);
+      return textToSVG(shape, transform, definitions);
     }
     case "path": {
-      return pathToSVG(shape, transform);
+      return pathToSVG(shape, transform, definitions);
     }
     case "image": {
       const asset = state.doc.assets?.[shape.props.assetId];
@@ -204,7 +207,7 @@ function shapeToSVG(shape: ShapeRecord, state: EditorState): string | null {
       return `<g transform="${transform}" opacity="${shape.opacity ?? 1}"><rect width="${w}" height="${h}" rx="8" fill="#f8fafc" stroke="${accent}" stroke-width="2"/><text x="12" y="20" font-family="sans-serif" font-size="12" font-weight="600" fill="${accent}">${referenceType.toUpperCase()}</text><text x="12" y="42" font-family="sans-serif" font-size="13" fill="#1f2937">${escapeXML(label || value)}</text></g>`;
     }
     case "markdown": {
-      return markdownToSVG(shape, transform);
+      return markdownToSVG(shape, transform, definitions);
     }
     default: {
       return null;
@@ -212,39 +215,39 @@ function shapeToSVG(shape: ShapeRecord, state: EditorState): string | null {
   }
 }
 
-function rectToSVG(shape: RectShape, transform: string): string {
+function rectToSVG(shape: RectShape, transform: string, definitions: string[]): string {
   const { w, h, fill, stroke, radius } = shape.props;
-  const fillAttribute = fill ? `fill="${escapeXML(fill)}"` : "fill=\"none\"";
-  const strokeAttribute = stroke ? `stroke="${escapeXML(stroke)}" stroke-width="2"` : "";
+  const fillAttribute = `fill="${paintToSvg(fill, `${shape.id}-fill`, definitions)}"`;
+  const strokeAttribute = stroke ? `stroke="${paintToSvg(stroke, `${shape.id}-stroke`, definitions)}" stroke-width="2"` : "";
   const radiusAttribute = radius > 0 ? `rx="${radius}" ry="${radius}"` : "";
 
   return `<rect transform="${transform}" width="${w}" height="${h}" ${fillAttribute} ${strokeAttribute} ${radiusAttribute}/>`;
 }
 
-function ellipseToSVG(shape: EllipseShape, transform: string): string {
+function ellipseToSVG(shape: EllipseShape, transform: string, definitions: string[]): string {
   const { w, h, fill, stroke } = shape.props;
   const cx = w / 2;
   const cy = h / 2;
   const rx = w / 2;
   const ry = h / 2;
-  const fillAttribute = fill ? `fill="${escapeXML(fill)}"` : "fill=\"none\"";
-  const strokeAttribute = stroke ? `stroke="${escapeXML(stroke)}" stroke-width="2"` : "";
+  const fillAttribute = `fill="${paintToSvg(fill, `${shape.id}-fill`, definitions)}"`;
+  const strokeAttribute = stroke ? `stroke="${paintToSvg(stroke, `${shape.id}-stroke`, definitions)}" stroke-width="2"` : "";
 
   return `<ellipse transform="${transform}" cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" ${fillAttribute} ${strokeAttribute}/>`;
 }
 
-function lineToSVG(shape: LineShape, transform: string): string {
+function lineToSVG(shape: LineShape, transform: string, definitions: string[]): string {
   const { a, b, stroke, width } = shape.props;
 
   return `<line transform="${transform}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${
-    escapeXML(stroke)
+    paintToSvg(stroke, `${shape.id}-stroke`, definitions)
   }" stroke-width="${width}"/>`;
 }
 
-function arrowToSVG(shape: ArrowShape, transform: string, state: EditorState): string {
+function arrowToSVG(shape: ArrowShape, transform: string, state: EditorState, definitions: string[]): string {
   const geometry = arrowGeometryForShape(state, shape);
   if (!geometry) return "";
-  const stroke = escapeXML(shape.props.style.stroke);
+  const stroke = paintToSvg(shape.props.style.stroke, `${shape.id}-stroke`, definitions);
   const width = svgNumber(shape.props.style.width);
   const shaft = arrowShaftGeometry(geometry.path, shape.props.style);
   const elements = pathGeometryIsPolyline(shaft)
@@ -324,22 +327,24 @@ function wrapSemanticMetadata(shape: ShapeRecord, content: string): string {
   return `<g data-shape-id="${escapeXML(shape.id)}"${attributes}>${content}</g>`;
 }
 
-function containerToSVG(shape: ContainerShape, transform: string): string {
+function containerToSVG(shape: ContainerShape, transform: string, definitions: string[]): string {
   const { w = 0, h = 0, title, fill, stroke, radius = 0 } = shape.props;
-  const elements = [`<rect transform="${transform}" width="${svgNumber(w)}" height="${svgNumber(h)}" rx="${svgNumber(Math.min(radius, w / 2, h / 2))}" fill="${escapeXML(fill ?? "none")}" stroke="${escapeXML(stroke ?? "none")}"/>`];
-  if (title) elements.push(`<text transform="${transform}" x="8" y="18" font-family="sans-serif" font-size="14" font-weight="600" fill="${escapeXML(stroke ?? '#69717d')}">${escapeXML(title)}</text>`);
+  const fillValue = paintToSvg(fill, `${shape.id}-fill`, definitions);
+  const strokeValue = paintToSvg(stroke, `${shape.id}-stroke`, definitions);
+  const elements = [`<rect transform="${transform}" width="${svgNumber(w)}" height="${svgNumber(h)}" rx="${svgNumber(Math.min(radius, w / 2, h / 2))}" fill="${fillValue}" stroke="${strokeValue}"/>`];
+  if (title) elements.push(`<text transform="${transform}" x="8" y="18" font-family="sans-serif" font-size="14" font-weight="600" fill="${strokeValue === "none" ? '#69717d' : strokeValue}">${escapeXML(title)}</text>`);
   return elements.join("");
 }
 
-function textToSVG(shape: TextShape, transform: string): string {
+function textToSVG(shape: TextShape, transform: string, definitions: string[]): string {
   const { text, fontSize, fontFamily, color } = shape.props;
 
   return `<text transform="${transform}" font-size="${fontSize}" font-family="${escapeXML(fontFamily)}" fill="${
-    escapeXML(color)
+    paintToSvg(color, `${shape.id}-fill`, definitions)
   }">${escapeXML(text)}</text>`;
 }
 
-function pathToSVG(shape: PathShape, transform: string): string {
+function pathToSVG(shape: PathShape, transform: string, definitions: string[]): string {
   const commands = shape.props.subpaths.map((subpath) => {
     const segments = subpath.segments.map((segment) => {
       switch (segment.type) {
@@ -352,8 +357,8 @@ function pathToSVG(shape: PathShape, transform: string): string {
     if (subpath.closed) segments.push("Z");
     return segments.join(" ");
   }).join(" ");
-  const fill = shape.props.fill ? escapeXML(shape.props.fill) : "none";
-  const stroke = shape.props.stroke ? ` stroke="${escapeXML(shape.props.stroke)}" stroke-width="${svgNumber(shape.props.stroke_width ?? 2)}"` : "";
+  const fill = paintToSvg(shape.props.fill, `${shape.id}-fill`, definitions);
+  const stroke = shape.props.stroke ? ` stroke="${paintToSvg(shape.props.stroke, `${shape.id}-stroke`, definitions)}" stroke-width="${svgNumber(shape.props.stroke_width ?? 2)}"` : "";
   return `<path transform="${transform}" d="${commands}" fill="${fill}" fill-rule="${shape.props.fill_rule}"${stroke}/>`;
 }
 
@@ -369,13 +374,13 @@ function svgNumber(value: number): string {
  *
  * For broader interoperability, the markdown is exported as plain text with basic formatting preserved.
  */
-function markdownToSVG(shape: MarkdownShape, transform: string): string {
+function markdownToSVG(shape: MarkdownShape, transform: string, definitions: string[]): string {
   const { md, w, h, fontSize, fontFamily, color, bg, border } = shape.props;
   const width = w;
   const height = h ?? fontSize * 10;
 
-  const bgStyle = bg ? `background: ${escapeXML(bg)};` : "background: white;";
-  const borderStyle = border ? `border: 1px solid ${escapeXML(border)};` : "";
+  const bgStyle = `background: ${paintToSvg(bg, `${shape.id}-background`, definitions)};`;
+  const borderStyle = border ? `border: 1px solid ${paintToSvg(border, `${shape.id}-border`, definitions)};` : "";
 
   const escapedMarkdown = escapeXML(md);
 
@@ -384,7 +389,7 @@ function markdownToSVG(shape: MarkdownShape, transform: string): string {
     `  <div xmlns="http://www.w3.org/1999/xhtml" style="${bgStyle}${borderStyle} padding: 8px; font-size: ${fontSize}px; font-family: ${
       escapeXML(fontFamily)
     }; color: ${
-      escapeXML(color)
+      paintToSvg(color, `${shape.id}-fill`, definitions)
     }; width: 100%; height: 100%; overflow: auto; white-space: pre-wrap; box-sizing: border-box;">`,
     `    ${escapedMarkdown}`,
     `  </div>`,

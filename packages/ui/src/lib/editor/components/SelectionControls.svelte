@@ -3,6 +3,7 @@
 		ArrowShape,
 		EditorState as EditorStateType,
 		MarkdownShape,
+		PaintValue,
 		ShapeMetadata,
 		ShapeRecord,
 		Store,
@@ -18,7 +19,7 @@
 	} from '@inkfinite/core';
 	import {
 		Button,
-		ColorPicker,
+		PaintPicker,
 		ContextMenu,
 		Dialog,
 		Icon,
@@ -204,14 +205,14 @@
 	let booleanPathSelection = $derived(canBooleanPathSelection(editorState));
 
 	let fillColorState = $derived.by(() => {
-		const shared = getSharedValue(fillTargets.map(getFillColor));
+		const shared = getSharedPaintValue(fillTargets.map(getFillPaint));
 		return {
 			value: shared ?? DEFAULT_FILL_COLOR,
 			mixed: fillTargets.length > 1 && shared === null
 		};
 	});
 	let strokeColorState = $derived.by(() => {
-		const shared = getSharedValue(strokeTargets.map(getStrokeColor));
+		const shared = getSharedPaintValue(strokeTargets.map(getStrokePaint));
 		return {
 			value: shared ?? DEFAULT_STROKE_COLOR,
 			mixed: strokeTargets.length > 1 && shared === null
@@ -252,6 +253,12 @@
 		if (values.length === 0) return null;
 		const first = values[0];
 		return values.every((value) => Object.is(value, first)) ? first : null;
+	}
+
+	function getSharedPaintValue(values: Array<PaintValue | null>): PaintValue | null {
+		if (values.length === 0) return null;
+		const first = JSON.stringify(values[0]);
+		return values.every((value) => JSON.stringify(value) === first) ? values[0] : null;
 	}
 
 	function getNumericState(values: number[]) {
@@ -336,7 +343,7 @@
 		);
 	}
 
-	function getFillColor(shape: ShapeRecord): string | null {
+	function getFillPaint(shape: ShapeRecord): PaintValue | null {
 		switch (shape.type) {
 			case 'text':
 				return shape.props.color;
@@ -352,7 +359,7 @@
 		}
 	}
 
-	function getStrokeColor(shape: ShapeRecord): string | null {
+	function getStrokePaint(shape: ShapeRecord): PaintValue | null {
 		switch (shape.type) {
 			case 'arrow':
 				return shape.props.style.stroke;
@@ -392,45 +399,45 @@
 		);
 	}
 
-	function applyFillColor(color: string) {
-		updateSelectedShapes('Set fill color', (shape) => {
+	function applyFillPaint(paint: PaintValue) {
+		updateSelectedShapes('Set fill paint', (shape) => {
 			switch (shape.type) {
 				case 'text':
-					return { ...shape, props: { ...shape.props, color } } as ShapeRecord;
+					return { ...shape, props: { ...shape.props, color: paint } } as ShapeRecord;
 				case 'rect':
 				case 'ellipse':
 				case 'path':
 				case 'container':
-					return { ...shape, props: { ...shape.props, fill: color } } as ShapeRecord;
+					return { ...shape, props: { ...shape.props, fill: paint } } as ShapeRecord;
 				case 'markdown':
-					return { ...shape, props: { ...shape.props, bg: color } } as ShapeRecord;
+					return { ...shape, props: { ...shape.props, bg: paint } } as ShapeRecord;
 				default:
 					return shape;
 			}
 		});
 	}
 
-	function applyStrokeColor(color: string) {
-		updateSelectedShapes('Set stroke color', (shape) => {
+	function applyStrokePaint(paint: PaintValue) {
+		updateSelectedShapes('Set stroke paint', (shape) => {
 			switch (shape.type) {
 				case 'arrow':
 					return {
 						...shape,
-						props: { ...shape.props, style: { ...shape.props.style, stroke: color } }
+						props: { ...shape.props, style: { ...shape.props.style, stroke: paint } }
 					} as ShapeRecord;
 				case 'stroke':
 					return {
 						...shape,
-						props: { ...shape.props, style: { ...shape.props.style, color } }
+						props: { ...shape.props, style: { ...shape.props.style, color: paint } }
 					} as ShapeRecord;
 				case 'rect':
 				case 'ellipse':
 				case 'line':
 				case 'path':
 				case 'container':
-					return { ...shape, props: { ...shape.props, stroke: color } } as ShapeRecord;
+					return { ...shape, props: { ...shape.props, stroke: paint } } as ShapeRecord;
 				case 'markdown':
-					return { ...shape, props: { ...shape.props, border: color } } as ShapeRecord;
+					return { ...shape, props: { ...shape.props, border: paint } } as ShapeRecord;
 				default:
 					return shape;
 			}
@@ -817,25 +824,21 @@
 						{#if fillTargets.length > 0}
 							<div class="selection-controls__color-control">
 								<span>Fill</span>
-								<ColorPicker
+								<PaintPicker
 									label="Fill color"
 									value={fillColorState.value}
 									mixed={fillColorState.mixed}
-									allowNone
-									onchange={applyFillColor}
-									align="end" />
+									onchange={applyFillPaint} />
 							</div>
 						{/if}
 						{#if strokeTargets.length > 0}
 							<div class="selection-controls__color-control">
 								<span>Stroke</span>
-								<ColorPicker
+								<PaintPicker
 									label="Stroke color"
 									value={strokeColorState.value}
 									mixed={strokeColorState.mixed}
-									allowNone
-									onchange={applyStrokeColor}
-									align="end" />
+									onchange={applyStrokePaint} />
 							</div>
 						{/if}
 						{#if fillOpacityTargets.length > 0}

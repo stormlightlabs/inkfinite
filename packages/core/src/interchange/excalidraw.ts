@@ -1,4 +1,5 @@
 import { shapeBounds } from '../geom';
+import { paintColor } from '../paint';
 import { clamp, Vec2 } from '../math';
 import { BindingRecord, ensureDocumentLayers, ShapeRecord, type ArrowShape, type ShapeRecord as Shape } from '../model';
 import type { BoardExport } from '../persistence/document';
@@ -417,8 +418,8 @@ function excalidrawElement(
 			height = shape.props.h;
 			specific = {
 				type: 'rectangle',
-				strokeColor: shape.props.stroke || 'transparent',
-				backgroundColor: shape.props.fill || 'transparent',
+				strokeColor: paintColor(shape.props.stroke) ?? 'transparent',
+				backgroundColor: paintColor(shape.props.fill) ?? 'transparent',
 				roundness: shape.props.radius > 0 ? { type: 3 } : null
 			};
 			break;
@@ -427,8 +428,8 @@ function excalidrawElement(
 			height = shape.props.h;
 			specific = {
 				type: 'ellipse',
-				strokeColor: shape.props.stroke || 'transparent',
-				backgroundColor: shape.props.fill || 'transparent',
+				strokeColor: paintColor(shape.props.stroke) ?? 'transparent',
+				backgroundColor: paintColor(shape.props.fill) ?? 'transparent',
 				roundness: null
 			};
 			break;
@@ -440,7 +441,7 @@ function excalidrawElement(
 			specific = {
 				type: 'line',
 				points: normalized.points.map((point) => [point.x, point.y]),
-				strokeColor: shape.props.stroke,
+				strokeColor: paintColor(shape.props.stroke) ?? 'transparent',
 				backgroundColor: 'transparent',
 				strokeWidth: shape.props.width,
 				roundness: null,
@@ -460,7 +461,7 @@ function excalidrawElement(
 			specific = {
 				type: 'arrow',
 				points: normalized.points.map((point) => [point.x, point.y]),
-				strokeColor: shape.props.style.stroke,
+				strokeColor: paintColor(shape.props.style.stroke) ?? 'transparent',
 				backgroundColor: 'transparent',
 				strokeWidth: shape.props.style.width,
 				strokeStyle: shape.props.style.dash ? 'dashed' : 'solid',
@@ -480,7 +481,7 @@ function excalidrawElement(
 			height = shape.props.fontSize * 1.2;
 			specific = {
 				type: 'text',
-				strokeColor: shape.props.color,
+				strokeColor: paintColor(shape.props.color) ?? '#000000',
 				backgroundColor: 'transparent',
 				fontSize: shape.props.fontSize,
 				fontFamily: 2,
@@ -502,7 +503,7 @@ function excalidrawElement(
 			height = shape.props.h ?? shape.props.fontSize * 10;
 			specific = {
 				type: 'text',
-				strokeColor: shape.props.color,
+				strokeColor: paintColor(shape.props.color) ?? '#000000',
 				backgroundColor: 'transparent',
 				fontSize: shape.props.fontSize,
 				fontFamily: 2,
@@ -551,8 +552,8 @@ function excalidrawElement(
 			specific = {
 				type: 'frame',
 				name: shape.props.title ?? 'Frame',
-				backgroundColor: shape.props.fill ?? 'transparent',
-				strokeColor: shape.props.stroke ?? '#2563eb',
+				backgroundColor: paintColor(shape.props.fill) ?? 'transparent',
+				strokeColor: paintColor(shape.props.stroke) ?? '#2563eb',
 				roundness: shape.props.radius ? { type: 3 } : null
 			};
 			break;
@@ -567,7 +568,7 @@ function excalidrawElement(
 				points: normalized.points.map((point) => [point.x, point.y]),
 				pressures: shape.props.points.map((point) => point[2] ?? 0.5),
 				simulatePressure: shape.props.brush.simulatePressure,
-				strokeColor: shape.props.style.color,
+				strokeColor: paintColor(shape.props.style.color) ?? '#000000',
 				backgroundColor: 'transparent',
 				strokeWidth: shape.props.brush.size / 2,
 				lastCommittedPoint: null

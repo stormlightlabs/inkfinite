@@ -96,15 +96,15 @@ inherited values. The importer preserves supported `fill`, `stroke`,
 values. SVG defaults are a black fill and no stroke. `none` and `transparent`
 become absent native paint values.
 
-Paint servers such as gradients, patterns, and other unsupported `url` values
-produce warnings. When they affect the visual result, the importer uses a
-sanitized static SVG image for the imported root instead of returning a partial
-native rendering.
-`currentColor` resolves to the computed SVG `color` value, which defaults to
-black. `linearGradient`, `radialGradient`, mesh gradients, patterns, `clipPath`,
-`mask`, and `filter` definitions and references each produce a feature-specific
-warning. The importer does not evaluate a paint server or resolve a resource
-URL.
+Supported linear and radial gradients are converted to native paint properties
+and remain editable after import. Patterns, clip paths, masks, and filters
+remain visible through the sanitized static fallback when they affect the
+visual result. Stylesheet blocks, event-handler attributes, scripts, and SVG
+animation elements are removed with warnings. External image URLs and other
+resource references are also omitted. No script, animation, stylesheet, or
+resource is executed, inserted into a live DOM, or fetched during import. The
+retained source asset is input data for provenance and future re-import, not
+executable document content.
 
 ## Text
 
@@ -150,8 +150,9 @@ It requires the matching `wasm-bindgen` CLI. The CLI accepts
 `inkfinite import svg FILE --input ARTWORK.svg` and can validate the transaction
 with `--dry-run` before saving.
 
-Gradients, patterns, clip paths, masks, and filters are not converted to native
-shape properties. They remain visible through the sanitized static fallback.
+Patterns, clip paths, masks, and filters are not converted to native shape
+properties. They remain visible through the sanitized static fallback when they
+affect the visual result. Supported gradients remain native and editable.
 Stylesheet blocks, event-handler attributes, scripts, and SVG animation elements
 are removed with warnings. External image URLs and other resource references are
 also omitted. No script, animation, stylesheet, or resource is executed,

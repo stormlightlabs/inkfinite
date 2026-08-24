@@ -23,8 +23,9 @@ use ts_rs::TS;
 use crate::engine::geometry::{Affine, path_bounds, union};
 use crate::proto::Bounds;
 use crate::{
-    AssetId, AssetRecord, AssetSource, Opacity, PathFillRule, PathGeometry, PathSegment as NativePathSegment,
-    PathSubpath, Provenance, ShapeKind, ShapeProperties, ShapeStyle, Timestamp, Transform, Vec2,
+    AssetId, AssetRecord, AssetSource, GradientSpread, GradientStop, GradientTransform, GradientUnits, Opacity, Paint,
+    PathFillRule, PathGeometry, PathSegment as NativePathSegment, PathSubpath, Provenance, ShapeKind, ShapeProperties,
+    ShapeStyle, Timestamp, Transform, Vec2,
 };
 
 /// Maximum UTF-8 input accepted by the SVG parser.
@@ -351,8 +352,8 @@ pub struct SvgImport {
 struct SvgStyle {
     /// Computed CSS `color` used when a paint value is `currentColor`.
     color: String,
-    fill: Option<String>,
-    stroke: Option<String>,
+    fill: Option<Paint>,
+    stroke: Option<Paint>,
     stroke_width: f64,
     fill_opacity: f32,
     stroke_opacity: f32,
@@ -367,7 +368,7 @@ impl Default for SvgStyle {
     fn default() -> Self {
         Self {
             color: "#000000".into(),
-            fill: Some("#000000".into()),
+            fill: Some(Paint::Solid { color: "#000000".into() }),
             stroke: None,
             stroke_width: 1.0,
             fill_opacity: 1.0,
@@ -400,6 +401,7 @@ struct ImportParser {
     assets: Vec<SvgAsset>,
     warnings: Vec<SvgImportWarning>,
     view_box: Option<SvgViewBox>,
+    gradients: BTreeMap<String, Paint>,
 }
 
 impl ImportParser {
@@ -417,7 +419,7 @@ impl ImportParser {
     ) -> Result<Option<SvgImportNode>, SvgImportError> {
         let element = local_name(node).to_owned();
         self.warn_event_handlers(node);
-        let style = resolve_style(parent_style, node, &mut self.warnings)?;
+        let style = resolve_style(parent_style, node, &mut self.warnings, &self.gradients)?;
         if !style.visible {
             return Ok(None);
         }
@@ -574,7 +576,15 @@ impl ImportParser {
             properties: properties([
                 ("a", json!(Vec2 { x: 0.0, y: 0.0 })),
                 ("b", json!(Vec2 { x: x2 - x1, y: y2 - y1 })),
-                ("stroke", json!(style.stroke.clone().unwrap_or_else(|| "none".into()))),
+                (
+                    "stroke",
+                    paint_value(
+                        style
+                            .stroke
+                            .clone()
+                            .or_else(|| Some(Paint::Solid { color: "none".into() })),
+                    ),
+                ),
                 ("width", json!(style.stroke_width)),
             ]),
             style: style.native_style()?,
@@ -652,7 +662,10 @@ impl ImportParser {
             .filter(|descendant| descendant.is_text())
             .filter_map(|descendant| descendant.text())
             .collect::<String>();
-        let color = style.fill.clone().unwrap_or_else(|| "none".into());
+        let color = style
+            .fill
+            .clone()
+            .unwrap_or_else(|| Paint::Solid { color: "none".into() });
         // Native text uses a top-aligned origin, while SVG text positions the
         // alphabetic baseline at `y`. Shift by the font size so imported labels
         // retain their expected vertical placement.
@@ -665,7 +678,7 @@ impl ImportParser {
                 ("text", json!(text)),
                 ("font_size", json!(style.font_size)),
                 ("font_family", json!(style.font_family.clone())),
-                ("color", json!(color)),
+                ("color", paint_value(Some(color))),
             ]),
             style: style.native_style()?,
         })
@@ -792,7 +805,7 @@ impl ImportParser {
         for descendant in node.descendants().filter(|descendant| descendant.is_element()) {
             self.warn_event_handlers(descendant);
             let feature = match local_name(descendant) {
-                "linearGradient" | "radialGradient" | "meshgradient" => Some(SvgUnsupportedFeature::Gradient),
+                "meshgradient" => Some(SvgUnsupportedFeature::Gradient),
                 "pattern" => Some(SvgUnsupportedFeature::Pattern),
                 "clipPath" => Some(SvgUnsupportedFeature::ClipPath),
                 "mask" => Some(SvgUnsupportedFeature::Mask),
@@ -856,9 +869,10 @@ pub fn parse_svg(source: &str) -> Result<SvgImport, SvgImportError> {
         .map(|value| parse_view_box(value, "svg", "viewBox"))
         .transpose()?;
     let source_asset = make_source_asset(source.as_bytes());
-    let mut parser = ImportParser { assets: Vec::new(), warnings: Vec::new(), view_box };
+    let gradients = collect_gradients(root, view_box)?;
+    let mut parser = ImportParser { assets: Vec::new(), warnings: Vec::new(), view_box, gradients };
     parser.warn_event_handlers(root);
-    let root_style = resolve_style(&SvgStyle::default(), root, &mut parser.warnings)?;
+    let root_style = resolve_style(&SvgStyle::default(), root, &mut parser.warnings, &parser.gradients)?;
     let mut children = parser.children(root, &root_style)?;
     let root_transform = parser.transform(root)?;
     if requires_static_fallback(&parser.warnings) {
@@ -910,12 +924,222 @@ pub fn import_svg(source: impl AsRef<[u8]>) -> Result<SvgImport, SvgImportError>
     parse_svg(source)
 }
 
+#[derive(Clone)]
+struct RawGradient {
+    kind: &'static str,
+    href: Option<String>,
+    attributes: BTreeMap<String, String>,
+    transform: Affine,
+    has_transform: bool,
+    stops: Vec<GradientStop>,
+}
+
+#[derive(Clone)]
+struct ResolvedGradient {
+    kind: &'static str,
+    attributes: BTreeMap<String, String>,
+    transform: Affine,
+    stops: Vec<GradientStop>,
+}
+
+fn collect_gradients(
+    root: Node<'_, '_>, view_box: Option<SvgViewBox>,
+) -> Result<BTreeMap<String, Paint>, SvgImportError> {
+    let mut sources = BTreeMap::new();
+    for node in root.descendants().filter(|node| node.is_element()) {
+        let kind = match local_name(node) {
+            "linearGradient" => "linear",
+            "radialGradient" => "radial",
+            _ => continue,
+        };
+        let Some(id) = node.attribute("id").filter(|id| !id.trim().is_empty()) else { continue };
+        let mut attributes = BTreeMap::new();
+        for name in [
+            "x1",
+            "y1",
+            "x2",
+            "y2",
+            "cx",
+            "cy",
+            "r",
+            "fx",
+            "fy",
+            "gradientUnits",
+            "spreadMethod",
+        ] {
+            if let Some(value) = node.attribute(name) {
+                attributes.insert(name.into(), value.trim().into());
+            }
+        }
+        let transform = node
+            .attribute("gradientTransform")
+            .map(parse_transform)
+            .transpose()
+            .map_err(|message| invalid_attribute(node, "gradientTransform", message))?
+            .unwrap_or(Affine::IDENTITY);
+        let href = node
+            .attribute("href")
+            .or_else(|| node.attribute(("http://www.w3.org/1999/xlink", "href")))
+            .and_then(|value| value.strip_prefix('#'))
+            .map(str::to_owned);
+        let stops = node
+            .children()
+            .filter(|child| child.is_element() && local_name(*child) == "stop")
+            .map(|stop| parse_gradient_stop(stop))
+            .collect::<Result<Vec<_>, _>>()?;
+        sources.insert(
+            id.to_owned(),
+            RawGradient {
+                kind,
+                href,
+                attributes,
+                transform,
+                has_transform: node.attribute("gradientTransform").is_some(),
+                stops,
+            },
+        );
+    }
+    let mut paints = BTreeMap::new();
+    for id in sources.keys() {
+        let gradient = resolve_gradient(id, &sources, &mut Vec::new())?;
+        let paint = gradient_paint(&gradient, view_box);
+        if paint.validate().is_ok() {
+            paints.insert(id.clone(), paint);
+        }
+    }
+    Ok(paints)
+}
+
+fn parse_gradient_stop(node: Node<'_, '_>) -> Result<GradientStop, SvgImportError> {
+    let mut declarations = BTreeMap::new();
+    for attribute in node.attributes() {
+        declarations.insert(attribute.name(), attribute.value());
+    }
+    if let Some(style) = node.attribute("style") {
+        for declaration in style.split(';') {
+            if let Some((name, value)) = declaration.split_once(':') {
+                declarations.insert(name.trim(), value.trim());
+            }
+        }
+    }
+    let offset = declarations
+        .get("offset")
+        .and_then(|value| parse_length(value, Some(1.0)).ok())
+        .ok_or_else(|| invalid_attribute(node, "offset", declarations.get("offset").copied().unwrap_or("missing")))?
+        .clamp(0.0, 1.0);
+    let color = declarations.get("stop-color").copied().unwrap_or("#000000").trim();
+    if color.is_empty() {
+        return Err(invalid_attribute(node, "stop-color", color));
+    }
+    let opacity = declarations
+        .get("stop-opacity")
+        .map_or(Ok(1.0), |value| parse_opacity(value, "stop-opacity", node))?;
+    Ok(GradientStop { offset, color: color.into(), opacity: f64::from(opacity) })
+}
+
+fn resolve_gradient(
+    id: &str, sources: &BTreeMap<String, RawGradient>, stack: &mut Vec<String>,
+) -> Result<ResolvedGradient, SvgImportError> {
+    if stack.iter().any(|value| value == id) {
+        return Err(invalid_attribute_name("gradient", "href", "cyclic reference"));
+    }
+    let source = sources
+        .get(id)
+        .ok_or_else(|| invalid_attribute_name("gradient", "href", format!("#{id}")))?;
+    stack.push(id.into());
+    let parent = source
+        .href
+        .as_deref()
+        .map(|parent| resolve_gradient(parent, sources, stack))
+        .transpose()?;
+    stack.pop();
+    let mut attributes = parent
+        .as_ref()
+        .map_or_else(BTreeMap::new, |value| value.attributes.clone());
+    attributes.extend(source.attributes.clone());
+    let parent_transform = parent.as_ref().map_or(Affine::IDENTITY, |value| value.transform);
+    let transform = if source.has_transform { parent_transform.then(source.transform) } else { parent_transform };
+    let stops = if source.stops.is_empty() {
+        parent.map_or_else(Vec::new, |value| value.stops)
+    } else {
+        source.stops.clone()
+    };
+    Ok(ResolvedGradient { kind: source.kind, attributes, transform, stops })
+}
+
+fn gradient_paint(gradient: &ResolvedGradient, view_box: Option<SvgViewBox>) -> Paint {
+    let units = match gradient.attributes.get("gradientUnits").map(String::as_str) {
+        Some("userSpaceOnUse") => GradientUnits::UserSpaceOnUse,
+        _ => GradientUnits::ObjectBoundingBox,
+    };
+    let spread = match gradient.attributes.get("spreadMethod").map(String::as_str) {
+        Some("reflect") => GradientSpread::Reflect,
+        Some("repeat") => GradientSpread::Repeat,
+        _ => GradientSpread::Pad,
+    };
+    let coordinate = |name: &str, default: &str| {
+        gradient
+            .attributes
+            .get(name)
+            .map(String::as_str)
+            .unwrap_or(default)
+            .to_owned()
+    };
+    let parse_coordinate = |value: &str, axis: Axis| {
+        if matches!(units, GradientUnits::ObjectBoundingBox) {
+            parse_length(value, Some(1.0)).unwrap_or(0.0)
+        } else {
+            let reference = view_box.map(|box_value| match axis {
+                Axis::Horizontal => box_value.width,
+                Axis::Vertical => box_value.height,
+            });
+            parse_length(value, reference).unwrap_or(0.0)
+        }
+    };
+    let transform = GradientTransform {
+        a: gradient.transform.a,
+        b: gradient.transform.b,
+        c: gradient.transform.c,
+        d: gradient.transform.d,
+        e: gradient.transform.e,
+        f: gradient.transform.f,
+    };
+    if gradient.kind == "linear" {
+        Paint::LinearGradient {
+            x1: parse_coordinate(&coordinate("x1", "0%"), Axis::Horizontal),
+            y1: parse_coordinate(&coordinate("y1", "0%"), Axis::Vertical),
+            x2: parse_coordinate(&coordinate("x2", "100%"), Axis::Horizontal),
+            y2: parse_coordinate(&coordinate("y2", "0%"), Axis::Vertical),
+            units,
+            transform,
+            spread,
+            stops: gradient.stops.clone(),
+        }
+    } else {
+        let cx = parse_coordinate(&coordinate("cx", "50%"), Axis::Horizontal);
+        let cy = parse_coordinate(&coordinate("cy", "50%"), Axis::Vertical);
+        let r = parse_coordinate(&coordinate("r", "50%"), Axis::Horizontal);
+        Paint::RadialGradient {
+            cx,
+            cy,
+            r,
+            fx: parse_coordinate(&coordinate("fx", &coordinate("cx", "50%")), Axis::Horizontal),
+            fy: parse_coordinate(&coordinate("fy", &coordinate("cy", "50%")), Axis::Vertical),
+            units,
+            transform,
+            spread,
+            stops: gradient.stops.clone(),
+        }
+    }
+}
+
 fn requires_static_fallback(warnings: &[SvgImportWarning]) -> bool {
     warnings.iter().any(|warning| match warning {
         SvgImportWarning::UnsupportedPaint { .. } | SvgImportWarning::UnsupportedElement { .. } => true,
         SvgImportWarning::UnsupportedFeature { feature, .. } => !matches!(
             feature,
-            SvgUnsupportedFeature::Script
+            SvgUnsupportedFeature::Gradient
+                | SvgUnsupportedFeature::Script
                 | SvgUnsupportedFeature::Animation
                 | SvgUnsupportedFeature::ExternalResource
                 | SvgUnsupportedFeature::Stylesheet
@@ -928,7 +1152,8 @@ fn mark_static_fallback(warnings: &mut [SvgImportWarning]) {
         if let SvgImportWarning::UnsupportedFeature { feature, action, .. } = warning
             && !matches!(
                 feature,
-                SvgUnsupportedFeature::Script
+                SvgUnsupportedFeature::Gradient
+                    | SvgUnsupportedFeature::Script
                     | SvgUnsupportedFeature::Animation
                     | SvgUnsupportedFeature::ExternalResource
                     | SvgUnsupportedFeature::Stylesheet
@@ -1086,6 +1311,7 @@ fn escape_svg_attribute(value: &str, output: &mut String) {
 
 fn resolve_style<'a, 'input>(
     parent: &SvgStyle, node: Node<'a, 'input>, warnings: &mut Vec<SvgImportWarning>,
+    gradients: &BTreeMap<String, Paint>,
 ) -> Result<SvgStyle, SvgImportError> {
     let mut style = parent.clone();
     style.opacity = 1.0;
@@ -1108,8 +1334,8 @@ fn resolve_style<'a, 'input>(
                         if value.eq_ignore_ascii_case("currentcolor") { parent.color.clone() } else { value.into() };
                 }
             }
-            "fill" => style.fill = parse_paint(value, "fill", node, warnings, &style.color),
-            "stroke" => style.stroke = parse_paint(value, "stroke", node, warnings, &style.color),
+            "fill" => style.fill = parse_paint(value, "fill", node, warnings, &style.color, gradients),
+            "stroke" => style.stroke = parse_paint(value, "stroke", node, warnings, &style.color, gradients),
             "stroke-width" => {
                 style.stroke_width = parse_style_length(value, "stroke-width", node)?;
                 if style.stroke_width < 0.0 {
@@ -1167,9 +1393,21 @@ fn resolve_style<'a, 'input>(
 
 fn parse_paint<'a, 'input>(
     value: &str, property: &str, node: Node<'a, 'input>, warnings: &mut Vec<SvgImportWarning>, current_color: &str,
-) -> Option<String> {
+    gradients: &BTreeMap<String, Paint>,
+) -> Option<Paint> {
     let value = value.trim();
     if value.eq_ignore_ascii_case("none") || value.eq_ignore_ascii_case("transparent") {
+        return None;
+    }
+    if let Some(identifier) = value.strip_prefix("url(#").and_then(|value| value.strip_suffix(')')) {
+        if let Some(paint) = gradients.get(identifier) {
+            return Some(paint.clone());
+        }
+        warnings.push(SvgImportWarning::UnsupportedPaint {
+            element: local_name(node).into(),
+            property: property.into(),
+            value: value.into(),
+        });
         return None;
     }
     if value.starts_with("url(") {
@@ -1181,9 +1419,9 @@ fn parse_paint<'a, 'input>(
         return None;
     }
     if value.eq_ignore_ascii_case("currentcolor") {
-        return Some(current_color.into());
+        return Some(Paint::Solid { color: current_color.into() });
     }
-    (!value.is_empty()).then(|| value.into())
+    (!value.is_empty()).then(|| Paint::Solid { color: value.into() })
 }
 
 fn ensure_non_negative<'a, 'input>(node: Node<'a, 'input>, attribute: &str, value: f64) -> Result<(), SvgImportError> {
@@ -1319,8 +1557,12 @@ fn properties(entries: impl IntoIterator<Item = (&'static str, Value)>) -> Shape
     entries.into_iter().map(|(key, value)| (key.into(), value)).collect()
 }
 
-fn paint_value(value: Option<String>) -> Value {
-    value.map_or_else(|| Value::Null, Value::String)
+fn paint_value(value: Option<Paint>) -> Value {
+    match value {
+        None => Value::Null,
+        Some(Paint::Solid { color }) => Value::String(color),
+        Some(paint) => serde_json::to_value(paint).expect("native paint should serialize"),
+    }
 }
 
 fn invalid_attribute<'a, 'input>(node: Node<'a, 'input>, attribute: &str, value: impl Into<String>) -> SvgImportError {
@@ -1814,6 +2056,43 @@ mod tests {
     }
 
     #[test]
+    fn imports_linear_radial_gradients_with_transforms_and_inheritance() {
+        let import = parse_svg(
+            r##"<svg viewBox="0 0 100 80">
+                <defs>
+                    <linearGradient id="base" x1="0%" y1="0%" x2="100%" y2="0%" spreadMethod="reflect">
+                        <stop offset="0%" stop-color="#111111"/>
+                        <stop offset="50%" stop-color="#ffffff" stop-opacity=".4"/>
+                    </linearGradient>
+                    <linearGradient id="child" href="#base" gradientTransform="rotate(15)"/>
+                    <radialGradient id="radial" gradientUnits="userSpaceOnUse" cx="20" cy="30" r="18" fx="10" fy="25">
+                        <stop offset="0" stop-color="#ff0000"/>
+                        <stop offset="1" stop-color="#0000ff"/>
+                    </radialGradient>
+                </defs>
+                <rect id="box" width="40" height="20" fill="url(#child)"/>
+                <path id="ring" d="M0 0L10 0" stroke="url(#radial)"/>
+            </svg>"##,
+        )
+        .expect("gradients should import");
+        let SvgImportNode::Shape(rect) = &import.root.children[0] else { panic!("rect") };
+        assert_eq!(rect.properties["fill"]["kind"], json!("linear_gradient"));
+        assert_eq!(rect.properties["fill"]["spread"], json!("reflect"));
+        assert!(
+            (rect.properties["fill"]["stops"][1]["opacity"]
+                .as_f64()
+                .unwrap_or_default()
+                - 0.4)
+                .abs()
+                < 1e-6
+        );
+        assert_ne!(rect.properties["fill"]["transform"]["a"], json!(1.0));
+        let SvgImportNode::Shape(path) = &import.root.children[1] else { panic!("path") };
+        assert_eq!(path.properties["stroke"]["kind"], json!("radial_gradient"));
+        assert_eq!(path.properties["stroke"]["units"], json!("user_space_on_use"));
+    }
+
+    #[test]
     fn normalizes_path_commands_arcs_and_compound_subpaths() {
         let import = parse_svg(
             r#"<svg><path fill-rule="evenodd" d="M0 0 h10 v10 q5 5 10 0 t10 0 c1 2 3 4 5 6 s7 8 9 10 a4 4 0 0 1 8 0 z M30 30 l5 5"/></svg>"#,
@@ -1936,7 +2215,7 @@ mod tests {
         )
         .expect("unsupported content should be reported");
         assert_eq!(import.root.children.len(), 1);
-        assert!(import.warnings.iter().any(|warning| matches!(
+        assert!(!import.warnings.iter().any(|warning| matches!(
             warning,
             SvgImportWarning::UnsupportedFeature { feature: SvgUnsupportedFeature::Gradient, .. }
         )));

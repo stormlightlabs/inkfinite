@@ -16,8 +16,8 @@ use crate::engine::geometry::{
 use crate::path_metrics::{DEFAULT_PATH_METRIC_TOLERANCE, path_length, trim_path};
 use crate::proto::Bounds;
 use crate::{
-    AssetId, AssetSource, BuiltinShapeKind, Document, DocumentSnapshot, LayerId, PageId, PathFillRule, PathGeometry,
-    PathSegment, PathSubpath, ShapeId, ShapeRecord, Vec2,
+    AssetId, AssetSource, BuiltinShapeKind, Document, DocumentSnapshot, GradientSpread, GradientUnits, LayerId, PageId,
+    Paint, PaintValue, PathFillRule, PathGeometry, PathSegment, PathSubpath, ShapeId, ShapeRecord, Vec2,
 };
 
 const DEFAULT_PADDING: f64 = 20.0;
@@ -199,6 +199,7 @@ impl Renderer<'_> {
             shape.style.stroke_opacity.unwrap_or(crate::Opacity::OPAQUE).get(),
         ));
         let mut output = String::new();
+        let mut gradient_defs = String::new();
         match BuiltinShapeKind::parse(shape.kind.as_str()) {
             Some(BuiltinShapeKind::Rectangle) => {
                 let props: BoxProps = properties(shape)?;
@@ -206,7 +207,7 @@ impl Renderer<'_> {
                     output,
                     "      <rect transform=\"{transform}\" width=\"{}\" height=\"{}\" rx=\"{}\" fill=\"{}\" fill-opacity=\"{fill_opacity}\" stroke=\"{}\" stroke-opacity=\"{stroke_opacity}\" stroke-width=\"2\"/>",
                     number(props.width), number(props.height), number(props.radius.min(props.width / 2.0).min(props.height / 2.0).max(0.0)),
-                    paint(props.fill.as_deref()), paint(props.stroke.as_deref())
+                    paint(props.fill.as_ref(), &shape.id, "fill", &mut gradient_defs), paint(props.stroke.as_ref(), &shape.id, "stroke", &mut gradient_defs)
                 ).expect("writing to a String cannot fail");
             }
             Some(BuiltinShapeKind::Container) => {
@@ -221,7 +222,7 @@ impl Renderer<'_> {
                         output,
                         "      <rect transform=\"{transform}\" width=\"{}\" height=\"{}\" rx=\"{}\" fill=\"{}\" fill-opacity=\"{fill_opacity}\" stroke=\"{}\" stroke-opacity=\"{stroke_opacity}\" stroke-width=\"2\"/>",
                         number(props.width), number(props.height), number(props.radius.min(props.width / 2.0).min(props.height / 2.0).max(0.0)),
-                        paint(props.fill.as_deref()), paint(props.stroke.as_deref())
+                        paint(props.fill.as_ref(), &shape.id, "fill", &mut gradient_defs), paint(props.stroke.as_ref(), &shape.id, "stroke", &mut gradient_defs)
                     ).expect("writing to a String cannot fail");
                 }
                 if let Some(title) = props.title.filter(|title| !title.is_empty()) {
@@ -238,7 +239,7 @@ impl Renderer<'_> {
                     output,
                     "      <ellipse transform=\"{transform}\" cx=\"{}\" cy=\"{}\" rx=\"{}\" ry=\"{}\" fill=\"{}\" fill-opacity=\"{fill_opacity}\" stroke=\"{}\" stroke-opacity=\"{stroke_opacity}\" stroke-width=\"2\"/>",
                     number(props.width / 2.0), number(props.height / 2.0), number(props.width / 2.0), number(props.height / 2.0),
-                    paint(props.fill.as_deref()), paint(props.stroke.as_deref())
+                    paint(props.fill.as_ref(), &shape.id, "fill", &mut gradient_defs), paint(props.stroke.as_ref(), &shape.id, "stroke", &mut gradient_defs)
                 ).expect("writing to a String cannot fail");
             }
             Some(BuiltinShapeKind::Line) => {
@@ -246,15 +247,29 @@ impl Renderer<'_> {
                 writeln!(
                     output,
                     "      <line transform=\"{transform}\" x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" fill=\"none\" stroke=\"{}\" stroke-opacity=\"{stroke_opacity}\" stroke-width=\"{}\"/>",
-                    number(props.a.x), number(props.a.y), number(props.b.x), number(props.b.y), escape_xml(&props.stroke), number(props.width)
+                    number(props.a.x), number(props.a.y), number(props.b.x), number(props.b.y), paint(Some(&props.stroke), &shape.id, "stroke", &mut gradient_defs), number(props.width)
                 ).expect("writing to a String cannot fail");
             }
-            Some(BuiltinShapeKind::Arrow) => {
-                self.render_arrow(shape, &transform, &stroke_opacity, &fill_opacity, &mut output)?
+            Some(BuiltinShapeKind::Arrow) => self.render_arrow(
+                shape,
+                &transform,
+                &stroke_opacity,
+                &fill_opacity,
+                &mut output,
+                &mut gradient_defs,
+            )?,
+            Some(BuiltinShapeKind::Text) => {
+                self.render_text(shape, &transform, &fill_opacity, &mut output, &mut gradient_defs)?
             }
-            Some(BuiltinShapeKind::Text) => self.render_text(shape, &transform, &fill_opacity, &mut output)?,
             Some(BuiltinShapeKind::Markdown) => {
-                self.render_markdown(shape, &transform, &fill_opacity, &stroke_opacity, &mut output)?;
+                self.render_markdown(
+                    shape,
+                    &transform,
+                    &fill_opacity,
+                    &stroke_opacity,
+                    &mut output,
+                    &mut gradient_defs,
+                )?;
             }
             Some(BuiltinShapeKind::Image) => {
                 let props: ImageProps = properties(shape)?;
@@ -353,7 +368,7 @@ impl Renderer<'_> {
                     writeln!(
                         output,
                         "      <path transform=\"{transform}\" d=\"{path} Z\" fill=\"{}\" fill-opacity=\"{}\" stroke=\"none\"/>",
-                        escape_xml(&props.style.color), number(opacity)
+                        paint(Some(&props.style.color), &shape.id, "stroke", &mut gradient_defs), number(opacity)
                     ).expect("writing to a String cannot fail");
                 }
             }
@@ -369,20 +384,24 @@ impl Renderer<'_> {
                     output,
                     "      <path transform=\"{transform}\" d=\"{}\" fill=\"{}\" fill-rule=\"{}\" fill-opacity=\"{fill_opacity}\" stroke=\"{}\" stroke-opacity=\"{stroke_opacity}\" stroke-width=\"{}\"/>",
                     path_data(&geometry),
-                    paint(props.fill.as_deref()),
+                    paint(props.fill.as_ref(), &shape.id, "fill", &mut gradient_defs),
                     path_fill_rule(props.fill_rule),
-                    paint(props.stroke.as_deref()),
+                    paint(props.stroke.as_ref(), &shape.id, "stroke", &mut gradient_defs),
                     number(props.stroke_width.unwrap_or(2.0).max(0.0)),
                 )
                 .expect("writing to a String cannot fail");
             }
             None => {}
         }
+        if !gradient_defs.is_empty() {
+            output = format!("      <defs>{gradient_defs}      </defs>\n{output}");
+        }
         Ok(output)
     }
 
     fn render_arrow(
         &self, shape: &ShapeRecord, transform: &str, stroke_opacity: &str, fill_opacity: &str, output: &mut String,
+        gradient_defs: &mut String,
     ) -> Result<(), SvgRenderError> {
         let props: ArrowProps = properties(shape)?;
         let geometry = resolve_arrow_geometry_for_shape(self.document, shape).map_err(|error| {
@@ -405,17 +424,34 @@ impl Renderer<'_> {
                 )
             })
             .unwrap_or_default();
-        writeln!(output, "      <path transform=\"{transform}\" d=\"{}\" fill=\"none\" stroke=\"{}\" stroke-opacity=\"{stroke_opacity}\" stroke-width=\"{}\"{dash}/>", path_data(&shaft), escape_xml(&props.style.stroke), number(props.style.width)).expect("writing to a String cannot fail");
+        let stroke = paint(Some(&props.style.stroke), &shape.id, "stroke", gradient_defs);
+        writeln!(output, "      <path transform=\"{transform}\" d=\"{}\" fill=\"none\" stroke=\"{stroke}\" stroke-opacity=\"{stroke_opacity}\" stroke-width=\"{}\"{dash}/>", path_data(&shaft), number(props.style.width)).expect("writing to a String cannot fail");
 
         if props.style.head_end.unwrap_or(true)
             && let Some(head) = arrow_head_geometry(&geometry.path, false)
         {
-            arrow_head(output, transform, &head, false, &props.style, stroke_opacity);
+            arrow_head(
+                output,
+                transform,
+                &head,
+                false,
+                &props.style,
+                stroke_opacity,
+                &mut SvgPaintContext { defs: gradient_defs, shape_id: &shape.id },
+            );
         }
         if props.style.head_start.unwrap_or(false)
             && let Some(head) = arrow_head_geometry(&geometry.path, true)
         {
-            arrow_head(output, transform, &head, true, &props.style, stroke_opacity);
+            arrow_head(
+                output,
+                transform,
+                &head,
+                true,
+                &props.style,
+                stroke_opacity,
+                &mut SvgPaintContext { defs: gradient_defs, shape_id: &shape.id },
+            );
         }
         if let Some(label) = props.label.filter(|label| !label.text.is_empty())
             && let Some((at, _distance)) = arrow_label_position(&geometry.path, &label)
@@ -428,6 +464,7 @@ impl Renderer<'_> {
 
     fn render_text(
         &mut self, shape: &ShapeRecord, transform: &str, fill_opacity: &str, output: &mut String,
+        gradient_defs: &mut String,
     ) -> Result<(), SvgRenderError> {
         let props: TextProps = properties(shape)?;
         let font = self.font(shape, &props.font_family);
@@ -435,7 +472,8 @@ impl Renderer<'_> {
             || vec![props.text.clone()],
             |width| wrap_text(&props.text, width, props.font_size),
         );
-        writeln!(output, "      <text transform=\"{transform}\" font-family=\"{}\" font-size=\"{}\" fill=\"{}\" fill-opacity=\"{fill_opacity}\" dominant-baseline=\"text-before-edge\">", escape_xml(font), number(props.font_size), escape_xml(&props.color)).expect("writing to a String cannot fail");
+        let color = paint(Some(&props.color), &shape.id, "fill", gradient_defs);
+        writeln!(output, "      <text transform=\"{transform}\" font-family=\"{}\" font-size=\"{}\" fill=\"{color}\" fill-opacity=\"{fill_opacity}\" dominant-baseline=\"text-before-edge\">", escape_xml(font), number(props.font_size)).expect("writing to a String cannot fail");
         let mut y = 0.0;
         for line in &lines {
             writeln!(
@@ -453,12 +491,17 @@ impl Renderer<'_> {
 
     fn render_markdown(
         &mut self, shape: &ShapeRecord, transform: &str, fill_opacity: &str, stroke_opacity: &str, output: &mut String,
+        gradient_defs: &mut String,
     ) -> Result<(), SvgRenderError> {
         let props: MarkdownProps = properties(shape)?;
         let height = props.height.unwrap_or(props.font_size * 10.0);
         let font = self.font(shape, &props.font_family).to_owned();
         writeln!(output, "      <g transform=\"{transform}\">").expect("writing to a String cannot fail");
-        writeln!(output, "        <rect width=\"{}\" height=\"{}\" fill=\"{}\" fill-opacity=\"{fill_opacity}\" stroke=\"{}\" stroke-opacity=\"{stroke_opacity}\"/>", number(props.width), number(height), paint(props.background.as_deref().or(Some("#ffffff"))), paint(props.border.as_deref())).expect("writing to a String cannot fail");
+        let background = props
+            .background
+            .clone()
+            .unwrap_or_else(|| PaintValue::Solid("#ffffff".into()));
+        writeln!(output, "        <rect width=\"{}\" height=\"{}\" fill=\"{}\" fill-opacity=\"{fill_opacity}\" stroke=\"{}\" stroke-opacity=\"{stroke_opacity}\"/>", number(props.width), number(height), paint(Some(&background), &shape.id, "background", gradient_defs), paint(props.border.as_ref(), &shape.id, "border", gradient_defs)).expect("writing to a String cannot fail");
         let mut y = 8.0;
         let line_height = props.font_size * 1.4;
         for line in markdown_lines(&props.markdown, props.font_size) {
@@ -470,7 +513,7 @@ impl Renderer<'_> {
                     break;
                 }
                 let content = if keeps_inline_style { markdown_inline_svg(&line.text) } else { escape_xml(&wrapped) };
-                writeln!(output, "        <text x=\"8\" y=\"{}\" font-family=\"{}\" font-size=\"{}\" font-weight=\"{}\" fill=\"{}\" fill-opacity=\"{fill_opacity}\" dominant-baseline=\"text-before-edge\">{content}</text>", number(y), escape_xml(if line.code { "monospace" } else { &font }), number(line.font_size), if line.bold { "bold" } else { "normal" }, escape_xml(&props.color)).expect("writing to a String cannot fail");
+                writeln!(output, "        <text x=\"8\" y=\"{}\" font-family=\"{}\" font-size=\"{}\" font-weight=\"{}\" fill=\"{}\" fill-opacity=\"{fill_opacity}\" dominant-baseline=\"text-before-edge\">{content}</text>", number(y), escape_xml(if line.code { "monospace" } else { &font }), number(line.font_size), if line.bold { "bold" } else { "normal" }, paint(Some(&props.color), &shape.id, "fill", gradient_defs)).expect("writing to a String cannot fail");
                 y += line.font_size * 1.4;
             }
         }
@@ -532,9 +575,9 @@ struct BoxProps {
     #[serde(alias = "h")]
     height: f64,
     #[serde(default)]
-    fill: Option<String>,
+    fill: Option<PaintValue>,
     #[serde(default)]
-    stroke: Option<String>,
+    stroke: Option<PaintValue>,
     #[serde(default)]
     radius: f64,
 }
@@ -548,9 +591,9 @@ struct ContainerProps {
     #[serde(default)]
     title: Option<String>,
     #[serde(default)]
-    fill: Option<String>,
+    fill: Option<PaintValue>,
     #[serde(default)]
-    stroke: Option<String>,
+    stroke: Option<PaintValue>,
     #[serde(default)]
     radius: f64,
 }
@@ -559,14 +602,14 @@ struct ContainerProps {
 struct LineProps {
     a: Vec2,
     b: Vec2,
-    stroke: String,
+    stroke: PaintValue,
     width: f64,
 }
 
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ArrowStyle {
-    stroke: String,
+    stroke: PaintValue,
     width: f64,
     head_start: Option<bool>,
     head_end: Option<bool>,
@@ -598,7 +641,7 @@ struct TextProps {
     font_size: f64,
     #[serde(alias = "font_family")]
     font_family: String,
-    color: String,
+    color: PaintValue,
     #[serde(alias = "w")]
     width: Option<f64>,
 }
@@ -616,10 +659,10 @@ struct MarkdownProps {
     font_size: f64,
     #[serde(alias = "font_family")]
     font_family: String,
-    color: String,
+    color: PaintValue,
     #[serde(alias = "bg")]
-    background: Option<String>,
-    border: Option<String>,
+    background: Option<PaintValue>,
+    border: Option<PaintValue>,
 }
 
 #[derive(Clone, Copy, Deserialize)]
@@ -673,9 +716,9 @@ struct PathProps {
     subpaths: Vec<PathSubpath>,
     fill_rule: PathFillRule,
     #[serde(default)]
-    fill: Option<String>,
+    fill: Option<PaintValue>,
     #[serde(default)]
-    stroke: Option<String>,
+    stroke: Option<PaintValue>,
     #[serde(default, alias = "strokeWidth")]
     stroke_width: Option<f64>,
 }
@@ -687,7 +730,7 @@ struct StrokePaintProperties {
 
 #[derive(Deserialize)]
 struct StrokeStyle {
-    color: String,
+    color: PaintValue,
     opacity: f64,
 }
 
@@ -1000,6 +1043,11 @@ fn contains_selected_descendant(document: &Document, shape: &ShapeRecord, select
     })
 }
 
+struct SvgPaintContext<'a> {
+    defs: &'a mut String,
+    shape_id: &'a ShapeId,
+}
+
 #[derive(Clone, Copy)]
 struct ArrowHeadGeometry {
     tip: Vec2,
@@ -1084,6 +1132,7 @@ fn point_at_distance(
 
 fn arrow_head(
     output: &mut String, transform: &str, head: &ArrowHeadGeometry, at_start: bool, style: &ArrowStyle, opacity: &str,
+    paint_context: &mut SvgPaintContext<'_>,
 ) {
     let filled = (at_start && style.head_start_style.as_deref() == Some("triangle"))
         || (!at_start && style.head_end_style.as_deref() == Some("triangle"));
@@ -1111,11 +1160,16 @@ fn arrow_head(
         )
     };
     let filled = triangle.ends_with(" Z");
+    let stroke = paint(
+        Some(&style.stroke),
+        paint_context.shape_id,
+        "stroke",
+        paint_context.defs,
+    );
     writeln!(
         output,
-        "      <path transform=\"{transform}\" d=\"{triangle}\" fill=\"{}\" stroke=\"{}\" stroke-opacity=\"{opacity}\" stroke-width=\"{}\"/>",
-        if filled { escape_xml(&style.stroke) } else { "none".into() },
-        escape_xml(&style.stroke),
+        "      <path transform=\"{transform}\" d=\"{triangle}\" fill=\"{}\" stroke=\"{stroke}\" stroke-opacity=\"{opacity}\" stroke-width=\"{}\"/>",
+        if filled { stroke.as_str() } else { "none" },
         number(style.width)
     )
     .expect("writing to a String cannot fail");
@@ -1305,10 +1359,148 @@ fn affine_svg(matrix: Affine) -> String {
     )
 }
 
-fn paint(value: Option<&str>) -> String {
-    value
-        .filter(|value| !value.is_empty())
-        .map_or_else(|| "none".into(), escape_xml)
+fn paint(value: Option<&PaintValue>, shape_id: &ShapeId, property: &str, defs: &mut String) -> String {
+    let Some(value) = value else { return "none".into() };
+    match value {
+        PaintValue::Solid(color) => {
+            if color.is_empty() {
+                "none".into()
+            } else {
+                escape_xml(color)
+            }
+        }
+        PaintValue::Native(Paint::Solid { color }) => {
+            if color.is_empty() {
+                "none".into()
+            } else {
+                escape_xml(color)
+            }
+        }
+        PaintValue::Native(Paint::LinearGradient { x1, y1, x2, y2, units, transform, spread, stops }) => {
+            let id = gradient_id(shape_id, property);
+            write_gradient(
+                defs,
+                &id,
+                &Paint::LinearGradient {
+                    x1: *x1,
+                    y1: *y1,
+                    x2: *x2,
+                    y2: *y2,
+                    units: *units,
+                    transform: *transform,
+                    spread: *spread,
+                    stops: stops.clone(),
+                },
+            );
+            format!("url(#{})", escape_xml(&id))
+        }
+        PaintValue::Native(Paint::RadialGradient { cx, cy, r, fx, fy, units, transform, spread, stops }) => {
+            let id = gradient_id(shape_id, property);
+            write_gradient(
+                defs,
+                &id,
+                &Paint::RadialGradient {
+                    cx: *cx,
+                    cy: *cy,
+                    r: *r,
+                    fx: *fx,
+                    fy: *fy,
+                    units: *units,
+                    transform: *transform,
+                    spread: *spread,
+                    stops: stops.clone(),
+                },
+            );
+            format!("url(#{})", escape_xml(&id))
+        }
+    }
+}
+
+fn gradient_id(shape_id: &ShapeId, property: &str) -> String {
+    format!(
+        "inkfinite-gradient-{}-{property}",
+        shape_id
+            .as_str()
+            .replace(|character: char| !character.is_ascii_alphanumeric(), "-")
+    )
+}
+
+fn write_gradient(defs: &mut String, id: &str, paint: &Paint) {
+    let (tag, attributes, stops) = match paint {
+        Paint::LinearGradient { x1, y1, x2, y2, stops, .. } => (
+            "linearGradient",
+            format!(
+                "x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\"",
+                number(*x1),
+                number(*y1),
+                number(*x2),
+                number(*y2)
+            ),
+            stops,
+        ),
+        Paint::RadialGradient { cx, cy, r, fx, fy, stops, .. } => (
+            "radialGradient",
+            format!(
+                "cx=\"{}\" cy=\"{}\" r=\"{}\" fx=\"{}\" fy=\"{}\"",
+                number(*cx),
+                number(*cy),
+                number(*r),
+                number(*fx),
+                number(*fy)
+            ),
+            stops,
+        ),
+        Paint::Solid { .. } => return,
+    };
+    let (units, transform, spread) = match paint {
+        Paint::LinearGradient { units, transform, spread, .. }
+        | Paint::RadialGradient { units, transform, spread, .. } => (*units, *transform, *spread),
+        Paint::Solid { .. } => unreachable!("solid paints do not create gradient definitions"),
+    };
+    write!(
+        defs,
+        "<{tag} id=\"{}\" {attributes} gradientUnits=\"{}\" gradientTransform=\"matrix({} {} {} {} {} {})\" spreadMethod=\"{}\">",
+        escape_xml(id),
+        gradient_units(units),
+        number(transform.a),
+        number(transform.b),
+        number(transform.c),
+        number(transform.d),
+        number(transform.e),
+        number(transform.f),
+        gradient_spread(spread)
+    )
+    .expect("writing to a String cannot fail");
+    write_stops(defs, stops);
+    writeln!(defs, "</{tag}>").expect("writing to a String cannot fail");
+}
+
+fn write_stops(defs: &mut String, stops: &[crate::GradientStop]) {
+    for stop in stops {
+        write!(
+            defs,
+            "<stop offset=\"{}\" stop-color=\"{}\" stop-opacity=\"{}\"/>",
+            number(stop.offset),
+            escape_xml(&stop.color),
+            number(stop.opacity)
+        )
+        .expect("writing to a String cannot fail");
+    }
+}
+
+fn gradient_units(units: GradientUnits) -> &'static str {
+    match units {
+        GradientUnits::ObjectBoundingBox => "objectBoundingBox",
+        GradientUnits::UserSpaceOnUse => "userSpaceOnUse",
+    }
+}
+
+fn gradient_spread(spread: GradientSpread) -> &'static str {
+    match spread {
+        GradientSpread::Pad => "pad",
+        GradientSpread::Reflect => "reflect",
+        GradientSpread::Repeat => "repeat",
+    }
 }
 
 fn number(value: f64) -> String {

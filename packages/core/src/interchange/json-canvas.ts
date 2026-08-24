@@ -1,4 +1,5 @@
 import { shapeBounds } from '../geom';
+import { paintColor } from '../paint';
 import {
 	BindingRecord,
 	ensureDocumentLayers,
@@ -263,7 +264,7 @@ export function exportJsonCanvas(snapshot: BoardExport, requestedPageId?: string
 			width: Math.max(1, Math.round(bounds.max.x - bounds.min.x)),
 			height: Math.max(1, Math.round(bounds.max.y - bounds.min.y)),
 			text: shape.type === 'text' ? shape.props.text : shape.props.md,
-			...(nodeColor(shape) ? { color: nodeColor(shape) } : {})
+			...(paintColor(nodeColor(shape)) ? { color: paintColor(nodeColor(shape)) } : {})
 		});
 		if (shape.groupId) {
 			const members = groups.get(shape.groupId) ?? [];
@@ -317,7 +318,7 @@ export function exportJsonCanvas(snapshot: BoardExport, requestedPageId?: string
 			toNode: end.toShapeId,
 			toSide: sideForAnchor(end.anchor),
 			toEnd: shape.props.style.headEnd === false ? 'none' : 'arrow',
-			color: shape.props.style.stroke,
+			color: paintColor(shape.props.style.stroke) ?? '#000000',
 			...(shape.props.label?.text ? { label: shape.props.label.text } : {})
 		});
 	}

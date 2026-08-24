@@ -219,7 +219,7 @@ pub(crate) struct StrokeBrushProperties {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct StrokeStyleProperties {
-    pub(crate) color: String,
+    pub(crate) color: PaintValue,
     pub(crate) opacity: f64,
 }
 
@@ -347,6 +347,13 @@ pub enum ShapePropertyError {
     /// A dimension property was negative.
     #[error("shape kind {kind} property {property} must not be negative")]
     NegativeNumber { kind: String, property: String },
+    /// A fill or stroke paint does not decode or fail gradient validation.
+    #[error("shape kind {kind} property {property} has invalid paint: {message}")]
+    InvalidPaint {
+        kind: String,
+        property: String,
+        message: String,
+    },
     /// Native path properties do not decode or fail path geometry validation.
     #[error("shape kind {kind} has invalid path geometry: {message}")]
     InvalidPath { kind: String, message: String },
@@ -862,6 +869,200 @@ pub struct SemanticMetadata {
     pub provenance: Provenance,
 }
 
+/// Coordinate space used by a gradient's geometry.
+#[derive(Clone, Copy, Debug, Default, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(rename_all = "snake_case")]
+pub enum GradientUnits {
+    /// Coordinates are fractions of the painted shape's bounding box.
+    #[default]
+    ObjectBoundingBox,
+    /// Coordinates are measured in the painted shape's local coordinate space.
+    UserSpaceOnUse,
+}
+
+/// How a gradient behaves outside its first and last stop.
+#[derive(Clone, Copy, Debug, Default, Eq, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(rename_all = "snake_case")]
+pub enum GradientSpread {
+    /// Hold the nearest stop colour.
+    #[default]
+    Pad,
+    /// Repeat the gradient while reversing each alternate copy.
+    Reflect,
+    /// Repeat the gradient from the first stop.
+    Repeat,
+}
+
+/// Affine transform applied in gradient coordinate space.
+#[derive(Clone, Copy, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+pub struct GradientTransform {
+    /// Horizontal scale and rotation component.
+    pub a: f64,
+    /// Vertical shear and rotation component.
+    pub b: f64,
+    /// Horizontal shear and rotation component.
+    pub c: f64,
+    /// Vertical scale component.
+    pub d: f64,
+    /// Horizontal translation.
+    pub e: f64,
+    /// Vertical translation.
+    pub f: f64,
+}
+
+impl Default for GradientTransform {
+    fn default() -> Self {
+        Self { a: 1.0, b: 0.0, c: 0.0, d: 1.0, e: 0.0, f: 0.0 }
+    }
+}
+
+/// One colour transition in a gradient.
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct GradientStop {
+    /// Position from zero to one along the gradient.
+    pub offset: f64,
+    /// CSS colour used at this position.
+    pub color: String,
+    /// Opacity applied to the colour at this position.
+    pub opacity: f64,
+}
+
+/// A native fill or stroke paint.
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+#[ts(rename_all = "snake_case")]
+pub enum Paint {
+    /// A single CSS colour.
+    Solid {
+        /// CSS colour value.
+        color: String,
+    },
+    /// A linear gradient between two points.
+    LinearGradient {
+        /// Start horizontal coordinate.
+        x1: f64,
+        /// Start vertical coordinate.
+        y1: f64,
+        /// End horizontal coordinate.
+        x2: f64,
+        /// End vertical coordinate.
+        y2: f64,
+        /// Coordinate space for the endpoints.
+        #[serde(default)]
+        units: GradientUnits,
+        /// Gradient coordinate transform.
+        #[serde(default)]
+        transform: GradientTransform,
+        /// Behaviour outside the stop range.
+        #[serde(default)]
+        spread: GradientSpread,
+        /// Ordered colour stops.
+        stops: Vec<GradientStop>,
+    },
+    /// A radial gradient with an optional separate focal point.
+    RadialGradient {
+        /// Centre horizontal coordinate.
+        cx: f64,
+        /// Centre vertical coordinate.
+        cy: f64,
+        /// Radius.
+        r: f64,
+        /// Focal point horizontal coordinate.
+        fx: f64,
+        /// Focal point vertical coordinate.
+        fy: f64,
+        /// Coordinate space for the geometry.
+        #[serde(default)]
+        units: GradientUnits,
+        /// Gradient coordinate transform.
+        #[serde(default)]
+        transform: GradientTransform,
+        /// Behaviour outside the stop range.
+        #[serde(default)]
+        spread: GradientSpread,
+        /// Ordered colour stops.
+        stops: Vec<GradientStop>,
+    },
+}
+
+/// Paint values accepted by legacy flat-colour records and native gradients.
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
+#[serde(untagged)]
+pub enum PaintValue {
+    /// A legacy CSS colour string.
+    Solid(String),
+    /// A native gradient or explicit solid paint.
+    Native(Paint),
+}
+
+impl Paint {
+    /// Validates gradient coordinates, transforms, stops, and colours.
+    pub fn validate(&self) -> Result<(), String> {
+        let (coordinates, transform, stops) = match self {
+            Self::Solid { color } => {
+                if color.trim().is_empty() {
+                    return Err("solid paint colour must not be empty".into());
+                }
+                return Ok(());
+            }
+            Self::LinearGradient { x1, y1, x2, y2, transform, stops, .. } => ([*x1, *y1, *x2, *y2], *transform, stops),
+            Self::RadialGradient { cx, cy, r, fx, fy, transform, stops, .. } => {
+                if !r.is_finite() || *r < 0.0 {
+                    return Err("radial gradient radius must be finite and non-negative".into());
+                }
+                ([*cx, *cy, *fx, *fy], *transform, stops)
+            }
+        };
+        if !coordinates.into_iter().all(f64::is_finite) {
+            return Err("gradient coordinates must be finite".into());
+        }
+        if ![
+            transform.a,
+            transform.b,
+            transform.c,
+            transform.d,
+            transform.e,
+            transform.f,
+        ]
+        .into_iter()
+        .all(f64::is_finite)
+        {
+            return Err("gradient transform must be finite".into());
+        }
+        if stops.is_empty() {
+            return Err("gradient must contain at least one stop".into());
+        }
+        for stop in stops {
+            if !stop.offset.is_finite() || !(0.0..=1.0).contains(&stop.offset) {
+                return Err("gradient stop offsets must be finite and between 0 and 1".into());
+            }
+            if !stop.opacity.is_finite() || !(0.0..=1.0).contains(&stop.opacity) {
+                return Err("gradient stop opacity must be between 0 and 1".into());
+            }
+            if stop.color.trim().is_empty() {
+                return Err("gradient stop colour must not be empty".into());
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Decodes either a legacy CSS colour or a native paint object.
+pub fn paint_from_value(value: &Value) -> Result<Paint, String> {
+    match value {
+        Value::String(color) => Ok(Paint::Solid { color: color.clone() }),
+        _ => serde_json::from_value::<Paint>(value.clone()).map_err(|error| error.to_string()),
+    }
+}
+
+/// Validates one legacy or native paint value.
+pub fn validate_paint_value(value: &Value) -> Result<(), String> {
+    paint_from_value(value)?.validate()
+}
+
 /// Common visual style shared by all shape kinds.
 #[derive(Clone, Copy, Debug, JsonSchema, PartialEq, Serialize, Deserialize, TS)]
 pub struct ShapeStyle {
@@ -1086,6 +1287,30 @@ pub fn validate_shape_properties(kind: &str, properties: &ShapeProperties) -> Re
         }
         if number < 0.0 {
             return Err(ShapePropertyError::NegativeNumber { kind: kind.to_owned(), property: property.to_owned() });
+        }
+    }
+    for property in ["fill", "stroke", "background", "border"] {
+        if let Some(value) = properties.get(property)
+            && !value.is_null()
+        {
+            validate_paint_value(value).map_err(|message| ShapePropertyError::InvalidPaint {
+                kind: kind.to_owned(),
+                property: property.to_owned(),
+                message,
+            })?;
+        }
+    }
+    if let Some(style) = properties.get("style").and_then(Value::as_object) {
+        for property in ["stroke", "color"] {
+            if let Some(value) = style.get(property)
+                && !value.is_null()
+            {
+                validate_paint_value(value).map_err(|message| ShapePropertyError::InvalidPaint {
+                    kind: kind.to_owned(),
+                    property: format!("style.{property}"),
+                    message,
+                })?;
+            }
         }
     }
     if kind == PATH_KIND {
@@ -1371,6 +1596,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cognitive_complexity)]
     fn builtin_registry_validates_shared_dimension_properties() {
         assert_eq!(
             builtin_shape_kinds(),
@@ -1492,6 +1718,35 @@ mod tests {
                 ])
             ),
             Err(ShapePropertyError::InvalidStroke { .. })
+        ));
+
+        let gradient = serde_json::json!({
+            "kind": "radial_gradient",
+            "cx": 0.5,
+            "cy": 0.5,
+            "r": 0.5,
+            "fx": 0.4,
+            "fy": 0.4,
+            "units": "object_bounding_box",
+            "transform": { "a": 1, "b": 0, "c": 0, "d": 1, "e": 0, "f": 0 },
+            "spread": "pad",
+            "stops": [
+                { "offset": 0, "color": "#fff", "opacity": 1 },
+                { "offset": 1, "color": "#000", "opacity": 0.5 }
+            ]
+        });
+        assert!(validate_shape_properties(RECTANGLE_KIND, &BTreeMap::from([("fill".into(), gradient)])).is_ok());
+        let invalid_gradient = serde_json::json!({
+            "kind": "linear_gradient",
+            "x1": 0,
+            "y1": 0,
+            "x2": 1,
+            "y2": 0,
+            "stops": [{ "offset": 0, "color": "#fff", "opacity": 2 }]
+        });
+        assert!(matches!(
+            validate_shape_properties(RECTANGLE_KIND, &BTreeMap::from([("fill".into(), invalid_gradient)])),
+            Err(ShapePropertyError::InvalidPaint { .. })
         ));
 
         assert_eq!(BuiltinShapeKind::parse("rect"), Some(BuiltinShapeKind::Rectangle));

@@ -144,15 +144,15 @@ selection, labels, and arrowheads.
 
 ### Gradient fills and strokes
 
-- [ ] Extend the paint representation beyond flat colors with linear and radial
+- [x] Extend the paint representation beyond flat colors with linear and radial
       gradients
-- [ ] Represent gradient stops, positions, transforms, spread behavior, and
+- [x] Represent gradient stops, positions, transforms, spread behavior, and
       opacity in canonical document data
-- [ ] Render gradients consistently in the interactive renderer and exports
-- [ ] Import and export supported SVG gradients without flattening them
-- [ ] Add gradient controls for stop creation, deletion, position, color, and
+- [x] Render gradients consistently in the interactive renderer and exports
+- [x] Import and export supported SVG gradients without flattening them
+- [x] Add gradient controls for stop creation, deletion, position, color, and
       opacity
-- [ ] Add fixtures covering transformed gradients and gradient inheritance
+- [x] Add fixtures covering transformed gradients and gradient inheritance
 
 ### Clips, masks, and filters
 

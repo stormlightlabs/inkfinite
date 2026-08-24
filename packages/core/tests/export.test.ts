@@ -38,6 +38,39 @@ describe("exportToSVG", () => {
     expect(svg).toContain("stroke=\"black\"");
   });
 
+  it("should export gradient definitions without flattening their stops", () => {
+    const { state, pageId } = createTestState();
+    const rect = ShapeRecord.createRect(pageId, 0, 0, {
+      w: 100,
+      h: 50,
+      fill: {
+        kind: "linear_gradient",
+        x1: 0,
+        y1: 0,
+        x2: 1,
+        y2: 0,
+        units: "object_bounding_box",
+        transform: { a: 1, b: 0, c: 0, d: 1, e: 3, f: 4 },
+        spread: "reflect",
+        stops: [
+          { offset: 0, color: "#111111", opacity: 1 },
+          { offset: 1, color: "#ffffff", opacity: 0.4 }
+        ]
+      },
+      stroke: "none",
+      radius: 0
+    });
+    state.doc.shapes[rect.id] = rect;
+    state.doc.pages[pageId].shapeIds.push(rect.id);
+
+    const svg = exportToSVG(state);
+    expect(svg).toContain("<linearGradient");
+    expect(svg).toContain('gradientTransform="matrix(1 0 0 1 3 4)"');
+    expect(svg).toContain('spreadMethod="reflect"');
+    expect(svg).toContain('stop-opacity="0.4"');
+    expect(svg).toContain("fill=\"url(#inkfinite-gradient-");
+  });
+
   it("should export semantic metadata for ordinary shapes", () => {
     const { state, pageId } = createTestState();
     const rect = ShapeRecord.createRect(pageId, 10, 20, { w: 100, h: 50, fill: "red", stroke: "black", radius: 0 });

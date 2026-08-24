@@ -4,6 +4,7 @@ import type {
 	PathTopologyOperation
 } from '@inkfinite/bindings/editor';
 import type {
+	PaintValue as NativePaintValue,
 	PathFillRule as NativePathFillRule,
 	PathGeometry as NativePathGeometry,
 	PathHandleMode as NativePathHandleMode,
@@ -77,9 +78,10 @@ export const LayerRecord = {
 	}
 };
 
-export type RectProps = { w: number; h: number; fill: string; stroke: string; radius: number };
-export type EllipseProps = { w: number; h: number; fill: string; stroke: string };
-export type LineProps = { a: Vec2; b: Vec2; stroke: string; width: number };
+export type PaintValue = NativePaintValue;
+export type RectProps = { w: number; h: number; fill: PaintValue; stroke: PaintValue; radius: number };
+export type EllipseProps = { w: number; h: number; fill: PaintValue; stroke: PaintValue };
+export type LineProps = { a: Vec2; b: Vec2; stroke: PaintValue; width: number };
 
 /** Fill rule for compound native paths. */
 export type PathFillRule = NativePathFillRule;
@@ -115,7 +117,7 @@ export type PathControlRef = PathAnchorRef & { control: 'quadratic' | 'control_1
 export type PathTopologyEdit = { shapeId: string; operations: PathTopologyOperation[] };
 
 /** Native path painting properties stored alongside its geometry. */
-export type PathProps = PathGeometry & { fill?: string; stroke?: string; stroke_width?: number };
+export type PathProps = PathGeometry & { fill?: PaintValue; stroke?: PaintValue; stroke_width?: number };
 
 /** Rust-resolved arrow shaft geometry projected for interactive consumers. */
 export type ResolvedArrowGeometry = NativeResolvedArrowGeometry;
@@ -129,7 +131,7 @@ export type ArrowEndpoint = { kind: 'free' | 'bound'; bindingId?: string };
  * Arrow style configuration
  */
 export type ArrowStyle = {
-	stroke: string;
+	stroke: PaintValue;
 	width: number;
 	headStart?: boolean;
 	headEnd?: boolean;
@@ -173,7 +175,7 @@ export type ArrowProps = {
 	label?: ArrowLabel;
 };
 
-export type TextProps = { text: string; fontSize: number; fontFamily: string; color: string; w?: number };
+export type TextProps = { text: string; fontSize: number; fontFamily: string; color: PaintValue; w?: number };
 
 /** Shape used to clip an image while it is rendered. */
 export type ImageMask = { kind: 'rectangle' | 'ellipse' | 'rounded'; radius?: number };
@@ -205,8 +207,8 @@ export type ContainerProps = {
 	w?: number;
 	h?: number;
 	title?: string;
-	fill?: string;
-	stroke?: string;
+	fill?: PaintValue;
+	stroke?: PaintValue;
 	radius?: number;
 };
 
@@ -223,9 +225,9 @@ export type MarkdownProps = {
 	h?: number;
 	fontSize: number;
 	fontFamily: string;
-	color: string;
-	bg?: string;
-	border?: string;
+	color: PaintValue;
+	bg?: PaintValue;
+	border?: PaintValue;
 };
 
 /**
@@ -249,7 +251,7 @@ export type BrushConfig = {
 /**
  * Style properties for stroke appearance
  */
-export type StrokeStyle = { color: string; opacity: number };
+export type StrokeStyle = { color: PaintValue; opacity: number };
 
 /**
  * Properties for freehand stroke shapes

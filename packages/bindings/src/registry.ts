@@ -88,6 +88,28 @@ export function validatePathGeometry(value: unknown): value is PathGeometry {
 	});
 }
 
+function validatePaintValue(value: unknown): boolean {
+	if (typeof value === 'string') return value.length > 0;
+	if (!isRecord(value) || typeof value.kind !== 'string') return false;
+	if (value.kind === 'solid') return typeof value.color === 'string' && value.color.length > 0;
+	if (value.kind !== 'linear_gradient' && value.kind !== 'radial_gradient') return false;
+	if (!Array.isArray(value.stops) || value.stops.length === 0) return false;
+	return value.stops.every(
+		(stop) =>
+			isRecord(stop) &&
+			typeof stop.offset === 'number' &&
+			Number.isFinite(stop.offset) &&
+			stop.offset >= 0 &&
+			stop.offset <= 1 &&
+			typeof stop.color === 'string' &&
+			stop.color.length > 0 &&
+			typeof stop.opacity === 'number' &&
+			Number.isFinite(stop.opacity) &&
+			stop.opacity >= 0 &&
+			stop.opacity <= 1
+	);
+}
+
 function validateStrokeProperties(properties: Record<string, JsonValue>): boolean {
 	const points = properties.points;
 	if (!Array.isArray(points) || points.length < 2) return false;
@@ -106,7 +128,7 @@ function validateStrokeProperties(properties: Record<string, JsonValue>): boolea
 	const style = properties.style;
 	if (
 		!isRecord(style) ||
-		typeof style.color !== 'string' ||
+		!validatePaintValue(style.color) ||
 		typeof style.opacity !== 'number' ||
 		!Number.isFinite(style.opacity) ||
 		style.opacity < 0 ||
@@ -237,6 +259,16 @@ export function validateShapeProperties(kind: string, properties: Record<string,
 	)
 		return false;
 	if (kind === 'stroke' && !validateStrokeProperties(properties)) return false;
+	for (const name of ['fill', 'stroke', 'background', 'border']) {
+		if (properties[name] !== undefined && properties[name] !== null && !validatePaintValue(properties[name]))
+			return false;
+	}
+	const style = properties.style;
+	if (isRecord(style)) {
+		for (const name of ['stroke', 'color']) {
+			if (style[name] !== undefined && style[name] !== null && !validatePaintValue(style[name])) return false;
+		}
+	}
 	return ['width', 'height'].every((name) => {
 		const value = properties[name];
 		return value === undefined || (typeof value === 'number' && Number.isFinite(value) && value >= 0);

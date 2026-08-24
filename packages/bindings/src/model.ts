@@ -99,6 +99,155 @@ export type Vec2 = {
 };
 
 /**
+ * Coordinate space used by a gradient's geometry.
+ */
+export type GradientUnits = 'object_bounding_box' | 'user_space_on_use';
+
+/**
+ * How a gradient behaves outside its first and last stop.
+ */
+export type GradientSpread = 'pad' | 'reflect' | 'repeat';
+
+/**
+ * Affine transform applied in gradient coordinate space.
+ */
+export type GradientTransform = {
+	/**
+	 * Horizontal scale and rotation component.
+	 */
+	a: number;
+	/**
+	 * Vertical shear and rotation component.
+	 */
+	b: number;
+	/**
+	 * Horizontal shear and rotation component.
+	 */
+	c: number;
+	/**
+	 * Vertical scale component.
+	 */
+	d: number;
+	/**
+	 * Horizontal translation.
+	 */
+	e: number;
+	/**
+	 * Vertical translation.
+	 */
+	f: number;
+};
+
+/**
+ * One colour transition in a gradient.
+ */
+export type GradientStop = {
+	/**
+	 * Position from zero to one along the gradient.
+	 */
+	offset: number;
+	/**
+	 * CSS colour used at this position.
+	 */
+	color: string;
+	/**
+	 * Opacity applied to the colour at this position.
+	 */
+	opacity: number;
+};
+
+/**
+ * A native fill or stroke paint.
+ */
+export type Paint =
+	| {
+			kind: 'solid';
+			/**
+			 * CSS colour value.
+			 */
+			color: string;
+	  }
+	| {
+			kind: 'linear_gradient';
+			/**
+			 * Start horizontal coordinate.
+			 */
+			x1: number;
+			/**
+			 * Start vertical coordinate.
+			 */
+			y1: number;
+			/**
+			 * End horizontal coordinate.
+			 */
+			x2: number;
+			/**
+			 * End vertical coordinate.
+			 */
+			y2: number;
+			/**
+			 * Coordinate space for the endpoints.
+			 */
+			units: GradientUnits;
+			/**
+			 * Gradient coordinate transform.
+			 */
+			transform: GradientTransform;
+			/**
+			 * Behaviour outside the stop range.
+			 */
+			spread: GradientSpread;
+			/**
+			 * Ordered colour stops.
+			 */
+			stops: Array<GradientStop>;
+	  }
+	| {
+			kind: 'radial_gradient';
+			/**
+			 * Centre horizontal coordinate.
+			 */
+			cx: number;
+			/**
+			 * Centre vertical coordinate.
+			 */
+			cy: number;
+			/**
+			 * Radius.
+			 */
+			r: number;
+			/**
+			 * Focal point horizontal coordinate.
+			 */
+			fx: number;
+			/**
+			 * Focal point vertical coordinate.
+			 */
+			fy: number;
+			/**
+			 * Coordinate space for the geometry.
+			 */
+			units: GradientUnits;
+			/**
+			 * Gradient coordinate transform.
+			 */
+			transform: GradientTransform;
+			/**
+			 * Behaviour outside the stop range.
+			 */
+			spread: GradientSpread;
+			/**
+			 * Ordered colour stops.
+			 */
+			stops: Array<GradientStop>;
+	  };
+
+/**
+ * Paint values accepted by legacy flat-colour records and native gradients.
+ */
+export type PaintValue = string | Paint;
+
+/**
  * Fill rule used to determine the interior of a compound path.
  */
 export type PathFillRule = 'nonzero' | 'evenodd';

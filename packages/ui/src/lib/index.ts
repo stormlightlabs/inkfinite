@@ -7,6 +7,9 @@ export type { BrushPopoverProps, BrushSettings } from './components/BrushPopover
 export { default as ColorPicker } from './components/ColorPicker.svelte';
 export type { ColorPickerProps } from './components/ColorPicker.svelte';
 
+export { default as PaintPicker } from './components/PaintPicker.svelte';
+export type { PaintPickerProps } from './components/PaintPicker.svelte';
+
 export { default as ContextMenu } from './components/ContextMenu.svelte';
 export type {
 	ContextMenuEntry,
