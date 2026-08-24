@@ -209,7 +209,10 @@
 					? {
 							text,
 							align: arrow.props.label?.align ?? 'center',
-							offset: arrow.props.label?.offset ?? 0
+							offset: arrow.props.label?.offset ?? 0,
+							...(arrow.props.label?.distance === undefined
+								? {}
+								: { distance: arrow.props.label.distance })
 						}
 					: undefined
 			}

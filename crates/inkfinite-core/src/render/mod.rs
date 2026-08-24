@@ -13,6 +13,7 @@ use crate::engine::geometry::world_transform;
 use crate::engine::geometry::{
     Affine, bounds_from_points, intersects, path_bounds, stroke_outline as canonical_stroke_outline, union,
 };
+use crate::path_metrics::{DEFAULT_PATH_METRIC_TOLERANCE, path_length, trim_path};
 use crate::proto::Bounds;
 use crate::{
     AssetId, AssetSource, BuiltinShapeKind, Document, DocumentSnapshot, LayerId, PageId, PathFillRule, PathGeometry,
@@ -391,10 +392,7 @@ impl Renderer<'_> {
                 message: error.to_string(),
             }
         })?;
-        let points = path_vertices(&geometry.path);
-        if points.len() < 2 {
-            return Ok(());
-        }
+        let shaft = arrow_shaft_geometry(&geometry.path, &props.style);
         let dash = props
             .style
             .dash
@@ -407,44 +405,23 @@ impl Renderer<'_> {
                 )
             })
             .unwrap_or_default();
-        writeln!(output, "      <path transform=\"{transform}\" d=\"{}\" fill=\"none\" stroke=\"{}\" stroke-opacity=\"{stroke_opacity}\" stroke-width=\"{}\"{dash}/>", path_data(&geometry.path), escape_xml(&props.style.stroke), number(props.style.width)).expect("writing to a String cannot fail");
+        writeln!(output, "      <path transform=\"{transform}\" d=\"{}\" fill=\"none\" stroke=\"{}\" stroke-opacity=\"{stroke_opacity}\" stroke-width=\"{}\"{dash}/>", path_data(&shaft), escape_xml(&props.style.stroke), number(props.style.width)).expect("writing to a String cannot fail");
 
-        if props.style.head_end.unwrap_or(true) {
-            let tangent = path_endpoint_tangent(&geometry.path, false).unwrap_or_else(|| Vec2 {
-                x: points[points.len() - 1].x - points[points.len() - 2].x,
-                y: points[points.len() - 1].y - points[points.len() - 2].y,
-            });
-            arrow_head(
-                output,
-                transform,
-                offset_point(points[points.len() - 1], tangent, -1.0),
-                points[points.len() - 1],
-                &props.style,
-                stroke_opacity,
-            );
+        if props.style.head_end.unwrap_or(true)
+            && let Some(head) = arrow_head_geometry(&geometry.path, false)
+        {
+            arrow_head(output, transform, &head, false, &props.style, stroke_opacity);
         }
-        if props.style.head_start.unwrap_or(false) {
-            let tangent = path_endpoint_tangent(&geometry.path, true)
-                .unwrap_or_else(|| Vec2 { x: points[1].x - points[0].x, y: points[1].y - points[0].y });
-            arrow_head(
-                output,
-                transform,
-                offset_point(points[0], tangent, 1.0),
-                points[0],
-                &props.style,
-                stroke_opacity,
-            );
+        if props.style.head_start.unwrap_or(false)
+            && let Some(head) = arrow_head_geometry(&geometry.path, true)
+        {
+            arrow_head(output, transform, &head, true, &props.style, stroke_opacity);
         }
-        if let Some(label) = props.label.filter(|label| !label.text.is_empty()) {
-            let length = polyline_length(&points);
-            let distance = match label.align.as_str() {
-                "start" => label.offset,
-                "end" => length - label.offset,
-                _ => length / 2.0 + label.offset,
-            };
-            let at = point_at_distance(&points, distance);
+        if let Some(label) = props.label.filter(|label| !label.text.is_empty())
+            && let Some((at, _distance)) = arrow_label_position(&geometry.path, &label)
+        {
             let label_width = deterministic_text_width(&label.text, 14.0) + 8.0;
-            writeln!(output, "      <g transform=\"{transform}\" fill-opacity=\"{fill_opacity}\"><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"18\" fill=\"#ffffff\" fill-opacity=\"0.9\" stroke=\"#cccccc\"/><text x=\"{}\" y=\"{}\" text-anchor=\"middle\" font-family=\"sans-serif\" font-size=\"14\" fill=\"#000000\">{}</text></g>", number(at.x - label_width / 2.0), number(at.y - 23.0), number(label_width), number(at.x), number(at.y - 7.0), escape_xml(&label.text)).expect("writing to a String cannot fail");
+            writeln!(output, "      <g transform=\"{transform}\" fill-opacity=\"{fill_opacity}\"><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"18\" fill=\"#ffffff\" fill-opacity=\"0.9\" stroke=\"#cccccc\"/><text x=\"{}\" y=\"{}\" text-anchor=\"middle\" dominant-baseline=\"middle\" font-family=\"sans-serif\" font-size=\"14\" fill=\"#000000\">{}</text></g>", number(at.x - label_width / 2.0), number(at.y - 9.0), number(label_width), number(at.x), number(at.y), escape_xml(&label.text)).expect("writing to a String cannot fail");
         }
         Ok(())
     }
@@ -593,6 +570,8 @@ struct ArrowStyle {
     width: f64,
     head_start: Option<bool>,
     head_end: Option<bool>,
+    head_start_style: Option<String>,
+    head_end_style: Option<String>,
     dash: Option<Vec<f64>>,
 }
 
@@ -601,6 +580,8 @@ struct ArrowLabel {
     text: String,
     align: String,
     offset: f64,
+    #[serde(default)]
+    distance: Option<f64>,
 }
 
 #[derive(Deserialize)]
@@ -847,6 +828,43 @@ fn properties<T: for<'de> Deserialize<'de>>(shape: &ShapeRecord) -> Result<T, Sv
     })
 }
 
+fn arrow_bounds(document: &Document, shape: &ShapeRecord) -> Result<Bounds, SvgRenderError> {
+    let geometry =
+        resolve_arrow_geometry_for_shape(document, shape).map_err(|error| SvgRenderError::InvalidShapeProperties {
+            shape_id: shape.id.clone(),
+            kind: shape.kind.to_string(),
+            message: error.to_string(),
+        })?;
+    let props: ArrowProps = properties(shape)?;
+    let mut bounds = path_bounds(&geometry.path);
+    let mut include_head = |at_start: bool| {
+        if let Some(head) = arrow_head_geometry(&geometry.path, at_start) {
+            bounds = union(bounds, bounds_from_points(&[head.tip, head.left, head.right]));
+        }
+    };
+    if props.style.head_end.unwrap_or(true) {
+        include_head(false);
+    }
+    if props.style.head_start.unwrap_or(false) {
+        include_head(true);
+    }
+    if let Some(label) = props.label.filter(|label| !label.text.is_empty())
+        && let Some((point, _distance)) = arrow_label_position(&geometry.path, &label)
+    {
+        let half_width = deterministic_text_width(&label.text, 14.0) / 2.0 + 4.0;
+        bounds = union(
+            bounds,
+            bounds_from_points(&[
+                Vec2 { x: point.x - half_width, y: point.y - 9.0 },
+                Vec2 { x: point.x + half_width, y: point.y - 9.0 },
+                Vec2 { x: point.x - half_width, y: point.y + 9.0 },
+                Vec2 { x: point.x + half_width, y: point.y + 9.0 },
+            ]),
+        );
+    }
+    Ok(bounds)
+}
+
 fn shape_local_bounds(document: &Document, shape: &ShapeRecord) -> Result<Bounds, SvgRenderError> {
     let bounds = match BuiltinShapeKind::parse(shape.kind.as_str()) {
         Some(BuiltinShapeKind::Rectangle | BuiltinShapeKind::Ellipse) => {
@@ -861,13 +879,7 @@ fn shape_local_bounds(document: &Document, shape: &ShapeRecord) -> Result<Bounds
             let props: LineProps = properties(shape)?;
             bounds_from_points(&[props.a, props.b])
         }
-        Some(BuiltinShapeKind::Arrow) => resolve_arrow_geometry_for_shape(document, shape)
-            .map(|geometry| path_bounds(&geometry.path))
-            .map_err(|error| SvgRenderError::InvalidShapeProperties {
-                shape_id: shape.id.clone(),
-                kind: shape.kind.to_string(),
-                message: error.to_string(),
-            })?,
+        Some(BuiltinShapeKind::Arrow) => arrow_bounds(document, shape)?,
         Some(BuiltinShapeKind::Text) => {
             let props: TextProps = properties(shape)?;
             let width = props
@@ -988,135 +1000,146 @@ fn contains_selected_descendant(document: &Document, shape: &ShapeRecord, select
     })
 }
 
-fn path_vertices(geometry: &PathGeometry) -> Vec<Vec2> {
-    geometry
-        .subpaths
-        .iter()
-        .flat_map(|subpath| subpath.segments.iter())
-        .map(|segment| match segment {
-            PathSegment::Move { to }
-            | PathSegment::Line { to }
-            | PathSegment::Quadratic { to, .. }
-            | PathSegment::Cubic { to, .. } => *to,
-        })
-        .collect()
+#[derive(Clone, Copy)]
+struct ArrowHeadGeometry {
+    tip: Vec2,
+    left: Vec2,
+    right: Vec2,
 }
 
-fn path_endpoint_tangent(geometry: &PathGeometry, at_start: bool) -> Option<Vec2> {
-    let subpath = geometry.subpaths.first()?;
-    let first = subpath.segments.first()?;
-    let PathSegment::Move { to: start } = first else { return None };
-    if at_start {
-        let mut current = *start;
-        for segment in subpath.segments.iter().skip(1) {
-            let tangent = match segment {
-                PathSegment::Move { to } => {
-                    current = *to;
-                    continue;
-                }
-                PathSegment::Line { to } => subtract(*to, current),
-                PathSegment::Quadratic { control, to } => {
-                    let control_tangent = subtract(*control, current);
-                    if nonzero(control_tangent) { control_tangent } else { subtract(*to, current) }
-                }
-                PathSegment::Cubic { control_1, control_2, to } => {
-                    let control_tangent = subtract(*control_1, current);
-                    if nonzero(control_tangent) {
-                        control_tangent
-                    } else {
-                        let fallback = subtract(*control_2, current);
-                        if nonzero(fallback) { fallback } else { subtract(*to, current) }
-                    }
-                }
-            };
-            if nonzero(tangent) {
-                return Some(tangent);
-            }
-            if let PathSegment::Line { to } | PathSegment::Quadratic { to, .. } | PathSegment::Cubic { to, .. } =
-                segment
-            {
-                current = *to;
-            }
-        }
-    } else {
-        let mut current = *start;
-        let mut tangent = None;
-        for segment in subpath.segments.iter().skip(1) {
-            match segment {
-                PathSegment::Move { to } => current = *to,
-                PathSegment::Line { to } => {
-                    tangent = Some(subtract(*to, current));
-                    current = *to;
-                }
-                PathSegment::Quadratic { control, to } => {
-                    tangent = Some(if nonzero(subtract(*to, *control)) {
-                        subtract(*to, *control)
-                    } else {
-                        subtract(*to, current)
-                    });
-                    current = *to;
-                }
-                PathSegment::Cubic { control_2, to, .. } => {
-                    tangent = Some(if nonzero(subtract(*to, *control_2)) {
-                        subtract(*to, *control_2)
-                    } else {
-                        subtract(*to, current)
-                    });
-                    current = *to;
-                }
-            }
-        }
-        return tangent.filter(|value| nonzero(*value));
+fn arrow_head_geometry(geometry: &PathGeometry, at_start: bool) -> Option<ArrowHeadGeometry> {
+    let length = path_length(geometry, DEFAULT_PATH_METRIC_TOLERANCE);
+    if length <= f64::EPSILON {
+        return None;
     }
-    None
+    let location = point_at_distance(
+        geometry,
+        if at_start { 0.0 } else { length },
+        DEFAULT_PATH_METRIC_TOLERANCE,
+    )?;
+    if !nonzero(location.tangent) {
+        return None;
+    }
+    let direction = if at_start { Vec2 { x: -location.tangent.x, y: -location.tangent.y } } else { location.tangent };
+    let left_direction = rotate(direction, -std::f64::consts::PI / 6.0);
+    let right_direction = rotate(direction, std::f64::consts::PI / 6.0);
+    Some(ArrowHeadGeometry {
+        tip: location.point,
+        left: subtract(location.point, scale(left_direction, 15.0)),
+        right: subtract(location.point, scale(right_direction, 15.0)),
+    })
+}
+
+fn arrow_shaft_geometry<'a>(geometry: &'a PathGeometry, style: &ArrowStyle) -> std::borrow::Cow<'a, PathGeometry> {
+    let start_trim = if style.head_start.unwrap_or(false) && style.head_start_style.as_deref() == Some("triangle") {
+        15.0
+    } else {
+        0.0
+    };
+    let end_trim = if style.head_end.unwrap_or(true) && style.head_end_style.as_deref() == Some("triangle") {
+        15.0
+    } else {
+        0.0
+    };
+    let length = path_length(geometry, DEFAULT_PATH_METRIC_TOLERANCE);
+    if start_trim == 0.0 && end_trim == 0.0 || length <= f64::EPSILON {
+        return std::borrow::Cow::Borrowed(geometry);
+    }
+    trim_path(
+        geometry,
+        start_trim,
+        (length - end_trim).max(start_trim),
+        DEFAULT_PATH_METRIC_TOLERANCE,
+    )
+    .map_or_else(|| std::borrow::Cow::Borrowed(geometry), std::borrow::Cow::Owned)
+}
+
+fn arrow_label_position(geometry: &PathGeometry, label: &ArrowLabel) -> Option<(Vec2, f64)> {
+    let length = path_length(geometry, DEFAULT_PATH_METRIC_TOLERANCE);
+    if length <= f64::EPSILON {
+        return None;
+    }
+    let distance = label.distance.unwrap_or_else(|| match label.align.as_str() {
+        "start" => 0.0,
+        "end" => length,
+        _ => length / 2.0,
+    });
+    let distance = if distance.is_finite() {
+        distance.clamp(0.0, length)
+    } else if distance.is_sign_negative() {
+        0.0
+    } else {
+        length
+    };
+    let location = point_at_distance(geometry, distance, DEFAULT_PATH_METRIC_TOLERANCE)?;
+    let normal = Vec2 { x: -location.tangent.y, y: location.tangent.x };
+    Some((add(location.point, scale(normal, label.offset)), location.distance))
+}
+
+fn point_at_distance(
+    geometry: &PathGeometry, distance: f64, tolerance: f64,
+) -> Option<crate::path_metrics::PathMetricPoint> {
+    crate::path_metrics::point_at_distance(geometry, distance, tolerance)
+}
+
+fn arrow_head(
+    output: &mut String, transform: &str, head: &ArrowHeadGeometry, at_start: bool, style: &ArrowStyle, opacity: &str,
+) {
+    let filled = (at_start && style.head_start_style.as_deref() == Some("triangle"))
+        || (!at_start && style.head_end_style.as_deref() == Some("triangle"));
+    let triangle = if filled {
+        format!(
+            "M {} {} L {} {} L {} {} Z",
+            number(head.tip.x),
+            number(head.tip.y),
+            number(head.left.x),
+            number(head.left.y),
+            number(head.right.x),
+            number(head.right.y)
+        )
+    } else {
+        format!(
+            "M {} {} L {} {} M {} {} L {} {}",
+            number(head.tip.x),
+            number(head.tip.y),
+            number(head.left.x),
+            number(head.left.y),
+            number(head.tip.x),
+            number(head.tip.y),
+            number(head.right.x),
+            number(head.right.y)
+        )
+    };
+    let filled = triangle.ends_with(" Z");
+    writeln!(
+        output,
+        "      <path transform=\"{transform}\" d=\"{triangle}\" fill=\"{}\" stroke=\"{}\" stroke-opacity=\"{opacity}\" stroke-width=\"{}\"/>",
+        if filled { escape_xml(&style.stroke) } else { "none".into() },
+        escape_xml(&style.stroke),
+        number(style.width)
+    )
+    .expect("writing to a String cannot fail");
+}
+
+fn add(left: Vec2, right: Vec2) -> Vec2 {
+    Vec2 { x: left.x + right.x, y: left.y + right.y }
 }
 
 fn subtract(left: Vec2, right: Vec2) -> Vec2 {
     Vec2 { x: left.x - right.x, y: left.y - right.y }
 }
 
+fn scale(point: Vec2, factor: f64) -> Vec2 {
+    Vec2 { x: point.x * factor, y: point.y * factor }
+}
+
+fn rotate(point: Vec2, angle: f64) -> Vec2 {
+    let (sine, cosine) = angle.sin_cos();
+    Vec2 { x: point.x * cosine - point.y * sine, y: point.x * sine + point.y * cosine }
+}
+
 fn nonzero(value: Vec2) -> bool {
     value.x.abs() > f64::EPSILON || value.y.abs() > f64::EPSILON
-}
-
-fn offset_point(point: Vec2, direction: Vec2, factor: f64) -> Vec2 {
-    let length = direction.x.hypot(direction.y);
-    if length <= f64::EPSILON {
-        return point;
-    }
-    Vec2 { x: point.x + direction.x / length * factor, y: point.y + direction.y / length * factor }
-}
-
-fn arrow_head(output: &mut String, transform: &str, from: Vec2, at: Vec2, style: &ArrowStyle, opacity: &str) {
-    let angle = (at.y - from.y).atan2(at.x - from.x);
-    let length = 15.0;
-    let spread = std::f64::consts::PI / 6.0;
-    let left = Vec2 { x: at.x - length * (angle - spread).cos(), y: at.y - length * (angle - spread).sin() };
-    let right = Vec2 { x: at.x - length * (angle + spread).cos(), y: at.y - length * (angle + spread).sin() };
-    writeln!(output, "      <path transform=\"{transform}\" d=\"M {} {} L {} {} M {} {} L {} {}\" fill=\"none\" stroke=\"{}\" stroke-opacity=\"{opacity}\" stroke-width=\"{}\"/>", number(at.x), number(at.y), number(left.x), number(left.y), number(at.x), number(at.y), number(right.x), number(right.y), escape_xml(&style.stroke), number(style.width)).expect("writing to a String cannot fail");
-}
-
-fn polyline_length(points: &[Vec2]) -> f64 {
-    points
-        .windows(2)
-        .map(|pair| (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y))
-        .sum()
-}
-
-fn point_at_distance(points: &[Vec2], target: f64) -> Vec2 {
-    let mut distance = 0.0;
-    for pair in points.windows(2) {
-        let length = (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y);
-        if distance + length >= target && length > 0.0 {
-            let ratio = (target - distance) / length;
-            return Vec2 {
-                x: pair[0].x + (pair[1].x - pair[0].x) * ratio,
-                y: pair[0].y + (pair[1].y - pair[0].y) * ratio,
-            };
-        }
-        distance += length;
-    }
-    points.last().copied().unwrap_or(Vec2 { x: 0.0, y: 0.0 })
 }
 
 fn markdown_lines(source: &str, base_size: f64) -> Vec<MarkdownLine> {

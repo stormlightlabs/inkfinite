@@ -1,4 +1,5 @@
 import type { Action } from '../actions';
+import { arrowLabelPlacement } from '../arrow-geometry';
 import {
 	arrowBendForPointer,
 	arrowBendHandleForShape,
@@ -13,7 +14,7 @@ import {
 	shapeTransform,
 	worldToLocal
 } from '../geom';
-import { nearestPointOnPath, pathLength, pointAtPathDistance, transformPathGeometry } from '../path-metrics';
+import { nearestPointOnPath } from '../path-metrics';
 import { Box2, clamp, Mat3, type Vec2, Vec2 as Vec2Ops } from '../math';
 import { duplicateAndConnectSelection } from '../selection';
 import { BindingRecord, createId, ShapeRecord } from '../model';
@@ -858,23 +859,9 @@ export class SelectTool implements Tool {
 				handles.push({ id: 'line-end', position: resolved.b });
 
 				if (shape.props.label) {
-					const polylineLength = pathLength(arrowGeometry.path);
-					const align = shape.props.label.align ?? 'center';
-					const offset = shape.props.label.offset ?? 0;
-
-					let distance: number;
-					if (align === 'center') {
-						distance = polylineLength / 2 + offset;
-					} else if (align === 'start') {
-						distance = offset;
-					} else {
-						distance = polylineLength - offset;
-					}
-
-					distance = Math.max(0, Math.min(distance, polylineLength));
-					const labelPos = pointAtPathDistance(arrowGeometry.path, distance)?.point;
-					if (labelPos) {
-						const worldLabelPos = localToWorld(shape, labelPos);
+					const placement = arrowLabelPlacement(arrowGeometry.path, shape.props.label);
+					if (placement) {
+						const worldLabelPos = localToWorld(shape, placement.point);
 						handles.push({ id: 'arrow-label', position: worldLabelPos });
 					}
 				}
@@ -998,24 +985,20 @@ export class SelectTool implements Tool {
 
 		const geometry = arrowGeometryForShape(state, initial);
 		if (!geometry) return null;
-		const worldGeometry = transformPathGeometry(geometry.path, shapeTransform(initial));
-		const nearest = nearestPointOnPath(worldGeometry, pointer);
+		const localPointer = worldToLocal(pointer, initial);
+		const nearest = nearestPointOnPath(geometry.path, localPointer);
 		if (!nearest) return null;
-		const polylineLength = pathLength(geometry.path);
-		const closestDistance = nearest.distance;
+		const normal = { x: -nearest.tangent.y, y: nearest.tangent.x };
+		const delta = { x: localPointer.x - nearest.point.x, y: localPointer.y - nearest.point.y };
+		const normalOffset = delta.x * normal.x + delta.y * normal.y;
 
-		const align = initial.props.label.align ?? 'center';
-		let newOffset: number;
-
-		if (align === 'center') {
-			newOffset = closestDistance - polylineLength / 2;
-		} else if (align === 'start') {
-			newOffset = closestDistance;
-		} else {
-			newOffset = polylineLength - closestDistance;
-		}
-
-		return { ...initial, props: { ...initial.props, label: { ...initial.props.label, offset: newOffset } } };
+		return {
+			...initial,
+			props: {
+				...initial.props,
+				label: { ...initial.props.label, distance: nearest.distance, offset: normalOffset }
+			}
+		};
 	}
 
 	private resizeLineShape(

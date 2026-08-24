@@ -128,7 +128,15 @@ export type ArrowEndpoint = { kind: 'free' | 'bound'; bindingId?: string };
 /**
  * Arrow style configuration
  */
-export type ArrowStyle = { stroke: string; width: number; headStart?: boolean; headEnd?: boolean; dash?: number[] };
+export type ArrowStyle = {
+	stroke: string;
+	width: number;
+	headStart?: boolean;
+	headEnd?: boolean;
+	headStartStyle?: 'open' | 'triangle';
+	headEndStyle?: 'open' | 'triangle';
+	dash?: number[];
+};
 
 /**
  * Arrow routing configuration
@@ -144,9 +152,13 @@ export type ArrowRouting = {
 };
 
 /**
- * Arrow label configuration
+ * Arrow label configuration.
+ *
+ * `distance` is an optional absolute distance along the resolved path. When it
+ * is omitted, `align` chooses the start, center, or end anchor. `offset` is a
+ * signed displacement along the path's local normal.
  */
-export type ArrowLabel = { text: string; align: 'center' | 'start' | 'end'; offset: number };
+export type ArrowLabel = { text: string; align: 'center' | 'start' | 'end'; offset: number; distance?: number };
 
 /**
  * Arrow properties using modern format
@@ -754,6 +766,15 @@ export function validateDoc(document: Document): ValidationResult {
 					errors.push(`Arrow shape '${shapeId}' missing style`);
 				} else if (props.style.width < 0) {
 					errors.push(`Arrow shape '${shapeId}' has negative width in style`);
+				} else {
+					for (const [name, value] of [
+						['start head style', props.style.headStartStyle],
+						['end head style', props.style.headEndStyle]
+					] as const) {
+						if (value !== undefined && value !== 'open' && value !== 'triangle') {
+							errors.push(`Arrow shape '${shapeId}' has invalid ${name}`);
+						}
+					}
 				}
 				if (props.routing) {
 					if (props.routing.bend !== undefined && !Number.isFinite(props.routing.bend)) {
@@ -768,6 +789,12 @@ export function validateDoc(document: Document): ValidationResult {
 				if (props.label) {
 					if (!['center', 'start', 'end'].includes(props.label.align)) {
 						errors.push(`Arrow shape '${shapeId}' has invalid label alignment`);
+					}
+					if (!Number.isFinite(props.label.offset)) {
+						errors.push(`Arrow shape '${shapeId}' has non-finite label offset`);
+					}
+					if (props.label.distance !== undefined && !Number.isFinite(props.label.distance)) {
+						errors.push(`Arrow shape '${shapeId}' has non-finite label distance`);
 					}
 				}
 

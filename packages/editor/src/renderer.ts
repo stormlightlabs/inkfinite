@@ -1,4 +1,5 @@
 import type {
+	ArrowLabel,
 	ArrowShape,
 	BindingIndex,
 	BindingRecord,
@@ -22,9 +23,10 @@ import type {
 import {
 	arrowBendHandleForShape,
 	arrowGeometryForShape,
+	arrowHeadGeometry,
+	arrowLabelPlacement,
 	arrowPathForShape,
-	pathLength,
-	pointAtPathDistance,
+	arrowShaftGeometry,
 	getLayersOnCurrentPage,
 	getStrokeOutline,
 	getShapesOnCurrentPage,
@@ -841,68 +843,42 @@ function drawArrow(
 	const shapeAlpha = context.globalAlpha;
 
 	const geometry = arrowGeometryForShape(state, shape, bindingsBySource);
-	const points = geometry ? arrowPathForShape(state, shape, bindingsBySource) : [];
-	if (!geometry || points.length < 2) return;
+	if (!geometry) return;
 
-	drawNativePath(context, geometry.path);
+	const shaft = arrowShaftGeometry(geometry.path, style);
+	drawNativePath(context, shaft);
 
 	context.strokeStyle = style.stroke;
 	context.globalAlpha = shapeAlpha * (shape.strokeOpacity ?? 1);
 	context.lineWidth = style.width;
-	if (style.dash) {
-		context.setLineDash(style.dash);
-	}
+	if (style.dash) context.setLineDash(style.dash);
 	context.stroke();
-	if (style.dash) {
-		context.setLineDash([]);
-	}
+	if (style.dash) context.setLineDash([]);
 
-	const lastSegment = { from: points[points.length - 2], to: points[points.length - 1] };
-	const angle = Math.atan2(lastSegment.to.y - lastSegment.from.y, lastSegment.to.x - lastSegment.from.x);
-	const arrowLength = 15;
-	const arrowAngle = Math.PI / 6;
-
-	const drawHead = (at: Vec2, reverse: boolean) => {
-		const dir = reverse ? angle + Math.PI : angle;
+	const drawHead = (atStart: boolean) => {
+		const head = arrowHeadGeometry(geometry.path, atStart);
+		if (!head) return;
+		const headStyle = atStart ? style.headStartStyle : style.headEndStyle;
 		context.beginPath();
-		context.moveTo(at.x, at.y);
-		context.lineTo(
-			at.x - arrowLength * Math.cos(dir - arrowAngle),
-			at.y - arrowLength * Math.sin(dir - arrowAngle)
-		);
-		context.moveTo(at.x, at.y);
-		context.lineTo(
-			at.x - arrowLength * Math.cos(dir + arrowAngle),
-			at.y - arrowLength * Math.sin(dir + arrowAngle)
-		);
+		context.moveTo(head.tip.x, head.tip.y);
+		if (headStyle === 'triangle') {
+			context.lineTo(head.left.x, head.left.y);
+			context.lineTo(head.right.x, head.right.y);
+			context.closePath();
+			context.fillStyle = style.stroke;
+			context.fill();
+		} else {
+			context.lineTo(head.left.x, head.left.y);
+			context.moveTo(head.tip.x, head.tip.y);
+			context.lineTo(head.right.x, head.right.y);
+		}
 		context.strokeStyle = style.stroke;
 		context.lineWidth = style.width;
 		context.stroke();
 	};
 
-	if (style.headEnd !== false) {
-		drawHead(lastSegment.to, false);
-	}
-
-	if (style.headStart) {
-		const firstSegment = { from: points[0], to: points[1] };
-		const startAngle = Math.atan2(firstSegment.to.y - firstSegment.from.y, firstSegment.to.x - firstSegment.from.x);
-		const startDir = startAngle + Math.PI;
-		context.beginPath();
-		context.moveTo(firstSegment.from.x, firstSegment.from.y);
-		context.lineTo(
-			firstSegment.from.x - arrowLength * Math.cos(startDir - arrowAngle),
-			firstSegment.from.y - arrowLength * Math.sin(startDir - arrowAngle)
-		);
-		context.moveTo(firstSegment.from.x, firstSegment.from.y);
-		context.lineTo(
-			firstSegment.from.x - arrowLength * Math.cos(startDir + arrowAngle),
-			firstSegment.from.y - arrowLength * Math.sin(startDir + arrowAngle)
-		);
-		context.strokeStyle = style.stroke;
-		context.lineWidth = style.width;
-		context.stroke();
-	}
+	if (style.headEnd !== false) drawHead(false);
+	if (style.headStart) drawHead(true);
 
 	const label = shape.props.label;
 	if (label) {
@@ -918,43 +894,32 @@ function drawArrowLabel(
 	context: CanvasRenderingContext2D,
 	state: EditorState,
 	geometry: PathGeometry,
-	label: { text: string; align: string; offset: number }
+	label: ArrowLabel
 ) {
 	if (!label.text) return;
 
-	let labelPos: Vec2;
-	const totalLength = pathLength(geometry);
-	let targetDist: number;
-
-	if (label.align === 'start') {
-		targetDist = label.offset;
-	} else if (label.align === 'end') {
-		targetDist = totalLength - label.offset;
-	} else {
-		targetDist = totalLength / 2 + label.offset;
-	}
-
-	labelPos = pointAtPathDistance(geometry, targetDist)?.point ?? geometry.subpaths[0]?.segments[0]?.to;
-	if (!labelPos) return;
+	const placement = arrowLabelPlacement(geometry, label);
+	if (!placement) return;
+	const labelPos = placement.point;
 
 	context.save();
 	context.font = '14px sans-serif';
 	context.fillStyle = '#000';
 	context.textAlign = 'center';
-	context.textBaseline = 'bottom';
+	context.textBaseline = 'middle';
 	const metrics = context.measureText(label.text);
 	const padding = 4;
 	const bgWidth = metrics.width + padding * 2;
 	const bgHeight = 18;
 
 	context.fillStyle = 'rgba(255, 255, 255, 0.9)';
-	context.fillRect(labelPos.x - bgWidth / 2, labelPos.y - bgHeight - 5, bgWidth, bgHeight);
+	context.fillRect(labelPos.x - bgWidth / 2, labelPos.y - bgHeight / 2, bgWidth, bgHeight);
 	context.strokeStyle = '#ccc';
 	context.lineWidth = 1 / state.camera.zoom;
-	context.strokeRect(labelPos.x - bgWidth / 2, labelPos.y - bgHeight - 5, bgWidth, bgHeight);
+	context.strokeRect(labelPos.x - bgWidth / 2, labelPos.y - bgHeight / 2, bgWidth, bgHeight);
 
 	context.fillStyle = '#000';
-	context.fillText(label.text, labelPos.x, labelPos.y - 5);
+	context.fillText(label.text, labelPos.x, labelPos.y);
 	context.restore();
 }
 
@@ -1664,24 +1629,11 @@ function getHandlesForShape(state: EditorState, shape: ShapeRecord, bindingsBySo
 			handles.push({ id: 'line-end', position: resolved.b });
 
 			if (shape.props.label) {
-				const polylineLength = pathLength(arrowGeometry.path);
-				const align = shape.props.label.align ?? 'center';
-				const offset = shape.props.label.offset ?? 0;
-
-				let distance: number;
-				if (align === 'center') {
-					distance = polylineLength / 2 + offset;
-				} else if (align === 'start') {
-					distance = offset;
-				} else {
-					distance = polylineLength - offset;
+				const placement = arrowLabelPlacement(arrowGeometry.path, shape.props.label);
+				if (placement) {
+					const worldLabelPos = localToWorld(shape, placement.point);
+					handles.push({ id: 'arrow-label', position: worldLabelPos });
 				}
-
-				distance = Math.max(0, Math.min(distance, polylineLength));
-				const labelPos = pointAtPathDistance(arrowGeometry.path, distance)?.point;
-				if (!labelPos) return handles;
-				const worldLabelPos = localToWorld(shape, labelPos);
-				handles.push({ id: 'arrow-label', position: worldLabelPos });
 			}
 		}
 		return handles;

@@ -1,4 +1,5 @@
 export * from './actions';
+export * from './arrow-geometry';
 export * from './camera';
 export * from './cards';
 export * from './cursor';

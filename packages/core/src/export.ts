@@ -1,13 +1,12 @@
 import {
   arrowGeometryForShape,
-  arrowPathForShape,
   localToWorld,
   pathGeometryBounds,
   shapeBounds,
 } from "./geom";
+import { arrowHeadGeometry, arrowLabelPlacement, arrowShaftGeometry } from "./arrow-geometry";
 import type { Box2 } from "./math";
 import { Box2 as Box2Ops } from "./math";
-import { pathLength, pointAtPathDistance } from "./path-metrics";
 import type { ArrowShape, ContainerShape, EllipseShape, LineShape, MarkdownShape, PathGeometry, PathShape, RectShape, ShapeRecord, TextShape } from "./model";
 import type { EditorState } from "./reactivity";
 import { getSelectedShapes, getShapesOnCurrentPage } from "./reactivity";
@@ -244,31 +243,35 @@ function lineToSVG(shape: LineShape, transform: string): string {
 
 function arrowToSVG(shape: ArrowShape, transform: string, state: EditorState): string {
   const geometry = arrowGeometryForShape(state, shape);
-  const points = arrowPathForShape(state, shape);
-  if (!geometry || points.length < 2) return "";
+  if (!geometry) return "";
   const stroke = escapeXML(shape.props.style.stroke);
   const width = svgNumber(shape.props.style.width);
-  const last = points.at(-1)!;
-  const previous = points.at(-2)!;
-  const angle = Math.atan2(last.y - previous.y, last.x - previous.x);
-  const head = (at: { x: number; y: number }, direction: number) => {
-    const length = 15;
-    const spread = Math.PI / 6;
-    const left = { x: at.x - length * Math.cos(direction - spread), y: at.y - length * Math.sin(direction - spread) };
-    const right = { x: at.x - length * Math.cos(direction + spread), y: at.y - length * Math.sin(direction + spread) };
-    return `<path d="M ${svgNumber(at.x)} ${svgNumber(at.y)} L ${svgNumber(left.x)} ${svgNumber(left.y)} M ${svgNumber(at.x)} ${svgNumber(at.y)} L ${svgNumber(right.x)} ${svgNumber(right.y)}" fill="none" stroke="${stroke}" stroke-width="${width}"/>`;
+  const shaft = arrowShaftGeometry(geometry.path, shape.props.style);
+  const elements = pathGeometryIsPolyline(shaft)
+    ? pathGeometryToLines(shaft, stroke, width)
+    : [`<path d="${pathGeometryToSVG(shaft)}" fill="none" stroke="${stroke}" stroke-width="${width}"/>`];
+
+  const head = (atStart: boolean) => {
+    const resolved = arrowHeadGeometry(geometry.path, atStart);
+    if (!resolved) return;
+    const headStyle = atStart ? shape.props.style.headStartStyle : shape.props.style.headEndStyle;
+    const points = `M ${svgNumber(resolved.tip.x)} ${svgNumber(resolved.tip.y)} L ${svgNumber(resolved.left.x)} ${svgNumber(resolved.left.y)} L ${svgNumber(resolved.right.x)} ${svgNumber(resolved.right.y)}`;
+    elements.push(
+      headStyle === "triangle"
+        ? `<path d="${points} Z" fill="${stroke}" stroke="${stroke}" stroke-width="${width}"/>`
+        : `<path d="M ${svgNumber(resolved.tip.x)} ${svgNumber(resolved.tip.y)} L ${svgNumber(resolved.left.x)} ${svgNumber(resolved.left.y)} M ${svgNumber(resolved.tip.x)} ${svgNumber(resolved.tip.y)} L ${svgNumber(resolved.right.x)} ${svgNumber(resolved.right.y)}" fill="none" stroke="${stroke}" stroke-width="${width}"/>`
+    );
   };
-  const elements = pathGeometryIsPolyline(geometry.path)
-    ? pathGeometryToLines(geometry.path, stroke, width)
-    : [`<path d="${pathGeometryToSVG(geometry.path)}" fill="none" stroke="${stroke}" stroke-width="${width}"/>`];
-  if (shape.props.style.headEnd !== false) elements.push(head(last, angle));
-  if (shape.props.style.headStart) elements.push(head(points[0], angle + Math.PI));
+
+  if (shape.props.style.headEnd !== false) head(false);
+  if (shape.props.style.headStart) head(true);
+
   const label = shape.props.label;
   if (label?.text) {
-    const length = pathLength(geometry.path);
-    const distance = label.align === "start" ? label.offset : label.align === "end" ? length - label.offset : length / 2 + label.offset;
-    const at = pointAtPathDistance(geometry.path, Math.max(0, Math.min(length, distance)))?.point;
-    if (at) elements.push(`<text x="${svgNumber(at.x)}" y="${svgNumber(at.y - 7)}" text-anchor="middle" font-family="sans-serif" font-size="14" fill="${stroke}">${escapeXML(label.text)}</text>`);
+    const placement = arrowLabelPlacement(geometry.path, label);
+    if (placement) {
+      elements.push(`<text x="${svgNumber(placement.point.x)}" y="${svgNumber(placement.point.y)}" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif" font-size="14" fill="${stroke}">${escapeXML(label.text)}</text>`);
+    }
   }
   return `<g transform="${transform}">${elements.join("")}</g>`;
 }
@@ -409,12 +412,33 @@ function exportBounds(state: EditorState, shape: ShapeRecord): Box2 {
   const geometry = arrowGeometryForShape(state, shape);
   if (!geometry) return shapeBounds(shape);
   const bounds = pathGeometryBounds(geometry.path);
-  return Box2Ops.fromPoints([
-    localToWorld(shape, bounds.min),
-    localToWorld(shape, { x: bounds.max.x, y: bounds.min.y }),
-    localToWorld(shape, bounds.max),
-    localToWorld(shape, { x: bounds.min.x, y: bounds.max.y })
-  ]);
+  const points = [
+    bounds.min,
+    { x: bounds.max.x, y: bounds.min.y },
+    bounds.max,
+    { x: bounds.min.x, y: bounds.max.y }
+  ];
+  if (shape.props.style.headEnd !== false) {
+    const head = arrowHeadGeometry(geometry.path, false);
+    if (head) points.push(head.tip, head.left, head.right);
+  }
+  if (shape.props.style.headStart) {
+    const head = arrowHeadGeometry(geometry.path, true);
+    if (head) points.push(head.tip, head.left, head.right);
+  }
+  if (shape.props.label?.text) {
+    const placement = arrowLabelPlacement(geometry.path, shape.props.label);
+    if (placement) {
+      const halfWidth = (shape.props.label.text.length * 7 + 8) / 2;
+      points.push(
+        { x: placement.point.x - halfWidth, y: placement.point.y - 9 },
+        { x: placement.point.x + halfWidth, y: placement.point.y - 9 },
+        { x: placement.point.x - halfWidth, y: placement.point.y + 9 },
+        { x: placement.point.x + halfWidth, y: placement.point.y + 9 }
+      );
+    }
+  }
+  return Box2Ops.fromPoints(points.map((point) => localToWorld(shape, point)));
 }
 
 function getExportSelection(state: EditorState): ShapeRecord[] {

@@ -1,6 +1,7 @@
 import getStroke from 'perfect-freehand';
 import type { Box2, Vec2 } from './math';
 import { Box2 as Box2Ops, Mat3, Vec2 as Vec2Ops } from './math';
+import { arrowHeadGeometry, arrowLabelPlacement } from './arrow-geometry';
 import type {
 	ArrowShape,
 	BindingRecord,
@@ -66,13 +67,47 @@ export function localShapeBounds(shape: ShapeRecord): Box2 {
 		case 'line':
 			return Box2Ops.fromPoints([shape.props.a, shape.props.b]);
 		case 'arrow': {
+			const style = shape.props.style;
 			const routing = shape.props.routing;
-			if (routing?.kind === 'curved' && !routing.automatic) {
-				return pathGeometryBounds(arrowPathGeometryFromProps(shape.props));
+			const geometry =
+				routing?.kind === 'curved' && !routing.automatic
+					? arrowPathGeometryFromProps(shape.props)
+					: (shape.resolvedGeometry?.path ?? arrowPathGeometryFromProps(shape.props));
+			let bounds = pathGeometryBounds(geometry);
+			const addPoint = (point: Vec2) => {
+				bounds = Box2Ops.expandToPoint(bounds, point);
+			};
+			if (style?.headEnd !== false) {
+				const head = arrowHeadGeometry(geometry, false);
+				if (head) {
+					addPoint(head.tip);
+					addPoint(head.left);
+					addPoint(head.right);
+				}
 			}
-			return shape.resolvedGeometry
-				? pathGeometryBounds(shape.resolvedGeometry.path)
-				: pathGeometryBounds(arrowPathGeometryFromProps(shape.props));
+			if (style?.headStart) {
+				const head = arrowHeadGeometry(geometry, true);
+				if (head) {
+					addPoint(head.tip);
+					addPoint(head.left);
+					addPoint(head.right);
+				}
+			}
+			if (shape.props.label?.text) {
+				const placement = arrowLabelPlacement(geometry, shape.props.label);
+				if (placement) {
+					const halfWidth = (shape.props.label.text.length * 7 + 8) / 2;
+					for (const point of [
+						{ x: placement.point.x - halfWidth, y: placement.point.y - 9 },
+						{ x: placement.point.x + halfWidth, y: placement.point.y - 9 },
+						{ x: placement.point.x - halfWidth, y: placement.point.y + 9 },
+						{ x: placement.point.x + halfWidth, y: placement.point.y + 9 }
+					]) {
+						addPoint(point);
+					}
+				}
+			}
+			return bounds;
 		}
 		case 'text':
 			return Box2Ops.create(0, 0, shape.props.w ?? shape.props.fontSize * 10, shape.props.fontSize * 1.2);
@@ -598,11 +633,39 @@ function hitTestShape(state: EditorState, shape: ShapeRecord, worldPoint: Vec2, 
 		case 'line':
 			return pointNearLine(worldPoint, shape, tolerance);
 		case 'arrow': {
+			const style = shape.props.style;
 			const geometry = arrowGeometryForShape(state, shape);
 			if (!geometry) return false;
 			const worldGeometry = transformPathGeometry(geometry.path, shapeTransform(shape));
 			const nearest = nearestPointOnPath(worldGeometry, worldPoint, Math.max(0.01, tolerance / 4));
-			return nearest !== null && nearest.distanceToPath <= tolerance + shape.props.style.width / 2;
+			if (nearest !== null && nearest.distanceToPath <= tolerance + (style?.width ?? 2) / 2) return true;
+
+			const localPoint = worldToLocal(worldPoint, shape);
+			const headHit = (atStart: boolean) => {
+				const head = arrowHeadGeometry(geometry.path, atStart);
+				if (!head) return false;
+				if ((atStart ? style?.headStart : style?.headEnd !== false) === false) return false;
+				if (
+					pointNearSegment(localPoint, head.tip, head.left, tolerance) ||
+					pointNearSegment(localPoint, head.tip, head.right, tolerance)
+				)
+					return true;
+				const headStyle = atStart ? style?.headStartStyle : style?.headEndStyle;
+				return headStyle === 'triangle' && pointInPolygon(localPoint, [head.tip, head.left, head.right]);
+			};
+			if (headHit(true) || headHit(false)) return true;
+
+			if (shape.props.label?.text) {
+				const placement = arrowLabelPlacement(geometry.path, shape.props.label);
+				if (placement) {
+					const halfWidth = (shape.props.label.text.length * 7 + 8) / 2 + tolerance;
+					return (
+						Math.abs(localPoint.x - placement.point.x) <= halfWidth &&
+						Math.abs(localPoint.y - placement.point.y) <= 9 + tolerance
+					);
+				}
+			}
+			return false;
 		}
 		case 'text':
 			return pointInText(worldPoint, shape);

@@ -116,17 +116,17 @@ selection, labels, and arrowheads.
 
 ### Path-aware arrowheads and labels
 
-- [ ] Orient start and end arrowheads from the tangent of the resolved path
+- [x] Orient start and end arrowheads from the tangent of the resolved path
       rather than the first or last sampled line segment
-- [ ] Define arrowhead geometry independently from shaft geometry so additional
+- [x] Define arrowhead geometry independently from shaft geometry so additional
       head styles can be added without changing routing
-- [ ] Trim the visible shaft where required so filled arrowheads do not overlap
+- [x] Trim the visible shaft where required so filled arrowheads do not overlap
       the path beneath them
-- [ ] Position arrow labels by distance along the resolved path
-- [ ] Apply label offset along the local path normal rather than a global axis
-- [ ] Keep label placement stable when bindings, bend, or orthogonal routing
+- [x] Position arrow labels by distance along the resolved path
+- [x] Apply label offset along the local path normal rather than a global axis
+- [x] Keep label placement stable when bindings, bend, or orthogonal routing
       change
-- [ ] Add hit-test and visual coverage for arrowheads and labels on straight,
+- [x] Add hit-test and visual coverage for arrowheads and labels on straight,
       curved, and orthogonal routes
 
 ## Advanced vector editing
