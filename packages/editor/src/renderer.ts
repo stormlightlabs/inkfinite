@@ -253,7 +253,7 @@ function drawScene(
 
 	applyCameraTransform(context, state.camera, viewport);
 
-	drawGrid(context, state.camera, viewport, snapSettings);
+	drawGrid(context, state.camera, viewport, snapSettings, theme);
 
 	const shapes = getShapesOnCurrentPage(state);
 	const bindingsBySource = new Map<string, BindingRecord[]>();
@@ -303,7 +303,7 @@ function drawScene(
 		}
 	}
 
-	drawSelection(context, state, shapes, handleState, bindingsBySource);
+	drawSelection(context, state, shapes, handleState, bindingsBySource, theme);
 
 	drawBindingPreview(context, state);
 
@@ -379,7 +379,13 @@ const DEFAULT_GRID_SIZE = 25;
  * At distant zoom levels, the renderer skips intermediate dots so the grid
  * stays legible without changing the snapping interval.
  */
-function drawGrid(context: CanvasRenderingContext2D, camera: Camera, viewport: Viewport, snapSettings?: SnapSettings) {
+function drawGrid(
+	context: CanvasRenderingContext2D,
+	camera: Camera,
+	viewport: Viewport,
+	snapSettings?: SnapSettings,
+	theme: 'light' | 'dark' = 'light'
+) {
 	if (snapSettings && !snapSettings.gridEnabled) {
 		return;
 	}
@@ -401,9 +407,9 @@ function drawGrid(context: CanvasRenderingContext2D, camera: Camera, viewport: V
 	const endX = Math.ceil(bottomRight.x / visibleGridSize) * visibleGridSize;
 	const startY = Math.floor(topLeft.y / visibleGridSize) * visibleGridSize;
 	const endY = Math.ceil(bottomRight.y / visibleGridSize) * visibleGridSize;
-	const dotRadius = 1 / camera.zoom;
+	const dotRadius = 1.25 / camera.zoom;
 
-	context.fillStyle = 'rgba(128, 128, 128, 0.24)';
+	context.fillStyle = theme === 'dark' ? 'rgba(167, 180, 188, 0.38)' : 'rgba(73, 80, 99, 0.32)';
 	context.beginPath();
 	for (let x = startX; x <= endX; x += visibleGridSize) {
 		for (let y = startY; y <= endY; y += visibleGridSize) {
@@ -1432,12 +1438,15 @@ function wrapText(
 /**
  * Draw selection outlines for selected shapes
  */
+const SELECTION_COLOR = '#34d399';
+
 function drawSelection(
 	context: CanvasRenderingContext2D,
 	state: EditorState,
 	shapes: ShapeRecord[],
 	handleState?: HandleRenderState,
-	bindingsBySource?: BindingIndex
+	bindingsBySource?: BindingIndex,
+	theme: 'light' | 'dark' = 'light'
 ) {
 	const selectedIds = new Set(state.ui.selectionIds);
 	const singleSelectionId = state.ui.selectionIds.length === 1 ? state.ui.selectionIds[0] : null;
@@ -1482,14 +1491,19 @@ function drawSelection(
 					break;
 				}
 				case 'arrow': {
-					const bounds = localShapeBounds(shape);
-					const padding = 5;
-					context.strokeRect(
-						bounds.min.x - padding,
-						bounds.min.y - padding,
-						bounds.max.x - bounds.min.x + padding * 2,
-						bounds.max.y - bounds.min.y + padding * 2
-					);
+					const geometry = arrowGeometryForShape(state, shape, bindingsBySource);
+					if (geometry) {
+						drawNativePath(context, arrowShaftGeometry(geometry.path, shape.props.style));
+						context.stroke();
+					} else {
+						const points = arrowPathForShape(state, shape, bindingsBySource);
+						if (points.length > 0) {
+							context.beginPath();
+							context.moveTo(points[0].x, points[0].y);
+							for (const point of points.slice(1)) context.lineTo(point.x, point.y);
+							context.stroke();
+						}
+					}
 					break;
 				}
 				case 'path': {
@@ -1545,18 +1559,15 @@ function drawSelection(
 			}
 		};
 
-		context.setLineDash([]);
-		context.strokeStyle = 'rgba(248, 250, 252, 0.96)';
-		context.lineWidth = 5 / state.camera.zoom;
-		strokeSelectionBounds();
-		context.strokeStyle = '#2563eb';
-		context.lineWidth = 2 / state.camera.zoom;
+		context.setLineDash([7 / state.camera.zoom, 5 / state.camera.zoom]);
+		context.strokeStyle = SELECTION_COLOR;
+		context.lineWidth = 2.5 / state.camera.zoom;
 		strokeSelectionBounds();
 
 		context.restore();
 
 		if (singleSelectionId === shape.id) {
-			drawHandles(context, state, shape, handleState, bindingsBySource);
+			drawHandles(context, state, shape, handleState, bindingsBySource, theme);
 			if (
 				state.ui.toolId === 'direct-select' &&
 				state.ui.pathSelection?.pathId === shape.id &&
@@ -1577,7 +1588,8 @@ function drawHandles(
 	state: EditorState,
 	shape: ShapeRecord,
 	handleState?: HandleRenderState,
-	bindingsBySource?: BindingIndex
+	bindingsBySource?: BindingIndex,
+	theme: 'light' | 'dark' = 'light'
 ) {
 	if (!handleState) {
 		return;
@@ -1590,7 +1602,7 @@ function drawHandles(
 	for (const handle of handles) {
 		if (handle.connectorFrom) {
 			context.save();
-			context.strokeStyle = 'rgba(37, 99, 235, 0.6)';
+			context.strokeStyle = 'rgba(52, 211, 153, 0.72)';
 			context.lineWidth = 1 / state.camera.zoom;
 			context.beginPath();
 			context.moveTo(handle.connectorFrom.x, handle.connectorFrom.y);
@@ -1602,27 +1614,17 @@ function drawHandles(
 		context.save();
 		const isActive = handleState.active === handle.id;
 		const isHover = handleState.hover === handle.id;
-		const fill = isActive ? '#2563eb' : isHover ? '#3b82f6' : '#ffffff';
-		const stroke = isActive || isHover ? '#2563eb' : '#1f2933';
-		const size = handle.id === 'rotate' ? 6 / state.camera.zoom : 5 / state.camera.zoom;
+		const fill = isActive || isHover ? SELECTION_COLOR : theme === 'dark' ? '#171928' : '#f0f3f4';
+		const size = (handle.id === 'rotate' ? 7 : 6) / state.camera.zoom;
 
 		context.translate(handle.position.x, handle.position.y);
-		context.lineWidth = 1 / state.camera.zoom;
-		context.strokeStyle = stroke;
+		context.lineWidth = 3 / state.camera.zoom;
+		context.strokeStyle = SELECTION_COLOR;
 		context.fillStyle = fill;
-
-		if (handle.id === 'rotate') {
-			context.beginPath();
-			context.arc(0, 0, size, 0, Math.PI * 2);
-			context.fill();
-			context.stroke();
-		} else {
-			const d = size;
-			context.beginPath();
-			context.rect(-d, -d, d * 2, d * 2);
-			context.fill();
-			context.stroke();
-		}
+		context.beginPath();
+		context.arc(0, 0, size, 0, Math.PI * 2);
+		context.fill();
+		context.stroke();
 
 		context.restore();
 	}

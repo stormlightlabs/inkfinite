@@ -25,6 +25,7 @@
 		ContextMenu,
 		Dialog,
 		Icon,
+		IconButton,
 		type ContextMenuEntry
 	} from '../../index';
 	import {
@@ -70,6 +71,7 @@
 	let sampledColorMessage = $state<string | null>(null);
 	let metadataOpen = $state(false);
 	let cardOpen = $state(false);
+	let collapsed = $state(false);
 	let sectionsViewport: HTMLDivElement | undefined = $state();
 	let canScrollSectionsBack = $state(false);
 	let canScrollSectionsForward = $state(false);
@@ -846,6 +848,7 @@
 	<div
 		class="selection-controls"
 		class:selection-controls--horizontal={orientation === 'horizontal'}
+		class:selection-controls--collapsed={collapsed}
 		role="toolbar"
 		aria-label="Selection controls"
 		data-agent-occlusion>
@@ -853,8 +856,13 @@
 			<strong
 				>{selectionCount}
 				{selectionCount === 1 ? 'object' : 'objects'} selected</strong>
+			<IconButton
+				label={collapsed ? 'Expand contextual actions' : 'Collapse contextual actions'}
+				name={collapsed ? 'chevron-down' : 'chevron-up'}
+				onclick={() => (collapsed = !collapsed)} />
 		</header>
 
+		{#if !collapsed}
 		<div
 			bind:this={sectionsViewport}
 			class="selection-controls__sections"
@@ -1556,6 +1564,7 @@
 				disabled={!canScrollSectionsForward}
 				onclick={() => shiftSections(1)}><Icon name="chevron-right" size={16} /></button>
 		</div>
+		{/if}
 	</div>
 
 	<ContextMenu
@@ -1591,10 +1600,18 @@
 			var(--ink-shadow-panel);
 		translate: -50% 0;
 		backdrop-filter: blur(14px);
+		transition-property: width, box-shadow;
+		transition-duration: var(--ink-duration-overlay);
+		transition-timing-function: var(--ink-ease-out);
 	}
 
 	.selection-controls--horizontal {
 		top: 11rem;
+	}
+
+	.selection-controls.selection-controls--collapsed {
+		width: 13rem;
+		overflow: clip;
 	}
 
 	.selection-controls__header {
@@ -1602,6 +1619,7 @@
 		flex: 0 0 auto;
 		min-width: max-content;
 		align-items: center;
+		gap: var(--ink-space-2);
 	}
 
 	.selection-controls__header strong {

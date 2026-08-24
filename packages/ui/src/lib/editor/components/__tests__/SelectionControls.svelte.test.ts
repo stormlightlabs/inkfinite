@@ -114,6 +114,35 @@ describe('SelectionControls', () => {
 			.toBeInTheDocument();
 	});
 
+	it('collapses contextual actions and restores them', async () => {
+		const page = PageRecord.create('Test page', 'page:test');
+		const rect = ShapeRecord.createRect(
+			page.id,
+			0,
+			0,
+			{ w: 80, h: 50, fill: '#ffffff', stroke: '#111111', radius: 4 },
+			'rect'
+		);
+		const screen = render(SelectionControls, {
+			currentTool: 'select',
+			orientation: 'vertical',
+			store: createSelectionStore([rect])
+		});
+
+		const toolbar = screen.getByRole('toolbar', { name: 'Selection controls' }).element();
+		expect(getComputedStyle(toolbar).transitionProperty).toContain('width');
+		await screen.getByRole('button', { name: 'Collapse contextual actions' }).click();
+		await new Promise((resolve) => setTimeout(resolve, 250));
+		expect(getComputedStyle(toolbar).width).toBe('208px');
+		await expect
+			.element(screen.getByRole('heading', { name: 'Appearance' }))
+			.not.toBeInTheDocument();
+		await screen.getByRole('button', { name: 'Expand contextual actions' }).click();
+		await expect
+			.element(screen.getByRole('heading', { name: 'Appearance' }))
+			.toBeInTheDocument();
+	});
+
 	it('projects and edits semantic metadata for ordinary objects', async () => {
 		const page = PageRecord.create('Test page', 'page:test');
 		const rect = ShapeRecord.createRect(

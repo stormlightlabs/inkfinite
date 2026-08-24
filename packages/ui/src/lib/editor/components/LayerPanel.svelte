@@ -482,7 +482,7 @@
 	}
 
 	.layer-panel--collapsed {
-		width: 7.5rem;
+		width: 10rem;
 	}
 
 	.layer-panel__header {

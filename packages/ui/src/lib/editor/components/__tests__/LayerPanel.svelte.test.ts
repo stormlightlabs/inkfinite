@@ -110,6 +110,10 @@ describe('LayerPanel', () => {
 		await expect.element(screen.getByRole('heading', { name: 'Layers' })).toBeInTheDocument();
 		const panel = screen.getByRole('complementary', { name: 'Layers' }).element();
 		expect(panel.querySelector('.layer-panel__title svg')).toBeNull();
+		const expandButton = screen.getByRole('button', { name: 'Expand layers' }).element();
+		const panelBounds = panel.getBoundingClientRect();
+		const buttonBounds = expandButton.getBoundingClientRect();
+		expect(buttonBounds.right).toBeLessThanOrEqual(panelBounds.right);
 		await expect
 			.element(screen.getByRole('list', { name: 'Page layers' }))
 			.not.toBeInTheDocument();

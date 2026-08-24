@@ -665,7 +665,35 @@ describe('Renderer', () => {
 			renderer.dispose();
 		});
 
-		it('renders a high-contrast double outline for selected shapes', async () => {
+		it('traces selected arrows instead of drawing a rectangular outline', async () => {
+			const store = new Store();
+			const page = PageRecord.create('Page 1', 'page:1');
+			const arrow = ShapeRecord.createArrow(
+				page.id,
+				0,
+				0,
+				{ a: { x: 0, y: 0 }, b: { x: 100, y: 0 }, stroke: '#000000', width: 2 },
+				'shape:arrow'
+			);
+
+			store.setState((state) => ({
+				...state,
+				doc: {
+					pages: { [page.id]: { ...page, shapeIds: [arrow.id] } },
+					shapes: { [arrow.id]: arrow },
+					bindings: {}
+				},
+				ui: { ...state.ui, currentPageId: page.id, selectionIds: [arrow.id] }
+			}));
+
+			const renderer = createRenderer(canvas, store);
+			await new Promise((resolve) => setTimeout(resolve, 50));
+
+			expect(context.strokeRect).not.toHaveBeenCalled();
+			renderer.dispose();
+		});
+
+		it('renders a dashed outline for selected shapes', async () => {
 			const store = new Store();
 
 			const page = PageRecord.create('Page 1', 'page:1');
@@ -693,7 +721,8 @@ describe('Renderer', () => {
 			const selectionStrokes = vi
 				.mocked(context.strokeRect)
 				.mock.calls.filter(([x, y, width, height]) => x === 0 && y === 0 && width === 200 && height === 100);
-			expect(selectionStrokes).toHaveLength(2);
+			expect(selectionStrokes).toHaveLength(1);
+			expect(context.setLineDash).toHaveBeenCalledWith([7, 5]);
 
 			renderer.dispose();
 		});
