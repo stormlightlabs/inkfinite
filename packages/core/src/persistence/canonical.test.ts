@@ -1,8 +1,80 @@
 import { describe, expect, it } from 'vitest';
 import { LayerRecord, PageRecord, ShapeRecord } from '../model';
-import { fromCanonicalDocumentSnapshot, toCanonicalDocumentSnapshot } from './canonical';
+import { fromCanonicalDocumentSnapshot, fromEditorProjection, toCanonicalDocumentSnapshot } from './canonical';
+import type { EditorProjection } from '@inkfinite/bindings/editor';
 
 describe('canonical editor projection', () => {
+	it('normalizes native property names from the Rust editor projection', () => {
+		const projection = {
+			pages: {
+				'page:one': { id: 'page:one', name: 'Page 1', shape_ids: ['shape:markdown'], layer_ids: ['layer:one'] }
+			},
+			layers: {
+				'layer:one': {
+					id: 'layer:one',
+					page_id: 'page:one',
+					name: 'Default',
+					shape_ids: ['shape:markdown'],
+					visible: true,
+					locked: false,
+					opacity: 1
+				}
+			},
+			shapes: {
+				'shape:markdown': {
+					id: 'shape:markdown',
+					type: 'markdown',
+					page_id: 'page:one',
+					transform: { a: 1, b: 0, c: 0, d: 1, e: 20, f: 30 },
+					x: 20,
+					y: 30,
+					rot: 0,
+					group_id: null,
+					layer_id: 'layer:one',
+					opacity: 1,
+					fill_opacity: null,
+					stroke_opacity: null,
+					locked: false,
+					agent_editable: true,
+					metadata: {
+						name: null,
+						title: null,
+						role: null,
+						description: null,
+						body: null,
+						tags: [],
+						source: null,
+						link: null,
+						custom_metadata: {},
+						locked: false,
+						agent_editable: true,
+						provenance: { actor_id: 'actor:test', origin: 'system', timestamp: 0, source: null }
+					},
+					props: {
+						width: 320,
+						height: 180,
+						markdown: '# Notes',
+						background: '#ffffff',
+						font_size: 16,
+						font_family: 'sans-serif'
+					}
+				}
+			},
+			bindings: {},
+			order: { page_ids: ['page:one'], shape_order: { 'page:one': ['shape:markdown'] }, layers: {} }
+		} as unknown as EditorProjection;
+
+		const projected = fromEditorProjection(projection);
+		expect(projected.shapes['shape:markdown'].props).toMatchObject({
+			w: 320,
+			h: 180,
+			md: '# Notes',
+			bg: '#ffffff',
+			fontSize: 16,
+			fontFamily: 'sans-serif'
+		});
+	});
+
 	it('traverses imported root containers and retains independently addressable descendants', () => {
 		const pageId = 'page:svg';
 		const layerId = 'layer:svg';

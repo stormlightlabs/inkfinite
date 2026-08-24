@@ -460,6 +460,53 @@ describe('Renderer', () => {
 			renderer.dispose();
 		});
 
+		it('does not fill a native path whose fill is none', () => {
+			const scheduledFrames: FrameRequestCallback[] = [];
+			globalThis.requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+				scheduledFrames.push(callback);
+				return scheduledFrames.length;
+			});
+			const page = PageRecord.create('Page 1', 'page:1');
+			const path = ShapeRecord.createPath(
+				page.id,
+				0,
+				0,
+				{
+					subpaths: [
+						{
+							segments: [
+								{ type: 'move', to: { x: 0, y: 20 } },
+								{ type: 'line', to: { x: 40, y: 0 } }
+							],
+							closed: false
+						}
+					],
+					fill_rule: 'nonzero',
+					fill: 'none',
+					stroke: '#0f766e',
+					stroke_width: 3
+				},
+				'path:none-fill'
+			);
+			const store = new Store();
+			store.setState((state) => ({
+				...state,
+				doc: {
+					pages: { [page.id]: { ...page, shapeIds: [path.id] } },
+					shapes: { [path.id]: path },
+					bindings: {}
+				},
+				ui: { ...state.ui, currentPageId: page.id }
+			}));
+
+			const renderer = createRenderer(canvas, store);
+			scheduledFrames.shift()?.(0);
+
+			expect(context.fill).not.toHaveBeenCalledWith('nonzero');
+			expect(context.stroke).toHaveBeenCalled();
+			renderer.dispose();
+		});
+
 		it('should render scene with line shape', async () => {
 			const store = new Store();
 

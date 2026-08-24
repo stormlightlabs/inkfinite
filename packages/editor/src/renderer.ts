@@ -1270,12 +1270,12 @@ function drawPath(context: CanvasRenderingContext2D, shape: PathShape) {
 		}
 		if (subpath.closed) context.closePath();
 	}
-	if (fill) {
+	if (fill && fill !== 'none' && fill !== 'transparent') {
 		context.globalAlpha = shapeAlpha * (shape.fillOpacity ?? 1);
 		context.fillStyle = fill;
 		context.fill(fillRule);
 	}
-	if (stroke) {
+	if (stroke && stroke !== 'none' && stroke !== 'transparent') {
 		context.globalAlpha = shapeAlpha * (shape.strokeOpacity ?? 1);
 		context.strokeStyle = stroke;
 		context.lineWidth = Math.max(0, strokeWidth ?? 2);

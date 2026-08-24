@@ -653,7 +653,10 @@ impl ImportParser {
             .filter_map(|descendant| descendant.text())
             .collect::<String>();
         let color = style.fill.clone().unwrap_or_else(|| "none".into());
-        let transform = self.transformed_geometry(node, x, y)?;
+        // Native text uses a top-aligned origin, while SVG text positions the
+        // alphabetic baseline at `y`. Shift by the font size so imported labels
+        // retain their expected vertical placement.
+        let transform = self.transformed_geometry(node, x, y - style.font_size)?;
         Ok(SvgShape {
             source_id: source_id(node),
             kind: ShapeKind::from(crate::TEXT_KIND),
@@ -1859,7 +1862,7 @@ mod tests {
             .expect("text should import");
         let text = shape(&import, 0);
         assert_eq!(text.kind.as_str(), crate::TEXT_KIND);
-        assert_eq!(text.transform.translation, Vec2 { x: 12.0, y: 24.0 });
+        assert_eq!(text.transform.translation, Vec2 { x: 12.0, y: 4.0 });
         assert_eq!(text.properties["text"], json!("Hello world"));
         assert_eq!(text.properties["font_family"], json!("Inter"));
     }

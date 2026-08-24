@@ -613,7 +613,9 @@ struct ArrowProps {
 #[serde(rename_all = "camelCase")]
 struct TextProps {
     text: String,
+    #[serde(alias = "font_size")]
     font_size: f64,
+    #[serde(alias = "font_family")]
     font_family: String,
     color: String,
     #[serde(alias = "w")]
@@ -629,7 +631,9 @@ struct MarkdownProps {
     width: f64,
     #[serde(alias = "h")]
     height: Option<f64>,
+    #[serde(alias = "font_size")]
     font_size: f64,
+    #[serde(alias = "font_family")]
     font_family: String,
     color: String,
     #[serde(alias = "bg")]

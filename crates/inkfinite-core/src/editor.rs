@@ -506,22 +506,38 @@ fn append_projected_shape(
 #[must_use]
 pub fn native_properties(properties: &ShapeProperties) -> ShapeProperties {
     let mut result = properties.clone();
-    if let Some(width) = result.remove("w") {
-        result.insert("width".into(), width);
-    }
-    if let Some(height) = result.remove("h") {
-        result.insert("height".into(), height);
+    for (editor, native) in [
+        ("w", "width"),
+        ("h", "height"),
+        ("md", "markdown"),
+        ("bg", "background"),
+        ("fontSize", "font_size"),
+        ("fontFamily", "font_family"),
+        ("assetId", "asset_id"),
+        ("referenceType", "reference_type"),
+    ] {
+        if let Some(value) = result.remove(editor) {
+            result.entry(native.into()).or_insert(value);
+        }
     }
     result
 }
 
 fn editor_properties(properties: &ShapeProperties) -> ShapeProperties {
     let mut result = properties.clone();
-    if let Some(width) = result.remove("width") {
-        result.insert("w".into(), width);
-    }
-    if let Some(height) = result.remove("height") {
-        result.insert("h".into(), height);
+    for (native, editor) in [
+        ("width", "w"),
+        ("height", "h"),
+        ("markdown", "md"),
+        ("background", "bg"),
+        ("font_size", "fontSize"),
+        ("font_family", "fontFamily"),
+        ("asset_id", "assetId"),
+        ("reference_type", "referenceType"),
+    ] {
+        if let Some(value) = result.remove(native) {
+            result.entry(editor.into()).or_insert(value);
+        }
     }
     result
 }
@@ -1031,6 +1047,41 @@ mod tests {
         assert_eq!(projection.shapes.len(), 3);
         assert_eq!(child.props["w"], Value::from(20.0));
         assert!(!child.props.contains_key("width"));
+    }
+
+    #[test]
+    fn projection_translates_native_property_names_for_editor_clients() {
+        let mut snapshot = nested_snapshot();
+        let child = snapshot
+            .document
+            .shapes
+            .get_mut(&ShapeId::from("shape:child"))
+            .expect("child fixture");
+        child.properties.extend([
+            ("markdown".into(), Value::from("# Notes")),
+            ("background".into(), Value::from("#ffffff")),
+            ("font_size".into(), Value::from(16.0)),
+            ("font_family".into(), Value::from("sans-serif")),
+            ("asset_id".into(), Value::from("asset:one")),
+            ("reference_type".into(), Value::from("url")),
+        ]);
+        let native = child.properties.clone();
+
+        let projection = project_editor(&snapshot);
+        let props = &projection.shapes[&ShapeId::from("shape:child")].props;
+        for editor_name in [
+            "w",
+            "h",
+            "md",
+            "bg",
+            "fontSize",
+            "fontFamily",
+            "assetId",
+            "referenceType",
+        ] {
+            assert!(props.contains_key(editor_name), "missing {editor_name}");
+        }
+        assert_eq!(native_properties(props), native);
     }
 
     #[test]

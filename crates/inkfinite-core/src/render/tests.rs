@@ -683,6 +683,30 @@ fn render_is_deterministic_and_covers_every_visual_builtin() {
 }
 
 #[test]
+fn renders_imported_snake_case_text_properties() {
+    let mut snapshot = fixture_snapshot();
+    let shape = snapshot
+        .document
+        .shapes
+        .get_mut(&ShapeId::from("shape:text"))
+        .expect("text fixture");
+    shape.properties.remove("fontSize");
+    shape.properties.remove("fontFamily");
+    shape.properties.insert("font_size".into(), serde_json::json!(18));
+    shape
+        .properties
+        .insert("font_family".into(), serde_json::json!("Inter"));
+
+    let output = render_svg(
+        &snapshot,
+        &SvgRenderOptions { page_id: Some(PageId::from("page:fixtures")), ..SvgRenderOptions::default() },
+    )
+    .expect("imported text renders");
+
+    assert!(output.svg.contains("data-shape-id=\"shape:text\""));
+}
+
+#[test]
 fn frame_child_order_controls_svg_presentation_order() {
     let mut snapshot = fixture_snapshot();
     let frame_id = ShapeId::from("group:card");

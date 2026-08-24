@@ -181,7 +181,7 @@ export function fromEditorProjection(projection: EditorProjection, snapshot?: Na
 			locked: shape.locked,
 			agentEditable: shape.agent_editable,
 			metadata: fromNativeMetadata(shape.metadata),
-			props: shape.props as ShapeRecord['props'],
+			props: editorProperties(shape.props as ShapeProperties) as ShapeRecord['props'],
 			...(shape.resolved_geometry ? { resolvedGeometry: shape.resolved_geometry } : {})
 		} as ShapeRecord;
 	}
@@ -599,21 +599,18 @@ function toNativeMetadata(
 
 function editorProperties(properties: ShapeProperties): ShapeProperties {
 	const result = JSON.parse(JSON.stringify(properties)) as ShapeProperties;
-	if ('width' in result) {
-		result.w = result.width;
-		delete result.width;
-	}
-	if ('height' in result) {
-		result.h = result.height;
-		delete result.height;
-	}
-	if ('asset_id' in result && !('assetId' in result)) {
-		result.assetId = result.asset_id;
-		delete result.asset_id;
-	}
-	if ('reference_type' in result && !('referenceType' in result)) {
-		result.referenceType = result.reference_type;
-		delete result.reference_type;
+	for (const [native, editor] of [
+		['width', 'w'],
+		['height', 'h'],
+		['markdown', 'md'],
+		['background', 'bg'],
+		['font_size', 'fontSize'],
+		['font_family', 'fontFamily'],
+		['asset_id', 'assetId'],
+		['reference_type', 'referenceType']
+	] as const) {
+		if (native in result && !(editor in result)) result[editor] = result[native];
+		delete result[native];
 	}
 	return result;
 }
