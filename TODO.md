@@ -4,23 +4,23 @@
 
 Make newly created content look deliberate before the user changes any styling.
 
-- [ ] Move creation-time visual defaults into a shared style policy instead of
+- [x] Move creation-time visual defaults into a shared style policy instead of
       hard-coding colors independently in editor tools and UI controls
-- [ ] Define defaults for rectangles, ellipses, frames, lines, arrows, pen
+- [x] Define defaults for rectangles, ellipses, frames, lines, arrows, pen
       strokes, text, Markdown, and cards
-- [ ] Use neutral shape styling by default and reserve the Inkfinite accent for
+- [x] Use neutral shape styling by default and reserve the Inkfinite accent for
       selection, arrows, emphasis, and interactive state
-- [ ] Increase the default rectangle corner radius and define distinct frame
+- [x] Increase the default rectangle corner radius and define distinct frame
       styling so frames do not look like ordinary shapes
-- [ ] Remove light-canvas assumptions from text and Markdown defaults
-- [] Resolve automatic creation colors against the document/page canvas at creation time
-  and persist the resulting explicit colors; keep application theme colors out of
-  canonical document rendering.
-- [ ] Ensure creation through the editor, CLI, MCP, stencils, and starter
+- [x] Remove light-canvas assumptions from text and Markdown defaults
+- [x] Resolve automatic creation colors against the document/page canvas at creation time
+      and persist the resulting explicit colors; keep application theme colors out of
+      canonical document rendering
+- [x] Ensure creation through the editor, CLI, MCP, stencils, and starter
       documents uses the same default style policy where appropriate
-- [ ] Add light- and dark-canvas visual fixtures covering every built-in
+- [x] Add light- and dark-canvas visual fixtures covering every built-in
       primitive
-- [ ] Add screenshot regression coverage for a representative mixed document
+- [x] Add screenshot regression coverage for a representative mixed document
 
 ## SVG round-trip
 

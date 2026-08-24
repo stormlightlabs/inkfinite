@@ -19,6 +19,7 @@ export * from './persistence/stats';
 export * from './reactivity';
 export * from './selection';
 export * from './snapping';
+export * from './style-policy';
 export * as stencils from './stencils';
 export * from './tools';
 export * from './ui/filebrowser';

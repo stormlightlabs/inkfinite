@@ -3,9 +3,12 @@ import { createId, ShapeRecord } from "../model";
 import type { EditorState, ToolId } from "../reactivity";
 import { canCreateShapeOnActiveLayer, getCurrentPage } from "../reactivity";
 import type { Tool } from "./base";
+import { creationStylePolicy, type CanvasAppearance } from "../style-policy";
 
 export class MarkdownTool implements Tool {
   readonly id: ToolId = "markdown";
+
+  constructor(private readonly getAppearance: () => CanvasAppearance = () => "light") {}
 
   onEnter(state: EditorState): EditorState {
     return state;
@@ -39,9 +42,7 @@ export class MarkdownTool implements Tool {
       md: "# Markdown\n\nEdit me...",
       w: 300,
       h: 200,
-      fontSize: 16,
-      fontFamily: "Instrument Sans Variable",
-      color: "#1f2933",
+      ...creationStylePolicy(this.getAppearance()).markdown,
     }, shapeId);
 
     const newPage = { ...currentPage, shapeIds: [...currentPage.shapeIds, shapeId] };

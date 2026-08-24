@@ -4,6 +4,7 @@ import { createId, ShapeRecord } from "../model";
 import type { EditorState, ToolId } from "../reactivity";
 import { canCreateShapeOnActiveLayer, getCurrentPage } from "../reactivity";
 import type { Tool } from "../tools/base";
+import { creationStylePolicy, type CanvasAppearance } from "../style-policy";
 
 /**
  * Internal state for pen tool
@@ -37,16 +38,6 @@ const MIN_POINT_DISTANCE = 1;
 const FRAME_DURATION_MS = 1000 / 60;
 
 /**
- * Default brush configuration
- */
-const DEFAULT_BRUSH = { size: 16, thinning: 0.5, smoothing: 0.5, streamline: 0.5, simulatePressure: true };
-
-/**
- * Default stroke style
- */
-const DEFAULT_STYLE: StrokeStyle = { color: "#000000", opacity: 1.0 };
-
-/**
  * Pen tool - creates freehand stroke shapes using perfect-freehand
  *
  * Features:
@@ -61,7 +52,11 @@ export class PenTool implements Tool {
   private getBrush: () => BrushConfig;
   private getStrokeStyle: () => StrokeStyle;
 
-  constructor(getBrush?: () => BrushConfig, getStrokeStyle?: () => StrokeStyle) {
+  constructor(
+    getBrush?: () => BrushConfig,
+    getStrokeStyle?: () => StrokeStyle,
+    getAppearance: () => CanvasAppearance = () => "light",
+  ) {
     this.toolState = {
       isDrawing: false,
       draftPoints: [],
@@ -69,8 +64,8 @@ export class PenTool implements Tool {
       draftNeedsSync: false,
       lastUpdateFrame: null,
     };
-    this.getBrush = getBrush ?? (() => DEFAULT_BRUSH);
-    this.getStrokeStyle = getStrokeStyle ?? (() => DEFAULT_STYLE);
+    this.getBrush = getBrush ?? (() => creationStylePolicy(getAppearance()).pen.brush);
+    this.getStrokeStyle = getStrokeStyle ?? (() => creationStylePolicy(getAppearance()).pen.style);
   }
 
   onEnter(state: EditorState): EditorState {

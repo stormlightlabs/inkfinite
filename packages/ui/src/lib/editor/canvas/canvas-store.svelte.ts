@@ -193,7 +193,9 @@ export function createCanvasController(
 
 	const cursorStore = new CursorStore();
 	const snapStore: SnapStore = createSnapStore();
-	const brushStore: BrushStore = createBrushStore();
+	const brushStore: BrushStore = createBrushStore({
+		color: themeStore.current === 'dark' ? '#d8e6e6' : '#1e2029'
+	});
 	type ScreenRect = { left: number; top: number; width: number; height: number };
 	let marqueeBounds: Box2 | null = null;
 	let marqueeRect = $state<ScreenRect | null>(null);
@@ -405,13 +407,14 @@ export function createCanvasController(
 		(point, state, excludedIds) => snapPoint(state, point, excludedIds, snapStore.get())
 	);
 	const directSelectTool = new DirectSelectTool();
-	const rectTool = new RectTool();
-	const ellipseTool = new EllipseTool();
-	const frameTool = new FrameTool();
-	const lineTool = new LineTool();
-	const arrowTool = new ArrowTool();
-	const textTool = new TextTool();
-	const markdownTool = new MarkdownTool();
+	const getCanvasAppearance = () => themeStore.current;
+	const rectTool = new RectTool(getCanvasAppearance);
+	const ellipseTool = new EllipseTool(getCanvasAppearance);
+	const frameTool = new FrameTool(getCanvasAppearance);
+	const lineTool = new LineTool(getCanvasAppearance);
+	const arrowTool = new ArrowTool(getCanvasAppearance);
+	const textTool = new TextTool(getCanvasAppearance);
+	const markdownTool = new MarkdownTool(getCanvasAppearance);
 	const getPenBrushConfig = () => {
 		const { color: _color, ...config } = brushStore.get();
 		return config;

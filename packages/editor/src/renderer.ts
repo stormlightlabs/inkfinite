@@ -780,7 +780,7 @@ function drawContainer(context: CanvasRenderingContext2D, shape: Extract<ShapeRe
 	}
 	if (title) {
 		context.globalAlpha = shapeAlpha * (shape.fillOpacity ?? 1);
-		context.fillStyle = '#1f2937';
+		context.fillStyle = stroke ?? '#69717d';
 		context.font = '600 14px sans-serif';
 		context.textBaseline = 'top';
 		context.fillText(title, 8, 6);

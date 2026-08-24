@@ -6,6 +6,7 @@ import { BindingRecord, createId, ShapeRecord } from '../model';
 import type { EditorState, ToolId } from '../reactivity';
 import { canCreateShapeOnActiveLayer, getCurrentPage } from '../reactivity';
 import type { Tool } from '../tools/base';
+import { creationStylePolicy, type CanvasAppearance } from '../style-policy';
 
 function adoptFrameContents(state: EditorState, frameId: string): EditorState {
 	const frame = state.doc.shapes[frameId];
@@ -100,7 +101,7 @@ export class RectTool implements Tool {
 	readonly id: ToolId = 'rect';
 	private toolState: ShapeCreationToolState;
 
-	constructor() {
+	constructor(private readonly getAppearance: () => CanvasAppearance = () => 'light') {
 		this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
 	}
 
@@ -151,7 +152,7 @@ export class RectTool implements Tool {
 			currentPage.id,
 			action.world.x,
 			action.world.y,
-			{ w: 0, h: 0, fill: '#4a90e2', stroke: '#2e5c8a', radius: 4 },
+			{ w: 0, h: 0, ...creationStylePolicy(this.getAppearance()).rect },
 			shapeId
 		);
 
@@ -258,6 +259,8 @@ export class FrameTool implements Tool {
 	readonly id: ToolId = 'frame';
 	private toolState: ShapeCreationToolState = { isCreating: false, startWorld: null, creatingShapeId: null };
 
+	constructor(private readonly getAppearance: () => CanvasAppearance = () => 'light') {}
+
 	onEnter(state: EditorState): EditorState {
 		this.resetToolState();
 		return state;
@@ -293,7 +296,7 @@ export class FrameTool implements Tool {
 			page.id,
 			action.world.x,
 			action.world.y,
-			{ w: 0, h: 0, title: 'Frame', fill: 'rgba(37, 99, 235, 0.05)', stroke: '#2563eb', radius: 8 },
+			{ w: 0, h: 0, title: 'Frame', ...creationStylePolicy(this.getAppearance()).frame },
 			id
 		);
 		shape.layerId = state.ui.activeLayerId ?? page.layerIds?.[0];
@@ -385,7 +388,7 @@ export class EllipseTool implements Tool {
 	readonly id: ToolId = 'ellipse';
 	private toolState: ShapeCreationToolState;
 
-	constructor() {
+	constructor(private readonly getAppearance: () => CanvasAppearance = () => 'light') {
 		this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
 	}
 
@@ -436,7 +439,7 @@ export class EllipseTool implements Tool {
 			currentPage.id,
 			action.world.x,
 			action.world.y,
-			{ w: 0, h: 0, fill: '#51cf66', stroke: '#2f9e44' },
+			{ w: 0, h: 0, ...creationStylePolicy(this.getAppearance()).ellipse },
 			shapeId
 		);
 
@@ -547,7 +550,7 @@ export class LineTool implements Tool {
 	readonly id: ToolId = 'line';
 	private toolState: ShapeCreationToolState;
 
-	constructor() {
+	constructor(private readonly getAppearance: () => CanvasAppearance = () => 'light') {
 		this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
 	}
 
@@ -598,7 +601,7 @@ export class LineTool implements Tool {
 			currentPage.id,
 			action.world.x,
 			action.world.y,
-			{ a: { x: 0, y: 0 }, b: { x: 0, y: 0 }, stroke: '#495057', width: 2 },
+			{ a: { x: 0, y: 0 }, b: { x: 0, y: 0 }, ...creationStylePolicy(this.getAppearance()).line },
 			shapeId
 		);
 
@@ -706,7 +709,7 @@ export class ArrowTool implements Tool {
 	readonly id: ToolId = 'arrow';
 	private toolState: ShapeCreationToolState;
 
-	constructor() {
+	constructor(private readonly getAppearance: () => CanvasAppearance = () => 'light') {
 		this.toolState = { isCreating: false, startWorld: null, creatingShapeId: null };
 	}
 
@@ -764,7 +767,7 @@ export class ArrowTool implements Tool {
 				],
 				start: { kind: 'free' },
 				end: { kind: 'free' },
-				style: { stroke: '#2563eb', width: 2, headEnd: true },
+				style: creationStylePolicy(this.getAppearance()).arrow,
 				routing: { kind: 'straight' }
 			},
 			shapeId

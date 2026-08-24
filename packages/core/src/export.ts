@@ -313,7 +313,7 @@ function wrapSemanticMetadata(shape: ShapeRecord, content: string): string {
 function containerToSVG(shape: ContainerShape, transform: string): string {
   const { w = 0, h = 0, title, fill, stroke, radius = 0 } = shape.props;
   const elements = [`<rect transform="${transform}" width="${svgNumber(w)}" height="${svgNumber(h)}" rx="${svgNumber(Math.min(radius, w / 2, h / 2))}" fill="${escapeXML(fill ?? "none")}" stroke="${escapeXML(stroke ?? "none")}"/>`];
-  if (title) elements.push(`<text transform="${transform}" x="8" y="18" font-family="sans-serif" font-size="14" font-weight="600" fill="#1f2937">${escapeXML(title)}</text>`);
+  if (title) elements.push(`<text transform="${transform}" x="8" y="18" font-family="sans-serif" font-size="14" font-weight="600" fill="${escapeXML(stroke ?? '#69717d')}">${escapeXML(title)}</text>`);
   return elements.join("");
 }
 

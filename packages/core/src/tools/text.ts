@@ -3,6 +3,7 @@ import { createId, ShapeRecord } from "../model";
 import type { EditorState, ToolId } from "../reactivity";
 import { canCreateShapeOnActiveLayer, getCurrentPage } from "../reactivity";
 import type { Tool } from "./base";
+import { creationStylePolicy, type CanvasAppearance } from "../style-policy";
 
 /**
  * Text tool - creates text shapes on click
@@ -14,6 +15,8 @@ import type { Tool } from "./base";
  */
 export class TextTool implements Tool {
   readonly id: ToolId = "text";
+
+  constructor(private readonly getAppearance: () => CanvasAppearance = () => "light") {}
 
   onEnter(state: EditorState): EditorState {
     return state;
@@ -45,9 +48,7 @@ export class TextTool implements Tool {
 
     const shape = ShapeRecord.createText(currentPage.id, action.world.x, action.world.y, {
       text: "Text",
-      fontSize: 16,
-      fontFamily: "Instrument Sans Variable",
-      color: "#1f2933",
+      ...creationStylePolicy(this.getAppearance()).text,
     }, shapeId);
 
     const newPage = { ...currentPage, shapeIds: [...currentPage.shapeIds, shapeId] };

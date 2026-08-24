@@ -471,7 +471,7 @@ describe("Tools", () => {
       const createdShape = shapeId ? nextState.doc.shapes[shapeId] : null;
 
       expect(createdShape?.type).toBe("text");
-      expect((createdShape?.props as TextProps).color).toBe("#1f2933");
+      expect((createdShape?.props as TextProps).color).toBe("#1e2029");
     });
   });
 });

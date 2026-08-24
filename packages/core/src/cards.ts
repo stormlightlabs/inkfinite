@@ -6,6 +6,7 @@ import {
 	type ShapeMetadata,
 	type ShapeRecord as Shape
 } from './model';
+import { creationStylePolicy, type CanvasAppearance } from './style-policy';
 
 /** User-editable fields carried by a card container. */
 export type CardFields = {
@@ -54,31 +55,27 @@ export function createCardShapes(
 	x: number,
 	y: number,
 	fields: CardFields,
-	id = createId('shape')
+	id = createId('shape'),
+	appearance: CanvasAppearance = 'light'
 ): Shape[] {
+	const styles = creationStylePolicy(appearance);
 	const container = ShapeRecord.createContainer(
 		pageId,
 		x,
 		y,
-		{ w: 320, h: 220, fill: '#ffffff', stroke: '#cbd5e1', radius: 10 },
+		{ w: 320, h: 220, ...styles.card.container },
 		id
 	);
 	const title = ShapeRecord.createText(pageId, x + 16, y + 16, {
 		text: fields.title,
-		fontSize: 18,
-		fontFamily: 'Instrument Sans Variable',
-		color: '#0f172a',
+		...styles.card.title,
 		w: 288
 	});
 	const body = ShapeRecord.createMarkdown(pageId, x + 16, y + 58, {
 		md: fields.body,
 		w: 288,
 		h: 140,
-		fontSize: 14,
-		fontFamily: 'Instrument Sans Variable',
-		color: '#334155',
-		bg: 'transparent',
-		border: 'transparent'
+		...styles.card.body
 	});
 	const children = [
 		{ ...title, groupId: container.id },
