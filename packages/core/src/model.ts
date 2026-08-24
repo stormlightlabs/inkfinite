@@ -135,7 +135,9 @@ export type ArrowStyle = { stroke: string; width: number; headStart?: boolean; h
  */
 export type ArrowRouting = {
 	kind: 'straight' | 'curved' | 'orthogonal';
-	/** Radius used by orthogonal corners when the renderer supports it. */
+	/** Signed local-space offset of a two-point curved arrow from its chord. */
+	bend?: number;
+	/** Radius used to round interior waypoints on curved routes and orthogonal corners. */
 	cornerRadius?: number;
 	/** Let the renderer choose a route around other shapes. */
 	automatic?: boolean;
@@ -754,7 +756,12 @@ export function validateDoc(document: Document): ValidationResult {
 					errors.push(`Arrow shape '${shapeId}' has negative width in style`);
 				}
 				if (props.routing) {
-					if (props.routing.cornerRadius !== undefined && props.routing.cornerRadius < 0) {
+					if (props.routing.bend !== undefined && !Number.isFinite(props.routing.bend)) {
+						errors.push(`Arrow shape '${shapeId}' has non-finite bend`);
+					}
+					if (props.routing.cornerRadius !== undefined && !Number.isFinite(props.routing.cornerRadius)) {
+						errors.push(`Arrow shape '${shapeId}' has invalid cornerRadius`);
+					} else if (props.routing.cornerRadius !== undefined && props.routing.cornerRadius < 0) {
 						errors.push(`Arrow shape '${shapeId}' has negative cornerRadius`);
 					}
 				}

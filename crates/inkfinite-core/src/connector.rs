@@ -138,9 +138,24 @@ pub fn resolve_arrow_geometry_for_shape(
         }
     }
 
-    let routing_kind = properties.routing.as_ref().map_or("straight", |routing| {
+    let routing = properties.routing.as_ref();
+    let routing_kind = routing.map_or("straight", |routing| {
         if routing.automatic { "orthogonal" } else { routing.kind.as_str() }
     });
+    if let Some(bend) = routing.and_then(|routing| routing.bend)
+        && !bend.is_finite()
+    {
+        return Err(ArrowGeometryError::InvalidProperties(
+            "arrow bend must be finite".into(),
+        ));
+    }
+    if let Some(radius) = routing.and_then(|routing| routing.corner_radius)
+        && (!radius.is_finite() || radius < 0.0)
+    {
+        return Err(ArrowGeometryError::InvalidProperties(
+            "arrow corner radius must be finite and non-negative".into(),
+        ));
+    }
     let path = if routing_kind == "orthogonal" && waypoints.len() >= 2 {
         let obstacles = document
             .shapes
@@ -172,7 +187,13 @@ pub fn resolve_arrow_geometry_for_shape(
                 .collect::<Vec<_>>(),
         )
     } else if routing_kind == "curved" {
-        curved_path(&waypoints)
+        curved_path(
+            &waypoints,
+            routing.and_then(|routing| routing.bend).unwrap_or(0.0),
+            routing
+                .and_then(|routing| routing.corner_radius)
+                .unwrap_or(DEFAULT_CURVE_CORNER_RADIUS),
+        )
     } else {
         line_path(&waypoints)
     };
@@ -202,6 +223,10 @@ struct ArrowRouting {
     kind: String,
     #[serde(default)]
     automatic: bool,
+    #[serde(default)]
+    bend: Option<f64>,
+    #[serde(default, rename = "cornerRadius")]
+    corner_radius: Option<f64>,
 }
 
 fn line_path(points: &[Vec2]) -> PathGeometry {
@@ -221,18 +246,62 @@ fn line_path(points: &[Vec2]) -> PathGeometry {
     }
 }
 
-fn curved_path(points: &[Vec2]) -> PathGeometry {
-    if points.len() < 3 {
+const DEFAULT_CURVE_CORNER_RADIUS: f64 = 16.0;
+
+fn curved_path(points: &[Vec2], bend: f64, corner_radius: f64) -> PathGeometry {
+    if points.len() < 2 {
         return line_path(points);
     }
+    if points.len() == 2 {
+        let start = points[0];
+        let end = points[1];
+        let direction = subtract(end, start);
+        let length = length(direction);
+        if length <= f64::EPSILON {
+            return line_path(points);
+        }
+        let midpoint = midpoint(start, end);
+        let control = Vec2 { x: midpoint.x - direction.y / length * bend, y: midpoint.y + direction.x / length * bend };
+        return PathGeometry {
+            subpaths: vec![PathSubpath {
+                segments: vec![
+                    PathSegment::Move { to: start },
+                    PathSegment::Quadratic { control, to: end },
+                ],
+                closed: false,
+                handle_modes: None,
+            }],
+            fill_rule: PathFillRule::NonZero,
+        };
+    }
+
+    let radius = corner_radius.max(0.0);
     let mut segments = vec![PathSegment::Move { to: points[0] }];
     for index in 1..points.len() - 1 {
-        let control = points[index];
-        let end = midpoint(control, points[index + 1]);
-        segments.push(PathSegment::Quadratic { control, to: end });
+        let previous = points[index - 1];
+        let corner = points[index];
+        let next = points[index + 1];
+        let incoming = subtract(previous, corner);
+        let outgoing = subtract(next, corner);
+        let incoming_length = length(incoming);
+        let outgoing_length = length(outgoing);
+        let corner_offset = radius.min(incoming_length / 2.0).min(outgoing_length / 2.0);
+        if corner_offset <= f64::EPSILON || incoming_length <= f64::EPSILON || outgoing_length <= f64::EPSILON {
+            segments.push(PathSegment::Line { to: corner });
+            continue;
+        }
+        let entry = Vec2 {
+            x: corner.x + incoming.x / incoming_length * corner_offset,
+            y: corner.y + incoming.y / incoming_length * corner_offset,
+        };
+        let exit = Vec2 {
+            x: corner.x + outgoing.x / outgoing_length * corner_offset,
+            y: corner.y + outgoing.y / outgoing_length * corner_offset,
+        };
+        segments.push(PathSegment::Line { to: entry });
+        segments.push(PathSegment::Quadratic { control: corner, to: exit });
     }
-    let control = points[points.len() - 2];
-    segments.push(PathSegment::Quadratic { control, to: points[points.len() - 1] });
+    segments.push(PathSegment::Line { to: *points.last().unwrap_or(&points[0]) });
     PathGeometry {
         subpaths: vec![PathSubpath { segments, closed: false, handle_modes: None }],
         fill_rule: PathFillRule::NonZero,
@@ -241,6 +310,14 @@ fn curved_path(points: &[Vec2]) -> PathGeometry {
 
 fn midpoint(left: Vec2, right: Vec2) -> Vec2 {
     Vec2 { x: (left.x + right.x) / 2.0, y: (left.y + right.y) / 2.0 }
+}
+
+fn subtract(left: Vec2, right: Vec2) -> Vec2 {
+    Vec2 { x: left.x - right.x, y: left.y - right.y }
+}
+
+fn length(point: Vec2) -> f64 {
+    point.x.hypot(point.y)
 }
 
 fn binding_point(bounds: crate::proto::Bounds, anchor: BindingAnchor, arrow_width: f64) -> Vec2 {
@@ -351,12 +428,19 @@ mod tests {
         for case in fixture["cases"].as_array().expect("connector cases") {
             let mut document = document_with_arrow(case["points"].clone());
             if case["routing"] != "straight" {
+                let mut routing = serde_json::Map::from_iter([("kind".into(), case["routing"].clone())]);
+                if let Some(bend) = case.get("bend") {
+                    routing.insert("bend".into(), bend.clone());
+                }
+                if let Some(radius) = case.get("cornerRadius") {
+                    routing.insert("cornerRadius".into(), radius.clone());
+                }
                 document
                     .shapes
                     .get_mut(&ShapeId::from("shape:arrow"))
                     .expect("fixture arrow")
                     .properties
-                    .insert("routing".into(), serde_json::json!({ "kind": case["routing"] }));
+                    .insert("routing".into(), serde_json::Value::Object(routing));
             }
             let geometry =
                 resolve_arrow_geometry(&document, &ShapeId::from("shape:arrow")).expect("fixture arrow should resolve");
@@ -386,10 +470,9 @@ mod tests {
     }
 
     #[test]
-    fn curved_arrows_resolve_to_quadratic_native_segments() {
+    fn curved_arrows_resolve_two_points_to_a_quadratic_segment() {
         let mut document = document_with_arrow(serde_json::json!([
             { "x": 0, "y": 0 },
-            { "x": 20, "y": 10 },
             { "x": 40, "y": 0 }
         ]));
         document
@@ -397,12 +480,36 @@ mod tests {
             .get_mut(&ShapeId::from("shape:arrow"))
             .unwrap()
             .properties
-            .insert("routing".into(), serde_json::json!({ "kind": "curved" }));
+            .insert("routing".into(), serde_json::json!({ "kind": "curved", "bend": 10 }));
         let geometry = resolve_arrow_geometry(&document, &ShapeId::from("shape:arrow")).expect("arrow geometry");
-        assert!(matches!(
+        assert_eq!(
             geometry.path.subpaths[0].segments[1],
-            PathSegment::Quadratic { .. }
-        ));
+            PathSegment::Quadratic { control: Vec2 { x: 20.0, y: 10.0 }, to: Vec2 { x: 40.0, y: 0.0 } }
+        );
+    }
+
+    #[test]
+    fn curved_multi_point_arrows_round_waypoints_without_moving_them() {
+        let mut document = document_with_arrow(serde_json::json!([
+            { "x": 0, "y": 0 },
+            { "x": 40, "y": 0 },
+            { "x": 40, "y": 40 }
+        ]));
+        document
+            .shapes
+            .get_mut(&ShapeId::from("shape:arrow"))
+            .unwrap()
+            .properties
+            .insert(
+                "routing".into(),
+                serde_json::json!({ "kind": "curved", "cornerRadius": 10 }),
+            );
+        let geometry = resolve_arrow_geometry(&document, &ShapeId::from("shape:arrow")).expect("arrow geometry");
+        assert_eq!(geometry.waypoints[1], Vec2 { x: 40.0, y: 0.0 });
+        assert_eq!(
+            geometry.path.subpaths[0].segments[2],
+            PathSegment::Quadratic { control: Vec2 { x: 40.0, y: 0.0 }, to: Vec2 { x: 40.0, y: 10.0 } }
+        );
     }
 
     #[test]

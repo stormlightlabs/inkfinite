@@ -100,18 +100,18 @@ selection, labels, and arrowheads.
 
 ### Curved arrows
 
-- [ ] Add persistent curved-arrow bend state without storing sampled curve
+- [x] Add persistent curved-arrow bend state without storing sampled curve
       points
-- [ ] Resolve two-point curved arrows to native quadratic Bézier geometry
-- [ ] Add a direct-manipulation bend handle with a well-defined straight-arrow
+- [x] Resolve two-point curved arrows to native quadratic Bézier geometry
+- [x] Add a direct-manipulation bend handle with a well-defined straight-arrow
       zero state
-- [ ] Preserve bound endpoints while the bend handle is edited
-- [ ] Define multi-point curved-arrow behavior as rounded waypoint routes
+- [x] Preserve bound endpoints while the bend handle is edited
+- [x] Define multi-point curved-arrow behavior as rounded waypoint routes
       rather than an unconstrained spline
-- [ ] Render native quadratic and cubic path segments directly instead of
+- [x] Render native quadratic and cubic path segments directly instead of
       drawing sampled curves with `lineTo`
-- [ ] Add undo/redo and save/reopen coverage for curved-arrow edits
-- [ ] Add visual fixtures for positive, negative, zero, short, long, bound, and
+- [x] Add undo/redo and save/reopen coverage for curved-arrow edits
+- [x] Add visual fixtures for positive, negative, zero, short, long, bound, and
       multi-point curves
 
 ### Path-aware arrowheads and labels

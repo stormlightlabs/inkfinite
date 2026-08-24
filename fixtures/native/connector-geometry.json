@@ -58,18 +58,17 @@
       }
     },
     {
-      "name": "free-curved",
+      "name": "free-curved-bend",
       "routing": "curved",
+      "bend": 20,
       "points": [
         { "x": 0, "y": 0 },
-        { "x": 40, "y": 60 },
         { "x": 100, "y": 0 }
       ],
       "expected": {
         "routing": "curved",
         "waypoints": [
           { "x": 0, "y": 0 },
-          { "x": 40, "y": 60 },
           { "x": 100, "y": 0 }
         ],
         "path": {
@@ -79,8 +78,151 @@
               "closed": false,
               "segments": [
                 { "type": "move", "to": { "x": 0, "y": 0 } },
-                { "type": "quadratic", "control": { "x": 40, "y": 60 }, "to": { "x": 70, "y": 30 } },
-                { "type": "quadratic", "control": { "x": 40, "y": 60 }, "to": { "x": 100, "y": 0 } }
+                { "type": "quadratic", "control": { "x": 50, "y": 20 }, "to": { "x": 100, "y": 0 } }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "free-curved-zero-bend",
+      "routing": "curved",
+      "bend": 0,
+      "points": [
+        { "x": 0, "y": 0 },
+        { "x": 100, "y": 0 }
+      ],
+      "expected": {
+        "routing": "curved",
+        "waypoints": [
+          { "x": 0, "y": 0 },
+          { "x": 100, "y": 0 }
+        ],
+        "path": {
+          "fill_rule": "nonzero",
+          "subpaths": [
+            {
+              "closed": false,
+              "segments": [
+                { "type": "move", "to": { "x": 0, "y": 0 } },
+                { "type": "quadratic", "control": { "x": 50, "y": 0 }, "to": { "x": 100, "y": 0 } }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "free-curved-negative-bend",
+      "routing": "curved",
+      "bend": -20,
+      "points": [
+        { "x": 0, "y": 0 },
+        { "x": 100, "y": 0 }
+      ],
+      "expected": {
+        "routing": "curved",
+        "waypoints": [
+          { "x": 0, "y": 0 },
+          { "x": 100, "y": 0 }
+        ],
+        "path": {
+          "fill_rule": "nonzero",
+          "subpaths": [
+            {
+              "closed": false,
+              "segments": [
+                { "type": "move", "to": { "x": 0, "y": 0 } },
+                { "type": "quadratic", "control": { "x": 50, "y": -20 }, "to": { "x": 100, "y": 0 } }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "free-curved-short-bend",
+      "routing": "curved",
+      "bend": 2,
+      "points": [
+        { "x": 0, "y": 0 },
+        { "x": 4, "y": 0 }
+      ],
+      "expected": {
+        "routing": "curved",
+        "waypoints": [
+          { "x": 0, "y": 0 },
+          { "x": 4, "y": 0 }
+        ],
+        "path": {
+          "fill_rule": "nonzero",
+          "subpaths": [
+            {
+              "closed": false,
+              "segments": [
+                { "type": "move", "to": { "x": 0, "y": 0 } },
+                { "type": "quadratic", "control": { "x": 2, "y": 2 }, "to": { "x": 4, "y": 0 } }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "free-curved-long-bend",
+      "routing": "curved",
+      "bend": -80,
+      "points": [
+        { "x": 0, "y": 0 },
+        { "x": 400, "y": 0 }
+      ],
+      "expected": {
+        "routing": "curved",
+        "waypoints": [
+          { "x": 0, "y": 0 },
+          { "x": 400, "y": 0 }
+        ],
+        "path": {
+          "fill_rule": "nonzero",
+          "subpaths": [
+            {
+              "closed": false,
+              "segments": [
+                { "type": "move", "to": { "x": 0, "y": 0 } },
+                { "type": "quadratic", "control": { "x": 200, "y": -80 }, "to": { "x": 400, "y": 0 } }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "free-curved-multi-point",
+      "routing": "curved",
+      "cornerRadius": 10,
+      "points": [
+        { "x": 0, "y": 0 },
+        { "x": 40, "y": 0 },
+        { "x": 40, "y": 40 }
+      ],
+      "expected": {
+        "routing": "curved",
+        "waypoints": [
+          { "x": 0, "y": 0 },
+          { "x": 40, "y": 0 },
+          { "x": 40, "y": 40 }
+        ],
+        "path": {
+          "fill_rule": "nonzero",
+          "subpaths": [
+            {
+              "closed": false,
+              "segments": [
+                { "type": "move", "to": { "x": 0, "y": 0 } },
+                { "type": "line", "to": { "x": 30, "y": 0 } },
+                { "type": "quadratic", "control": { "x": 40, "y": 0 }, "to": { "x": 40, "y": 10 } },
+                { "type": "line", "to": { "x": 40, "y": 40 } }
               ]
             }
           ]

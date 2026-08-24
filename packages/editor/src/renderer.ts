@@ -20,6 +20,7 @@ import type {
 	SnapGuide
 } from '@inkfinite/core';
 import {
+	arrowBendHandleForShape,
 	arrowGeometryForShape,
 	arrowPathForShape,
 	pathLength,
@@ -1656,6 +1657,9 @@ function getHandlesForShape(state: EditorState, shape: ShapeRecord, bindingsBySo
 				const worldPos = localToWorld(shape, point);
 				handles.push({ id: `arrow-point-${i}`, position: worldPos });
 			}
+
+			const bendHandle = arrowBendHandleForShape(state, shape, bindingsBySource);
+			if (bendHandle) handles.push({ id: 'arrow-bend', ...bendHandle });
 
 			handles.push({ id: 'line-end', position: resolved.b });
 

@@ -130,6 +130,24 @@ describe("exportToSVG", () => {
     expect(svg).toContain("stroke=\"black\"");
   });
 
+  it("should export curved arrows as native quadratic commands", () => {
+    const { state, pageId } = createTestState();
+    const arrow = ShapeRecord.createArrow(pageId, 0, 0, {
+      points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+      start: { kind: "free" },
+      end: { kind: "free" },
+      style: { stroke: "black", width: 2 },
+      routing: { kind: "curved", bend: 20 },
+    });
+
+    state.doc.shapes[arrow.id] = arrow;
+    state.doc.pages[pageId].shapeIds.push(arrow.id);
+
+    const svg = exportToSVG(state);
+    expect(svg).toContain('<path d="M 0 0 Q 50 20 100 0"');
+    expect(svg).not.toContain('<line x1="0" y1="0" x2="100" y2="0"');
+  });
+
   it("should export SVG with a text shape", () => {
     const { state, pageId } = createTestState();
 

@@ -1,5 +1,7 @@
 import type { Action } from '../actions';
 import {
+	arrowBendForPointer,
+	arrowBendHandleForShape,
 	arrowGeometryForShape,
 	computeNormalizedAnchor,
 	hitTestPoint,
@@ -59,7 +61,14 @@ type SelectToolState = {
 
 type RectHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 
-type HandleKind = RectHandle | 'rotate' | 'line-start' | 'line-end' | `arrow-point-${number}` | 'arrow-label';
+type HandleKind =
+	| RectHandle
+	| 'rotate'
+	| 'line-start'
+	| 'line-end'
+	| `arrow-point-${number}`
+	| 'arrow-bend'
+	| 'arrow-label';
 
 /** Context passed to the selection snapper at each movement preview. */
 export type SelectSnapContext = {
@@ -424,9 +433,11 @@ export class SelectTool implements Tool {
 		} else if (
 			this.toolState.activeHandle === 'line-start' ||
 			this.toolState.activeHandle === 'line-end' ||
+			this.toolState.activeHandle === 'arrow-bend' ||
 			this.toolState.activeHandle.startsWith('arrow-point-')
 		) {
 			updated = this.resizeLineShape(
+				state,
 				initialShape,
 				snappedPoint,
 				this.toolState.activeHandle,
@@ -841,6 +852,9 @@ export class SelectTool implements Tool {
 					handles.push({ id: `arrow-point-${i}` as HandleKind, position: worldPos });
 				}
 
+				const bendHandle = arrowBendHandleForShape(state, shape);
+				if (bendHandle) handles.push({ id: 'arrow-bend', ...bendHandle });
+
 				handles.push({ id: 'line-end', position: resolved.b });
 
 				if (shape.props.label) {
@@ -1005,6 +1019,7 @@ export class SelectTool implements Tool {
 	}
 
 	private resizeLineShape(
+		state: EditorState,
 		initial: ShapeRecord,
 		pointer: Vec2,
 		handle: HandleKind,
@@ -1012,6 +1027,15 @@ export class SelectTool implements Tool {
 	): ShapeRecord | null {
 		if (initial.type !== 'line' && initial.type !== 'arrow') {
 			return null;
+		}
+
+		if (initial.type === 'arrow' && handle === 'arrow-bend') {
+			const bend = arrowBendForPointer(state, initial, pointer);
+			if (bend === null) return null;
+			return {
+				...initial,
+				props: { ...initial.props, routing: { ...initial.props.routing, kind: 'curved', bend } }
+			};
 		}
 
 		if (initial.type === 'arrow' && typeof handle === 'string' && handle.startsWith('arrow-point-')) {

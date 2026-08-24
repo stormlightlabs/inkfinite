@@ -9,7 +9,8 @@ export const handleCursorMap: Record<string, string> = {
 	se: 'nwse-resize',
 	rotate: 'alias',
 	'line-start': 'crosshair',
-	'line-end': 'crosshair'
+	'line-end': 'crosshair',
+	'arrow-bend': 'crosshair'
 };
 
 export function computeCursor(

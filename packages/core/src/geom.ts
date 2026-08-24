@@ -65,10 +65,15 @@ export function localShapeBounds(shape: ShapeRecord): Box2 {
 			return Box2Ops.create(0, 0, shape.props.w ?? 0, shape.props.h ?? 0);
 		case 'line':
 			return Box2Ops.fromPoints([shape.props.a, shape.props.b]);
-		case 'arrow':
+		case 'arrow': {
+			const routing = shape.props.routing;
+			if (routing?.kind === 'curved' && !routing.automatic) {
+				return pathGeometryBounds(arrowPathGeometryFromProps(shape.props));
+			}
 			return shape.resolvedGeometry
 				? pathGeometryBounds(shape.resolvedGeometry.path)
-				: Box2Ops.fromPoints(shape.props.points ?? []);
+				: pathGeometryBounds(arrowPathGeometryFromProps(shape.props));
+		}
 		case 'text':
 			return Box2Ops.create(0, 0, shape.props.w ?? shape.props.fontSize * 10, shape.props.fontSize * 1.2);
 		case 'markdown':
@@ -864,8 +869,12 @@ export function arrowGeometryForShape(
 		...shape.props.points.slice(1, -1),
 		worldToLocal(resolved.b, shape)
 	];
-	const routing = shape.props.routing?.automatic ? 'orthogonal' : (shape.props.routing?.kind ?? 'straight');
+	const routingConfig = shape.props.routing;
+	const routing = routingConfig?.automatic ? 'orthogonal' : (routingConfig?.kind ?? 'straight');
+	// Curved routing also depends on compact routing parameters. Recompute it
+	// instead of accepting a projection cached before a bend or radius edit.
 	if (
+		routing !== 'curved' &&
 		shape.resolvedGeometry &&
 		shape.resolvedGeometry.routing === routing &&
 		samePoints(shape.resolvedGeometry.waypoints, waypoints)
@@ -904,10 +913,48 @@ export function arrowGeometryForShape(
 		return { path: linePathGeometry(worldPath.map((point) => worldToLocal(point, shape))), routing, waypoints };
 	}
 	return {
-		path: routing === 'curved' ? curvedPathGeometry(waypoints) : linePathGeometry(waypoints),
+		path:
+			routing === 'curved'
+				? curvedPathGeometry(waypoints, routingConfig?.bend, routingConfig?.cornerRadius)
+				: linePathGeometry(waypoints),
 		routing,
 		waypoints
 	};
+}
+
+/** Return the editable bend handle for a two-point curved arrow. */
+export function arrowBendHandleForShape(
+	state: EditorState,
+	shape: ArrowShape,
+	bindingsBySource?: BindingIndex
+): { position: Vec2; connectorFrom: Vec2 } | null {
+	if (shape.props.routing?.kind !== 'curved' || shape.props.routing.automatic || shape.props.points?.length !== 2)
+		return null;
+	const geometry = arrowGeometryForShape(state, shape, bindingsBySource);
+	const segment = geometry?.path.subpaths[0]?.segments[1];
+	if (!segment || segment.type !== 'quadratic') return null;
+	const resolved = resolveArrowEndpoints(state, shape.id, bindingsBySource);
+	if (!resolved) return null;
+	return {
+		position: localToWorld(shape, segment.control),
+		connectorFrom: { x: (resolved.a.x + resolved.b.x) / 2, y: (resolved.a.y + resolved.b.y) / 2 }
+	};
+}
+
+/** Convert a world pointer position to a two-point curved arrow's signed bend. */
+export function arrowBendForPointer(state: EditorState, shape: ArrowShape, pointer: Vec2): number | null {
+	if (shape.props.routing?.kind !== 'curved' || shape.props.routing.automatic || shape.props.points?.length !== 2)
+		return null;
+	const resolved = resolveArrowEndpoints(state, shape.id);
+	if (!resolved) return null;
+	const start = worldToLocal(resolved.a, shape);
+	const end = worldToLocal(resolved.b, shape);
+	const localPointer = worldToLocal(pointer, shape);
+	const direction = Vec2Ops.sub(end, start);
+	const length = Vec2Ops.len(direction);
+	if (length <= Number.EPSILON) return 0;
+	const bend = (direction.x * (localPointer.y - start.y) - direction.y * (localPointer.x - start.x)) / length;
+	return Number.isFinite(bend) && Math.abs(bend) > Number.EPSILON ? bend : 0;
 }
 
 /**
@@ -944,16 +991,70 @@ function linePathGeometry(points: readonly Vec2[]): PathGeometry {
 	};
 }
 
-function curvedPathGeometry(points: readonly Vec2[]): PathGeometry {
-	if (points.length < 3) return linePathGeometry(points);
+function curvedPathGeometry(points: readonly Vec2[], bend = 0, cornerRadius = 16): PathGeometry {
+	if (points.length < 2) return linePathGeometry(points);
+	if (points.length === 2) {
+		const start = points[0]!;
+		const end = points[1]!;
+		const direction = Vec2Ops.sub(end, start);
+		const length = Vec2Ops.len(direction);
+		if (length <= Number.EPSILON) return linePathGeometry(points);
+		const midpoint = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+		const offset = Number.isFinite(bend) ? bend : 0;
+		const control = {
+			x: midpoint.x - (direction.y / length) * offset,
+			y: midpoint.y + (direction.x / length) * offset
+		};
+		return {
+			subpaths: [
+				{
+					segments: [
+						{ type: 'move', to: start },
+						{ type: 'quadratic', control, to: end }
+					],
+					closed: false
+				}
+			],
+			fill_rule: 'nonzero'
+		};
+	}
+
+	const radius = Number.isFinite(cornerRadius) ? Math.max(0, cornerRadius) : 0;
 	const segments: PathSegment[] = [{ type: 'move', to: points[0]! }];
 	for (let index = 1; index < points.length - 1; index += 1) {
-		const control = points[index]!;
+		const previous = points[index - 1]!;
+		const corner = points[index]!;
 		const next = points[index + 1]!;
-		segments.push({ type: 'quadratic', control, to: { x: (control.x + next.x) / 2, y: (control.y + next.y) / 2 } });
+		const incoming = Vec2Ops.sub(previous, corner);
+		const outgoing = Vec2Ops.sub(next, corner);
+		const incomingLength = Vec2Ops.len(incoming);
+		const outgoingLength = Vec2Ops.len(outgoing);
+		const cornerOffset = Math.min(radius, incomingLength / 2, outgoingLength / 2);
+		if (cornerOffset <= Number.EPSILON || incomingLength <= Number.EPSILON || outgoingLength <= Number.EPSILON) {
+			segments.push({ type: 'line', to: corner });
+			continue;
+		}
+		const entry = {
+			x: corner.x + (incoming.x / incomingLength) * cornerOffset,
+			y: corner.y + (incoming.y / incomingLength) * cornerOffset
+		};
+		const exit = {
+			x: corner.x + (outgoing.x / outgoingLength) * cornerOffset,
+			y: corner.y + (outgoing.y / outgoingLength) * cornerOffset
+		};
+		segments.push({ type: 'line', to: entry }, { type: 'quadratic', control: corner, to: exit });
 	}
-	segments.push({ type: 'quadratic', control: points.at(-2)!, to: points.at(-1)! });
+	segments.push({ type: 'line', to: points.at(-1)! });
 	return { subpaths: [{ segments, closed: false }], fill_rule: 'nonzero' };
+}
+
+function arrowPathGeometryFromProps(props: ArrowShape['props']): PathGeometry {
+	const points = props.points ?? [];
+	const routing = props.routing;
+	const kind = routing?.automatic ? 'orthogonal' : (routing?.kind ?? 'straight');
+	return kind === 'curved'
+		? curvedPathGeometry(points, routing?.bend, routing?.cornerRadius)
+		: linePathGeometry(points);
 }
 
 function flattenPathGeometry(geometry: PathGeometry): Vec2[] {
@@ -1042,37 +1143,9 @@ function simplifyRoute(path: readonly Vec2[]): Vec2[] {
 	return result;
 }
 
-/** Return a sampled quadratic path through arrow bend points. */
-export function computeCurvedPath(points: readonly Vec2[], samplesPerCurve = 12): Vec2[] {
-	if (points.length < 3) return points.map((point) => ({ ...point }));
-	const samples = Math.max(2, Math.floor(samplesPerCurve));
-	const output: Vec2[] = [{ ...points[0] }];
-	const midpoint = (left: Vec2, right: Vec2): Vec2 => ({ x: (left.x + right.x) / 2, y: (left.y + right.y) / 2 });
-	let start = points[0];
-	for (let index = 1; index < points.length - 1; index += 1) {
-		const control = points[index];
-		const end = midpoint(control, points[index + 1]);
-		for (let step = 1; step <= samples; step += 1) {
-			const t = step / samples;
-			const inverse = 1 - t;
-			output.push({
-				x: inverse * inverse * start.x + 2 * inverse * t * control.x + t * t * end.x,
-				y: inverse * inverse * start.y + 2 * inverse * t * control.y + t * t * end.y
-			});
-		}
-		start = end;
-	}
-	const control = points.at(-2)!;
-	const end = points.at(-1)!;
-	for (let step = 1; step <= samples; step += 1) {
-		const t = step / samples;
-		const inverse = 1 - t;
-		output.push({
-			x: inverse * inverse * start.x + 2 * inverse * t * control.x + t * t * end.x,
-			y: inverse * inverse * start.y + 2 * inverse * t * control.y + t * t * end.y
-		});
-	}
-	return output;
+/** Flatten a native curved arrow path for callers that still need a polyline. */
+export function computeCurvedPath(points: readonly Vec2[], _samplesPerCurve = 12): Vec2[] {
+	return flattenPathGeometry(curvedPathGeometry(points));
 }
 
 /** Resolve the local polyline used to draw an arrow. */

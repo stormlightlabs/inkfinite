@@ -1562,7 +1562,7 @@ describe("JSON serialization", () => {
       start: { kind: "free" },
       end: { kind: "free" },
       style: { stroke: "#ff0000", width: 3, headStart: true, headEnd: true, dash: [5, 3] },
-      routing: { kind: "orthogonal", cornerRadius: 5 },
+      routing: { kind: "curved", bend: -18, cornerRadius: 5 },
       label: { text: "Connection", align: "center", offset: 0 },
     }, "arrow1");
 
