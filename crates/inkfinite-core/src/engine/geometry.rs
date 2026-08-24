@@ -155,9 +155,16 @@ pub fn world_shape_bounds(document: &Document, shape_id: &ShapeId) -> Bounds {
     let Some(shape) = document.shapes.get(shape_id) else {
         return Bounds { x: 0.0, y: 0.0, width: 0.0, height: 0.0 };
     };
+    let local = if shape.kind.as_str() == crate::ARROW_KIND {
+        crate::resolve_arrow_geometry_for_shape(document, shape)
+            .map(|geometry| path_bounds(&geometry.path))
+            .unwrap_or_else(|_| local_shape_bounds(shape))
+    } else {
+        local_shape_bounds(shape)
+    };
     parent_world_transform(document, &shape.parent)
         .unwrap_or(Affine::IDENTITY)
-        .transform_bounds(local_shape_bounds(shape))
+        .transform_bounds(local)
 }
 
 /// Returns the world transform of a shape parent.
@@ -302,9 +309,15 @@ pub fn bounds_from_points(points: &[Vec2]) -> Bounds {
 /// Reads a finite numeric property from a shape record.
 #[must_use]
 pub fn numeric_property(shape: &ShapeRecord, name: &str) -> Option<f64> {
+    let alias = match name {
+        "width" => Some("w"),
+        "height" => Some("h"),
+        _ => None,
+    };
     shape
         .properties
         .get(name)
+        .or_else(|| alias.and_then(|name| shape.properties.get(name)))
         .and_then(serde_json::Value::as_f64)
         .filter(|value| value.is_finite())
 }

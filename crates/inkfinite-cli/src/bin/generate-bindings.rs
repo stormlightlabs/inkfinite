@@ -195,6 +195,7 @@ fn model_bindings() -> String {
     append_clean_declaration::<PathSegment>(&mut output, &config);
     append_clean_declaration::<PathSubpath>(&mut output, &config);
     append_clean_declaration::<PathGeometry>(&mut output, &config);
+    append_declaration::<ResolvedArrowGeometry>(&mut output, &config);
     append_declaration::<Transform>(&mut output, &config);
     append_declaration::<Origin>(&mut output, &config);
     append_declaration::<Provenance>(&mut output, &config);
@@ -313,7 +314,7 @@ fn editor_bindings() -> String {
     let config = ts_config();
     let mut output = GENERATED_TS_HEADER.to_owned();
     output.push_str(
-        "import type { ActorId, AssetId, AssetRecord, BindingAnchor, BindingId, BindingKind, BindingRecord, ContainerLayout, LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord, SemanticMetadata, ShapeId, ShapeKind, ShapeParent, ShapeProperties, ShapeStyle, SiblingAnchor, Timestamp } from './model.js';\n",
+        "import type { ActorId, AssetId, AssetRecord, BindingAnchor, BindingId, BindingKind, BindingRecord, ContainerLayout, LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord, ResolvedArrowGeometry, SemanticMetadata, ShapeId, ShapeKind, ShapeParent, ShapeProperties, ShapeStyle, SiblingAnchor, Timestamp } from './model.js';\n",
     );
     output.push_str("import type { LayerContentsDisposition, LayerPatch, TransactionId } from './transaction.js';\n\n");
     append_declaration::<EditorTransform>(&mut output, &config);
@@ -335,12 +336,14 @@ fn wasm_bindings() -> String {
     let config = ts_config();
     let mut output = GENERATED_TS_HEADER.to_owned();
     output.push_str("import type { Bounds, CommitResult, TransactionDraft } from './transaction.js';\n");
-    output.push_str("import type { AssetId, DocumentSnapshot, ShapeId } from './model.js';\n");
+    output.push_str("import type { AssetId, DocumentSnapshot, ResolvedArrowGeometry, ShapeId } from './model.js';\n");
     output.push_str("import type { EditorProjection } from './editor.js';\n");
     output.push_str("import type { SvgImport, SvgImportWarning } from './svg-import.js';\n\n");
     append_declaration::<WasmDocumentSessionFailure>(&mut output, &config);
     append_declaration::<WasmDocumentSessionState>(&mut output, &config);
     append_clean_declaration::<WasmDocumentMutationResponse>(&mut output, &config);
+    append_declaration::<WasmArrowGeometryFailure>(&mut output, &config);
+    append_clean_declaration::<WasmArrowGeometryResponse>(&mut output, &config);
     append_declaration::<WasmSvgRenderOptions>(&mut output, &config);
     append_declaration::<WasmSvgImportFailure>(&mut output, &config);
     append_clean_declaration::<WasmSvgImportResponse>(&mut output, &config);

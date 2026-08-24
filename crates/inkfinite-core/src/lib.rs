@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod connector;
 pub mod crdt;
 pub mod editor;
 pub mod engine;
@@ -22,6 +23,9 @@ pub mod svg_import;
 pub mod svg_transaction;
 pub mod sync;
 pub mod wasm;
+pub use connector::{
+    ArrowGeometryError, ResolvedArrowGeometry, resolve_arrow_geometry, resolve_arrow_geometry_for_shape,
+};
 
 use std::collections::BTreeMap;
 use std::fmt;

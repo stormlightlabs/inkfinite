@@ -1,0 +1,91 @@
+{
+  "cases": [
+    {
+      "name": "free-straight",
+      "routing": "straight",
+      "points": [
+        { "x": 0, "y": 0 },
+        { "x": 100, "y": 50 }
+      ],
+      "expected": {
+        "routing": "straight",
+        "waypoints": [
+          { "x": 0, "y": 0 },
+          { "x": 100, "y": 50 }
+        ],
+        "path": {
+          "fill_rule": "nonzero",
+          "subpaths": [
+            {
+              "closed": false,
+              "segments": [
+                { "type": "move", "to": { "x": 0, "y": 0 } },
+                { "type": "line", "to": { "x": 100, "y": 50 } }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "multi-point-straight",
+      "routing": "straight",
+      "points": [
+        { "x": 0, "y": 0 },
+        { "x": 40, "y": 20 },
+        { "x": 100, "y": 0 }
+      ],
+      "expected": {
+        "routing": "straight",
+        "waypoints": [
+          { "x": 0, "y": 0 },
+          { "x": 40, "y": 20 },
+          { "x": 100, "y": 0 }
+        ],
+        "path": {
+          "fill_rule": "nonzero",
+          "subpaths": [
+            {
+              "closed": false,
+              "segments": [
+                { "type": "move", "to": { "x": 0, "y": 0 } },
+                { "type": "line", "to": { "x": 40, "y": 20 } },
+                { "type": "line", "to": { "x": 100, "y": 0 } }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "free-curved",
+      "routing": "curved",
+      "points": [
+        { "x": 0, "y": 0 },
+        { "x": 40, "y": 60 },
+        { "x": 100, "y": 0 }
+      ],
+      "expected": {
+        "routing": "curved",
+        "waypoints": [
+          { "x": 0, "y": 0 },
+          { "x": 40, "y": 60 },
+          { "x": 100, "y": 0 }
+        ],
+        "path": {
+          "fill_rule": "nonzero",
+          "subpaths": [
+            {
+              "closed": false,
+              "segments": [
+                { "type": "move", "to": { "x": 0, "y": 0 } },
+                { "type": "quadratic", "control": { "x": 40, "y": 60 }, "to": { "x": 70, "y": 30 } },
+                { "type": "quadratic", "control": { "x": 40, "y": 60 }, "to": { "x": 100, "y": 0 } }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

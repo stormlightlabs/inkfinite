@@ -181,7 +181,8 @@ export function fromEditorProjection(projection: EditorProjection, snapshot?: Na
 			locked: shape.locked,
 			agentEditable: shape.agent_editable,
 			metadata: fromNativeMetadata(shape.metadata),
-			props: shape.props as ShapeRecord['props']
+			props: shape.props as ShapeRecord['props'],
+			...(shape.resolved_geometry ? { resolvedGeometry: shape.resolved_geometry } : {})
 		} as ShapeRecord;
 	}
 	for (const binding of Object.values(projection.bindings)) {

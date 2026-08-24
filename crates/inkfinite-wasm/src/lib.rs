@@ -17,6 +17,7 @@ use inkfinite_core::render::{SvgRenderError, SvgRenderOptions, SvgRenderWarning,
 use inkfinite_core::svg_import::{SvgImportError, SvgImportNode, import_svg as parse_svg};
 use inkfinite_core::svg_transaction::{SvgImportTransactionOptions, build_svg_import_transaction};
 use inkfinite_core::wasm::{
+    WasmArrowGeometryFailure as ArrowGeometryFailure, WasmArrowGeometryResponse as ArrowGeometryResponse,
     WasmDocumentMutationResponse as DocumentMutationResponse, WasmDocumentSessionFailure as DocumentSessionFailure,
     WasmDocumentSessionState as DocumentSessionState, WasmEditorProjectionFailure as EditorProjectionFailure,
     WasmEditorProjectionResponse as EditorProjectionResponse,
@@ -29,7 +30,7 @@ use inkfinite_core::wasm::{
 };
 use inkfinite_core::{
     ActorId, AssetId, DocumentId, DocumentSnapshot, INKFINITE_FORMAT_ID, INKFINITE_FORMAT_VERSION, LayerId, Origin,
-    PageId, ShapeId, Timestamp,
+    PageId, ShapeId, Timestamp, resolve_arrow_geometry as resolve_native_arrow_geometry,
 };
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
@@ -366,6 +367,31 @@ pub fn import_svg(source: &[u8]) -> String {
 #[wasm_bindgen]
 pub fn render_svg(snapshot_json: &str, options_json: &str) -> String {
     render_svg_json(snapshot_json, options_json)
+}
+
+/// Resolves one arrow from a canonical snapshot without requiring a WASM runtime.
+#[must_use]
+pub fn resolve_arrow_geometry_json(snapshot_json: &str, arrow_id: &str) -> String {
+    let snapshot = match serde_json::from_str::<DocumentSnapshot>(snapshot_json) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            return serialize_response(ArrowGeometryResponse::Error {
+                error: ArrowGeometryFailure { code: "invalid_snapshot".into(), message: error.to_string() },
+            });
+        }
+    };
+    match resolve_native_arrow_geometry(&snapshot.document, &ShapeId::from(arrow_id)) {
+        Ok(geometry) => serialize_response(ArrowGeometryResponse::Success { geometry }),
+        Err(error) => serialize_response(ArrowGeometryResponse::Error {
+            error: ArrowGeometryFailure { code: "arrow_geometry".into(), message: error.to_string() },
+        }),
+    }
+}
+
+/// Resolves one arrow from a canonical document snapshot.
+#[wasm_bindgen]
+pub fn resolve_arrow_geometry(snapshot_json: &str, arrow_id: &str) -> String {
+    resolve_arrow_geometry_json(snapshot_json, arrow_id)
 }
 
 /// Projects a canonical snapshot without requiring a WASM runtime.

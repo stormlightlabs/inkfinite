@@ -7,14 +7,16 @@ use serde::Deserialize;
 use serde_json::Value;
 use thiserror::Error;
 
+use crate::connector::resolve_arrow_geometry_for_shape;
+#[cfg(test)]
+use crate::engine::geometry::world_transform;
 use crate::engine::geometry::{
-    Affine, bounds_from_points, intersects, stroke_outline as canonical_stroke_outline, union, world_transform,
+    Affine, bounds_from_points, intersects, path_bounds, stroke_outline as canonical_stroke_outline, union,
 };
 use crate::proto::Bounds;
-use crate::routing::obstacle_aware_orthogonal_route;
 use crate::{
-    AssetId, AssetSource, BindingAnchor, BuiltinShapeKind, Document, DocumentSnapshot, LayerId, PageId, PathFillRule,
-    PathGeometry, PathSegment, PathSubpath, ShapeId, ShapeRecord, Vec2,
+    AssetId, AssetSource, BuiltinShapeKind, Document, DocumentSnapshot, LayerId, PageId, PathFillRule, PathGeometry,
+    PathSegment, PathSubpath, ShapeId, ShapeRecord, Vec2,
 };
 
 const DEFAULT_PADDING: f64 = 20.0;
@@ -143,7 +145,7 @@ impl Renderer<'_> {
         }
 
         let matrix = parent_matrix.then(Affine::from_transform(shape.transform));
-        let local_bounds = shape_local_bounds(shape)?;
+        let local_bounds = shape_local_bounds(self.document, shape)?;
         let world_bounds = matrix.transform_bounds(local_bounds);
         let bound_arrow = shape.kind.as_str() == crate::ARROW_KIND
             && self
@@ -247,7 +249,7 @@ impl Renderer<'_> {
                 ).expect("writing to a String cannot fail");
             }
             Some(BuiltinShapeKind::Arrow) => {
-                self.render_arrow(shape, matrix, &transform, &stroke_opacity, &fill_opacity, &mut output)?;
+                self.render_arrow(shape, &transform, &stroke_opacity, &fill_opacity, &mut output)?
             }
             Some(BuiltinShapeKind::Text) => self.render_text(shape, &transform, &fill_opacity, &mut output)?,
             Some(BuiltinShapeKind::Markdown) => {
@@ -379,86 +381,20 @@ impl Renderer<'_> {
     }
 
     fn render_arrow(
-        &self, shape: &ShapeRecord, matrix: Affine, transform: &str, stroke_opacity: &str, fill_opacity: &str,
-        output: &mut String,
+        &self, shape: &ShapeRecord, transform: &str, stroke_opacity: &str, fill_opacity: &str, output: &mut String,
     ) -> Result<(), SvgRenderError> {
         let props: ArrowProps = properties(shape)?;
-        if props.points.len() < 2 {
+        let geometry = resolve_arrow_geometry_for_shape(self.document, shape).map_err(|error| {
+            SvgRenderError::InvalidShapeProperties {
+                shape_id: shape.id.clone(),
+                kind: shape.kind.to_string(),
+                message: error.to_string(),
+            }
+        })?;
+        let points = path_vertices(&geometry.path);
+        if points.len() < 2 {
             return Ok(());
         }
-        let mut points = props.points.clone();
-        let inverse = matrix.inverse();
-        for binding in self
-            .document
-            .bindings
-            .values()
-            .filter(|binding| binding.source_shape_id == shape.id)
-        {
-            let Some(target) = self.document.shapes.get(&binding.target_shape_id) else { continue };
-            let target_bounds = render_shape_world_bounds(self.document, target)?;
-            let point = binding_point(target_bounds, binding.anchor, props.style.width);
-            let local = inverse.map_or(point, |inverse| inverse.point(point));
-            if binding.source_handle == "start" {
-                points[0] = local;
-            } else if binding.source_handle == "end" {
-                let last = points.len() - 1;
-                points[last] = local;
-            }
-        }
-        let routing_kind = props.routing.as_ref().map_or("straight", |routing| {
-            if routing.automatic { "orthogonal" } else { routing.kind.as_str() }
-        });
-        if routing_kind == "orthogonal" {
-            let excluded_targets: BTreeSet<_> = self
-                .document
-                .bindings
-                .values()
-                .filter(|binding| binding.source_shape_id == shape.id)
-                .map(|binding| binding.target_shape_id.clone())
-                .collect();
-            let obstacles: Vec<_> = self
-                .document
-                .shapes
-                .values()
-                .filter(|candidate| {
-                    candidate.id != shape.id
-                        && !excluded_targets.contains(&candidate.id)
-                        && !matches!(
-                            BuiltinShapeKind::parse(candidate.kind.as_str()),
-                            Some(BuiltinShapeKind::Arrow | BuiltinShapeKind::Line | BuiltinShapeKind::Container)
-                        )
-                })
-                .filter_map(|candidate| render_shape_world_bounds(self.document, candidate).ok())
-                .collect();
-            let world_route = obstacle_aware_orthogonal_route(
-                matrix.point(points[0]),
-                matrix.point(points[points.len() - 1]),
-                &obstacles,
-                12.0,
-            );
-            if let Some(inverse) = inverse {
-                points = world_route.into_iter().map(|point| inverse.point(point)).collect();
-            }
-        } else if routing_kind == "curved" {
-            points = curved(points.as_slice());
-        }
-        let path = if routing_kind == "curved" {
-            curved_path_data(&points)
-        } else {
-            points
-                .iter()
-                .enumerate()
-                .map(|(index, point)| {
-                    format!(
-                        "{} {} {}",
-                        if index == 0 { "M" } else { "L" },
-                        number(point.x),
-                        number(point.y)
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join(" ")
-        };
         let dash = props
             .style
             .dash
@@ -471,25 +407,40 @@ impl Renderer<'_> {
                 )
             })
             .unwrap_or_default();
-        writeln!(output, "      <path transform=\"{transform}\" d=\"{path}\" fill=\"none\" stroke=\"{}\" stroke-opacity=\"{stroke_opacity}\" stroke-width=\"{}\"{dash}/>", escape_xml(&props.style.stroke), number(props.style.width)).expect("writing to a String cannot fail");
+        writeln!(output, "      <path transform=\"{transform}\" d=\"{}\" fill=\"none\" stroke=\"{}\" stroke-opacity=\"{stroke_opacity}\" stroke-width=\"{}\"{dash}/>", path_data(&geometry.path), escape_xml(&props.style.stroke), number(props.style.width)).expect("writing to a String cannot fail");
+
         if props.style.head_end.unwrap_or(true) {
+            let tangent = path_endpoint_tangent(&geometry.path, false).unwrap_or_else(|| Vec2 {
+                x: points[points.len() - 1].x - points[points.len() - 2].x,
+                y: points[points.len() - 1].y - points[points.len() - 2].y,
+            });
             arrow_head(
                 output,
                 transform,
-                points[points.len() - 2],
+                offset_point(points[points.len() - 1], tangent, -1.0),
                 points[points.len() - 1],
                 &props.style,
                 stroke_opacity,
             );
         }
         if props.style.head_start.unwrap_or(false) {
-            arrow_head(output, transform, points[1], points[0], &props.style, stroke_opacity);
+            let tangent = path_endpoint_tangent(&geometry.path, true)
+                .unwrap_or_else(|| Vec2 { x: points[1].x - points[0].x, y: points[1].y - points[0].y });
+            arrow_head(
+                output,
+                transform,
+                offset_point(points[0], tangent, 1.0),
+                points[0],
+                &props.style,
+                stroke_opacity,
+            );
         }
         if let Some(label) = props.label.filter(|label| !label.text.is_empty()) {
+            let length = polyline_length(&points);
             let distance = match label.align.as_str() {
                 "start" => label.offset,
-                "end" => polyline_length(&points) - label.offset,
-                _ => polyline_length(&points) / 2.0 + label.offset,
+                "end" => length - label.offset,
+                _ => length / 2.0 + label.offset,
             };
             let at = point_at_distance(&points, distance);
             let label_width = deterministic_text_width(&label.text, 14.0) + 8.0;
@@ -646,13 +597,6 @@ struct ArrowStyle {
 }
 
 #[derive(Deserialize)]
-struct ArrowRouting {
-    kind: String,
-    #[serde(default)]
-    automatic: bool,
-}
-
-#[derive(Deserialize)]
 struct ArrowLabel {
     text: String,
     align: String,
@@ -661,9 +605,7 @@ struct ArrowLabel {
 
 #[derive(Deserialize)]
 struct ArrowProps {
-    points: Vec<Vec2>,
     style: ArrowStyle,
-    routing: Option<ArrowRouting>,
     label: Option<ArrowLabel>,
 }
 
@@ -901,7 +843,7 @@ fn properties<T: for<'de> Deserialize<'de>>(shape: &ShapeRecord) -> Result<T, Sv
     })
 }
 
-fn shape_local_bounds(shape: &ShapeRecord) -> Result<Bounds, SvgRenderError> {
+fn shape_local_bounds(document: &Document, shape: &ShapeRecord) -> Result<Bounds, SvgRenderError> {
     let bounds = match BuiltinShapeKind::parse(shape.kind.as_str()) {
         Some(BuiltinShapeKind::Rectangle | BuiltinShapeKind::Ellipse) => {
             let props: BoxProps = properties(shape)?;
@@ -915,10 +857,13 @@ fn shape_local_bounds(shape: &ShapeRecord) -> Result<Bounds, SvgRenderError> {
             let props: LineProps = properties(shape)?;
             bounds_from_points(&[props.a, props.b])
         }
-        Some(BuiltinShapeKind::Arrow) => {
-            let props: ArrowProps = properties(shape)?;
-            bounds_from_points(&props.points)
-        }
+        Some(BuiltinShapeKind::Arrow) => resolve_arrow_geometry_for_shape(document, shape)
+            .map(|geometry| path_bounds(&geometry.path))
+            .map_err(|error| SvgRenderError::InvalidShapeProperties {
+                shape_id: shape.id.clone(),
+                kind: shape.kind.to_string(),
+                message: error.to_string(),
+            })?,
         Some(BuiltinShapeKind::Text) => {
             let props: TextProps = properties(shape)?;
             let width = props
@@ -1029,10 +974,6 @@ fn path_fill_rule(rule: PathFillRule) -> &'static str {
     }
 }
 
-fn render_shape_world_bounds(document: &Document, shape: &ShapeRecord) -> Result<Bounds, SvgRenderError> {
-    Ok(world_transform(document, shape).transform_bounds(shape_local_bounds(shape)?))
-}
-
 fn contains_selected_descendant(document: &Document, shape: &ShapeRecord, selection: &BTreeSet<ShapeId>) -> bool {
     shape.child_ids.iter().any(|id| {
         selection.contains(id)
@@ -1043,105 +984,103 @@ fn contains_selected_descendant(document: &Document, shape: &ShapeRecord, select
     })
 }
 
-fn binding_point(bounds: Bounds, anchor: BindingAnchor, arrow_width: f64) -> Vec2 {
-    let center = Vec2 { x: bounds.x + bounds.width / 2.0, y: bounds.y + bounds.height / 2.0 };
-    match anchor {
-        BindingAnchor::Center => center,
-        BindingAnchor::Edge { x, y } => {
-            let mut point = Vec2 { x: center.x + x * bounds.width / 2.0, y: center.y + y * bounds.height / 2.0 };
-            let dx = point.x - center.x;
-            let dy = point.y - center.y;
-            let distance = dx.hypot(dy);
-            if distance >= 0.01 {
-                let offset = 1.0 + arrow_width / 2.0;
-                point.x += dx / distance * offset;
-                point.y += dy / distance * offset;
+fn path_vertices(geometry: &PathGeometry) -> Vec<Vec2> {
+    geometry
+        .subpaths
+        .iter()
+        .flat_map(|subpath| subpath.segments.iter())
+        .map(|segment| match segment {
+            PathSegment::Move { to }
+            | PathSegment::Line { to }
+            | PathSegment::Quadratic { to, .. }
+            | PathSegment::Cubic { to, .. } => *to,
+        })
+        .collect()
+}
+
+fn path_endpoint_tangent(geometry: &PathGeometry, at_start: bool) -> Option<Vec2> {
+    let subpath = geometry.subpaths.first()?;
+    let first = subpath.segments.first()?;
+    let PathSegment::Move { to: start } = first else { return None };
+    if at_start {
+        let mut current = *start;
+        for segment in subpath.segments.iter().skip(1) {
+            let tangent = match segment {
+                PathSegment::Move { to } => {
+                    current = *to;
+                    continue;
+                }
+                PathSegment::Line { to } => subtract(*to, current),
+                PathSegment::Quadratic { control, to } => {
+                    let control_tangent = subtract(*control, current);
+                    if nonzero(control_tangent) { control_tangent } else { subtract(*to, current) }
+                }
+                PathSegment::Cubic { control_1, control_2, to } => {
+                    let control_tangent = subtract(*control_1, current);
+                    if nonzero(control_tangent) {
+                        control_tangent
+                    } else {
+                        let fallback = subtract(*control_2, current);
+                        if nonzero(fallback) { fallback } else { subtract(*to, current) }
+                    }
+                }
+            };
+            if nonzero(tangent) {
+                return Some(tangent);
             }
-            point
+            if let PathSegment::Line { to } | PathSegment::Quadratic { to, .. } | PathSegment::Cubic { to, .. } =
+                segment
+            {
+                current = *to;
+            }
         }
-    }
-}
-
-fn curved(points: &[Vec2]) -> Vec<Vec2> {
-    if points.len() < 3 {
-        return points.to_vec();
-    }
-    let samples = 12;
-    let midpoint = |left: Vec2, right: Vec2| Vec2 { x: (left.x + right.x) / 2.0, y: (left.y + right.y) / 2.0 };
-    let mut output = vec![points[0]];
-    let mut start = points[0];
-    for index in 1..points.len() - 1 {
-        let control = points[index];
-        let end = midpoint(control, points[index + 1]);
-        for step in 1..=samples {
-            output.push(quadratic_point(
-                start,
-                control,
-                end,
-                f64::from(step) / f64::from(samples),
-            ));
+    } else {
+        let mut current = *start;
+        let mut tangent = None;
+        for segment in subpath.segments.iter().skip(1) {
+            match segment {
+                PathSegment::Move { to } => current = *to,
+                PathSegment::Line { to } => {
+                    tangent = Some(subtract(*to, current));
+                    current = *to;
+                }
+                PathSegment::Quadratic { control, to } => {
+                    tangent = Some(if nonzero(subtract(*to, *control)) {
+                        subtract(*to, *control)
+                    } else {
+                        subtract(*to, current)
+                    });
+                    current = *to;
+                }
+                PathSegment::Cubic { control_2, to, .. } => {
+                    tangent = Some(if nonzero(subtract(*to, *control_2)) {
+                        subtract(*to, *control_2)
+                    } else {
+                        subtract(*to, current)
+                    });
+                    current = *to;
+                }
+            }
         }
-        start = end;
+        return tangent.filter(|value| nonzero(*value));
     }
-    let control = points[points.len() - 2];
-    let end = points[points.len() - 1];
-    for step in 1..=samples {
-        output.push(quadratic_point(
-            start,
-            control,
-            end,
-            f64::from(step) / f64::from(samples),
-        ));
-    }
-    output
+    None
 }
 
-fn quadratic_point(start: Vec2, control: Vec2, end: Vec2, t: f64) -> Vec2 {
-    let inverse = 1.0 - t;
-    Vec2 {
-        x: inverse * inverse * start.x + 2.0 * inverse * t * control.x + t * t * end.x,
-        y: inverse * inverse * start.y + 2.0 * inverse * t * control.y + t * t * end.y,
-    }
+fn subtract(left: Vec2, right: Vec2) -> Vec2 {
+    Vec2 { x: left.x - right.x, y: left.y - right.y }
 }
 
-fn curved_path_data(points: &[Vec2]) -> String {
-    if points.len() < 3 {
-        return points
-            .iter()
-            .enumerate()
-            .map(|(index, point)| {
-                format!(
-                    "{} {} {}",
-                    if index == 0 { "M" } else { "L" },
-                    number(point.x),
-                    number(point.y)
-                )
-            })
-            .collect::<Vec<_>>()
-            .join(" ");
+fn nonzero(value: Vec2) -> bool {
+    value.x.abs() > f64::EPSILON || value.y.abs() > f64::EPSILON
+}
+
+fn offset_point(point: Vec2, direction: Vec2, factor: f64) -> Vec2 {
+    let length = direction.x.hypot(direction.y);
+    if length <= f64::EPSILON {
+        return point;
     }
-    let midpoint = |left: Vec2, right: Vec2| Vec2 { x: (left.x + right.x) / 2.0, y: (left.y + right.y) / 2.0 };
-    let mut path = format!("M {} {}", number(points[0].x), number(points[0].y));
-    for index in 1..points.len() - 1 {
-        let end = midpoint(points[index], points[index + 1]);
-        path.push_str(&format!(
-            " Q {} {} {} {}",
-            number(points[index].x),
-            number(points[index].y),
-            number(end.x),
-            number(end.y)
-        ));
-    }
-    let last = points[points.len() - 1];
-    let control = points[points.len() - 2];
-    path.push_str(&format!(
-        " Q {} {} {} {}",
-        number(control.x),
-        number(control.y),
-        number(last.x),
-        number(last.y)
-    ));
-    path
+    Vec2 { x: point.x + direction.x / length * factor, y: point.y + direction.y / length * factor }
 }
 
 fn arrow_head(output: &mut String, transform: &str, from: Vec2, at: Vec2, style: &ArrowStyle, opacity: &str) {

@@ -187,6 +187,28 @@ export type PathGeometry = {
 };
 
 /**
+ * The resolved native geometry of one semantic arrow.
+ */
+export type ResolvedArrowGeometry = {
+	/**
+	 * The arrow shaft as native path segments in the arrow's local space.
+	 */
+	path: PathGeometry;
+	/**
+	 * Routing mode that produced the path, after applying automatic routing.
+	 */
+	routing: string;
+	/**
+	 * Resolved endpoints and retained waypoints in arrow-local coordinates.
+	 *
+	 * This is useful to editor clients that need to compare a projected
+	 * resolution with an in-progress waypoint edit without inspecting the
+	 * path's curve representation.
+	 */
+	waypoints: Array<Vec2>;
+};
+
+/**
  * Transform relative to a shape's parent container or layer.
  */
 export type Transform = {

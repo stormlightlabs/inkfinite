@@ -15,6 +15,7 @@ import type {
 	PathSegmentRef,
 	PathShape,
 	RectShape,
+	ResolvedArrowGeometry,
 	ShapeRecord,
 	StrokePoint,
 	StrokeShape,
@@ -64,7 +65,9 @@ export function localShapeBounds(shape: ShapeRecord): Box2 {
 		case 'line':
 			return Box2Ops.fromPoints([shape.props.a, shape.props.b]);
 		case 'arrow':
-			return Box2Ops.fromPoints(shape.props.points ?? []);
+			return shape.resolvedGeometry
+				? pathGeometryBounds(shape.resolvedGeometry.path)
+				: Box2Ops.fromPoints(shape.props.points ?? []);
 		case 'text':
 			return Box2Ops.create(0, 0, shape.props.w ?? shape.props.fontSize * 10, shape.props.fontSize * 1.2);
 		case 'markdown':
@@ -983,39 +986,133 @@ export function computeObstacleAwareOrthogonalPath(
 	return fallback;
 }
 
+/** Resolve an arrow into the native path representation used by all editor consumers. */
+export function arrowGeometryForShape(
+	state: EditorState,
+	shape: ArrowShape,
+	bindingsBySource?: BindingIndex
+): ResolvedArrowGeometry | null {
+	const resolved = resolveArrowEndpoints(state, shape.id, bindingsBySource);
+	if (!resolved) return null;
+	const waypoints = [
+		worldToLocal(resolved.a, shape),
+		...shape.props.points.slice(1, -1),
+		worldToLocal(resolved.b, shape)
+	];
+	const routing = shape.props.routing?.automatic ? 'orthogonal' : (shape.props.routing?.kind ?? 'straight');
+	if (
+		shape.resolvedGeometry &&
+		shape.resolvedGeometry.routing === routing &&
+		samePoints(shape.resolvedGeometry.waypoints, waypoints)
+	) {
+		return shape.resolvedGeometry;
+	}
+
+	if (routing === 'orthogonal') {
+		const boundTargets = new Set(
+			(
+				bindingsBySource?.get(shape.id) ??
+				Object.values(state.doc.bindings).filter((binding) => binding.fromShapeId === shape.id)
+			).map((binding) => binding.toShapeId)
+		);
+		const obstacles = getShapesOnCurrentPage(state)
+			.filter(
+				(candidate) =>
+					candidate.id !== shape.id &&
+					candidate.type !== 'arrow' &&
+					candidate.type !== 'line' &&
+					candidate.type !== 'container' &&
+					!boundTargets.has(candidate.id)
+			)
+			.map(shapeBounds);
+		const worldWaypoints = waypoints.map((point) => localToWorld(shape, point));
+		const worldPath: Vec2[] = [];
+		for (let index = 1; index < worldWaypoints.length; index += 1) {
+			const leg = computeObstacleAwareOrthogonalPath(worldWaypoints[index - 1]!, worldWaypoints[index]!, obstacles);
+			if (worldPath.length === 0) worldPath.push(...leg);
+			else worldPath.push(...leg.slice(1));
+		}
+		return { path: linePathGeometry(worldPath.map((point) => worldToLocal(point, shape))), routing, waypoints };
+	}
+	return {
+		path: routing === 'curved' ? curvedPathGeometry(waypoints) : linePathGeometry(waypoints),
+		routing,
+		waypoints
+	};
+}
+
 /**
  * Resolve an arrow's rendered path, including automatic obstacle routing.
  *
  * @param bindingsBySource - Optional binding index reused across a render pass
  */
 export function arrowPathForShape(state: EditorState, shape: ArrowShape, bindingsBySource?: BindingIndex): Vec2[] {
-	const resolved = resolveArrowEndpoints(state, shape.id, bindingsBySource);
-	if (!resolved) return [];
-	const endpoints = [
-		worldToLocal(resolved.a, shape),
-		...shape.props.points.slice(1, -1),
-		worldToLocal(resolved.b, shape)
-	];
-	const routing = shape.props.routing?.automatic ? 'orthogonal' : (shape.props.routing?.kind ?? 'straight');
-	if (routing !== 'orthogonal') return arrowPath(endpoints, routing);
-	const boundTargets = new Set(
-		(
-			bindingsBySource?.get(shape.id) ??
-			Object.values(state.doc.bindings).filter((binding) => binding.fromShapeId === shape.id)
-		).map((binding) => binding.toShapeId)
+	const geometry = arrowGeometryForShape(state, shape, bindingsBySource);
+	return geometry ? flattenPathGeometry(geometry.path) : [];
+}
+
+function samePoints(left: readonly Vec2[], right: readonly Vec2[]): boolean {
+	return (
+		left.length === right.length &&
+		left.every((point, index) => {
+			const other = right[index]!;
+			return point.x === other.x && point.y === other.y;
+		})
 	);
-	const obstacles = getShapesOnCurrentPage(state)
-		.filter(
-			(candidate) =>
-				candidate.id !== shape.id &&
-				candidate.type !== 'arrow' &&
-				candidate.type !== 'line' &&
-				candidate.type !== 'container' &&
-				!boundTargets.has(candidate.id)
-		)
-		.map(shapeBounds);
-	const worldPath = computeObstacleAwareOrthogonalPath(resolved.a, resolved.b, obstacles);
-	return worldPath.map((point) => worldToLocal(point, shape));
+}
+
+function linePathGeometry(points: readonly Vec2[]): PathGeometry {
+	return {
+		subpaths: [
+			{
+				segments: points.map((point, index) =>
+					index === 0 ? { type: 'move', to: point } : { type: 'line', to: point }
+				),
+				closed: false
+			}
+		],
+		fill_rule: 'nonzero'
+	};
+}
+
+function curvedPathGeometry(points: readonly Vec2[]): PathGeometry {
+	if (points.length < 3) return linePathGeometry(points);
+	const segments: PathSegment[] = [{ type: 'move', to: points[0]! }];
+	for (let index = 1; index < points.length - 1; index += 1) {
+		const control = points[index]!;
+		const next = points[index + 1]!;
+		segments.push({ type: 'quadratic', control, to: { x: (control.x + next.x) / 2, y: (control.y + next.y) / 2 } });
+	}
+	segments.push({ type: 'quadratic', control: points.at(-2)!, to: points.at(-1)! });
+	return { subpaths: [{ segments, closed: false }], fill_rule: 'nonzero' };
+}
+
+function flattenPathGeometry(geometry: PathGeometry): Vec2[] {
+	const points: Vec2[] = [];
+	for (const subpath of geometry.subpaths) {
+		const first = subpath.segments[0];
+		if (!first || first.type !== 'move') continue;
+		let current = first.to;
+		points.push(current);
+		for (const segment of subpath.segments.slice(1)) {
+			if (segment.type === 'line') {
+				points.push(segment.to);
+				current = segment.to;
+			} else if (segment.type === 'quadratic') {
+				for (let step = 1; step <= 24; step += 1) {
+					points.push(quadraticPoint(current, segment.control, segment.to, step / 24));
+				}
+				current = segment.to;
+			} else if (segment.type === 'cubic') {
+				for (let step = 1; step <= 32; step += 1) {
+					points.push(cubicPoint(current, segment.control_1, segment.control_2, segment.to, step / 32));
+				}
+				current = segment.to;
+			}
+		}
+		if (subpath.closed) points.push(first.to);
+	}
+	return points;
 }
 
 function uniqueSorted(values: number[]): number[] {

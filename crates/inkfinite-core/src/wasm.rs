@@ -9,7 +9,7 @@ use ts_rs::TS;
 use crate::editor::EditorProjection;
 use crate::proto::{Bounds, CommitResult, TransactionDraft};
 use crate::svg_import::{SvgImport, SvgImportWarning};
-use crate::{AssetId, DocumentSnapshot, ShapeId};
+use crate::{AssetId, DocumentSnapshot, ResolvedArrowGeometry, ShapeId};
 
 /// A structured failure returned by a browser document-engine operation.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -46,6 +46,31 @@ pub enum WasmDocumentMutationResponse {
     Error {
         /// Mutation failure details.
         error: WasmDocumentSessionFailure,
+    },
+}
+
+/// A structured arrow geometry resolution failure.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+pub struct WasmArrowGeometryFailure {
+    /// Machine-readable failure category.
+    pub code: String,
+    /// Human-readable failure detail.
+    pub message: String,
+}
+
+/// Result of resolving one arrow through the Rust/WASM geometry boundary.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case", tag = "status")]
+pub enum WasmArrowGeometryResponse {
+    /// Native path geometry resolved from the supplied snapshot.
+    Success {
+        /// Resolved arrow shaft and waypoints.
+        geometry: ResolvedArrowGeometry,
+    },
+    /// The snapshot or shape could not be resolved.
+    Error {
+        /// Resolution failure details.
+        error: WasmArrowGeometryFailure,
     },
 }
 

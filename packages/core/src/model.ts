@@ -8,7 +8,8 @@ import type {
 	PathGeometry as NativePathGeometry,
 	PathHandleMode as NativePathHandleMode,
 	PathSegment as NativePathSegment,
-	PathSubpath as NativePathSubpath
+	PathSubpath as NativePathSubpath,
+	ResolvedArrowGeometry as NativeResolvedArrowGeometry
 } from '@inkfinite/bindings/model';
 import { v4 } from 'uuid';
 import type { Vec2 } from './math';
@@ -115,6 +116,9 @@ export type PathTopologyEdit = { shapeId: string; operations: PathTopologyOperat
 
 /** Native path painting properties stored alongside its geometry. */
 export type PathProps = PathGeometry & { fill?: string; stroke?: string; stroke_width?: number };
+
+/** Rust-resolved arrow shaft geometry projected for interactive consumers. */
+export type ResolvedArrowGeometry = NativeResolvedArrowGeometry;
 
 /**
  * Arrow endpoint binding metadata
@@ -305,7 +309,12 @@ export type BaseShape = {
 export type RectShape = BaseShape & { type: 'rect'; props: RectProps };
 export type EllipseShape = BaseShape & { type: 'ellipse'; props: EllipseProps };
 export type LineShape = BaseShape & { type: 'line'; props: LineProps };
-export type ArrowShape = BaseShape & { type: 'arrow'; props: ArrowProps };
+export type ArrowShape = BaseShape & {
+	type: 'arrow';
+	props: ArrowProps;
+	/** Latest Rust-resolved geometry, when the shape came from a canonical projection. */
+	resolvedGeometry?: ResolvedArrowGeometry;
+};
 export type TextShape = BaseShape & { type: 'text'; props: TextProps };
 export type ImageShape = BaseShape & { type: 'image'; props: ImageProps };
 export type ReferenceShape = BaseShape & { type: 'reference'; props: ReferenceProps };

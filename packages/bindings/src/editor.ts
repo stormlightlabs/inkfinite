@@ -16,6 +16,7 @@ import type {
 	Origin,
 	PageId,
 	PageRecord,
+	ResolvedArrowGeometry,
 	SemanticMetadata,
 	ShapeId,
 	ShapeKind,
@@ -133,6 +134,10 @@ export type EditorShape = {
 	 * Kind-specific properties using editor property names.
 	 */
 	props: ShapeProperties;
+	/**
+	 * Rust-resolved arrow geometry for interactive consumers.
+	 */
+	resolved_geometry?: ResolvedArrowGeometry | null;
 };
 
 /**

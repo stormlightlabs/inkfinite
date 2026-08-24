@@ -8,6 +8,7 @@ import type {
 	EllipseShape,
 	LineShape,
 	MarkdownShape,
+	PathGeometry,
 	PathShape,
 	RectShape,
 	ShapeRecord,
@@ -19,6 +20,7 @@ import type {
 	SnapGuide
 } from '@inkfinite/core';
 import {
+	arrowGeometryForShape,
 	arrowPathForShape,
 	computePolylineLength,
 	getPointAtDistance,
@@ -324,13 +326,14 @@ function isShapeVisible(
 	viewport: VisibleBounds,
 	bindingsBySource?: BindingIndex
 ): boolean {
-	if (shape.type === 'arrow' && (shape.props.start?.kind === 'bound' || shape.props.end?.kind === 'bound')) {
-		const endpoints = resolveArrowEndpoints(state, shape.id, bindingsBySource);
-		if (endpoints) {
-			const minX = Math.min(endpoints.a.x, endpoints.b.x);
-			const minY = Math.min(endpoints.a.y, endpoints.b.y);
-			const maxX = Math.max(endpoints.a.x, endpoints.b.x);
-			const maxY = Math.max(endpoints.a.y, endpoints.b.y);
+	if (shape.type === 'arrow') {
+		const points = arrowPathForShape(state, shape, bindingsBySource);
+		if (points.length >= 2) {
+			const worldPoints = points.map((point) => localToWorld(shape, point));
+			const minX = Math.min(...worldPoints.map((point) => point.x));
+			const minY = Math.min(...worldPoints.map((point) => point.y));
+			const maxX = Math.max(...worldPoints.map((point) => point.x));
+			const maxY = Math.max(...worldPoints.map((point) => point.y));
 			return maxX >= viewport.minX && minX <= viewport.maxX && maxY >= viewport.minY && minY <= viewport.maxY;
 		}
 	}
@@ -794,6 +797,36 @@ function drawContainer(context: CanvasRenderingContext2D, shape: Extract<ShapeRe
 	}
 }
 
+function drawNativePath(context: CanvasRenderingContext2D, geometry: PathGeometry) {
+	context.beginPath();
+	for (const subpath of geometry.subpaths) {
+		for (const segment of subpath.segments) {
+			switch (segment.type) {
+				case 'move':
+					context.moveTo(segment.to.x, segment.to.y);
+					break;
+				case 'line':
+					context.lineTo(segment.to.x, segment.to.y);
+					break;
+				case 'quadratic':
+					context.quadraticCurveTo(segment.control.x, segment.control.y, segment.to.x, segment.to.y);
+					break;
+				case 'cubic':
+					context.bezierCurveTo(
+						segment.control_1.x,
+						segment.control_1.y,
+						segment.control_2.x,
+						segment.control_2.y,
+						segment.to.x,
+						segment.to.y
+					);
+					break;
+			}
+		}
+		if (subpath.closed) context.closePath();
+	}
+}
+
 /**
  * Draw an arrow shape
  */
@@ -806,14 +839,11 @@ function drawArrow(
 	const style = shape.props.style;
 	const shapeAlpha = context.globalAlpha;
 
-	const points = arrowPathForShape(state, shape, bindingsBySource);
-	if (points.length < 2) return;
+	const geometry = arrowGeometryForShape(state, shape, bindingsBySource);
+	const points = geometry ? arrowPathForShape(state, shape, bindingsBySource) : [];
+	if (!geometry || points.length < 2) return;
 
-	context.beginPath();
-	context.moveTo(points[0].x, points[0].y);
-	for (let i = 1; i < points.length; i++) {
-		context.lineTo(points[i].x, points[i].y);
-	}
+	drawNativePath(context, geometry.path);
 
 	context.strokeStyle = style.stroke;
 	context.globalAlpha = shapeAlpha * (shape.strokeOpacity ?? 1);

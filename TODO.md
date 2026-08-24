@@ -62,19 +62,19 @@ selection, labels, and arrowheads.
 
 ### Shared resolved geometry
 
-- [ ] Define a resolved arrow geometry representation backed by native
+- [x] Define a resolved arrow geometry representation backed by native
       `PathGeometry`
-- [ ] Resolve bound endpoints, explicit waypoints, and routing configuration
+- [x] Resolve bound endpoints, explicit waypoints, and routing configuration
       before rendering or interaction code consumes the arrow
-- [ ] Make straight arrows resolve to ordinary line path segments without
+- [x] Make straight arrows resolve to ordinary line path segments without
       changing existing document behavior
-- [ ] Move canonical arrow geometry resolution into Rust and expose it through
+- [x] Move canonical arrow geometry resolution into Rust and expose it through
       the existing editor/WASM bindings
-- [ ] Use the same resolved geometry for interactive rendering and headless SVG
+- [x] Use the same resolved geometry for interactive rendering and headless SVG
       export
-- [ ] Replace arrow bounds derived only from stored points with bounds from the
+- [x] Replace arrow bounds derived only from stored points with bounds from the
       resolved path, including Bézier extrema
-- [ ] Add deterministic fixtures comparing interactive and exported geometry
+- [x] Add deterministic fixtures comparing interactive and exported geometry
       for free, bound, transformed, and multi-point arrows
 
 ### Path metrics

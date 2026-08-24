@@ -2,6 +2,7 @@ import type { DocumentSnapshot } from '@inkfinite/bindings/model';
 import type { EditorProjection, EditorReconciliationRequest } from '@inkfinite/bindings/editor';
 import type { CommitResult, TransactionDraft } from '@inkfinite/bindings/transaction';
 import type {
+	WasmArrowGeometryResponse,
 	WasmDocumentMutationResponse,
 	WasmDocumentSessionFailure,
 	WasmDocumentSessionState,
@@ -25,6 +26,7 @@ export type {
 export type { TransactionDraft, CommitResult } from '@inkfinite/bindings/transaction';
 export type { SvgImport, SvgImportWarning } from '@inkfinite/bindings/svg-import';
 export type {
+	WasmArrowGeometryResponse,
 	WasmDocumentMutationResponse,
 	WasmDocumentSessionFailure,
 	WasmDocumentSessionState,
@@ -89,6 +91,7 @@ interface GeneratedWasmModule {
 	default(input?: unknown): Promise<unknown>;
 	import_svg(source: Uint8Array): string;
 	project_editor(snapshotJson: string): string;
+	resolve_arrow_geometry(snapshotJson: string, arrowId: string): string;
 	reconcile_editor_patches(snapshotJson: string, requestJson: string): string;
 	render_svg(snapshotJson: string, optionsJson: string): string;
 	create_document(snapshotJson: string, actorId: string): GeneratedDocumentSession;
@@ -202,6 +205,15 @@ export async function projectEditor(snapshot: DocumentSnapshot): Promise<EditorP
 		throw new Error(response.error.message);
 	}
 	return response.projection;
+}
+
+/** Resolves one arrow through the Rust-owned connector geometry path. */
+export async function resolveArrowGeometry(
+	snapshot: DocumentSnapshot,
+	arrowId: string
+): Promise<WasmArrowGeometryResponse> {
+	const module = await loadModule();
+	return JSON.parse(module.resolve_arrow_geometry(JSON.stringify(snapshot), arrowId)) as WasmArrowGeometryResponse;
 }
 
 /** Reconciles semantic editor changes into one native transaction draft. */

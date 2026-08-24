@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use ts_rs::TS;
 
+use crate::connector::{ResolvedArrowGeometry, resolve_arrow_geometry_for_shape};
 use crate::engine::geometry::{Affine, decompose_transform, parent_world_transform, world_transform};
 use crate::path::{PathTopologyOperation, apply_path_topology_operations};
 use crate::proto::{
@@ -99,6 +100,9 @@ pub struct EditorShape {
     /// Kind-specific properties using editor property names.
     #[ts(type = "ShapeProperties")]
     pub props: ShapeProperties,
+    /// Rust-resolved arrow geometry for interactive consumers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved_geometry: Option<ResolvedArrowGeometry>,
 }
 
 /// A new shape supplied by an editor patch.
@@ -487,6 +491,9 @@ fn append_projected_shape(
             agent_editable: shape.metadata.agent_editable,
             metadata: shape.metadata.clone(),
             props: properties,
+            resolved_geometry: (shape.kind.as_str() == crate::ARROW_KIND)
+                .then(|| resolve_arrow_geometry_for_shape(document, shape).ok())
+                .flatten(),
         },
     );
     let child_group = if shape.kind.as_str() == CONTAINER_KIND { Some(shape.id.clone()) } else { group_id };

@@ -1,13 +1,15 @@
 import {
+  arrowGeometryForShape,
   arrowPathForShape,
   computePolylineLength,
   getPointAtDistance,
   localToWorld,
+  pathGeometryBounds,
   shapeBounds,
 } from "./geom";
 import type { Box2 } from "./math";
 import { Box2 as Box2Ops } from "./math";
-import type { ArrowShape, ContainerShape, EllipseShape, LineShape, MarkdownShape, PathShape, RectShape, ShapeRecord, TextShape } from "./model";
+import type { ArrowShape, ContainerShape, EllipseShape, LineShape, MarkdownShape, PathGeometry, PathShape, RectShape, ShapeRecord, TextShape } from "./model";
 import type { EditorState } from "./reactivity";
 import { getSelectedShapes, getShapesOnCurrentPage } from "./reactivity";
 
@@ -242,9 +244,9 @@ function lineToSVG(shape: LineShape, transform: string): string {
 }
 
 function arrowToSVG(shape: ArrowShape, transform: string, state: EditorState): string {
+  const geometry = arrowGeometryForShape(state, shape);
   const points = arrowPathForShape(state, shape);
-  if (points.length < 2) return "";
-  const routing = shape.props.routing?.automatic ? "orthogonal" : shape.props.routing?.kind ?? "straight";
+  if (!geometry || points.length < 2) return "";
   const stroke = escapeXML(shape.props.style.stroke);
   const width = svgNumber(shape.props.style.width);
   const last = points.at(-1)!;
@@ -257,12 +259,9 @@ function arrowToSVG(shape: ArrowShape, transform: string, state: EditorState): s
     const right = { x: at.x - length * Math.cos(direction + spread), y: at.y - length * Math.sin(direction + spread) };
     return `<path d="M ${svgNumber(at.x)} ${svgNumber(at.y)} L ${svgNumber(left.x)} ${svgNumber(left.y)} M ${svgNumber(at.x)} ${svgNumber(at.y)} L ${svgNumber(right.x)} ${svgNumber(right.y)}" fill="none" stroke="${stroke}" stroke-width="${width}"/>`;
   };
-  const pathData = routing === "curved"
-    ? curvedPathData(points)
-    : points.map((point, index) => `${index === 0 ? "M" : "L"} ${svgNumber(point.x)} ${svgNumber(point.y)}`).join(" ");
-  const elements = routing === "straight"
-    ? points.slice(1).map((point, index) => `<line x1="${svgNumber(points[index].x)}" y1="${svgNumber(points[index].y)}" x2="${svgNumber(point.x)}" y2="${svgNumber(point.y)}" fill="none" stroke="${stroke}" stroke-width="${width}"/>`)
-    : [`<path d="${pathData}" fill="none" stroke="${stroke}" stroke-width="${width}"/>`];
+  const elements = pathGeometryIsPolyline(geometry.path)
+    ? pathGeometryToLines(geometry.path, stroke, width)
+    : [`<path d="${pathGeometryToSVG(geometry.path)}" fill="none" stroke="${stroke}" stroke-width="${width}"/>`];
   if (shape.props.style.headEnd !== false) elements.push(head(last, angle));
   if (shape.props.style.headStart) elements.push(head(points[0], angle + Math.PI));
   const label = shape.props.label;
@@ -275,20 +274,33 @@ function arrowToSVG(shape: ArrowShape, transform: string, state: EditorState): s
   return `<g transform="${transform}">${elements.join("")}</g>`;
 }
 
-function curvedPathData(points: Array<{ x: number; y: number }>): string {
-  if (points.length < 3) return points.map((point, index) => `${index === 0 ? "M" : "L"} ${svgNumber(point.x)} ${svgNumber(point.y)}`).join(" ");
-  const midpoint = (left: { x: number; y: number }, right: { x: number; y: number }) => ({
-    x: (left.x + right.x) / 2,
-    y: (left.y + right.y) / 2,
+function pathGeometryIsPolyline(geometry: PathGeometry): boolean {
+  return geometry.subpaths.every((subpath) => subpath.segments.every((segment) => segment.type === "move" || segment.type === "line"));
+}
+
+function pathGeometryToLines(geometry: PathGeometry, stroke: string, width: string): string[] {
+  return geometry.subpaths.flatMap((subpath) => {
+    const first = subpath.segments[0];
+    if (!first || first.type !== "move") return [];
+    let from = first.to;
+    return subpath.segments.slice(1).flatMap((segment) => {
+      if (segment.type !== "line") return [];
+      const line = `<line x1="${svgNumber(from.x)}" y1="${svgNumber(from.y)}" x2="${svgNumber(segment.to.x)}" y2="${svgNumber(segment.to.y)}" fill="none" stroke="${stroke}" stroke-width="${width}"/>`;
+      from = segment.to;
+      return [line];
+    });
   });
-  let path = `M ${svgNumber(points[0].x)} ${svgNumber(points[0].y)}`;
-  for (let index = 1; index < points.length - 1; index += 1) {
-    const end = midpoint(points[index], points[index + 1]);
-    path += ` Q ${svgNumber(points[index].x)} ${svgNumber(points[index].y)} ${svgNumber(end.x)} ${svgNumber(end.y)}`;
-  }
-  const control = points[points.length - 2];
-  const end = points[points.length - 1];
-  return `${path} Q ${svgNumber(control.x)} ${svgNumber(control.y)} ${svgNumber(end.x)} ${svgNumber(end.y)}`;
+}
+
+function pathGeometryToSVG(geometry: PathGeometry): string {
+  return geometry.subpaths.flatMap((subpath) => subpath.segments.map((segment) => {
+    switch (segment.type) {
+      case "move": return `M ${svgNumber(segment.to.x)} ${svgNumber(segment.to.y)}`;
+      case "line": return `L ${svgNumber(segment.to.x)} ${svgNumber(segment.to.y)}`;
+      case "quadratic": return `Q ${svgNumber(segment.control.x)} ${svgNumber(segment.control.y)} ${svgNumber(segment.to.x)} ${svgNumber(segment.to.y)}`;
+      case "cubic": return `C ${svgNumber(segment.control_1.x)} ${svgNumber(segment.control_1.y)} ${svgNumber(segment.control_2.x)} ${svgNumber(segment.control_2.y)} ${svgNumber(segment.to.x)} ${svgNumber(segment.to.y)}`;
+    }
+  })).join(" ");
 }
 
 function wrapSemanticMetadata(shape: ShapeRecord, content: string): string {
@@ -395,9 +407,15 @@ function escapeXML(string_: string): string {
 
 function exportBounds(state: EditorState, shape: ShapeRecord): Box2 {
   if (shape.type !== "arrow") return shapeBounds(shape);
-  const points = arrowPathForShape(state, shape);
-  if (points.length < 2) return shapeBounds(shape);
-  return Box2Ops.fromPoints(points.map((point) => localToWorld(shape, point)));
+  const geometry = arrowGeometryForShape(state, shape);
+  if (!geometry) return shapeBounds(shape);
+  const bounds = pathGeometryBounds(geometry.path);
+  return Box2Ops.fromPoints([
+    localToWorld(shape, bounds.min),
+    localToWorld(shape, { x: bounds.max.x, y: bounds.min.y }),
+    localToWorld(shape, bounds.max),
+    localToWorld(shape, { x: bounds.min.x, y: bounds.max.y })
+  ]);
 }
 
 function getExportSelection(state: EditorState): ShapeRecord[] {
