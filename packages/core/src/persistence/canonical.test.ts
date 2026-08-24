@@ -9,13 +9,13 @@ describe('canonical editor projection', () => {
 		const page = PageRecord.create('SVG', pageId);
 		const layer = LayerRecord.create(pageId, 'Imported', layerId);
 		page.layerIds = [layerId];
-		const root = ShapeRecord.createContainer(pageId, 10, 20, { width: 100, height: 80 }, 'shape:svg:root');
-		const group = ShapeRecord.createContainer(pageId, 5, 6, { width: 40, height: 30 }, 'shape:svg:group');
+		const root = ShapeRecord.createContainer(pageId, 10, 20, { w: 100, h: 80 }, 'shape:svg:root');
+		const group = ShapeRecord.createContainer(pageId, 5, 6, { w: 40, h: 30 }, 'shape:svg:group');
 		const child = ShapeRecord.createRect(
 			pageId,
 			2,
 			3,
-			{ w: 20, h: 10, fill: '#123456', stroke: null, radius: 0 },
+			{ w: 20, h: 10, fill: '#123456', stroke: 'none', radius: 0 },
 			'shape:svg:child'
 		);
 		root.layerId = layerId;
@@ -40,6 +40,7 @@ describe('canonical editor projection', () => {
 		expect(canonical.document.shapes[group.id].child_ids).toEqual([child.id]);
 
 		const projected = fromCanonicalDocumentSnapshot(canonical);
+		if (!projected.layers) throw new Error('Expected projected layers');
 		expect(projected.layers[layerId].shapeIds).toEqual([root.id, group.id, child.id]);
 		expect(projected.pages[pageId].shapeIds).toEqual([root.id, group.id, child.id]);
 		expect(projected.shapes[group.id].groupId).toBe(root.id);
@@ -50,8 +51,6 @@ describe('canonical editor projection', () => {
 		projected.pages[pageId].shapeIds = projected.pages[pageId].shapeIds.filter((id) => id !== child.id);
 		const afterDelete = toCanonicalDocumentSnapshot(
 			{
-				id: 'document:svg',
-				name: 'SVG',
 				pages: projected.pages,
 				layers: projected.layers,
 				shapes: projected.shapes,
