@@ -54,6 +54,74 @@ and rendered output where visual fidelity matters.
 - [ ] Add end-to-end import, edit, and export comparisons for representative
       mixed-format documents
 
+## Connector geometry
+
+Make arrows semantic connectors backed by the same geometry operations used
+for native paths. Avoid separate approximations for rendering, export,
+selection, labels, and arrowheads.
+
+### Shared resolved geometry
+
+- [ ] Define a resolved arrow geometry representation backed by native
+      `PathGeometry`
+- [ ] Resolve bound endpoints, explicit waypoints, and routing configuration
+      before rendering or interaction code consumes the arrow
+- [ ] Make straight arrows resolve to ordinary line path segments without
+      changing existing document behavior
+- [ ] Move canonical arrow geometry resolution into Rust and expose it through
+      the existing editor/WASM bindings
+- [ ] Use the same resolved geometry for interactive rendering and headless SVG
+      export
+- [ ] Replace arrow bounds derived only from stored points with bounds from the
+      resolved path, including Bézier extrema
+- [ ] Add deterministic fixtures comparing interactive and exported geometry
+      for free, bound, transformed, and multi-point arrows
+
+### Path metrics
+
+- [ ] Add shared path flattening with a geometric tolerance rather than fixed
+      samples per curve
+- [ ] Add path length and point-at-distance queries
+- [ ] Add tangent-at-distance queries for line, quadratic, and cubic segments
+- [ ] Add nearest-point and distance-along-path queries for hit testing and
+      snapping
+- [ ] Add path trimming by start and end distance
+- [ ] Reuse the shared path metrics for native path and arrow hit testing
+      instead of maintaining separate curve-sampling implementations
+- [ ] Add deterministic tests for lines, quadratic curves, cubic curves,
+      transformed paths, and degenerate segments
+
+### Curved arrows
+
+- [ ] Add persistent curved-arrow bend state without storing sampled curve
+      points
+- [ ] Resolve two-point curved arrows to native quadratic Bézier geometry
+- [ ] Add a direct-manipulation bend handle with a well-defined straight-arrow
+      zero state
+- [ ] Preserve bound endpoints while the bend handle is edited
+- [ ] Define multi-point curved-arrow behavior as rounded waypoint routes
+      rather than an unconstrained spline
+- [ ] Render native quadratic and cubic path segments directly instead of
+      drawing sampled curves with `lineTo`
+- [ ] Add undo/redo and save/reopen coverage for curved-arrow edits
+- [ ] Add visual fixtures for positive, negative, zero, short, long, bound, and
+      multi-point curves
+
+### Path-aware arrowheads and labels
+
+- [ ] Orient start and end arrowheads from the tangent of the resolved path
+      rather than the first or last sampled line segment
+- [ ] Define arrowhead geometry independently from shaft geometry so additional
+      head styles can be added without changing routing
+- [ ] Trim the visible shaft where required so filled arrowheads do not overlap
+      the path beneath them
+- [ ] Position arrow labels by distance along the resolved path
+- [ ] Apply label offset along the local path normal rather than a global axis
+- [ ] Keep label placement stable when bindings, bend, or orthogonal routing
+      change
+- [ ] Add hit-test and visual coverage for arrowheads and labels on straight,
+      curved, and orthogonal routes
+
 ## Advanced vector editing
 
 ### Boolean paths
@@ -104,8 +172,13 @@ and rendered output where visual fidelity matters.
 
 ### Text on path
 
+Build text-on-path behavior on the shared path metrics introduced for
+path-aware connectors rather than creating a second path-placement system.
+
 - [ ] Define the relationship between a text object and its supporting path
-- [ ] Support offset, direction, alignment, and path reversal
+- [ ] Represent text position as an offset along the supporting path
+- [ ] Reuse shared path length, point, tangent, and normal queries for layout
+- [ ] Support direction, alignment, side, and path reversal
 - [ ] Keep the path independently editable without destroying attached text
 - [ ] Add direct manipulation for text offset along the path
 - [ ] Import and export representative SVG `textPath` content

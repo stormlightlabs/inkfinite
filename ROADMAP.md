@@ -29,6 +29,30 @@ The editor should have coherent defaults for shapes, frames, connectors, pen
 strokes, text, Markdown, and cards across light and dark appearances. Visual
 regression fixtures should make accidental changes to those defaults visible.
 
+### Connector geometry
+
+Treat arrows as semantic relationships whose resolved visual geometry uses the
+same native path representation as other Inkfinite vectors.
+
+Straight, curved, and orthogonal routing should resolve bindings, waypoints,
+and routing parameters into ordinary path geometry. Rendering, SVG export,
+bounds, hit testing, labels, and arrowheads should consume that resolved path
+rather than maintaining separate connector approximations.
+
+Curved arrows should retain compact editable routing state such as bend and
+waypoint information rather than persisting sampled polylines. Arrowheads
+should follow the tangent of the resolved path, and labels should be positioned
+by distance and normal offset along it.
+
+Shared path metrics should provide length, point and tangent at distance,
+nearest-point queries, flattening, and trimming. Keep the canonical geometry
+implementation in Rust and expose it through the existing editor bindings so
+interactive rendering and headless export cannot diverge.
+
+This path-aware connector work should also provide the geometry foundation for
+text on path and other future features that attach content or markers to vector
+paths.
+
 ### SVG round-trip
 
 Inkfinite has one validated Rust SVG pipeline across desktop, web, CLI, and
