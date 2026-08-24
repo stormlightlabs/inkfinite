@@ -10,6 +10,7 @@
 		ToolId
 	} from '@inkfinite/core';
 	import {
+		canBooleanPathSelection,
 		cardChildren,
 		EditorState,
 		getSelectedShapes,
@@ -200,6 +201,7 @@
 	let allSelectedLocked = $derived(
 		selectionCount > 0 && selectedShapes.every((shape) => shape.locked)
 	);
+	let booleanPathSelection = $derived(canBooleanPathSelection(editorState));
 
 	let fillColorState = $derived.by(() => {
 		const shared = getSharedValue(fillTargets.map(getFillColor));
@@ -1335,6 +1337,36 @@
 					aria-labelledby="selection-arrow-label">
 					<h2 id="selection-arrow-label">Arrow</h2>
 					<ArrowPopover {store} />
+				</section>
+			{/if}
+
+			{#if booleanPathSelection}
+				<section
+					class="selection-controls__section"
+					aria-labelledby="selection-boolean-label">
+					<h2 id="selection-boolean-label">Boolean paths</h2>
+					<div class="selection-controls__actions">
+						<button
+							class="selection-controls__action"
+							type="button"
+							onclick={() => executeSelectionCommand(store, 'boolean-union')}
+							>Union</button>
+						<button
+							class="selection-controls__action"
+							type="button"
+							onclick={() => executeSelectionCommand(store, 'boolean-intersection')}
+							>Intersect</button>
+						<button
+							class="selection-controls__action"
+							type="button"
+							onclick={() => executeSelectionCommand(store, 'boolean-difference')}
+							>Subtract</button>
+						<button
+							class="selection-controls__action"
+							type="button"
+							onclick={() => executeSelectionCommand(store, 'boolean-exclusion')}
+							>Exclude</button>
+					</div>
 				</section>
 			{/if}
 

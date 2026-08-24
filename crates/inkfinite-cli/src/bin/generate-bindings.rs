@@ -331,6 +331,7 @@ fn editor_bindings() -> String {
     append_declaration::<EditorProjection>(&mut output, &config);
     append_declaration::<PathCurveKind>(&mut output, &config);
     append_declaration::<PathTopologyOperation>(&mut output, &config);
+    append_declaration::<BooleanPathOperation>(&mut output, &config);
     append_clean_declaration::<EditorPatch>(&mut output, &config);
     append_declaration::<EditorReconciliationRequest>(&mut output, &config);
     output

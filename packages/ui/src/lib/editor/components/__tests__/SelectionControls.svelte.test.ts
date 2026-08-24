@@ -22,6 +22,40 @@ function createSelectionStore(shapes: Shape[], selectionIds = shapes.map((shape)
 }
 
 describe('SelectionControls', () => {
+	it('exposes boolean path controls for a closed path selection', async () => {
+		const page = PageRecord.create('Test page', 'page:test');
+		const pathProps = {
+			subpaths: [
+				{
+					segments: [
+						{ type: 'move' as const, to: { x: 0, y: 0 } },
+						{ type: 'line' as const, to: { x: 40, y: 0 } },
+						{ type: 'line' as const, to: { x: 40, y: 40 } },
+						{ type: 'line' as const, to: { x: 0, y: 40 } }
+					],
+					closed: true
+				}
+			],
+			fill_rule: 'evenodd' as const,
+			fill: '#ffffff'
+		};
+		const first = ShapeRecord.createPath(page.id, 0, 0, pathProps, 'first');
+		const second = ShapeRecord.createPath(page.id, 20, 0, pathProps, 'second');
+		const store = createSelectionStore([first, second]);
+		const screen = render(SelectionControls, {
+			currentTool: 'select',
+			orientation: 'vertical',
+			store
+		});
+
+		await expect
+			.element(screen.getByRole('heading', { name: 'Boolean paths' }))
+			.toBeInTheDocument();
+		await screen.getByRole('button', { name: 'Union' }).click();
+		expect(store.getState().ui.selectionIds).toEqual(['first']);
+		expect(store.getState().doc.shapes.second).toBeUndefined();
+	});
+
 	it('shows appearance and object metadata controls for a selected rectangle', async () => {
 		const page = PageRecord.create('Test page', 'page:test');
 		const rect = ShapeRecord.createRect(

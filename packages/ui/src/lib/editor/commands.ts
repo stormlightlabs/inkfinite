@@ -1,5 +1,7 @@
 import {
 	alignShapes,
+	booleanPathSelection,
+	canBooleanPathSelection,
 	distributeShapes,
 	graphLayout,
 	gridShapes,
@@ -12,16 +14,22 @@ import {
 	setShapesLocked,
 	SnapshotCommand,
 	ungroupShapes,
-	convertSelectedShapes,
-	type SelectionConversionTarget,
-	type EditorState,
-	type ShapeAlignment,
-	type Store
+	convertSelectedShapes
+} from '@inkfinite/core';
+import type {
+	SelectionConversionTarget,
+	EditorState,
+	ShapeAlignment,
+	Store
 } from '@inkfinite/core';
 
 /** Commands shared by the selection toolbar and canvas context menu. */
 export type SelectionCommand =
 	| `align-${ShapeAlignment}`
+	| 'boolean-union'
+	| 'boolean-intersection'
+	| 'boolean-difference'
+	| 'boolean-exclusion'
 	| 'distribute-horizontal'
 	| 'distribute-vertical'
 	| 'stack-horizontal'
@@ -47,6 +55,10 @@ export type SelectionCommand =
 
 /** User-facing names used for history entries and command menus. */
 export const SELECTION_COMMAND_LABELS: Record<SelectionCommand, string> = {
+	'boolean-union': 'Union Paths',
+	'boolean-intersection': 'Intersect Paths',
+	'boolean-difference': 'Subtract Paths',
+	'boolean-exclusion': 'Exclude Paths',
 	'align-left': 'Align Left',
 	'align-center': 'Align Center',
 	'align-right': 'Align Right',
@@ -82,6 +94,14 @@ export const SELECTION_COMMAND_LABELS: Record<SelectionCommand, string> = {
 export function applySelectionCommand(state: EditorState, command: SelectionCommand): EditorState {
 	const ids = state.ui.selectionIds;
 	switch (command) {
+		case 'boolean-union':
+			return booleanPathSelection(state, 'union') ?? state;
+		case 'boolean-intersection':
+			return booleanPathSelection(state, 'intersection') ?? state;
+		case 'boolean-difference':
+			return booleanPathSelection(state, 'difference') ?? state;
+		case 'boolean-exclusion':
+			return booleanPathSelection(state, 'exclusion') ?? state;
 		case 'group':
 			return groupShapes(state, ids);
 		case 'ungroup':
@@ -191,6 +211,20 @@ export function getCommandPaletteEntries(
 		disabled: selectedCount < (id.startsWith('distribute-') ? 3 : 2),
 		keywords: 'align distribute layout'
 	}));
+	const booleanEntries: CommandPaletteEntry[] = (
+		[
+			'boolean-union',
+			'boolean-intersection',
+			'boolean-difference',
+			'boolean-exclusion'
+		] as SelectionCommand[]
+	).map((id) => ({
+		id,
+		label: SELECTION_COMMAND_LABELS[id],
+		group: 'Selection' as const,
+		disabled: !canBooleanPathSelection(state),
+		keywords: 'boolean path vector'
+	}));
 	const entries: CommandPaletteEntry[] = [
 		{ id: 'select-all', label: 'Select all shapes', group: 'Selection', shortcut: '⌘/Ctrl A' },
 		{
@@ -216,6 +250,7 @@ export function getCommandPaletteEntries(
 			keywords: 'copy connector arrow'
 		},
 		...alignmentEntries,
+		...booleanEntries,
 		{
 			id: 'convert-to-rect',
 			label: SELECTION_COMMAND_LABELS['convert-to-rect'],

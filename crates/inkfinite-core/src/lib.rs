@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod boolean;
 pub mod connector;
 pub mod crdt;
 pub mod editor;
@@ -24,6 +25,7 @@ pub mod svg_import;
 pub mod svg_transaction;
 pub mod sync;
 pub mod wasm;
+pub use boolean::{BooleanPathError, BooleanPathOperation, boolean_path_operation};
 pub use connector::{
     ArrowGeometryError, ResolvedArrowGeometry, resolve_arrow_geometry, resolve_arrow_geometry_for_shape,
 };

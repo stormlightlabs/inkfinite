@@ -422,6 +422,12 @@ export type PathTopologyOperation =
 	  };
 
 /**
+ * Boolean operation applied from the first selected path to the remaining
+ * paths in their selection order.
+ */
+export type BooleanPathOperation = 'union' | 'intersection' | 'difference' | 'exclusion';
+
+/**
  * Semantic editor changes that can be reconciled into native operations.
  *
  * Shape transforms are world-space transforms from [`EditorShape::transform`].
@@ -488,6 +494,17 @@ export type EditorPatch =
 			 * Ordered operations applied to the path in one transaction.
 			 */
 			operations: Array<PathTopologyOperation>;
+	  }
+	| {
+			type: 'boolean_paths';
+			/**
+			 * Paths to combine in selection order.
+			 */
+			shape_ids: Array<ShapeId>;
+			/**
+			 * Boolean operation applied to the selected filled regions.
+			 */
+			operation: BooleanPathOperation;
 	  }
 	| {
 			type: 'create_page';

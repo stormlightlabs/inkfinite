@@ -133,13 +133,13 @@ selection, labels, and arrowheads.
 
 ### Boolean paths
 
-- [ ] Define union, intersection, difference, and exclusion operations over
+- [x] Define union, intersection, difference, and exclusion operations over
       Inkfinite's native path representation
-- [ ] Preserve transforms and fill rules when combining selected paths
-- [ ] Expose boolean operations through editor commands and selection controls
-- [ ] Make each boolean operation one undoable document transaction
-- [ ] Verify generated geometry through SVG import/export round trips
-- [ ] Add deterministic fixtures for overlapping, nested, compound, and
+- [x] Preserve transforms and fill rules when combining selected paths
+- [x] Expose boolean operations through editor commands and selection controls
+- [x] Make each boolean operation one undoable document transaction
+- [x] Verify generated geometry through SVG import/export round trips
+- [x] Add deterministic fixtures for overlapping, nested, compound, and
       self-intersecting paths
 
 ### Gradient fills and strokes

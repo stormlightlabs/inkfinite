@@ -92,9 +92,11 @@ expand the vector model itself.
 
 ### Boolean geometry
 
-Support union, intersection, difference, and exclusion as deterministic,
-undoable operations over native paths. Generated geometry must remain ordinary
-Inkfinite vector data and survive SVG round trips.
+Union, intersection, difference, and exclusion operate on selected native paths
+as one undoable editor command. Rust resolves transformed path geometry through
+one boolean pipeline, stores the result as ordinary native line segments, and
+keeps the first path's transform, paint, metadata, and fill rule. Generated
+geometry survives SVG export and import.
 
 ### Rich paint
 

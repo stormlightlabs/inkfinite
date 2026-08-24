@@ -1,0 +1,42 @@
+{
+  "_generated_by": "Inkfinite boolean path fixture",
+  "format": "inkfinite.boolean-paths-fixture",
+  "cases": [
+    {
+      "name": "overlapping-union",
+      "operation": "union",
+      "fill_rule": "evenodd",
+      "paths": [
+        [[0, 0], [10, 0], [10, 10], [0, 10]],
+        [[5, 0], [15, 0], [15, 10], [5, 10]]
+      ]
+    },
+    {
+      "name": "nested-difference",
+      "operation": "difference",
+      "fill_rule": "evenodd",
+      "paths": [
+        [[0, 0], [20, 0], [20, 20], [0, 20]],
+        [[5, 5], [15, 5], [15, 15], [5, 15]]
+      ]
+    },
+    {
+      "name": "compound-intersection",
+      "operation": "intersection",
+      "fill_rule": "evenodd",
+      "paths": [
+        [[0, 0], [30, 0], [30, 30], [0, 30]],
+        [[-5, 10], [35, 10], [35, 20], [-5, 20]]
+      ]
+    },
+    {
+      "name": "self-intersecting-exclusion",
+      "operation": "exclusion",
+      "fill_rule": "evenodd",
+      "paths": [
+        [[0, 0], [20, 20], [0, 20], [20, 0]],
+        [[5, 5], [15, 5], [15, 15], [5, 15]]
+      ]
+    }
+  ]
+}

@@ -549,6 +549,7 @@ fn reconciliation_failure(error: &EditorReconciliationError) -> EditorReconcilia
         EditorReconciliationError::SingularParent { .. } => "singular_parent",
         EditorReconciliationError::UnsupportedShear { .. } => "unsupported_shear",
         EditorReconciliationError::PathTopology { .. } => "path_topology",
+        EditorReconciliationError::BooleanPaths { .. } => "boolean_paths",
     };
     EditorReconciliationFailure { code: code.into(), message: error.to_string() }
 }

@@ -1,9 +1,20 @@
+use inkfinite_core::editor::{EditorPatch, EditorReconciliationRequest, reconcile_editor_patches};
 use inkfinite_core::engine::TransactionEngine;
 use inkfinite_core::proto::{Operation, ShapePatch, TransactionDraft, TransactionId};
 use inkfinite_core::render::{SvgRenderOptions, render_svg};
-use inkfinite_core::svg_import::import_svg;
+use inkfinite_core::svg_import::{SvgGroup, SvgImportNode, import_svg};
 use inkfinite_core::svg_transaction::{SvgImportTransactionOptions, build_svg_import_transaction};
-use inkfinite_core::{ActorId, ChangeHash, DocumentId, Origin, Timestamp, Transform, Vec2, blank_document};
+use inkfinite_core::{
+    ActorId, BooleanPathOperation, ChangeHash, DocumentId, Origin, Timestamp, Transform, Vec2, blank_document,
+};
+
+fn contains_path(group: &SvgGroup) -> bool {
+    group.children.iter().any(|node| match node {
+        SvgImportNode::Group(child) => contains_path(child),
+        SvgImportNode::Shape(shape) => shape.kind.as_str() == inkfinite_core::PATH_KIND,
+        SvgImportNode::Image(_) => false,
+    })
+}
 
 fn import_transaction(
     engine: &mut TransactionEngine, actor: &ActorId, source: &str, name: &str,
@@ -100,6 +111,52 @@ fn native_svg_survives_edit_export_save_reopen_undo_redo_and_merge() {
 
     // The explicit type keeps this test honest if the public head representation changes.
     let _: &[ChangeHash] = &baseline.heads;
+}
+
+#[test]
+fn boolean_geometry_exports_and_imports_as_a_native_path() {
+    let actor = ActorId::from("actor:boolean-round-trip");
+    let document_id = DocumentId::from("document:boolean-round-trip");
+    let mut engine = TransactionEngine::create(document_id.clone(), actor.clone(), blank_document(&document_id, None))
+        .expect("engine should create");
+    let imported = import_transaction(
+        &mut engine,
+        &actor,
+        r##"<svg viewBox="0 0 40 20"><path id="left" fill="#fff" d="M0 0h20v20H0z"/><path id="right" fill="#fff" d="M10 0h20v20H10z"/></svg>"##,
+        "boolean.svg",
+    );
+    engine.commit(imported.transaction).expect("paths should commit");
+
+    let snapshot = engine.snapshot().expect("snapshot should materialize");
+    let shape_ids = snapshot
+        .document
+        .shapes
+        .values()
+        .filter(|shape| shape.kind.as_str() == inkfinite_core::PATH_KIND)
+        .map(|shape| shape.id.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(shape_ids.len(), 2);
+    let transaction = reconcile_editor_patches(
+        &snapshot,
+        EditorReconciliationRequest {
+            patches: vec![EditorPatch::BooleanPaths { shape_ids, operation: BooleanPathOperation::Union }],
+            actor_id: actor.clone(),
+            origin: Origin::Human,
+            transaction_id: TransactionId("transaction:boolean-round-trip".into()),
+            description: "Union paths".into(),
+            timestamp: Timestamp(2),
+        },
+    )
+    .expect("boolean paths should reconcile");
+    engine.commit(transaction).expect("boolean paths should commit");
+
+    let result = engine.snapshot().expect("boolean snapshot should materialize");
+    let rendered = render_svg(&result, &SvgRenderOptions::default())
+        .expect("boolean result should render")
+        .svg;
+    assert!(rendered.contains("fill-rule=\"nonzero\""));
+    let reparsed = import_svg(&rendered).expect("rendered boolean SVG should import");
+    assert!(contains_path(&reparsed.root));
 }
 
 #[test]

@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use ts_rs::TS;
 
+use crate::boolean::{BooleanPathOperation, boolean_path_operation};
 use crate::connector::{ResolvedArrowGeometry, resolve_arrow_geometry_for_shape};
 use crate::engine::geometry::{Affine, decompose_transform, parent_world_transform, world_transform};
 use crate::path::{PathTopologyOperation, apply_path_topology_operations};
@@ -21,8 +22,9 @@ use crate::proto::{
 };
 use crate::{
     ActorId, AssetRecord, BindingAnchor, BindingRecord, CONTAINER_KIND, ContainerLayout, Document, DocumentSnapshot,
-    LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord, Provenance, RecordVersion, SemanticMetadata, ShapeId,
-    ShapeKind, ShapeParent, ShapeProperties, ShapeRecord, ShapeStyle, SiblingAnchor, Timestamp, Transform,
+    LayerId, LayerRecord, Opacity, Origin, PageId, PageRecord, PathGeometry, PathSegment, PathSubpath, Provenance,
+    RecordVersion, SemanticMetadata, ShapeId, ShapeKind, ShapeParent, ShapeProperties, ShapeRecord, ShapeStyle,
+    SiblingAnchor, Timestamp, Transform,
 };
 
 /// Full affine transform used by the editor projection.
@@ -247,6 +249,13 @@ pub enum EditorPatch {
         /// Ordered operations applied to the path in one transaction.
         operations: Vec<PathTopologyOperation>,
     },
+    /// Combine selected native paths into the first selected path.
+    BooleanPaths {
+        /// Paths to combine in selection order.
+        shape_ids: Vec<ShapeId>,
+        /// Boolean operation applied to the selected filled regions.
+        operation: BooleanPathOperation,
+    },
     /// Create a page and its later layer records.
     CreatePage {
         /// New page record.
@@ -387,6 +396,12 @@ pub enum EditorReconciliationError {
     PathTopology {
         /// Shape whose geometry was targeted.
         shape_id: ShapeId,
+        /// Canonical geometry error.
+        message: String,
+    },
+    /// A boolean path operation could not produce a valid native result.
+    #[error("boolean path operation failed: {message}")]
+    BooleanPaths {
         /// Canonical geometry error.
         message: String,
     },
@@ -615,6 +630,9 @@ pub fn reconcile_editor_patches(
             EditorPatch::PathTopology { shape_id, operations: topology } => {
                 reconcile_path_topology(document, shape_id, &topology, &mut operations)?;
             }
+            EditorPatch::BooleanPaths { shape_ids, operation } => {
+                reconcile_boolean_paths(document, &shape_ids, operation, &mut operations)?;
+            }
             EditorPatch::CreateShape { shape, parent, transform, anchor } => {
                 let local_transform = local_transform(
                     document,
@@ -753,6 +771,138 @@ fn reconcile_path_topology(
         });
     }
     Ok(())
+}
+
+fn reconcile_boolean_paths(
+    document: &Document, shape_ids: &[ShapeId], operation: BooleanPathOperation, operations: &mut Vec<Operation>,
+) -> Result<(), EditorReconciliationError> {
+    if shape_ids.len() < 2 {
+        return Err(EditorReconciliationError::BooleanPaths { message: "at least two paths are required".into() });
+    }
+    if shape_ids.iter().collect::<BTreeSet<_>>().len() != shape_ids.len() {
+        return Err(EditorReconciliationError::BooleanPaths { message: "paths must be distinct".into() });
+    }
+    let first = document
+        .shapes
+        .get(&shape_ids[0])
+        .ok_or_else(|| EditorReconciliationError::UnknownShape(shape_ids[0].clone()))?;
+    let first_page = shape_page_id(document, first);
+    let mut geometries = Vec::with_capacity(shape_ids.len());
+    for (index, shape_id) in shape_ids.iter().enumerate() {
+        let shape = document
+            .shapes
+            .get(shape_id)
+            .ok_or_else(|| EditorReconciliationError::UnknownShape(shape_id.clone()))?;
+        if shape.kind.as_str() != crate::PATH_KIND {
+            return Err(EditorReconciliationError::BooleanPaths {
+                message: format!("shape {} is not a path", shape.id),
+            });
+        }
+        if shape_page_id(document, shape) != first_page {
+            return Err(EditorReconciliationError::BooleanPaths {
+                message: "boolean paths must be on one page".into(),
+            });
+        }
+        let geometry = crate::path_geometry_from_properties(&shape.properties)
+            .map_err(|error| EditorReconciliationError::BooleanPaths { message: format!("path {index}: {error}") })?;
+        let flattened = crate::flatten_path_with_transform(
+            &geometry,
+            world_transform(document, shape),
+            crate::DEFAULT_PATH_METRIC_TOLERANCE.min(0.1),
+        );
+        let subpaths = flattened
+            .subpaths
+            .into_iter()
+            .map(|subpath| PathSubpath {
+                segments: subpath
+                    .points
+                    .into_iter()
+                    .enumerate()
+                    .map(|(point_index, point)| {
+                        if point_index == 0 { PathSegment::Move { to: point } } else { PathSegment::Line { to: point } }
+                    })
+                    .collect(),
+                closed: subpath.closed,
+                handle_modes: None,
+            })
+            .collect();
+        geometries.push(PathGeometry { subpaths, fill_rule: geometry.fill_rule });
+    }
+
+    let combined = boolean_path_operation(&geometries, operation)
+        .map_err(|error| EditorReconciliationError::BooleanPaths { message: error.to_string() })?;
+    let inverse =
+        world_transform(document, first)
+            .inverse()
+            .ok_or_else(|| EditorReconciliationError::BooleanPaths {
+                message: format!("shape {} has a singular transform", first.id),
+            })?;
+    let local = transform_path_geometry(&combined, inverse);
+    let mut properties = first.properties.clone();
+    properties.insert(
+        "subpaths".into(),
+        serde_json::to_value(local.subpaths)
+            .map_err(|error| EditorReconciliationError::BooleanPaths { message: error.to_string() })?,
+    );
+    properties.insert(
+        "fill_rule".into(),
+        serde_json::to_value(local.fill_rule)
+            .map_err(|error| EditorReconciliationError::BooleanPaths { message: error.to_string() })?,
+    );
+    operations.push(Operation::PatchShape {
+        shape_id: first.id.clone(),
+        patch: NativeShapePatch { properties: Some(properties), ..NativeShapePatch::default() },
+        expected_version: Some(first.version),
+    });
+    for shape_id in shape_ids.iter().skip(1) {
+        let shape = document
+            .shapes
+            .get(shape_id)
+            .ok_or_else(|| EditorReconciliationError::UnknownShape(shape_id.clone()))?;
+        operations.push(Operation::DeleteShape { shape_id: shape.id.clone(), expected_version: Some(shape.version) });
+    }
+    Ok(())
+}
+
+fn shape_page_id(document: &Document, shape: &ShapeRecord) -> Option<PageId> {
+    match &shape.parent {
+        ShapeParent::Layer(layer_id) => document.layers.get(layer_id).map(|layer| layer.page_id.clone()),
+        ShapeParent::Shape(parent_id) => document
+            .shapes
+            .get(parent_id)
+            .and_then(|parent| shape_page_id(document, parent)),
+    }
+}
+
+fn transform_path_geometry(geometry: &PathGeometry, transform: Affine) -> PathGeometry {
+    let transform_point = |point| transform.point(point);
+    PathGeometry {
+        fill_rule: geometry.fill_rule,
+        subpaths: geometry
+            .subpaths
+            .iter()
+            .map(|subpath| PathSubpath {
+                closed: subpath.closed,
+                handle_modes: None,
+                segments: subpath
+                    .segments
+                    .iter()
+                    .map(|segment| match *segment {
+                        PathSegment::Move { to } => PathSegment::Move { to: transform_point(to) },
+                        PathSegment::Line { to } => PathSegment::Line { to: transform_point(to) },
+                        PathSegment::Quadratic { control, to } => {
+                            PathSegment::Quadratic { control: transform_point(control), to: transform_point(to) }
+                        }
+                        PathSegment::Cubic { control_1, control_2, to } => PathSegment::Cubic {
+                            control_1: transform_point(control_1),
+                            control_2: transform_point(control_2),
+                            to: transform_point(to),
+                        },
+                    })
+                    .collect(),
+            })
+            .collect(),
+    }
 }
 
 struct ReconcileShapeOptions<'a> {
@@ -1189,6 +1339,56 @@ mod tests {
         let segments = properties["subpaths"][0]["segments"].as_array().expect("segments");
         assert_eq!(segments.len(), 4);
         assert_eq!(segments[1]["to"], serde_json::json!({ "x": 20.0, "y": 0.0 }));
+    }
+
+    #[test]
+    fn reconciliation_combines_transformed_paths_and_deletes_the_other_inputs() {
+        let mut snapshot = nested_snapshot();
+        let path_id = ShapeId::from("shape:child");
+        let parent_id = ShapeId::from("shape:group");
+        let path_properties = BTreeMap::from([
+            (
+                "subpaths".into(),
+                serde_json::json!([{
+                    "segments": [
+                        { "type": "move", "to": { "x": 0.0, "y": 0.0 } },
+                        { "type": "line", "to": { "x": 30.0, "y": 0.0 } },
+                        { "type": "line", "to": { "x": 30.0, "y": 30.0 } },
+                        { "type": "line", "to": { "x": 0.0, "y": 30.0 } }
+                    ],
+                    "closed": true
+                }]),
+            ),
+            ("fill_rule".into(), serde_json::json!("evenodd")),
+        ]);
+        snapshot.document.shapes.get_mut(&path_id).unwrap().kind = ShapeKind::from(crate::PATH_KIND);
+        snapshot.document.shapes.get_mut(&path_id).unwrap().properties = path_properties;
+        let second_id = ShapeId::from("shape:second-path");
+        let mut second = snapshot.document.shapes[&path_id].clone();
+        second.id = second_id.clone();
+        second.parent = ShapeParent::Shape(parent_id.clone());
+        second.transform.translation.x += 12.0;
+        second.version = RecordVersion(1);
+        snapshot.document.shapes.insert(second_id.clone(), second);
+        snapshot
+            .document
+            .shapes
+            .get_mut(&parent_id)
+            .unwrap()
+            .child_ids
+            .push(second_id.clone());
+        let transaction = reconcile_editor_patches(
+            &snapshot,
+            request(vec![EditorPatch::BooleanPaths {
+                shape_ids: vec![path_id, second_id],
+                operation: BooleanPathOperation::Union,
+            }]),
+        )
+        .expect("boolean paths should reconcile");
+
+        assert_eq!(transaction.operations.len(), 2);
+        assert!(matches!(transaction.operations[0], Operation::PatchShape { .. }));
+        assert!(matches!(transaction.operations[1], Operation::DeleteShape { .. }));
     }
 
     #[test]

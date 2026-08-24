@@ -11,7 +11,7 @@
 		type LayerRecord,
 		type Store
 	} from '@inkfinite/core';
-	import { onMount, tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 
 	import { Button, ContextMenu, Icon, IconButton, type ContextMenuEntry } from '../../index';
 
@@ -20,8 +20,7 @@
 		onCommit
 	}: { store: Store; onCommit: (name: string, next: EditorState) => void } = $props();
 
-	// svelte-ignore state_referenced_locally
-	let editorState: EditorState = $state(store.getState());
+	let editorState: EditorState = $state(untrack(() => store.getState()));
 	let collapsed = $state(false);
 	let renamingLayerId = $state<string | null>(null);
 	let renameInputEl = $state<HTMLInputElement | null>(null);
@@ -72,7 +71,10 @@
 		];
 	});
 
-	onMount(() => store.subscribe((next) => (editorState = next)));
+	$effect(() => {
+		editorState = store.getState();
+		return store.subscribe((next) => (editorState = next));
+	});
 
 	$effect(() => {
 		if (!renamingLayerId) return;

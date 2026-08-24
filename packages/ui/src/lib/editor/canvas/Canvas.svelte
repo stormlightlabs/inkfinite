@@ -2,12 +2,14 @@
 	import {
 		Action,
 		Camera,
+		canBooleanPathSelection,
 		exportToSVG,
 		getSelectedShapes,
 		hitTestPoint,
 		selectionTarget,
 		stencils
 	} from '@inkfinite/core';
+	import { untrack } from 'svelte';
 	import { Button, ContextMenu, Dialog, type ContextMenuEntry } from '../../index';
 	import {
 		copySelection,
@@ -196,22 +198,23 @@
 	}
 
 	// The composition root fixes the platform adapter for this component's lifetime.
-	// svelte-ignore state_referenced_locally
-	const c = createCanvasController(platformAdapter, {
-		setHistoryViewerOpen(value: boolean) {
-			historyViewerOpen = value;
-		},
-		setShortcutsOpen(value: boolean) {
-			shortcutsOpen = value;
-		},
-		setCommandPaletteOpen(value: boolean) {
-			commandPaletteOpen = value;
-		},
-		reportError,
-		onCopyRequested: () => void copyCurrentSelection(),
-		onCutRequested: () => void cutCurrentSelection(),
-		onPasteRequested: () => void pasteFromClipboard()
-	});
+	const c = untrack(() =>
+		createCanvasController(platformAdapter, {
+			setHistoryViewerOpen(value: boolean) {
+				historyViewerOpen = value;
+			},
+			setShortcutsOpen(value: boolean) {
+				shortcutsOpen = value;
+			},
+			setCommandPaletteOpen(value: boolean) {
+				commandPaletteOpen = value;
+			},
+			reportError,
+			onCopyRequested: () => void copyCurrentSelection(),
+			onCutRequested: () => void cutCurrentSelection(),
+			onPasteRequested: () => void pasteFromClipboard()
+		})
+	);
 
 	function enterFrame(frameId: string) {
 		c.store.setState((state) => ({
@@ -457,6 +460,7 @@
 		);
 		const allLocked = selected.length > 0 && selected.every((shape) => shape.locked);
 		const imageSelected = selected.length === 1 && selected[0]?.type === 'image';
+		const booleanAvailable = canBooleanPathSelection(state);
 		return [
 			{
 				id: 'copy',
@@ -509,6 +513,31 @@
 				icon: 'ellipse',
 				disabled: selected.length === 0
 			},
+			{
+				id: 'boolean-union',
+				label: SELECTION_COMMAND_LABELS['boolean-union'],
+				icon: 'layers',
+				disabled: !booleanAvailable
+			},
+			{
+				id: 'boolean-intersection',
+				label: SELECTION_COMMAND_LABELS['boolean-intersection'],
+				icon: 'layers',
+				disabled: !booleanAvailable
+			},
+			{
+				id: 'boolean-difference',
+				label: SELECTION_COMMAND_LABELS['boolean-difference'],
+				icon: 'layers',
+				disabled: !booleanAvailable
+			},
+			{
+				id: 'boolean-exclusion',
+				label: SELECTION_COMMAND_LABELS['boolean-exclusion'],
+				icon: 'layers',
+				disabled: !booleanAvailable
+			},
+			{ type: 'separator' },
 			{
 				id: 'group',
 				label: SELECTION_COMMAND_LABELS.group,
