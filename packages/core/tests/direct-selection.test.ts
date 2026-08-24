@@ -184,6 +184,46 @@ describe('DirectSelectTool', () => {
 		}
 	});
 
+	it('edits stroke width points independently from the stroke path points', () => {
+		const page = PageRecord.create('Page', 'page:direct-width');
+		const stroke = ShapeRecord.createStroke(
+			page.id,
+			0,
+			0,
+			{
+				points: [
+					[0, 0],
+					[100, 0]
+				],
+				brush: { size: 10, thinning: 0, smoothing: 0.5, streamline: 0.5, simulatePressure: true },
+				style: { color: '#000000', opacity: 1 }
+			},
+			'stroke:direct-width'
+		);
+		page.shapeIds = [stroke.id];
+		const state = new Store({
+			doc: { pages: { [page.id]: page }, shapes: { [stroke.id]: stroke }, bindings: {} },
+			ui: { currentPageId: page.id, selectionIds: [stroke.id], toolId: 'direct-select' },
+			camera: { x: 0, y: 0, zoom: 1 }
+		}).getState();
+		const tool = new DirectSelectTool();
+
+		let next = tool.onEnter(state);
+		next = tool.onAction(next, pointerDown(0, 5));
+		next = tool.onAction(next, pointerMove(0, 15));
+		next = tool.onAction(next, pointerUp(0, 15));
+
+		const updated = next.doc.shapes[stroke.id];
+		expect(updated?.type).toBe('stroke');
+		if (updated?.type === 'stroke') {
+			expect(updated.props.points).toEqual([
+				[0, 0],
+				[100, 0]
+			]);
+			expect(updated.props.widthProfile?.[0]?.width).toBe(30);
+		}
+	});
+
 	it('drags quadratic and cubic control handles', () => {
 		const { state, path } = createPathState();
 		const tool = new DirectSelectTool();

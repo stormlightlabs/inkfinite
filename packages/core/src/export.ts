@@ -1,5 +1,6 @@
 import {
   arrowGeometryForShape,
+  getStrokeOutline,
   localToWorld,
   pathGeometryBounds,
   shapeBounds,
@@ -182,6 +183,9 @@ function shapeToSVG(shape: ShapeRecord, state: EditorState, definitions: string[
     }
     case "path": {
       return withSvgEffects(shape, pathToSVG(shape, transform, definitions), transform, definitions);
+    }
+    case "stroke": {
+      return withSvgEffects(shape, strokeToSVG(shape, transform, definitions), transform, definitions);
     }
     case "image": {
       const asset = state.doc.assets?.[shape.props.assetId];
@@ -392,6 +396,15 @@ function textToSVG(shape: TextShape, transform: string, definitions: string[]): 
   return `<text transform="${transform}" font-size="${fontSize}" font-family="${escapeXML(fontFamily)}" fill="${
     paintToSvg(color, `${shape.id}-fill`, definitions)
   }">${escapeXML(text)}</text>`;
+}
+
+function strokeToSVG(shape: Extract<ShapeRecord, { type: 'stroke' }>, transform: string, definitions: string[]): string {
+  const outline = getStrokeOutline(shape);
+  if (outline.length === 0) return '';
+  const commands = outline.map((point, index) => `${index === 0 ? 'M' : 'L'} ${svgNumber(point.x)} ${svgNumber(point.y)}`).join(' ');
+  const fill = paintToSvg(shape.props.style.color, `${shape.id}-stroke`, definitions);
+  const opacity = svgNumber(shape.strokeOpacity ?? shape.props.style.opacity);
+  return `<path transform="${transform}" d="${commands} Z" fill="${fill}" fill-opacity="${opacity}" stroke="none"/>`;
 }
 
 function pathToSVG(shape: PathShape, transform: string, definitions: string[]): string {

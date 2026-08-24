@@ -43,7 +43,9 @@ import {
 	shapeTransform,
 	worldToLocal,
 	pathAnchorHandleId,
-	pathControlHandleId
+	pathControlHandleId,
+	strokeWidthHandleId,
+	strokeWidthHandles
 } from '@inkfinite/core';
 
 export interface Renderer {
@@ -1568,12 +1570,9 @@ function drawSelection(
 
 		if (singleSelectionId === shape.id) {
 			drawHandles(context, state, shape, handleState, bindingsBySource, theme);
-			if (
-				state.ui.toolId === 'direct-select' &&
-				state.ui.pathSelection?.pathId === shape.id &&
-				shape.type === 'path'
-			) {
-				drawPathEditingHandles(context, state, shape, handleState);
+			if (state.ui.toolId === 'direct-select' && state.ui.pathSelection?.pathId === shape.id) {
+				if (shape.type === 'path') drawPathEditingHandles(context, state, shape, handleState);
+				if (shape.type === 'stroke') drawStrokeEditingHandles(context, state, shape, handleState);
 			}
 		}
 	}
@@ -1677,6 +1676,37 @@ function drawPathEditingHandles(
 		context.lineWidth = 1.5 / scale;
 		context.beginPath();
 		context.rect(position.x - anchorSize, position.y - anchorSize, anchorSize * 2, anchorSize * 2);
+		context.fill();
+		context.stroke();
+	}
+	context.restore();
+}
+
+function drawStrokeEditingHandles(
+	context: CanvasRenderingContext2D,
+	state: EditorState,
+	shape: StrokeShape,
+	handleState?: HandleRenderState
+): void {
+	const selected = new Set(state.ui.pathSelection?.widthPoints ?? []);
+	const scale = state.camera.zoom;
+	context.save();
+	applyShapeTransform(context, shape);
+	context.lineWidth = 1 / scale;
+	context.setLineDash([]);
+	for (const handle of strokeWidthHandles(shape)) {
+		const id = strokeWidthHandleId(handle.index);
+		const active = handleState?.active === id;
+		const hover = handleState?.hover === id;
+		context.strokeStyle = 'rgba(37, 99, 235, 0.6)';
+		context.beginPath();
+		context.moveTo(handle.center.x, handle.center.y);
+		context.lineTo(handle.position.x, handle.position.y);
+		context.stroke();
+		context.fillStyle = selected.has(handle.index) || active ? '#2563eb' : hover ? '#dbeafe' : '#ffffff';
+		context.strokeStyle = active || hover ? '#1d4ed8' : '#2563eb';
+		context.beginPath();
+		context.arc(handle.position.x, handle.position.y, 5 / scale, 0, Math.PI * 2);
 		context.fill();
 		context.stroke();
 	}

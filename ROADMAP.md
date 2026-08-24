@@ -116,9 +116,11 @@ content rather than being discarded.
 
 ### Expressive strokes
 
-Add variable-width and pressure-aware strokes without making pressure hardware
-a requirement. Width data must remain editable and have deterministic SVG
-export behavior.
+Freehand strokes store optional hardware pressure samples and editable width
+profiles along normalized path distance. Direct selection exposes width handles
+separately from the sampled path points, while outline rendering uses document
+units so zoom changes do not change the result. SVG export writes the rendered
+outline as a filled path when a variable profile is present.
 
 ### Text on path
 

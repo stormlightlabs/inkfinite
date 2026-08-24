@@ -2,7 +2,7 @@ use perfect_freehand::{InputPoint, StrokeOptions, get_stroke};
 use serde_json::Value;
 
 use super::{Bounds, Document, EngineError, ShapeId, ShapeParent, ShapeRecord};
-use crate::{PathGeometry, PathSegment, ShapeProperties, StrokeProperties, Transform, Vec2};
+use crate::{PathGeometry, PathSegment, ShapeProperties, StrokeProperties, StrokeWidthPoint, Transform, Vec2};
 
 /// A two-dimensional affine transform shared by document geometry consumers.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -121,18 +121,46 @@ pub fn stroke_outline(properties: &ShapeProperties) -> Result<Vec<Vec2>, String>
     if stroke.points.len() < 2 {
         return Ok(Vec::new());
     }
-    let points = stroke
-        .points
-        .iter()
-        .map(|point| InputPoint::Array([point[0], point[1]], point.get(2).copied()))
-        .collect::<Vec<_>>();
-    let options = StrokeOptions {
-        size: Some(stroke.brush.size),
-        thinning: Some(stroke.brush.thinning),
-        smoothing: Some(stroke.brush.smoothing),
-        streamline: Some(stroke.brush.streamline),
-        simulate_pressure: Some(stroke.brush.simulate_pressure),
-        ..StrokeOptions::default()
+    let variable_profile = stroke.width_profile.as_deref().filter(|profile| !profile.is_empty());
+    let points = if let Some(profile) = variable_profile {
+        let offsets = stroke_point_offsets(&stroke.points);
+        let max_width = profile.iter().map(|point| point.width).fold(0.01, f64::max);
+        stroke
+            .points
+            .iter()
+            .zip(offsets)
+            .map(|(point, offset)| {
+                InputPoint::Array(
+                    [point[0], point[1]],
+                    Some(interpolate_stroke_width(profile, offset) / max_width),
+                )
+            })
+            .collect::<Vec<_>>()
+    } else {
+        stroke
+            .points
+            .iter()
+            .map(|point| InputPoint::Array([point[0], point[1]], point.get(2).copied()))
+            .collect::<Vec<_>>()
+    };
+    let options = if let Some(profile) = variable_profile {
+        StrokeOptions {
+            size: Some(profile.iter().map(|point| point.width).fold(0.01, f64::max) / 2.0),
+            thinning: Some(1.0),
+            smoothing: Some(stroke.brush.smoothing),
+            streamline: Some(stroke.brush.streamline),
+            simulate_pressure: Some(false),
+            ..StrokeOptions::default()
+        }
+    } else {
+        StrokeOptions {
+            size: Some(stroke.brush.size),
+            thinning: Some(stroke.brush.thinning),
+            smoothing: Some(stroke.brush.smoothing),
+            streamline: Some(stroke.brush.streamline),
+            simulate_pressure: Some(stroke.brush.simulate_pressure),
+            ..StrokeOptions::default()
+        }
     };
     Ok(get_stroke(&points, &options)
         .into_iter()
@@ -147,6 +175,48 @@ pub fn stroke_outline(properties: &ShapeProperties) -> Result<Vec<Vec2>, String>
 /// Returns the decoded stroke-property error when the properties are malformed.
 pub fn stroke_bounds(properties: &ShapeProperties) -> Result<Bounds, String> {
     Ok(bounds_from_points(&stroke_outline(properties)?))
+}
+
+fn stroke_point_offsets(points: &[Vec<f64>]) -> Vec<f64> {
+    if points.len() < 2 {
+        return points.iter().map(|_| 0.0).collect();
+    }
+    let mut distances = Vec::with_capacity(points.len());
+    distances.push(0.0);
+    for index in 1..points.len() {
+        let previous = &points[index - 1];
+        let current = &points[index];
+        let distance = (current[0] - previous[0]).hypot(current[1] - previous[1]);
+        distances.push(distances[index - 1] + distance);
+    }
+    let total = *distances.last().unwrap_or(&0.0);
+    if total <= f64::EPSILON {
+        distances
+            .iter()
+            .enumerate()
+            .map(|(index, _)| index as f64 / (points.len() - 1) as f64)
+            .collect()
+    } else {
+        distances.into_iter().map(|distance| distance / total).collect()
+    }
+}
+
+fn interpolate_stroke_width(profile: &[StrokeWidthPoint], offset: f64) -> f64 {
+    let Some(first) = profile.first() else {
+        return 0.01;
+    };
+    if offset <= first.offset {
+        return first.width.max(0.01);
+    }
+    for pair in profile.windows(2) {
+        let [previous, next] = pair else { continue };
+        if offset <= next.offset {
+            let span = next.offset - previous.offset;
+            let amount = if span <= f64::EPSILON { 0.0 } else { (offset - previous.offset) / span };
+            return (previous.width + (next.width - previous.width) * amount).max(0.01);
+        }
+    }
+    profile.last().map_or(0.01, |point| point.width.max(0.01))
 }
 
 /// Returns a shape's axis-aligned bounds in document coordinates.
@@ -514,6 +584,38 @@ mod tests {
             path_bounds(&geometry),
             Bounds { x: 10.0, y: 20.0, width: 20.0, height: 0.0 }
         );
+    }
+
+    #[test]
+    fn variable_width_profile_changes_committed_outline_width() {
+        let properties = |profile: Option<serde_json::Value>| {
+            let mut properties = ShapeProperties::from([
+                ("points".into(), serde_json::json!([[0.0, 0.0], [100.0, 0.0]])),
+                ("style".into(), serde_json::json!({ "color": "#000", "opacity": 1.0 })),
+                (
+                    "brush".into(),
+                    serde_json::json!({
+                        "size": 10.0,
+                        "thinning": 0.0,
+                        "smoothing": 0.5,
+                        "streamline": 0.5,
+                        "simulatePressure": true
+                    }),
+                ),
+            ]);
+            if let Some(profile) = profile {
+                properties.insert("widthProfile".into(), profile);
+            }
+            properties
+        };
+        let flat = stroke_bounds(&properties(None)).expect("flat stroke should render");
+        let variable = stroke_bounds(&properties(Some(serde_json::json!([
+            { "offset": 0.0, "width": 4.0 },
+            { "offset": 1.0, "width": 24.0 }
+        ]))))
+        .expect("variable stroke should render");
+
+        assert!(variable.height > flat.height);
     }
 
     #[test]

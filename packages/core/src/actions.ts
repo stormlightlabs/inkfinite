@@ -24,6 +24,8 @@ export type PointerDownAction = {
 	world: Vec2;
 	/** Which button was pressed */
 	button: number;
+	/** Pointer pressure when the device reports it, normalized to 0-1. */
+	pressure?: number;
 	/** State of all buttons after this event */
 	buttons: PointerButtons;
 	/** Modifier keys state */
@@ -43,6 +45,8 @@ export type PointerMoveAction = {
 	world: Vec2;
 	/** State of all buttons */
 	buttons: PointerButtons;
+	/** Pointer pressure when the device reports it, normalized to 0-1. */
+	pressure?: number;
 	/** Modifier keys state */
 	modifiers: Modifiers;
 	/** Timestamp of the event */
@@ -60,6 +64,8 @@ export type PointerUpAction = {
 	world: Vec2;
 	/** Which button was released */
 	button: number;
+	/** Pointer pressure when the device reports it, normalized to 0-1. */
+	pressure?: number;
 	/** State of all buttons after this event */
 	buttons: PointerButtons;
 	/** Modifier keys state */
@@ -143,9 +149,19 @@ export const Action = {
 		button: number,
 		buttons: PointerButtons,
 		modifiers: Modifiers,
-		timestamp = Date.now()
+		timestamp = Date.now(),
+		pressure?: number
 	): PointerDownAction {
-		return { type: 'pointer-down', screen, world, button, buttons, modifiers, timestamp };
+		return {
+			type: 'pointer-down',
+			screen,
+			world,
+			button,
+			buttons,
+			modifiers,
+			timestamp,
+			...(pressure === undefined ? {} : { pressure })
+		};
 	},
 
 	/**
@@ -156,9 +172,18 @@ export const Action = {
 		world: Vec2,
 		buttons: PointerButtons,
 		modifiers: Modifiers,
-		timestamp = Date.now()
+		timestamp = Date.now(),
+		pressure?: number
 	): PointerMoveAction {
-		return { type: 'pointer-move', screen, world, buttons, modifiers, timestamp };
+		return {
+			type: 'pointer-move',
+			screen,
+			world,
+			buttons,
+			modifiers,
+			timestamp,
+			...(pressure === undefined ? {} : { pressure })
+		};
 	},
 
 	/**
@@ -170,9 +195,19 @@ export const Action = {
 		button: number,
 		buttons: PointerButtons,
 		modifiers: Modifiers,
-		timestamp = Date.now()
+		timestamp = Date.now(),
+		pressure?: number
 	): PointerUpAction {
-		return { type: 'pointer-up', screen, world, button, buttons, modifiers, timestamp };
+		return {
+			type: 'pointer-up',
+			screen,
+			world,
+			button,
+			buttons,
+			modifiers,
+			timestamp,
+			...(pressure === undefined ? {} : { pressure })
+		};
 	},
 
 	/**

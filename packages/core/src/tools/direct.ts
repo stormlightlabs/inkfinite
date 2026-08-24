@@ -5,7 +5,11 @@ import {
 	hitTestPathSegment,
 	hitTestPathSubpath,
 	hitTestPoint,
+	hitTestStrokeWidthHandle,
 	pathAnchorRefs,
+	strokeWidthHandleId,
+	strokeWidthHandles,
+	strokeWidthProfile,
 	worldToLocal
 } from '../geom';
 import type { Vec2 } from '../math';
@@ -15,6 +19,7 @@ import {
 	type PathAnchorRef,
 	type PathControlRef,
 	type PathShape,
+	type StrokeShape,
 	type PathTopologyEdit,
 	type PathTopologyOperation
 } from '../model';
@@ -23,12 +28,16 @@ import type { Tool } from './base';
 
 const HANDLE_HIT_RADIUS = 10;
 
-type DirectHandle = { kind: 'anchor'; ref: PathAnchorRef } | { kind: 'control'; ref: PathControlRef };
+type DirectHandle =
+	| { kind: 'anchor'; ref: PathAnchorRef }
+	| { kind: 'control'; ref: PathControlRef }
+	| { kind: 'width'; index: number };
 
 type DirectToolState = {
 	activeHandle: DirectHandle | null;
 	dragStartWorld: Vec2 | null;
 	initialShape: PathShape | null;
+	initialStroke: StrokeShape | null;
 };
 
 /** Return the stable renderer ID for a path anchor handle. */
@@ -57,7 +66,9 @@ export class DirectSelectTool implements Tool {
 		this.resetToolState();
 		this.pendingTopologyEdits = [];
 		const selected = state.ui.selectionIds.length === 1 ? state.doc.shapes[state.ui.selectionIds[0]] : undefined;
-		if (selected?.type !== 'path') return { ...state, ui: { ...state.ui, pathSelection: undefined } };
+		if (selected?.type !== 'path' && selected?.type !== 'stroke') {
+			return { ...state, ui: { ...state.ui, pathSelection: undefined } };
+		}
 		return {
 			...state,
 			ui: {
@@ -65,7 +76,11 @@ export class DirectSelectTool implements Tool {
 				pathSelection:
 					state.ui.pathSelection?.pathId === selected.id
 						? state.ui.pathSelection
-						: { pathId: selected.id, anchors: [] }
+						: {
+								pathId: selected.id,
+								anchors: [],
+								...(selected.type === 'stroke' ? { widthPoints: [] } : {})
+							}
 			}
 		};
 	}
@@ -111,6 +126,11 @@ export class DirectSelectTool implements Tool {
 
 	/** Return the handle under a point for hover and cursor feedback. */
 	getHandleAtPoint(state: EditorState, point: Vec2): string | null {
+		const stroke = this.getSelectedStroke(state);
+		if (stroke) {
+			const widthIndex = hitTestStrokeWidthHandle(stroke, point, HANDLE_HIT_RADIUS);
+			return widthIndex === null ? null : strokeWidthHandleId(widthIndex);
+		}
 		const path = this.getSelectedPath(state);
 		if (!path) return null;
 
@@ -123,10 +143,20 @@ export class DirectSelectTool implements Tool {
 	getActiveHandle(): string | null {
 		const active = this.toolState.activeHandle;
 		if (!active) return null;
+		if (active.kind === 'width') return strokeWidthHandleId(active.index);
 		return active.kind === 'anchor' ? pathAnchorHandleId(active.ref) : pathControlHandleId(active.ref);
 	}
 
 	private handlePointerDown(state: EditorState, action: Extract<Action, { type: 'pointer-down' }>): EditorState {
+		const selectedStroke = this.getSelectedStroke(state);
+		if (selectedStroke) {
+			const widthIndex = hitTestStrokeWidthHandle(selectedStroke, action.world, HANDLE_HIT_RADIUS);
+			if (widthIndex !== null) {
+				const nextState = this.setStrokeSelection(state, selectedStroke, [widthIndex]);
+				this.beginWidthDrag(nextState, widthIndex, action.world);
+				return nextState;
+			}
+		}
 		const selectedPath = this.getSelectedPath(state);
 		if (selectedPath) {
 			const control = hitTestPathControl(selectedPath, action.world, HANDLE_HIT_RADIUS);
@@ -194,6 +224,12 @@ export class DirectSelectTool implements Tool {
 			}
 		}
 		const target = targetId ? state.doc.shapes[targetId] : undefined;
+		if (target?.type === 'stroke') {
+			const nextState = this.setStrokeSelection(state, target, []);
+			const widthIndex = hitTestStrokeWidthHandle(target, action.world, HANDLE_HIT_RADIUS);
+			if (widthIndex !== null) this.beginWidthDrag(nextState, widthIndex, action.world);
+			return nextState;
+		}
 		if (target?.type === 'path') {
 			if (action.modifiers.alt) {
 				const segment = hitTestPathSegment(target, action.world, HANDLE_HIT_RADIUS);
@@ -231,8 +267,15 @@ export class DirectSelectTool implements Tool {
 	}
 
 	private handlePointerMove(state: EditorState, action: Extract<Action, { type: 'pointer-move' }>): EditorState {
-		const { activeHandle, dragStartWorld, initialShape } = this.toolState;
-		if (!activeHandle || !dragStartWorld || !initialShape) return state;
+		const { activeHandle, dragStartWorld, initialShape, initialStroke } = this.toolState;
+		if (!activeHandle || !dragStartWorld) return state;
+		if (activeHandle.kind === 'width' && initialStroke) {
+			const updated = moveStrokeWidth(initialStroke, activeHandle.index, action.world);
+			return updated
+				? { ...state, doc: { ...state.doc, shapes: { ...state.doc.shapes, [updated.id]: updated } } }
+				: state;
+		}
+		if (!initialShape) return state;
 
 		const pathSelection = state.ui.pathSelection;
 		if (!pathSelection || pathSelection.pathId !== initialShape.id) return state;
@@ -255,8 +298,8 @@ export class DirectSelectTool implements Tool {
 		this.resetToolState();
 		const pathSelection = state.ui.pathSelection;
 		if (!pathSelection) return { ...state, ui: { ...state.ui, selectionIds: [] } };
-		if (pathSelection.anchors.length > 0) {
-			return { ...state, ui: { ...state.ui, pathSelection: { ...pathSelection, anchors: [] } } };
+		if (pathSelection.anchors.length > 0 || (pathSelection.widthPoints?.length ?? 0) > 0) {
+			return { ...state, ui: { ...state.ui, pathSelection: { ...pathSelection, anchors: [], widthPoints: [] } } };
 		}
 		return { ...state, ui: { ...state.ui, selectionIds: [], pathSelection: undefined } };
 	}
@@ -268,6 +311,13 @@ export class DirectSelectTool implements Tool {
 		return path?.type === 'path' ? path : null;
 	}
 
+	private getSelectedStroke(state: EditorState): StrokeShape | null {
+		const strokeId = state.ui.pathSelection?.pathId;
+		if (!strokeId || !state.ui.selectionIds.includes(strokeId)) return null;
+		const stroke = state.doc.shapes[strokeId];
+		return stroke?.type === 'stroke' ? stroke : null;
+	}
+
 	private setPathSelection(state: EditorState, path: PathShape, anchors: PathAnchorRef[]): EditorState {
 		return {
 			...state,
@@ -275,6 +325,17 @@ export class DirectSelectTool implements Tool {
 				...state.ui,
 				selectionIds: [path.id],
 				pathSelection: { pathId: path.id, anchors: uniqueAnchors(anchors) }
+			}
+		};
+	}
+
+	private setStrokeSelection(state: EditorState, stroke: StrokeShape, widthPoints: number[]): EditorState {
+		return {
+			...state,
+			ui: {
+				...state.ui,
+				selectionIds: [stroke.id],
+				pathSelection: { pathId: stroke.id, anchors: [], widthPoints: [...widthPoints] }
 			}
 		};
 	}
@@ -451,7 +512,7 @@ export class DirectSelectTool implements Tool {
 	}
 
 	private beginDrag(
-		kind: DirectHandle['kind'],
+		kind: 'anchor' | 'control',
 		ref: PathAnchorRef | PathControlRef,
 		state: EditorState,
 		point: Vec2
@@ -463,7 +524,19 @@ export class DirectSelectTool implements Tool {
 			activeHandle:
 				kind === 'anchor' ? { kind, ref: ref as PathAnchorRef } : { kind, ref: ref as PathControlRef },
 			dragStartWorld: point,
-			initialShape: ShapeRecord.clone(path) as PathShape
+			initialShape: ShapeRecord.clone(path) as PathShape,
+			initialStroke: null
+		};
+	}
+
+	private beginWidthDrag(state: EditorState, index: number, point: Vec2): void {
+		const stroke = this.getSelectedStroke(state);
+		if (!stroke) return;
+		this.toolState = {
+			activeHandle: { kind: 'width', index },
+			dragStartWorld: point,
+			initialShape: null,
+			initialStroke: ShapeRecord.clone(stroke) as StrokeShape
 		};
 	}
 
@@ -472,8 +545,25 @@ export class DirectSelectTool implements Tool {
 	}
 
 	private createToolState(): DirectToolState {
-		return { activeHandle: null, dragStartWorld: null, initialShape: null };
+		return { activeHandle: null, dragStartWorld: null, initialShape: null, initialStroke: null };
 	}
+}
+
+function moveStrokeWidth(stroke: StrokeShape, index: number, worldPoint: Vec2): StrokeShape | null {
+	const handle = strokeWidthHandles(stroke).find((candidate) => candidate.index === index);
+	if (!handle) return null;
+	const dx = handle.position.x - handle.center.x;
+	const dy = handle.position.y - handle.center.y;
+	const length = Math.hypot(dx, dy) || 1;
+	const normal = { x: dx / length, y: dy / length };
+	const localPoint = worldToLocal(worldPoint, stroke);
+	const width = Math.max(
+		0.01,
+		Math.abs((localPoint.x - handle.center.x) * normal.x + (localPoint.y - handle.center.y) * normal.y) * 2
+	);
+	const profile = strokeWidthProfile(stroke);
+	profile[index] = { ...profile[index]!, width };
+	return { ...stroke, props: { ...stroke.props, widthProfile: profile } };
 }
 
 function toggleAnchor(current: PathAnchorRef[], anchor: PathAnchorRef, shift: boolean): PathAnchorRef[] {

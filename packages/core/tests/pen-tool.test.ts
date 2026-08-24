@@ -15,7 +15,7 @@ function nextTimestamp(step = 17): number {
   return currentTimestamp;
 }
 
-function createPointerDownAction(worldX: number, worldY: number, timestamp = nextTimestamp()): Action {
+function createPointerDownAction(worldX: number, worldY: number, timestamp = nextTimestamp(), pressure?: number): Action {
   return {
     type: "pointer-down",
     world: { x: worldX, y: worldY },
@@ -24,10 +24,11 @@ function createPointerDownAction(worldX: number, worldY: number, timestamp = nex
     buttons: PointerButtons.create(true, false, false),
     modifiers: Modifiers.create(false, false, false, false),
     timestamp,
+    ...(pressure === undefined ? {} : { pressure }),
   };
 }
 
-function createPointerMoveAction(worldX: number, worldY: number, timestamp = nextTimestamp()): Action {
+function createPointerMoveAction(worldX: number, worldY: number, timestamp = nextTimestamp(), pressure?: number): Action {
   return {
     type: "pointer-move",
     world: { x: worldX, y: worldY },
@@ -35,10 +36,11 @@ function createPointerMoveAction(worldX: number, worldY: number, timestamp = nex
     buttons: PointerButtons.create(true, false, false),
     modifiers: Modifiers.create(false, false, false, false),
     timestamp,
+    ...(pressure === undefined ? {} : { pressure }),
   };
 }
 
-function createPointerUpAction(worldX: number, worldY: number, timestamp = nextTimestamp()): Action {
+function createPointerUpAction(worldX: number, worldY: number, timestamp = nextTimestamp(), pressure?: number): Action {
   return {
     type: "pointer-up",
     world: { x: worldX, y: worldY },
@@ -47,6 +49,7 @@ function createPointerUpAction(worldX: number, worldY: number, timestamp = nextT
     buttons: PointerButtons.create(false, false, false),
     modifiers: Modifiers.create(false, false, false, false),
     timestamp,
+    ...(pressure === undefined ? {} : { pressure }),
   };
 }
 
@@ -135,6 +138,30 @@ describe("PenTool", () => {
       if (shape.type === "stroke") {
         expect(shape.props.points.length).toBe(1);
         expect(shape.props.points[0]).toEqual([100, 100]);
+      }
+    });
+
+    it("should retain hardware pressure samples when available", () => {
+      const tool = new PenTool();
+      const store = new Store();
+      const page = PageRecord.create("Page 1", "page:1");
+
+      store.setState((state) => ({
+        ...state,
+        doc: { ...state.doc, pages: { [page.id]: page } },
+        ui: { ...state.ui, currentPageId: page.id },
+      }));
+
+      let state = store.getState();
+      state = tool.onAction(state, createPointerDownAction(0, 0, nextTimestamp(), 0.2));
+      state = tool.onAction(state, createPointerMoveAction(20, 0, nextTimestamp(), 0.8));
+      state = tool.onAction(state, createPointerUpAction(20, 0));
+
+      const shape = state.doc.shapes[Object.keys(state.doc.shapes)[0]];
+      expect(shape?.type).toBe("stroke");
+      if (shape?.type === "stroke") {
+        expect(shape.props.points[0]?.[2]).toBe(0.2);
+        expect(shape.props.points[1]?.[2]).toBe(0.8);
       }
     });
 

@@ -609,7 +609,8 @@ function editorProperties(properties: ShapeProperties): ShapeProperties {
 		['asset_id', 'assetId'],
 		['reference_type', 'referenceType'],
 		['clip_path', 'clipPath'],
-		['mask_effect', 'maskEffect']
+		['mask_effect', 'maskEffect'],
+		['width_profile', 'widthProfile']
 	] as const) {
 		if (native in result && !(editor in result)) result[editor] = result[native];
 		delete result[native];

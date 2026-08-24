@@ -20,6 +20,25 @@ describe("exportToSVG", () => {
     expect(svg).toContain("</svg>");
   });
 
+  it("should export variable-width strokes as outlined paths", () => {
+    const { state, pageId } = createTestState();
+    const stroke = ShapeRecord.createStroke(pageId, 0, 0, {
+      points: [[0, 0], [100, 0]],
+      brush: { size: 10, thinning: 0, smoothing: 0.5, streamline: 0.5, simulatePressure: true },
+      style: { color: "#123456", opacity: 0.75 },
+      widthProfile: [{ offset: 0, width: 4 }, { offset: 1, width: 24 }]
+    });
+    state.doc.shapes[stroke.id] = stroke;
+    state.doc.pages[pageId].shapeIds.push(stroke.id);
+
+    const svg = exportToSVG(state);
+    expect(svg).toContain('<path');
+    expect(svg).toContain('fill="#123456"');
+    expect(svg).toContain('fill-opacity="0.75"');
+    expect(svg).toContain('stroke="none"');
+    expect(svg).not.toContain('<polyline');
+  });
+
   it("should export SVG with a rectangle shape", () => {
     const { state, pageId } = createTestState();
 

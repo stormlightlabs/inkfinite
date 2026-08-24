@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   boundsFromOutline,
   computeOutline,
+  strokeWidthHandles,
   hitTestPoint,
   hitTestStroke,
   PageRecord,
@@ -63,6 +64,29 @@ describe("Stroke Geometry", () => {
 
       expect(smallOutline.length).toBeGreaterThan(0);
       expect(largeOutline.length).toBeGreaterThan(0);
+    });
+
+    it("should render an independent width profile", () => {
+      const points: StrokePoint[] = [[0, 0], [100, 0]];
+      const brush = { size: 10, thinning: 0, smoothing: 0.5, streamline: 0.5, simulatePressure: true };
+      const outline = computeOutline(points, brush, [
+        { offset: 0, width: 4 },
+        { offset: 1, width: 24 }
+      ]);
+
+      const bounds = boundsFromOutline(outline);
+      expect(bounds.max.y - bounds.min.y).toBeGreaterThan(10);
+
+      const stroke = ShapeRecord.createStroke("page:1", 0, 0, {
+        points,
+        brush,
+        style: { color: "#000000", opacity: 1 },
+        widthProfile: [{ offset: 0, width: 4 }, { offset: 1, width: 24 }]
+      });
+      expect(strokeWidthHandles(stroke)).toMatchObject([
+        { index: 0, width: 4 },
+        { index: 1, width: 24 }
+      ]);
     });
   });
 

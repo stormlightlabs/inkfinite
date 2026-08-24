@@ -112,7 +112,7 @@ export type PathAnchorRef = { subpathIndex: number; segmentIndex: number };
 export type PathSegmentRef = PathAnchorRef & { t: number };
 
 /** Ephemeral selection state used by the direct-selection tool. */
-export type PathSelection = { pathId: string; anchors: PathAnchorRef[] };
+export type PathSelection = { pathId: string; anchors: PathAnchorRef[]; widthPoints?: number[] };
 
 /** A path control handle exposed by the direct-selection tool. */
 export type PathControlRef = PathAnchorRef & { control: 'quadratic' | 'control_1' | 'control_2' };
@@ -276,6 +276,9 @@ export type MarkdownProps = ShapeEffects & {
  */
 export type StrokePoint = [number, number, number?];
 
+/** A width override at a normalized distance along a freehand stroke. */
+export type StrokeWidthPoint = { offset: number; width: number };
+
 /**
  * Brush configuration for stroke rendering
  * Maps to perfect-freehand options
@@ -298,7 +301,13 @@ export type StrokeStyle = { color: PaintValue; opacity: number };
  * Points are in world coordinates
  * Outline and bounds are computed lazily and not persisted
  */
-export type StrokeProps = ShapeEffects & { points: StrokePoint[]; style: StrokeStyle; brush: BrushConfig };
+export type StrokeProps = ShapeEffects & {
+	points: StrokePoint[];
+	style: StrokeStyle;
+	brush: BrushConfig;
+	/** Optional absolute widths in local units, interpolated by normalized path distance. */
+	widthProfile?: StrokeWidthPoint[];
+};
 
 /** Semantic fields shared by native shapes and card containers. */
 export type ShapeMetadata = {
@@ -486,7 +495,8 @@ export const ShapeRecord = {
 					...cloneShapeEffects(shape.props),
 					points: shape.props.points.map((p) => [...p] as StrokePoint),
 					style: { ...shape.props.style },
-					brush: { ...shape.props.brush }
+					brush: { ...shape.props.brush },
+					widthProfile: shape.props.widthProfile?.map((point) => ({ ...point }))
 				}
 			};
 		}
@@ -884,6 +894,21 @@ export function validateDoc(document: Document): ValidationResult {
 					shape.props.style.opacity > 1
 				) {
 					errors.push(`Stroke shape '${shapeId}' has invalid opacity`);
+				}
+				if (shape.props.widthProfile) {
+					let previousOffset = -1;
+					for (const point of shape.props.widthProfile) {
+						if (!Number.isFinite(point.offset) || point.offset < 0 || point.offset > 1) {
+							errors.push(`Stroke shape '${shapeId}' has an invalid width offset`);
+						}
+						if (!Number.isFinite(point.width) || point.width <= 0) {
+							errors.push(`Stroke shape '${shapeId}' has an invalid width`);
+						}
+						if (point.offset <= previousOffset) {
+							errors.push(`Stroke shape '${shapeId}' width offsets must be increasing`);
+						}
+						previousOffset = point.offset;
+					}
 				}
 
 				break;

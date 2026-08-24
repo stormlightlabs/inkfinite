@@ -1,6 +1,7 @@
 import { localToWorld, worldToLocal } from './geom';
 import type { EditorState } from './reactivity';
-import type { PathGeometry, PathSegment, ShapeRecord, Vec2 } from './model';
+import type { PathGeometry, PathSegment, ShapeRecord } from './model';
+import type { Vec2 } from './math';
 
 /** Returns whether the current selection can make one path clip another shape. */
 export function canClipSelection(state: EditorState): boolean {

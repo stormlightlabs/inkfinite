@@ -20,6 +20,7 @@ import type {
 	ShapeRecord,
 	StrokePoint,
 	StrokeShape,
+	StrokeWidthPoint,
 	TextShape
 } from './model';
 import type { EditorState } from './reactivity';
@@ -309,34 +310,156 @@ function cubicPoint(start: Vec2, control1: Vec2, control2: Vec2, end: Vec2, t: n
 	};
 }
 
-/**
- * Compute outline polygon points for a stroke using perfect-freehand
- *
- * @param points - Array of stroke points [x, y, pressure?]
- * @param brush - Brush configuration
- * @returns Array of outline points [x, y]
- */
-export function computeOutline(points: StrokePoint[], brush: BrushConfig): Vec2[] {
-	if (points.length < 2) {
-		return [];
+/** A rendered width handle for an editable freehand stroke profile. */
+export type StrokeWidthHandle = { index: number; center: Vec2; position: Vec2; width: number };
+
+/** Return the stable renderer ID for a freehand width handle. */
+export function strokeWidthHandleId(index: number): string {
+	return `stroke-width-${index}`;
+}
+
+/** Return the profile used for rendering, deriving one from sampled pressure when absent. */
+export function strokeWidthProfile(shape: StrokeShape): StrokeWidthPoint[] {
+	if (shape.props.widthProfile && shape.props.widthProfile.length > 0) {
+		return shape.props.widthProfile.map((point) => ({ ...point }));
 	}
+	const offsets = strokePointOffsets(shape.props.points);
+	return shape.props.points.map((point, index) => ({
+		offset: offsets[index] ?? 0,
+		width: strokeWidthFromPressure(point[2], shape.props.brush)
+	}));
+}
 
-	const formattedPoints = points.map((p) => {
-		if (p.length === 3 && p[2] !== undefined) {
-			return [p[0], p[1], p[2]];
+/** Interpolate an absolute stroke width at a normalized centerline offset. */
+export function strokeWidthAtOffset(profile: StrokeWidthPoint[], offset: number, fallback: number): number {
+	if (profile.length === 0) return fallback;
+	const sorted = [...profile].sort((left, right) => left.offset - right.offset);
+	if (offset <= sorted[0]!.offset) return Math.max(0.01, sorted[0]!.width);
+	const last = sorted[sorted.length - 1]!;
+	if (offset >= last.offset) return Math.max(0.01, last.width);
+	for (let index = 1; index < sorted.length; index += 1) {
+		const next = sorted[index]!;
+		const previous = sorted[index - 1]!;
+		if (offset <= next.offset) {
+			const span = next.offset - previous.offset;
+			const amount = span <= Number.EPSILON ? 0 : (offset - previous.offset) / span;
+			return Math.max(0.01, previous.width + (next.width - previous.width) * amount);
 		}
-		return [p[0], p[1]];
-	});
+	}
+	return Math.max(0.01, last.width);
+}
 
-	const outlinePoints = getStroke(formattedPoints, {
-		size: brush.size,
-		thinning: brush.thinning,
-		smoothing: brush.smoothing,
-		streamline: brush.streamline,
-		simulatePressure: brush.simulatePressure
+/** Return editable width handles in stroke-local coordinates. */
+export function strokeWidthHandles(shape: StrokeShape): StrokeWidthHandle[] {
+	const profile = strokeWidthProfile(shape);
+	return profile.map((point, index) => {
+		const centerline = strokeCenterlineAtOffset(shape.props.points, point.offset);
+		const normal = { x: -centerline.tangent.y, y: centerline.tangent.x };
+		return {
+			index,
+			center: centerline.point,
+			position: {
+				x: centerline.point.x + (normal.x * point.width) / 2,
+				y: centerline.point.y + (normal.y * point.width) / 2
+			},
+			width: point.width
+		};
 	});
+}
 
-	return outlinePoints.map((p) => ({ x: p[0], y: p[1] }));
+/** Find a freehand width handle under a world point. */
+export function hitTestStrokeWidthHandle(shape: StrokeShape, point: Vec2, tolerance = 10): number | null {
+	let closest: number | null = null;
+	let closestDistance = tolerance;
+	for (const handle of strokeWidthHandles(shape)) {
+		const distance = Vec2Ops.dist(point, localToWorld(shape, handle.position));
+		if (distance <= closestDistance) {
+			closest = handle.index;
+			closestDistance = distance;
+		}
+	}
+	return closest;
+}
+
+/** Compute outline polygon points for a stroke using perfect-freehand. */
+export function computeOutline(points: StrokePoint[], brush: BrushConfig, widthProfile?: StrokeWidthPoint[]): Vec2[] {
+	if (points.length < 2) return [];
+
+	const profile = widthProfile?.length ? widthProfile : undefined;
+	const formattedPoints = profile
+		? (() => {
+				const offsets = strokePointOffsets(points);
+				const widths = offsets.map((offset) => strokeWidthAtOffset(profile, offset, brush.size));
+				const maxWidth = Math.max(...widths, 0.01);
+				return points.map(
+					(point, index) => [point[0], point[1], widths[index]! / maxWidth] as [number, number, number]
+				);
+			})()
+		: points.map((point) =>
+				point.length === 3 && point[2] !== undefined ? [point[0], point[1], point[2]] : [point[0], point[1]]
+			);
+	const options = profile
+		? {
+				size: Math.max(...profile.map((point) => point.width), 0.01) / 2,
+				thinning: 1,
+				smoothing: brush.smoothing,
+				streamline: brush.streamline,
+				simulatePressure: false
+			}
+		: {
+				size: brush.size,
+				thinning: brush.thinning,
+				smoothing: brush.smoothing,
+				streamline: brush.streamline,
+				simulatePressure: brush.simulatePressure
+			};
+	return getStroke(formattedPoints, options).map((point) => ({ x: point[0], y: point[1] }));
+}
+
+function strokeWidthFromPressure(pressure: number | undefined, brush: BrushConfig): number {
+	const normalized = pressure === undefined ? 0.5 : Math.max(0, Math.min(1, pressure));
+	return Math.max(0.01, brush.size * (1 - brush.thinning + 2 * brush.thinning * normalized));
+}
+
+function strokePointOffsets(points: StrokePoint[]): number[] {
+	if (points.length < 2) return points.map(() => 0);
+	const distances = [0];
+	for (let index = 1; index < points.length; index += 1) {
+		distances.push(
+			distances[index - 1]! +
+				Math.hypot(points[index]![0] - points[index - 1]![0], points[index]![1] - points[index - 1]![1])
+		);
+	}
+	const total = distances.at(-1) ?? 0;
+	return total <= Number.EPSILON
+		? points.map((_, index) => index / (points.length - 1))
+		: distances.map((distance) => distance / total);
+}
+
+function strokeCenterlineAtOffset(points: StrokePoint[], offset: number): { point: Vec2; tangent: Vec2 } {
+	if (points.length === 0) return { point: { x: 0, y: 0 }, tangent: { x: 1, y: 0 } };
+	const offsets = strokePointOffsets(points);
+	const target = Math.max(0, Math.min(1, offset));
+	for (let index = 1; index < points.length; index += 1) {
+		if (target > offsets[index]!) continue;
+		const from = points[index - 1]!;
+		const to = points[index]!;
+		const span = offsets[index]! - offsets[index - 1]!;
+		const amount = span <= Number.EPSILON ? 0 : (target - offsets[index - 1]!) / span;
+		const dx = to[0] - from[0];
+		const dy = to[1] - from[1];
+		const length = Math.hypot(dx, dy) || 1;
+		return {
+			point: { x: from[0] + dx * amount, y: from[1] + dy * amount },
+			tangent: { x: dx / length, y: dy / length }
+		};
+	}
+	const last = points[points.length - 1]!;
+	const previous = points[points.length - 2] ?? last;
+	const dx = last[0] - previous[0];
+	const dy = last[1] - previous[1];
+	const length = Math.hypot(dx, dy) || 1;
+	return { point: { x: last[0], y: last[1] }, tangent: { x: dx / length, y: dy / length } };
 }
 
 /**
@@ -351,7 +474,7 @@ export function getStrokeOutline(shape: StrokeShape): Vec2[] {
 		return cached;
 	}
 
-	const outline = computeOutline(shape.props.points, shape.props.brush);
+	const outline = computeOutline(shape.props.points, shape.props.brush, shape.props.widthProfile);
 	strokeOutlineCache.set(shape, outline);
 	return outline;
 }

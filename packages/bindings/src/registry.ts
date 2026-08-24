@@ -125,6 +125,31 @@ function validateStrokeProperties(properties: Record<string, JsonValue>): boolea
 		)
 	)
 		return false;
+	const widthProfile = properties.widthProfile ?? properties.width_profile;
+	if (widthProfile !== undefined) {
+		if (
+			!Array.isArray(widthProfile) ||
+			!widthProfile.every(
+				(point) =>
+					isRecord(point) &&
+					typeof point.offset === 'number' &&
+					Number.isFinite(point.offset) &&
+					point.offset >= 0 &&
+					point.offset <= 1 &&
+					typeof point.width === 'number' &&
+					Number.isFinite(point.width) &&
+					point.width > 0
+			)
+		)
+			return false;
+		const profilePoints = widthProfile as unknown as Array<Record<string, unknown>>;
+		for (let index = 1; index < profilePoints.length; index += 1) {
+			const previousOffset = profilePoints[index - 1]?.offset;
+			const nextOffset = profilePoints[index]?.offset;
+			if (typeof previousOffset !== 'number' || typeof nextOffset !== 'number' || previousOffset >= nextOffset)
+				return false;
+		}
+	}
 	const style = properties.style;
 	if (
 		!isRecord(style) ||

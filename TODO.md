@@ -168,14 +168,14 @@ selection, labels, and arrowheads.
 
 ### Variable-width strokes
 
-- [ ] Extend stroke data with a width or pressure profile along the path
-- [ ] Capture pointer pressure where available without making pressure input
+- [x] Extend stroke data with a width or pressure profile along the path
+- [x] Capture pointer pressure where available without making pressure input
       mandatory
-- [ ] Add editing for width points independently of ordinary path nodes
-- [ ] Render width profiles consistently at different zoom levels
-- [ ] Define SVG export behavior, including conversion to outlined paths when
+- [x] Add editing for width points independently of ordinary path nodes
+- [x] Render width profiles consistently at different zoom levels
+- [x] Define SVG export behavior, including conversion to outlined paths when
       required
-- [ ] Add pen, edit, undo/redo, and export fixtures
+- [x] Add pen, edit, undo/redo, and export fixtures
 
 ### Text on path
 

@@ -191,6 +191,12 @@ export class InputAdapter {
 		return Camera.screenToWorld(camera, screen, viewport);
 	}
 
+	/** Return hardware pressure when the pointer type exposes a useful value. */
+	private pointerPressure(e: PointerEvent): number | undefined {
+		if ((e.pointerType !== 'pen' && e.pointerType !== 'touch') || !Number.isFinite(e.pressure)) return undefined;
+		return Math.max(0, Math.min(1, e.pressure));
+	}
+
 	/**
 	 * Handle pointer down event
 	 */
@@ -220,7 +226,9 @@ export class InputAdapter {
 			// unavailable, including synthetic events and detached test canvases.
 		}
 
-		this.config.onAction(Action.pointerDown(screen, world, e.button, buttons, modifiers));
+		this.config.onAction(
+			Action.pointerDown(screen, world, e.button, buttons, modifiers, Date.now(), this.pointerPressure(e))
+		);
 		this.queueCursorUpdate(world, screen);
 	}
 
@@ -241,7 +249,9 @@ export class InputAdapter {
 		this.pointerState.lastScreen = screen;
 		this.pointerState.buttons = buttons;
 
-		this.config.onAction(Action.pointerMove(screen, world, buttons, modifiers));
+		this.config.onAction(
+			Action.pointerMove(screen, world, buttons, modifiers, Date.now(), this.pointerPressure(e))
+		);
 		this.queueCursorUpdate(world, screen);
 	}
 
@@ -288,7 +298,9 @@ export class InputAdapter {
 			this.activeButton = null;
 		}
 
-		this.config.onAction(Action.pointerUp(screen, world, button, buttons, modifiers));
+		this.config.onAction(
+			Action.pointerUp(screen, world, button, buttons, modifiers, Date.now(), this.pointerPressure(e))
+		);
 		this.queueCursorUpdate(world, screen);
 
 		if (released) {

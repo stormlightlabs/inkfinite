@@ -224,10 +224,20 @@ pub(crate) struct StrokeStyleProperties {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StrokeWidthPoint {
+    pub(crate) offset: f64,
+    pub(crate) width: f64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct StrokeProperties {
     pub(crate) points: Vec<Vec<f64>>,
     pub(crate) style: StrokeStyleProperties,
     pub(crate) brush: StrokeBrushProperties,
+    #[serde(default, alias = "width_profile")]
+    pub(crate) width_profile: Option<Vec<StrokeWidthPoint>>,
 }
 
 /// The semantic target represented by a reference shape.
@@ -1495,6 +1505,16 @@ pub fn normalize_shape_properties(
                 message: error.to_string(),
             })?,
         );
+        normalized.remove("width_profile");
+        if let Some(profile) = stroke.width_profile {
+            normalized.insert(
+                "widthProfile".into(),
+                serde_json::to_value(profile).map_err(|error| ShapePropertyError::InvalidStroke {
+                    kind: kind.to_owned(),
+                    message: error.to_string(),
+                })?,
+            );
+        }
     }
     Ok(normalized)
 }
@@ -1670,6 +1690,21 @@ fn validate_stroke_properties(properties: &ShapeProperties) -> Result<(), String
     }
     if !(0.0..=1.0).contains(&stroke.style.opacity) {
         return Err("stroke style opacity must be between 0 and 1".into());
+    }
+    if let Some(profile) = &stroke.width_profile {
+        let mut previous_offset = -1.0;
+        for point in profile {
+            if !point.offset.is_finite() || !(0.0..=1.0).contains(&point.offset) {
+                return Err("stroke width offsets must be finite and between 0 and 1".into());
+            }
+            if !point.width.is_finite() || point.width <= 0.0 {
+                return Err("stroke widths must be finite and positive".into());
+            }
+            if point.offset <= previous_offset {
+                return Err("stroke width offsets must be strictly increasing".into());
+            }
+            previous_offset = point.offset;
+        }
     }
     Ok(())
 }
@@ -1850,11 +1885,16 @@ mod tests {
                     "simulatePressure": true
                 }),
             ),
+            (
+                "widthProfile".into(),
+                serde_json::json!([{ "offset": 0.0, "width": 4.0 }, { "offset": 1.0, "width": 12.0 }]),
+            ),
         ]);
         assert!(validate_shape_properties(STROKE_KIND, &stroke_properties).is_ok());
         let normalized = normalize_shape_properties(STROKE_KIND, &stroke_properties).expect("stroke normalizes");
         assert_eq!(normalized["points"], stroke_properties["points"]);
         assert_eq!(normalized["brush"]["simulatePressure"], Value::Bool(true));
+        assert_eq!(normalized["widthProfile"], stroke_properties["widthProfile"]);
         assert!(matches!(
             validate_shape_properties(
                 STROKE_KIND,

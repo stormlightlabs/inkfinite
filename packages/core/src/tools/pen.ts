@@ -110,7 +110,7 @@ export class PenTool implements Tool {
     if (!currentPage) return state;
 
     const shapeId = createId("shape");
-    const firstPoint: StrokePoint = [action.world.x, action.world.y];
+    const firstPoint = strokePoint(action);
 
     const strokeStyle = { ...this.getStrokeStyle() };
 
@@ -155,7 +155,7 @@ export class PenTool implements Tool {
       return state;
     }
 
-    const newPoint: StrokePoint = [action.world.x, action.world.y];
+    const newPoint = strokePoint(action);
     this.toolState.draftPoints.push(newPoint);
     this.toolState.draftNeedsSync = true;
 
@@ -169,6 +169,15 @@ export class PenTool implements Tool {
   private handlePointerUp(state: EditorState, action: Action): EditorState {
     if (action.type !== "pointer-up" || !this.toolState.draftShapeId) return state;
 
+    const lastPoint = this.toolState.draftPoints.at(-1);
+    if (lastPoint) {
+      const dx = action.world.x - lastPoint[0];
+      const dy = action.world.y - lastPoint[1];
+      if (Math.hypot(dx, dy) >= MIN_POINT_DISTANCE) {
+        this.toolState.draftPoints.push(strokePoint(action));
+        this.toolState.draftNeedsSync = true;
+      }
+    }
     let newState = this.syncDraftShape(state);
 
     const shape = newState.doc.shapes[this.toolState.draftShapeId];
@@ -264,6 +273,12 @@ export class PenTool implements Tool {
       doc: { ...state.doc, shapes: { ...state.doc.shapes, [this.toolState.draftShapeId]: updatedShape } },
     };
   }
+}
+
+function strokePoint(action: Extract<Action, { type: "pointer-down" | "pointer-move" | "pointer-up" }>): StrokePoint {
+  return action.pressure === undefined
+    ? [action.world.x, action.world.y]
+    : [action.world.x, action.world.y, action.pressure];
 }
 
 function frameFromTimestamp(timestamp: number): number {

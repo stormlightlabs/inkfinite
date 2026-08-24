@@ -91,7 +91,10 @@ export const EditorState = {
 				pathSelection: state.ui.pathSelection
 					? {
 							pathId: state.ui.pathSelection.pathId,
-							anchors: state.ui.pathSelection.anchors.map((anchor) => ({ ...anchor }))
+							anchors: state.ui.pathSelection.anchors.map((anchor) => ({ ...anchor })),
+							widthPoints: state.ui.pathSelection.widthPoints
+								? [...state.ui.pathSelection.widthPoints]
+								: undefined
 						}
 					: undefined,
 				toolId: state.ui.toolId,
