@@ -127,6 +127,7 @@ describe('Editor Toolbar', () => {
 	it('offers import choices and editable export actions', async () => {
 		const onImportEditable = vi.fn();
 		const onImportSvg = vi.fn();
+		const onCreateFromSvg = vi.fn();
 		const onImportSvgMarkup = vi.fn();
 		const onExportEditable = vi.fn();
 		const screen = render(Toolbar, {
@@ -136,6 +137,7 @@ describe('Editor Toolbar', () => {
 			brushStore: createBrushStore(),
 			onImportEditable,
 			onImportSvg,
+			onCreateFromSvg,
 			onImportSvgMarkup,
 			onExportEditable
 		});
@@ -153,14 +155,24 @@ describe('Editor Toolbar', () => {
 
 		(screen.getByRole('button', { name: 'Import' }).element() as HTMLButtonElement).click();
 		(
-			screen.getByRole('menuitem', { name: 'SVG file' }).element() as HTMLButtonElement
+			screen
+				.getByRole('menuitem', { name: 'Add SVG to current document' })
+				.element() as HTMLButtonElement
 		).click();
 		expect(onImportSvg).toHaveBeenCalledOnce();
 
 		(screen.getByRole('button', { name: 'Import' }).element() as HTMLButtonElement).click();
 		(
 			screen
-				.getByRole('menuitem', { name: 'SVG code / markup' })
+				.getByRole('menuitem', { name: 'New document from SVG' })
+				.element() as HTMLButtonElement
+		).click();
+		expect(onCreateFromSvg).toHaveBeenCalledOnce();
+
+		(screen.getByRole('button', { name: 'Import' }).element() as HTMLButtonElement).click();
+		(
+			screen
+				.getByRole('menuitem', { name: 'Add SVG code / markup' })
 				.element() as HTMLButtonElement
 		).click();
 		expect(onImportSvgMarkup).toHaveBeenCalledOnce();

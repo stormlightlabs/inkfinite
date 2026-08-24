@@ -20,7 +20,7 @@ export type SvgUnsupportedFeature =
 /**
  * Action taken for unsupported SVG content during static import.
  */
-export type SvgUnsupportedAction = 'omitted';
+export type SvgUnsupportedAction = 'omitted' | 'preserved_static_fallback';
 
 /**
  * A non-fatal condition encountered while importing an SVG.

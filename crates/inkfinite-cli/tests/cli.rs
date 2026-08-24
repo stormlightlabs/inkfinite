@@ -176,6 +176,50 @@ fn svg_import_is_one_atomic_transaction_with_dry_run_support() {
     let summary = parse_stdout(&run(["inspect", path(&document_path), "--summary", "--json"]));
     assert_eq!(summary["counts"]["assets"], 1);
     assert_eq!(summary["counts"]["shapes"], 4);
+
+    let queried = run([
+        "query",
+        path(&document_path),
+        "--tag",
+        "svg-import",
+        "--kind",
+        "rect",
+        "--detail",
+        "--json",
+    ]);
+    assert_success(&queried);
+    let queried_json = parse_stdout(&queried);
+    let shape_id = queried_json["records"][0]["id"]
+        .as_str()
+        .expect("imported rectangle id");
+    let version = queried_json["details"][0]["record"]["version"]
+        .as_u64()
+        .expect("imported rectangle version");
+    let patched = run([
+        "shape",
+        "patch",
+        path(&document_path),
+        "--shape-id",
+        shape_id,
+        "--expected-version",
+        &version.to_string(),
+        "--patch",
+        r#"{"transform":{"translation":{"x":7,"y":9},"rotation":0,"scale_x":1,"scale_y":1}}"#,
+        "--json",
+    ]);
+    assert_success(&patched);
+    let after = parse_stdout(&run([
+        "query",
+        path(&document_path),
+        "--id",
+        shape_id,
+        "--detail",
+        "--json",
+    ]));
+    assert_eq!(
+        after["details"][0]["record"]["transform"]["translation"]["x"].as_f64(),
+        Some(7.0)
+    );
 }
 
 #[test]

@@ -83,6 +83,7 @@ describe('Toolbar accessibility', () => {
 				brushStore: createBrushStore(),
 				onImportEditable: () => {},
 				onImportSvg: () => {},
+				onCreateFromSvg: () => {},
 				onImportSvgMarkup: () => {}
 			}
 		});
@@ -96,7 +97,12 @@ describe('Toolbar accessibility', () => {
 			[...menu!.querySelectorAll('[role="menuitem"]')].map((item) =>
 				item.textContent?.trim()
 			)
-		).toEqual(['Editable document', 'SVG file', 'SVG code / markup']);
+		).toEqual([
+			'Editable document',
+			'Add SVG to current document',
+			'New document from SVG',
+			'Add SVG code / markup'
+		]);
 	});
 
 	it('should have visible focus states on buttons', () => {

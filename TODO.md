@@ -28,20 +28,20 @@ Run representative native and fallback SVG fixtures through each complete
 document workflow. Compare normalized structure where representation matters
 and rendered output where visual fidelity matters.
 
-- [ ] Offer creation of a new document from SVG as a separate editor action
-- [ ] Verify and fix TypeScript editor traversal of imported root containers so
+- [x] Offer creation of a new document from SVG as a separate editor action
+- [x] Verify and fix TypeScript editor traversal of imported root containers so
       existing child records can be selected, edited, reparented, and deleted
       independently
-- [ ] Test import through save/reopen, edit/export, undo/redo, and CRDT merge
-- [ ] Test active-document import and explicit new-document creation end to end
-- [ ] Test imported child shapes through editor selection and targeted CLI
+- [x] Test import through save/reopen, edit/export, undo/redo, and CRDT merge
+- [x] Test active-document import and explicit new-document creation end to end
+- [x] Test imported child shapes through editor selection and targeted CLI
       query and mutation
-- [ ] Verify native vectors export without rasterization
-- [ ] Verify nested transforms export deterministically
-- [ ] Verify compound fill rules survive import and export
-- [ ] Add sanitized static fallback content for unsupported visuals and verify
+- [x] Verify native vectors export without rasterization
+- [x] Verify nested transforms export deterministically
+- [x] Verify compound fill rules survive import and export
+- [x] Add sanitized static fallback content for unsupported visuals and verify
       that it remains visually stable
-- [ ] Add deterministic round-trip fixtures for these workflows
+- [x] Add deterministic round-trip fixtures for these workflows
 
 ## Richer interoperability and embeds
 

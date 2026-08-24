@@ -69,6 +69,8 @@ pub enum SvgUnsupportedFeature {
 pub enum SvgUnsupportedAction {
     /// Leave the content out of the normalized native tree.
     Omitted,
+    /// Preserve the static visual in a sanitized embedded SVG image.
+    PreservedStaticFallback,
 }
 
 impl fmt::Display for SvgUnsupportedFeature {
@@ -91,6 +93,7 @@ impl fmt::Display for SvgUnsupportedAction {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::Omitted => "omitted from native tree",
+            Self::PreservedStaticFallback => "preserved as sanitized static fallback",
         })
     }
 }
@@ -853,8 +856,30 @@ pub fn parse_svg(source: &str) -> Result<SvgImport, SvgImportError> {
     let mut parser = ImportParser { assets: Vec::new(), warnings: Vec::new(), view_box };
     parser.warn_event_handlers(root);
     let root_style = resolve_style(&SvgStyle::default(), root, &mut parser.warnings)?;
-    let children = parser.children(root, &root_style)?;
+    let mut children = parser.children(root, &root_style)?;
     let root_transform = parser.transform(root)?;
+    if requires_static_fallback(&parser.warnings) {
+        let sanitized = sanitize_static_svg(root);
+        let fallback_asset = make_svg_asset("sanitized-fallback.svg", sanitized.into_bytes());
+        let (width, height) = fallback_dimensions(root, view_box, &mut parser)?;
+        children = vec![SvgImportNode::Image(SvgImage {
+            source_id: Some("sanitized-static-fallback".into()),
+            asset_id: fallback_asset.id.clone(),
+            transform: Transform { translation: Vec2 { x: 0.0, y: 0.0 }, rotation: 0.0, scale_x: 1.0, scale_y: 1.0 },
+            properties: properties([
+                ("width", json!(width)),
+                ("height", json!(height)),
+                ("caption", Value::Null),
+            ]),
+            style: ShapeStyle {
+                opacity: Opacity::new(1.0).expect("one is a valid opacity"),
+                fill_opacity: None,
+                stroke_opacity: None,
+            },
+        })];
+        parser.assets.push(fallback_asset);
+        mark_static_fallback(&mut parser.warnings);
+    }
     let root_group = SvgGroup {
         source_id: source_id(root),
         transform: root_transform,
@@ -880,6 +905,180 @@ pub fn import_svg(source: impl AsRef<[u8]>) -> Result<SvgImport, SvgImportError>
     }
     let source = std::str::from_utf8(bytes).map_err(|error| SvgImportError::InvalidUtf8(error.to_string()))?;
     parse_svg(source)
+}
+
+fn requires_static_fallback(warnings: &[SvgImportWarning]) -> bool {
+    warnings.iter().any(|warning| match warning {
+        SvgImportWarning::UnsupportedPaint { .. } | SvgImportWarning::UnsupportedElement { .. } => true,
+        SvgImportWarning::UnsupportedFeature { feature, .. } => !matches!(
+            feature,
+            SvgUnsupportedFeature::Script
+                | SvgUnsupportedFeature::Animation
+                | SvgUnsupportedFeature::ExternalResource
+                | SvgUnsupportedFeature::Stylesheet
+        ),
+    })
+}
+
+fn mark_static_fallback(warnings: &mut [SvgImportWarning]) {
+    for warning in warnings {
+        if let SvgImportWarning::UnsupportedFeature { feature, action, .. } = warning
+            && !matches!(
+                feature,
+                SvgUnsupportedFeature::Script
+                    | SvgUnsupportedFeature::Animation
+                    | SvgUnsupportedFeature::ExternalResource
+                    | SvgUnsupportedFeature::Stylesheet
+            )
+        {
+            *action = SvgUnsupportedAction::PreservedStaticFallback;
+        }
+    }
+}
+
+fn fallback_dimensions<'a, 'input>(
+    root: Node<'a, 'input>, view_box: Option<SvgViewBox>, parser: &mut ImportParser,
+) -> Result<(f64, f64), SvgImportError> {
+    let width = parser.length(
+        root,
+        "width",
+        view_box.map_or(300.0, |value| value.width),
+        Axis::Horizontal,
+    )?;
+    let height = parser.length(
+        root,
+        "height",
+        view_box.map_or(150.0, |value| value.height),
+        Axis::Vertical,
+    )?;
+    ensure_non_negative(root, "width", width)?;
+    ensure_non_negative(root, "height", height)?;
+    Ok((width, height))
+}
+
+fn sanitize_static_svg(root: Node<'_, '_>) -> String {
+    let mut output = String::from(r#"<svg xmlns="http://www.w3.org/2000/svg""#);
+    write_safe_attributes(root, &mut output);
+    output.push('>');
+    write_safe_children(root, &mut output);
+    output.push_str("</svg>");
+    output
+}
+
+fn write_safe_children(node: Node<'_, '_>, output: &mut String) {
+    for child in node.children() {
+        if child.is_text() {
+            escape_svg_text(child.text().unwrap_or_default(), output);
+            continue;
+        }
+        if !child.is_element() || !safe_static_element(local_name(child)) {
+            continue;
+        }
+        let name = local_name(child);
+        output.push('<');
+        output.push_str(name);
+        write_safe_attributes(child, output);
+        output.push('>');
+        write_safe_children(child, output);
+        output.push_str("</");
+        output.push_str(name);
+        output.push('>');
+    }
+}
+
+fn safe_static_element(name: &str) -> bool {
+    matches!(
+        name,
+        "svg"
+            | "g"
+            | "defs"
+            | "symbol"
+            | "use"
+            | "rect"
+            | "circle"
+            | "ellipse"
+            | "line"
+            | "polygon"
+            | "polyline"
+            | "path"
+            | "text"
+            | "tspan"
+            | "image"
+            | "linearGradient"
+            | "radialGradient"
+            | "stop"
+            | "pattern"
+            | "clipPath"
+            | "mask"
+            | "filter"
+            | "feBlend"
+            | "feColorMatrix"
+            | "feComponentTransfer"
+            | "feComposite"
+            | "feConvolveMatrix"
+            | "feDiffuseLighting"
+            | "feDisplacementMap"
+            | "feDropShadow"
+            | "feFlood"
+            | "feGaussianBlur"
+            | "feImage"
+            | "feMerge"
+            | "feMergeNode"
+            | "feMorphology"
+            | "feOffset"
+            | "feSpecularLighting"
+            | "feTile"
+            | "feTurbulence"
+    )
+}
+
+fn write_safe_attributes(node: Node<'_, '_>, output: &mut String) {
+    for attribute in node.attributes() {
+        let name = attribute.name();
+        let value = attribute.value();
+        if name.len() >= 2 && name[..2].eq_ignore_ascii_case("on") {
+            continue;
+        }
+        let normalized_value = value.trim().to_ascii_lowercase();
+        if matches!(name, "href" | "xlink:href")
+            && !(normalized_value.starts_with('#')
+                || ["data:image/png", "data:image/jpeg", "data:image/gif", "data:image/webp"]
+                    .iter()
+                    .any(|prefix| normalized_value.starts_with(prefix)))
+        {
+            continue;
+        }
+        if normalized_value.contains("url(") && !normalized_value.contains("url(#") {
+            continue;
+        }
+        output.push(' ');
+        output.push_str(name);
+        output.push_str("=\"");
+        escape_svg_attribute(value, output);
+        output.push('"');
+    }
+}
+
+fn escape_svg_text(value: &str, output: &mut String) {
+    for character in value.chars() {
+        match character {
+            '&' => output.push_str("&amp;"),
+            '<' => output.push_str("&lt;"),
+            '>' => output.push_str("&gt;"),
+            _ => output.push(character),
+        }
+    }
+}
+
+fn escape_svg_attribute(value: &str, output: &mut String) {
+    for character in value.chars() {
+        match character {
+            '&' => output.push_str("&amp;"),
+            '<' => output.push_str("&lt;"),
+            '"' => output.push_str("&quot;"),
+            _ => output.push(character),
+        }
+    }
 }
 
 fn resolve_style<'a, 'input>(
@@ -1538,6 +1737,10 @@ fn hex_digit(value: u8) -> Option<u8> {
 
 fn make_source_asset(bytes: &[u8]) -> SvgAsset {
     make_asset("image/svg+xml".into(), bytes.to_vec(), "source")
+}
+
+fn make_svg_asset(prefix: &str, bytes: Vec<u8>) -> SvgAsset {
+    make_asset("image/svg+xml".into(), bytes, prefix.trim_end_matches(".svg"))
 }
 
 fn make_asset(media_type: String, bytes: Vec<u8>, prefix: &str) -> SvgAsset {

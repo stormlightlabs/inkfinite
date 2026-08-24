@@ -36,15 +36,12 @@ MCP. It maps supported geometry and embedded images into native shapes,
 preserves hierarchy, transforms, and compound fills, retains source assets,
 and reports unsupported content.
 
-The remaining editor work must expose imported descendants through ordinary
-selection, editing, reparenting, ungrouping, deletion, CLI access, and MCP
-access.
+Imported descendants are ordinary document records available to editor, CLI,
+and MCP operations. Native and fallback fixtures cover save/reopen,
+edit/export, undo/redo, CRDT merge, active-document import, and explicit
+creation of a new document from SVG.
 
-Complete workflows still need to be proven through save/reopen, edit/export,
-undo/redo, CRDT merge, active-document import, and explicit creation of a new
-document from SVG.
-
-Interchange should prefer deterministic native representation where Inkfinite
+Interchange uses deterministic native representation where Inkfinite
 understands the content and sanitized static fallback content where it does
 not.
 

@@ -103,9 +103,21 @@ describe('compiled document engine worker', () => {
 			'layer:one',
 			2
 		);
-		expect(imported.shape_ids.length).toBeGreaterThan(0);
+		expect(imported.shape_ids.length).toBeGreaterThan(1);
+		const importedChildId = imported.shape_ids.at(-1)!;
+		expect(imported.editor_projection.shapes[importedChildId]).toBeDefined();
 		const rendered = await worker.render(imported.snapshot, { page_id: 'page:one' });
 		expect(rendered.status).toBe('success');
-		if (rendered.status === 'success') expect(rendered.svg).toContain('<svg');
+		if (rendered.status === 'success') {
+			expect(rendered.svg).toContain('<path');
+			expect(rendered.svg).not.toContain('data:image/svg+xml');
+		}
+
+		const withoutImport = await worker.undoDocument();
+		expect(withoutImport.snapshot.document.shapes[importedChildId]).toBeUndefined();
+		const restoredImport = await worker.redoDocument();
+		expect(restoredImport.snapshot.document.shapes[importedChildId]).toBeDefined();
+		const reopenedImport = await worker.openDocument(restoredImport.bytes, 'browser');
+		expect(reopenedImport.editor_projection.shapes[importedChildId]).toBeDefined();
 	});
 });

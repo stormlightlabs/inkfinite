@@ -97,7 +97,9 @@ values. SVG defaults are a black fill and no stroke. `none` and `transparent`
 become absent native paint values.
 
 Paint servers such as gradients, patterns, and other unsupported `url` values
-produce warnings and are omitted from the native paint properties.
+produce warnings. When they affect the visual result, the importer uses a
+sanitized static SVG image for the imported root instead of returning a partial
+native rendering.
 `currentColor` resolves to the computed SVG `color` value, which defaults to
 black. `linearGradient`, `radialGradient`, mesh gradients, patterns, `clipPath`,
 `mask`, and `filter` definitions and references each produce a feature-specific
@@ -126,17 +128,19 @@ shape that references the extracted asset.
 
 ## Unsupported content and security
 
-The importer is a static parser. Named unsupported visual features are omitted
-from the normalized native tree and reported through typed
+The importer is a static parser. Named unsupported visual features are reported through typed
 `SvgImportWarning::UnsupportedFeature` values. Other unsupported elements use
-`SvgImportWarning::UnsupportedElement`. Their bytes remain in
-`source_asset`. The importer does not create a live fallback for omitted
-content.
+`SvgImportWarning::UnsupportedElement`. If unsupported content affects the
+visual result, the importer replaces that SVG's partial native tree with one
+image backed by sanitized SVG bytes. The sanitizer retains static SVG geometry,
+paint servers, clips, masks, and filters. It removes scripts, event handlers,
+animations, stylesheets, `foreignObject`, external resources, and unknown
+elements. The exact original bytes remain in `source_asset` for provenance.
 
 Desktop imports use the native Tauri dialog plugin to select a path, then Rust
-reads, parses, and commits the file through the active session. The browser adapter
-exposes an Import menu with editable-document, SVG file, and pasted SVG code or
-markup options. SVG file bytes and pasted markup cross one reusable worker. The
+reads, parses, and commits the file through the active session. The browser adapter exposes separate Import menu actions for adding an SVG to the
+active document and creating a document from an SVG file. Pasted SVG code is added
+to the active document. SVG file bytes and pasted markup cross one reusable worker. The
 Rust document session parses the bytes, builds the shared SVG transaction, commits
 one history entry, and returns the new canonical snapshot and editor projection.
 The browser caches that projection with the canonical IndexedDB bytes and uses it
@@ -146,9 +150,10 @@ It requires the matching `wasm-bindgen` CLI. The CLI accepts
 `inkfinite import svg FILE --input ARTWORK.svg` and can validate the transaction
 with `--dry-run` before saving.
 
-Gradients, patterns, clip paths, masks, and filters are not evaluated. Stylesheet
-blocks, event-handler attributes, scripts, and SVG animation elements are
-ignored with warnings. External image URLs and other resource references are
+Gradients, patterns, clip paths, masks, and filters are not converted to native
+shape properties. They remain visible through the sanitized static fallback.
+Stylesheet blocks, event-handler attributes, scripts, and SVG animation elements
+are removed with warnings. External image URLs and other resource references are
 also omitted. No script, animation, stylesheet, or resource is executed,
 inserted into a live DOM, or fetched during import. The retained source asset is
 input data for provenance and future re-import, not executable document content.

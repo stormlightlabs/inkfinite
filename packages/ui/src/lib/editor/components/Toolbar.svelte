@@ -25,6 +25,7 @@
 		onFitSelection?: () => void;
 		onImportEditable?: () => void;
 		onImportSvg?: () => void;
+		onCreateFromSvg?: () => void;
 		onImportSvgMarkup?: () => void;
 		onExportSvg?: (selectedOnly: boolean) => Promise<void>;
 		onExportEditable?: (format: InterchangeFormat) => void;
@@ -43,6 +44,7 @@
 		onFitSelection,
 		onImportEditable,
 		onImportSvg,
+		onCreateFromSvg,
 		onImportSvgMarkup,
 		onExportSvg,
 		onExportEditable,
@@ -287,12 +289,21 @@
 		if (onImportEditable) {
 			items.push({ id: 'import-document', label: 'Editable document', icon: 'layers' });
 		}
-		if (onImportSvg) {
+		if (onImportSvg || onCreateFromSvg || onImportSvgMarkup) {
 			if (items.length > 0) items.push({ type: 'separator' });
-			items.push({ id: 'import-svg-file', label: 'SVG file', icon: 'folder' });
+		}
+		if (onImportSvg) {
+			items.push({
+				id: 'import-svg-file',
+				label: 'Add SVG to current document',
+				icon: 'folder'
+			});
+		}
+		if (onCreateFromSvg) {
+			items.push({ id: 'create-from-svg', label: 'New document from SVG', icon: 'svg' });
 		}
 		if (onImportSvgMarkup) {
-			items.push({ id: 'import-svg-markup', label: 'SVG code / markup', icon: 'svg' });
+			items.push({ id: 'import-svg-markup', label: 'Add SVG code / markup', icon: 'svg' });
 		}
 		return items;
 	}
@@ -304,6 +315,9 @@
 				break;
 			case 'import-svg-file':
 				onImportSvg?.();
+				break;
+			case 'create-from-svg':
+				onCreateFromSvg?.();
 				break;
 			case 'import-svg-markup':
 				onImportSvgMarkup?.();

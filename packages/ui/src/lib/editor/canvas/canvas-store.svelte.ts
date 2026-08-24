@@ -589,7 +589,7 @@ export function createCanvasController(
 		}
 	}
 
-	async function importBrowserSvgSource(source: {
+	async function createBrowserDocumentFromSvg(source: {
 		name: string;
 		contents: string | Uint8Array;
 	}) {
@@ -629,6 +629,40 @@ export function createCanvasController(
 		};
 	}
 
+	async function importSvgIntoCurrentDocument(source: {
+		name: string;
+		contents: string | Uint8Array;
+	}) {
+		if (!activeBoardId || !sink || !platformSession?.commitSvgImport) {
+			throw new Error('The browser document engine is not available.');
+		}
+		const bytes =
+			typeof source.contents === 'string'
+				? new TextEncoder().encode(source.contents)
+				: source.contents;
+		if (bytes.byteLength > 16 * 1024 * 1024) {
+			throw new Error('The SVG source is larger than the 16 MB import limit.');
+		}
+		await sink.flush();
+		const state = store.getState();
+		const pageId = state.ui.currentPageId ?? Object.keys(state.doc.pages)[0];
+		if (!pageId) throw new Error('The current document has no page for SVG import.');
+		const imported = await platformSession.commitSvgImport({
+			boardId: activeBoardId,
+			source: bytes,
+			sourceName: source.name,
+			pageId,
+			layerId: state.doc.pages[pageId]?.layerIds?.[0]
+		});
+		applyLoadedDoc(imported.doc, true);
+		interchangeNotice = {
+			title: 'SVG import complete',
+			message: 'The SVG was added to the current document as native shapes.',
+			warnings: imported.warnings,
+			error: false
+		};
+	}
+
 	async function importSvg() {
 		if (!repo || !sink || !platformSession?.interchange) return;
 		interchangeBusy = true;
@@ -663,7 +697,7 @@ export function createCanvasController(
 			}
 			const source = await platformSession.interchange.pickSvg?.();
 			if (source)
-				await importBrowserSvgSource({ name: source.name, contents: source.bytes });
+				await importSvgIntoCurrentDocument({ name: source.name, contents: source.bytes });
 		} catch (error) {
 			interchangeNotice = {
 				title: 'SVG import failed',
@@ -676,7 +710,7 @@ export function createCanvasController(
 		}
 	}
 
-	async function importBrowserSvgSourceWithStatus(
+	async function createBrowserDocumentFromSvgWithStatus(
 		source:
 			| { name: string; contents: string | Uint8Array }
 			| Promise<{ name: string; contents: string | Uint8Array }>
@@ -684,7 +718,7 @@ export function createCanvasController(
 		if (platform !== 'web' || !platformSession?.interchange) return;
 		interchangeBusy = true;
 		try {
-			await importBrowserSvgSource(await source);
+			await createBrowserDocumentFromSvg(await source);
 		} catch (error) {
 			interchangeNotice = {
 				title: 'SVG import failed',
@@ -698,7 +732,30 @@ export function createCanvasController(
 	}
 
 	async function importSvgMarkup(contents: string) {
-		await importBrowserSvgSourceWithStatus({ name: 'pasted-svg.svg', contents });
+		interchangeBusy = true;
+		try {
+			await importSvgIntoCurrentDocument({ name: 'pasted-svg.svg', contents });
+		} catch (error) {
+			interchangeNotice = {
+				title: 'SVG import failed',
+				message: error instanceof Error ? error.message : String(error),
+				warnings: [],
+				error: true
+			};
+		} finally {
+			interchangeBusy = false;
+		}
+	}
+
+	async function createDocumentFromSvg() {
+		if (!platformSession?.interchange?.pickSvg) return;
+		const source = await platformSession.interchange.pickSvg();
+		if (source) {
+			await createBrowserDocumentFromSvgWithStatus({
+				name: source.name,
+				contents: source.bytes
+			});
+		}
 	}
 
 	async function importSvgFile(file: File) {
@@ -720,7 +777,7 @@ export function createCanvasController(
 			}
 			return;
 		}
-		await importBrowserSvgSourceWithStatus(
+		await createBrowserDocumentFromSvgWithStatus(
 			file
 				.arrayBuffer()
 				.then((bytes) => ({ name: file.name, contents: new Uint8Array(bytes) }))
@@ -1219,6 +1276,7 @@ export function createCanvasController(
 		commitLayerState,
 		importEditableCanvas,
 		importSvg,
+		createDocumentFromSvg,
 		importSvgMarkup,
 		importSvgFile,
 		importImageFile,

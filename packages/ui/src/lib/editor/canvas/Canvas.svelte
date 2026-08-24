@@ -778,6 +778,7 @@
 		brushStore={c.brushStore}
 		onImportEditable={c.importEditableCanvas}
 		onImportSvg={c.importSvg}
+		onCreateFromSvg={platformKind === 'web' ? c.createDocumentFromSvg : undefined}
 		onImportSvgMarkup={platformKind === 'web' ? openSvgMarkupDialog : undefined}
 		onExportSvg={platformKind === 'web' ? c.exportSvg : undefined}
 		onExportEditable={c.exportEditableCanvas}
