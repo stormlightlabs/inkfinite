@@ -51,6 +51,35 @@ describe('SelectionControls', () => {
 			.not.toBeInTheDocument();
 	});
 
+	it('keeps contextual sections on one horizontal viewport with scroll controls', async () => {
+		const page = PageRecord.create('Test page', 'page:test');
+		const rect = ShapeRecord.createRect(
+			page.id,
+			0,
+			0,
+			{ w: 80, h: 50, fill: '#ffffff', stroke: '#111111', radius: 4 },
+			'rect'
+		);
+		const screen = render(SelectionControls, {
+			currentTool: 'select',
+			orientation: 'vertical',
+			store: createSelectionStore([rect])
+		});
+		const toolbar = screen.getByRole('toolbar', { name: 'Selection controls' }).element();
+		const sections = toolbar.querySelector('.selection-controls__sections');
+		if (!sections) throw new Error('Expected the contextual sections viewport');
+
+		expect(getComputedStyle(toolbar).display).toBe('flex');
+		expect(getComputedStyle(sections).flexWrap).toBe('nowrap');
+		expect(getComputedStyle(sections).overflowX).toBe('auto');
+		await expect
+			.element(screen.getByRole('button', { name: 'Show previous contextual controls' }))
+			.toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('button', { name: 'Show more contextual controls' }))
+			.toBeInTheDocument();
+	});
+
 	it('projects and edits semantic metadata for ordinary objects', async () => {
 		const page = PageRecord.create('Test page', 'page:test');
 		const rect = ShapeRecord.createRect(

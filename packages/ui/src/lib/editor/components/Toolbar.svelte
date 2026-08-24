@@ -369,7 +369,7 @@
 					onclick={onStencilsClick}
 					aria-label="Open stencils library"
 					title="Insert from library">
-					<Icon name="book-open" size={17} />
+					<Icon name="insert" size={17} />
 					<span class="application-chrome__label">Insert</span>
 				</button>
 			{/if}

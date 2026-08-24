@@ -127,6 +127,7 @@ describe('Canvas component', () => {
 			'.application-chrome [aria-label="Open stencils library"]'
 		);
 		expect(insertButton).toBeTruthy();
+		expect(insertButton?.querySelector('.i-ph-list-plus')).toBeTruthy();
 		expect(insertButton?.closest('.toolbar')).toBeNull();
 	});
 

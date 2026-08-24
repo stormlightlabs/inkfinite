@@ -25,6 +25,7 @@ export const ICONS = {
 	'grip-vertical': 'i-tabler-grip-vertical',
 	history: 'i-tabler-history',
 	'info-circle': 'i-tabler-info-circle',
+	insert: 'i-ph-list-plus',
 	light: 'i-tabler-sun',
 	menu: 'i-bi-list',
 	markdown: 'i-tabler-markdown',

@@ -800,20 +800,6 @@
 			<strong
 				>{selectionCount}
 				{selectionCount === 1 ? 'object' : 'objects'} selected</strong>
-			<div
-				class="selection-controls__scroll-actions"
-				aria-label="Browse contextual controls">
-				<button
-					aria-label="Show previous contextual controls"
-					disabled={!canScrollSectionsBack}
-					onclick={() => shiftSections(-1)}
-					><Icon name="chevron-left" size={16} /></button>
-				<button
-					aria-label="Show more contextual controls"
-					disabled={!canScrollSectionsForward}
-					onclick={() => shiftSections(1)}
-					><Icon name="chevron-right" size={16} /></button>
-			</div>
 		</header>
 
 		<div
@@ -1430,6 +1416,17 @@
 				</div>
 			</section>
 		</div>
+
+		<div class="selection-controls__scroll-actions" aria-label="Browse contextual controls">
+			<button
+				aria-label="Show previous contextual controls"
+				disabled={!canScrollSectionsBack}
+				onclick={() => shiftSections(-1)}><Icon name="chevron-left" size={16} /></button>
+			<button
+				aria-label="Show more contextual controls"
+				disabled={!canScrollSectionsForward}
+				onclick={() => shiftSections(1)}><Icon name="chevron-right" size={16} /></button>
+		</div>
 	</div>
 
 	<ContextMenu
@@ -1450,9 +1447,12 @@
 		top: 5.25rem;
 		left: 50%;
 		z-index: 95;
-		display: grid;
+		display: flex;
+		align-items: center;
+		gap: var(--ink-space-3);
 		width: min(81rem, calc(100vw - 9rem));
 		max-width: calc(100vw - 9rem);
+		padding: var(--ink-space-2) var(--ink-space-3);
 		border: 1px solid color-mix(in srgb, var(--ink-border) 68%, transparent);
 		border-radius: var(--ink-radius-panel-small);
 		color: var(--ink-text);
@@ -1470,12 +1470,13 @@
 
 	.selection-controls__header {
 		display: flex;
-		min-width: 0;
+		flex: 0 0 auto;
+		min-width: max-content;
 		align-items: center;
-		justify-content: space-between;
-		gap: var(--ink-space-3);
-		padding: var(--ink-space-2) var(--ink-space-3);
-		border-bottom: 1px solid color-mix(in srgb, var(--ink-border) 58%, transparent);
+	}
+
+	.selection-controls__header strong {
+		white-space: nowrap;
 	}
 
 	.selection-controls__section h2 {
@@ -1492,17 +1493,22 @@
 
 	.selection-controls__sections {
 		display: flex;
+		flex: 1 1 auto;
 		min-width: 0;
 		align-items: stretch;
+		flex-wrap: nowrap;
 		gap: var(--ink-space-3);
-		padding: var(--ink-space-2) var(--ink-space-3);
-		padding-inline-end: calc(100% - var(--ink-space-3));
-		overflow-x: hidden;
+		overflow-x: auto;
 		scrollbar-width: none;
+	}
+
+	.selection-controls__sections::-webkit-scrollbar {
+		display: none;
 	}
 
 	.selection-controls__scroll-actions {
 		display: flex;
+		flex: 0 0 auto;
 		align-items: center;
 		gap: var(--ink-space-1);
 	}
@@ -1535,6 +1541,7 @@
 
 	.selection-controls__section {
 		display: grid;
+		flex: 0 0 auto;
 		min-width: max-content;
 		align-content: start;
 		gap: var(--ink-space-2);
@@ -1870,8 +1877,8 @@
 		}
 
 		.selection-controls__sections {
-			flex-wrap: wrap;
-			overflow-x: visible;
+			flex-wrap: nowrap;
+			overflow-x: auto;
 		}
 
 		.selection-controls__section {
