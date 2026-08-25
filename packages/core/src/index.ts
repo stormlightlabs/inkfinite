@@ -1,3 +1,6 @@
+// The root entry point is a convenience API. Capability-oriented consumers
+// should prefer ./model, ./geometry, ./commands, ./selection, ./interchange,
+// and ./persistence so platform concerns remain visible at import sites.
 export * from './actions';
 export * from './arrow-geometry';
 export * from './boolean-paths';
@@ -23,11 +26,6 @@ export * from './path-topology';
 export * from './path-metrics';
 export * from './text-path';
 export * from './paint';
-export * from './persistence/desktop';
-export * from './persistence/canonical';
-export * from './persistence/document';
-export * from './persistence/repo';
-export * from './persistence/stats';
 export * from './reactivity';
 export * from './selection';
 export * from './snapping';
@@ -35,5 +33,3 @@ export * from './style-policy';
 export * as stencils from './stencils';
 export * from './tools';
 export * from './vector-effects';
-export * from './ui/filebrowser';
-export * from './ui/statusbar';

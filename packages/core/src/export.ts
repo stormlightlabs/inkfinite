@@ -1,3 +1,4 @@
+import { encodeBase64 } from './base64';
 import { arrowGeometryForShape, getStrokeOutline, localToWorld, pathGeometryBounds, shapeBoundsForState } from './geom';
 import { arrowHeadGeometry, arrowLabelPlacement, arrowShaftGeometry } from './arrow-geometry';
 import { paintToSvg } from './paint';
@@ -16,7 +17,7 @@ import type {
 	TextShape
 } from './editor-model';
 import type { EditorState } from './reactivity';
-import { getSelectedShapes, getShapesOnCurrentPage } from './reactivity';
+import { getShapesOnCurrentPage } from './reactivity';
 
 export type ExportOptions = {
 	/**
@@ -38,84 +39,6 @@ export type ExportOptions = {
 	 */
 	includeCamera?: boolean;
 };
-
-/**
- * Export the current viewport as a PNG blob.
- *
- * This captures whatever is currently visible on the canvas.
- *
- * @param canvas - The canvas element to export
- * @returns Promise resolving to PNG blob
- */
-export async function exportViewportToPNG(canvas: HTMLCanvasElement): Promise<Blob> {
-	return new Promise((resolve, reject) => {
-		canvas.toBlob((blob) => {
-			if (blob) {
-				resolve(blob);
-			} else {
-				reject(new Error('Failed to export canvas to PNG'));
-			}
-		}, 'image/png');
-	});
-}
-
-/**
- * Export selected shapes as a PNG blob.
- *
- * This creates a temporary canvas, renders only the selected shapes
- * with their bounds, and exports it as PNG.
- *
- * @param state - Editor state containing shapes
- * @param renderFn - Function to render shapes to a canvas context
- * @returns Promise resolving to PNG blob, or null if no selection
- */
-export async function exportSelectionToPNG(
-	state: EditorState,
-	renderFunction: (context: CanvasRenderingContext2D, shapes: EditorShapeRecord[], bounds: Box2) => void
-): Promise<Blob | null> {
-	const shapes = getSelectedShapes(state);
-	if (shapes.length === 0) {
-		return null;
-	}
-
-	const bounds = combineBounds(shapes.map((shape) => exportBounds(state, shape)));
-	if (!bounds) {
-		return null;
-	}
-
-	const padding = 20;
-	const width = Box2Ops.width(bounds) + padding * 2;
-	const height = Box2Ops.height(bounds) + padding * 2;
-
-	const canvas = document.createElement('canvas');
-	canvas.width = width;
-	canvas.height = height;
-
-	const context = canvas.getContext('2d');
-	if (!context) {
-		throw new Error('Failed to get 2D context');
-	}
-
-	context.fillStyle = 'white';
-	context.fillRect(0, 0, width, height);
-
-	context.save();
-	context.translate(-bounds.min.x + padding, -bounds.min.y + padding);
-
-	renderFunction(context, shapes, bounds);
-
-	context.restore();
-
-	return new Promise((resolve, reject) => {
-		canvas.toBlob((blob) => {
-			if (blob) {
-				resolve(blob);
-			} else {
-				reject(new Error('Failed to export selection to PNG'));
-			}
-		}, 'image/png');
-	});
-}
 
 /**
  * Export shapes to SVG format.
@@ -577,13 +500,6 @@ function markdownToSVG(shape: MarkdownShape, transform: string, definitions: str
 	].join('\n');
 }
 
-function encodeBase64(bytes: number[]): string {
-	if (typeof btoa !== 'function') return '';
-	let binary = '';
-	for (const byte of bytes) binary += String.fromCharCode(byte);
-	return btoa(binary);
-}
-
 /**
  * Escape special XML characters in strings.
  */
@@ -596,7 +512,8 @@ function escapeXML(string_: string): string {
 		.replaceAll("'", '&apos;');
 }
 
-function exportBounds(state: EditorState, shape: EditorShapeRecord): Box2 {
+/** Compute the export bounds for one shape, including arrow heads and labels. */
+export function exportBounds(state: EditorState, shape: EditorShapeRecord): Box2 {
 	if (shape.type !== 'arrow') return shapeBoundsForState(state, shape);
 	const geometry = arrowGeometryForShape(state, shape);
 	if (!geometry) return shapeBoundsForState(state, shape);

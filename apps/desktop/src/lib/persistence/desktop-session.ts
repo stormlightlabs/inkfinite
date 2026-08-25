@@ -1,24 +1,22 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { createId } from '@inkfinite/core';
 import {
 	createEditorReconciliationRequest,
-	createId,
 	fromCanonicalDocumentSnapshot,
 	fromEditorProjection
-} from '@inkfinite/core';
+} from '@inkfinite/core/persistence';
+import type { EditorLayerRecord, EditorPageRecord } from '@inkfinite/core';
 import type {
 	BoardExport,
 	BoardMeta,
-	DesktopFileOps,
 	DocPatch,
-	FileHandle,
 	LoadedDoc,
-	EditorLayerRecord,
-	EditorPageRecord,
 	PersistenceSink,
-	PersistenceStatus,
 	PersistentDocRepo
-} from '@inkfinite/core';
+} from '@inkfinite/core/persistence';
+import type { PersistenceStatus } from '@inkfinite/ui/editor';
+import type { DesktopFileOps, FileHandle } from '../fileops';
 import type {
 	ChangeHash,
 	CommitResult,

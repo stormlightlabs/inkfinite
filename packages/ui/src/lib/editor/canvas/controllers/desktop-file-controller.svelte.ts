@@ -1,4 +1,4 @@
-import type { BoardMeta, LoadedDoc, PersistentDocRepo } from '@inkfinite/core';
+import type { BoardMeta, LoadedDoc, PersistentDocRepo } from '@inkfinite/core/persistence';
 import type { DesktopDocumentRepo } from '../../platform';
 
 function isUserCancelled(error: unknown) {

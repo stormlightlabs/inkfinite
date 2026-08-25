@@ -107,10 +107,18 @@ Rust inkfinite-wasm ──> web app persistence adapter
 Rust Tauri commands ──> desktop app persistence adapter
 ```
 
-`@inkfinite/editor` owns normalized input, interaction state, commands, and Canvas rendering. The
-UI package owns Svelte presentation and inspector controls. Applications own browser storage,
-filesystem access, Tauri or WASM calls, and composition. No UI, editor runtime, or application code
-owns canonical records or applies native transactions directly.
+`@inkfinite/editor` owns normalized input, interaction state, commands, Canvas rendering, and
+browser Canvas export adapters. The UI package owns Svelte presentation, inspector controls, file
+browser and status-bar view models. Applications own browser storage, filesystem access, Tauri or
+WASM calls, and composition. No UI, editor runtime, or application code owns canonical records or
+applies native transactions directly.
+
+`@inkfinite/core` is headless and has no DOM, Svelte, application, or platform imports. Its root
+entry point is a convenience API; capability-oriented consumers can use the explicit `model`,
+`geometry`, `commands`, `selection`, `interchange`, and `persistence` entry points. The core root
+keeps SVG export and pure paint serialization, while `@inkfinite/editor/export` owns PNG helpers
+that require `HTMLCanvasElement`. Browser and desktop persistence implementations stay in their
+application roots, and the desktop file-operation contract lives beside the Tauri adapter.
 
 For the record structure, see [Document model](/docs/concepts/document-model/). The [native path
 geometry guide](/docs/development/native-path-geometry/) documents the path representation used by
@@ -168,7 +176,7 @@ Causal heads and record versions are used for optimistic concurrency. See
 | `crates/inkfinite-cli`   | `inkfinite` command parsing, human/JSON output, file-mode operations, live desktop control, and binding/schema generation |
 | `apps/desktop/src-tauri` | Tauri command surface and native application integration around `inkfinite-core`                                          |
 | `packages/bindings`      | Generated TypeScript contracts derived from Rust. Do not edit these by hand                                               |
-| `packages/core`          | Editor-facing model, geometry, actions, tools, stencils, interchange, and browser-side utilities                          |
+| `packages/core`          | Headless editor model, geometry, actions, tools, stencils, interchange, SVG export, and persistence projections           |
 | `packages/editor`        | DOM input normalization, interaction state, transaction drafts, and Canvas 2D rendering                                   |
 | `packages/ui`            | Shared Svelte editor, panels, controls, themes, and UI components                                                         |
 | `apps/web`               | Browser composition root, documentation site, and IndexedDB-backed editor persistence                                     |
@@ -187,8 +195,9 @@ text and Markdown layout. Selection handles, binding previews, and snapping guid
 editor-only state and are not native document records.
 
 Headless rendering is separate. `inkfinite-core` renders the canonical document directly to
-deterministic SVG for CLI output, fixtures, and inspection. This keeps headless output independent
-of the browser renderer.
+deterministic SVG for CLI output, fixtures, and inspection. `@inkfinite/core` also provides pure SVG
+serialization for the interactive editor model. PNG export remains in `@inkfinite/editor` because
+it requires a browser Canvas. This keeps headless output independent of the browser renderer.
 
 ## Desktop sessions, CLI, and MCP
 

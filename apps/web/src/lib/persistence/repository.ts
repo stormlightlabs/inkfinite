@@ -1,15 +1,24 @@
 import {
 	EditorBindingRecord as BindingOps,
-	BoardStatsOps,
 	createId,
-	fromCanonicalDocumentSnapshot,
-	fromEditorProjection,
 	EditorLayerRecord as LayerOps,
 	EditorPageRecord as PageOps,
 	EditorShapeRecord as ShapeOps
 } from '@inkfinite/core';
+import {
+	BoardStatsOps,
+	fromCanonicalDocumentSnapshot,
+	fromEditorProjection
+} from '@inkfinite/core/persistence';
 import type {
 	EditorBindingRecord,
+	EditorDocument,
+	EditorLayerRecord,
+	EditorPageRecord,
+	EditorShapeRecord,
+	ImportedAsset
+} from '@inkfinite/core';
+import type {
 	BoardExport,
 	BoardInspectorData,
 	BoardMeta,
@@ -17,17 +26,12 @@ import type {
 	CanonicalDocumentState,
 	DocOrder,
 	DocPatch,
-	EditorDocument,
 	LoadedDoc,
-	EditorLayerRecord,
-	ImportedAsset,
-	EditorPageRecord,
 	PersistenceSink,
 	PersistentDocRepo,
 	SchemaInfo,
-	EditorShapeRecord,
 	Timestamp
-} from '@inkfinite/core';
+} from '@inkfinite/core/persistence';
 import Dexie from 'dexie';
 
 /** IndexedDB row for a page scoped to its board. */

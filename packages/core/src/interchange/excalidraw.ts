@@ -1,7 +1,14 @@
+import { decodeBase64, encodeBase64 } from '../base64';
 import { shapeBounds } from '../geom';
 import { paintColor } from '../paint';
 import { clamp, Vec2 } from '../math';
-import { EditorBindingRecord, ensureDocumentLayers, EditorShapeRecord, type ArrowShape, type EditorShapeRecord as Shape } from '../editor-model';
+import {
+	EditorBindingRecord,
+	ensureDocumentLayers,
+	EditorShapeRecord,
+	type ArrowShape,
+	type EditorShapeRecord as Shape
+} from '../editor-model';
 import type { BoardExport } from '../persistence/document';
 import type { InterchangeExport, InterchangeImport } from '../interchange';
 import {
@@ -161,7 +168,13 @@ export function importExcalidraw(root: JsonObject, fileName: string): Interchang
 					digest: assetId,
 					bytes: data.bytes
 				};
-				shape = EditorShapeRecord.createImage(pageId, origin.x, origin.y, { w: width, h: height, assetId }, shapeId);
+				shape = EditorShapeRecord.createImage(
+					pageId,
+					origin.x,
+					origin.y,
+					{ w: width, h: height, assetId },
+					shapeId
+				);
 				break;
 			}
 			case 'text':
@@ -685,13 +698,6 @@ function excalidrawPointTuples(value: unknown, name: string): Array<[number, num
 	});
 }
 
-function encodeBase64(bytes: number[]): string {
-	if (typeof btoa !== 'function') return '';
-	let binary = '';
-	for (const byte of bytes) binary += String.fromCharCode(byte);
-	return btoa(binary);
-}
-
 function decodeImageData(value: string, declaredMediaType: unknown): { mediaType: string; bytes: number[] } | null {
 	let mediaType = typeof declaredMediaType === 'string' ? declaredMediaType : 'image/png';
 	let encoded = value;
@@ -701,8 +707,7 @@ function decodeImageData(value: string, declaredMediaType: unknown): { mediaType
 		encoded = dataUrl[2] ?? '';
 	}
 	try {
-		if (typeof atob !== 'function') return null;
-		return { mediaType, bytes: [...atob(encoded)].map((character) => character.charCodeAt(0)) };
+		return { mediaType, bytes: decodeBase64(encoded) };
 	} catch {
 		return null;
 	}

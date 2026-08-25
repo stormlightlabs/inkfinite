@@ -11,6 +11,14 @@ export default defineConfig({
 		alias: {
 			'@inkfinite/bindings': new URL('../../packages/bindings/src/index.ts', import.meta.url)
 				.pathname,
+			'@inkfinite/core/persistence': new URL(
+				'../../packages/core/src/persistence.ts',
+				import.meta.url
+			).pathname,
+			'@inkfinite/core/geometry': new URL(
+				'../../packages/core/src/geometry.ts',
+				import.meta.url
+			).pathname,
 			'@inkfinite/core': new URL('../../packages/core/src/index.ts', import.meta.url)
 				.pathname,
 			'@inkfinite/editor/input-dom': new URL(
@@ -19,6 +27,10 @@ export default defineConfig({
 			).pathname,
 			'@inkfinite/editor/renderer': new URL(
 				'../../packages/editor/src/renderer.ts',
+				import.meta.url
+			).pathname,
+			'@inkfinite/editor/export': new URL(
+				'../../packages/editor/src/export.ts',
 				import.meta.url
 			).pathname,
 			'@inkfinite/editor/runtime': new URL(

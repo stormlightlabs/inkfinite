@@ -15,7 +15,6 @@ import {
 	DirectSelectTool,
 	createToolMap,
 	CursorStore,
-	diffDoc,
 	EllipseTool,
 	FrameTool,
 	getInteractiveShapesOnCurrentPage,
@@ -43,13 +42,12 @@ import type {
 	Box2,
 	InterchangeFormat,
 	InterchangeWarning,
-	LoadedDoc,
 	SvgExport,
 	SvgExportOptions,
-	PersistenceSink,
-	PersistentDocRepo,
 	Viewport
 } from '@inkfinite/core';
+import { diffDoc } from '@inkfinite/core/persistence';
+import type { LoadedDoc, PersistenceSink, PersistentDocRepo } from '@inkfinite/core/persistence';
 import { stencils } from '@inkfinite/core';
 import { Action, EditorRuntime } from '@inkfinite/editor/runtime';
 import { createImageAsset, pasteImage } from '../clipboard';
@@ -1233,7 +1231,9 @@ export function createCanvasController(
 			void sink
 				?.flush()
 				.then(() => desktopRepo?.closeSession())
-				.catch((error) => console.error('Failed to close desktop session', error));
+				.catch((error: unknown) =>
+					console.error('Failed to close desktop session', error)
+				);
 		}
 		unsubscribeMarqueeCamera();
 		removeBeforeUnload?.();

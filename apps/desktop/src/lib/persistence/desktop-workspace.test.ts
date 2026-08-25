@@ -1,4 +1,4 @@
-import type { DesktopFileOps } from '@inkfinite/core';
+import type { DesktopFileOps } from '../fileops';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createDesktopSessionRepo } from '$lib/persistence/desktop-session';
 

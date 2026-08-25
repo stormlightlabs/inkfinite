@@ -1,4 +1,6 @@
-import { EditorPageRecord, EditorShapeRecord, type BoardExport, type DesktopFileOps, type FileHandle } from '@inkfinite/core';
+import { EditorPageRecord, EditorShapeRecord } from '@inkfinite/core';
+import type { BoardExport } from '@inkfinite/core/persistence';
+import type { DesktopFileOps, FileHandle } from '../fileops';
 import type { ChangeHash, DocumentSnapshot, Proposal, ShapeProperties, TransactionDraft } from '@inkfinite/bindings';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createDesktopSessionRepo } from '$lib/persistence/desktop-session';

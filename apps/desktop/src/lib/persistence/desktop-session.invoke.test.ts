@@ -1,4 +1,4 @@
-import type { DesktopFileOps } from '@inkfinite/core';
+import type { DesktopFileOps } from '../fileops';
 import type { DocumentSnapshot, Proposal } from '@inkfinite/bindings';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

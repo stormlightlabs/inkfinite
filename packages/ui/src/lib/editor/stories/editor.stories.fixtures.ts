@@ -1,14 +1,13 @@
 import {
 	CursorStore,
 	EditorState,
-	FileBrowserVM,
 	EditorPageRecord,
 	EditorShapeRecord,
 	Store,
-	type BoardMeta,
-	type DocRepo,
 	type EditorState as EditorStateType
 } from '@inkfinite/core';
+import { FileBrowserVM } from '../filebrowser/model';
+import type { BoardMeta, DocRepo } from '@inkfinite/core/persistence';
 
 import type { EditorPlatformAdapter } from '../platform';
 import { createBrushStore, createSnapStore, createStatusStore } from '../status';

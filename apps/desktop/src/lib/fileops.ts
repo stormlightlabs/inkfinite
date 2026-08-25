@@ -1,9 +1,28 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { load } from '@tauri-apps/plugin-store';
-import type { DesktopFileOps, DirectoryEntry, FileHandle } from '@inkfinite/core';
+/** A recent or currently open desktop document. */
+export type FileHandle = { path: string; name: string; modifiedAt?: number };
+/** One filesystem entry returned by the desktop workspace adapter. */
+export type DirectoryEntry = { path: string; name: string; isDir: boolean; modifiedAt?: number };
 
-export type { DesktopFileOps };
+/** Native dialogs, recent files, and workspace operations supplied by Tauri. */
+export interface DesktopFileOps {
+	showOpenDialog(): Promise<string | null>;
+	showSaveDialog(defaultName?: string): Promise<string | null>;
+	showSvgDialog(): Promise<string | null>;
+	getRecentFiles(): Promise<FileHandle[]>;
+	addRecentFile(handle: FileHandle): Promise<void>;
+	removeRecentFile(path: string): Promise<void>;
+	clearRecentFiles(): Promise<void>;
+	getWorkspaceDir(): Promise<string | null>;
+	setWorkspaceDir(path: string | null): Promise<void>;
+	pickWorkspaceDir(): Promise<string | null>;
+	readDirectory(directory: string, pattern?: string): Promise<DirectoryEntry[]>;
+	getFileModifiedAt?(path: string): Promise<number | null>;
+	renameFile(oldPath: string, newPath: string): Promise<void>;
+	deleteFile(path: string): Promise<void>;
+}
 
 const STORE_NAME = 'inkfinite-desktop.json';
 const RECENT_FILES_KEY = 'recentFiles';

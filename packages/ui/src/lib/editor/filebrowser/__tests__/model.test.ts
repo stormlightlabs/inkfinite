@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { DocRepo } from '../src/persistence/repo';
-import { FileBrowserVM } from '../src/ui/filebrowser';
+import type { DocRepo } from '@inkfinite/core/persistence';
+import { FileBrowserVM } from '../model';
 
 function createRepoMock(): DocRepo {
 	return {
@@ -45,7 +45,11 @@ describe('FileBrowserVM', () => {
 		const repo = createRepoMock();
 		const vm = FileBrowserVM.create({ repo, boards, sort: 'name-asc' });
 
-		expect(vm.filteredBoards.map((board) => board.name)).toEqual(['Alpha Board', 'Beta Board', 'Gamma']);
+		expect(vm.filteredBoards.map((board) => board.name)).toEqual([
+			'Alpha Board',
+			'Beta Board',
+			'Gamma'
+		]);
 	});
 
 	it('selects the first available board when selection is invalid', () => {

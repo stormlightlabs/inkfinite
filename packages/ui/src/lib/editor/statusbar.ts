@@ -1,8 +1,8 @@
-import type { CursorState } from '../cursor';
-import { shapeBoundsForState } from '../geom';
-import { type Box2, Box2 as Box2Ops, type Vec2, Vec2 as Vec2Ops } from '../math';
-import type { EditorState, ToolId } from '../reactivity';
-import { getSelectedShapes } from '../reactivity';
+import type { CursorState } from '@inkfinite/core';
+import { shapeBoundsForState } from '@inkfinite/core/geometry';
+import { type Box2, Box2 as Box2Ops, type Vec2, Vec2 as Vec2Ops } from '@inkfinite/core/geometry';
+import type { EditorState, ToolId } from '@inkfinite/core';
+import { getSelectedShapes } from '@inkfinite/core';
 
 export type SelectionSummary = { count: number; kind?: string; bounds?: { w: number; h: number } };
 
@@ -67,7 +67,9 @@ export function getSelectionSummary(state: EditorState): SelectionSummary {
 	return {
 		count,
 		kind,
-		bounds: combinedBounds ? { w: Box2Ops.width(combinedBounds), h: Box2Ops.height(combinedBounds) } : undefined
+		bounds: combinedBounds
+			? { w: Box2Ops.width(combinedBounds), h: Box2Ops.height(combinedBounds) }
+			: undefined
 	};
 }
 
@@ -91,7 +93,9 @@ export function buildStatusBarVM(
 ): StatusBarVM {
 	return {
 		cursorWorld: Vec2Ops.clone(cursorState.cursorWorld),
-		cursorScreen: cursorState.cursorScreen ? Vec2Ops.clone(cursorState.cursorScreen) : undefined,
+		cursorScreen: cursorState.cursorScreen
+			? Vec2Ops.clone(cursorState.cursorScreen)
+			: undefined,
 		toolId: getToolId(editorState),
 		mode,
 		selection: getSelectionSummary(editorState),
@@ -108,7 +112,10 @@ function combineBounds(boxes: Box2[]): Box2 | null {
 	for (let index = 1; index < boxes.length; index++) {
 		const box = boxes[index];
 		combined = {
-			min: { x: Math.min(combined.min.x, box.min.x), y: Math.min(combined.min.y, box.min.y) },
+			min: {
+				x: Math.min(combined.min.x, box.min.x),
+				y: Math.min(combined.min.y, box.min.y)
+			},
 			max: { x: Math.max(combined.max.x, box.max.x), y: Math.max(combined.max.y, box.max.y) }
 		};
 	}

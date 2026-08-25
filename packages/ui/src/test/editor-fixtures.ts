@@ -1,12 +1,6 @@
-import {
-	EditorState,
-	FileBrowserVM,
-	EditorPageRecord,
-	EditorShapeRecord,
-	Store,
-	type BoardMeta,
-	type DocRepo
-} from '@inkfinite/core';
+import { EditorState, EditorPageRecord, EditorShapeRecord, Store } from '@inkfinite/core';
+import { FileBrowserVM } from '../lib/editor/filebrowser/model';
+import type { BoardMeta, DocRepo } from '@inkfinite/core/persistence';
 import { vi } from 'vitest';
 
 export const testBoards: BoardMeta[] = [

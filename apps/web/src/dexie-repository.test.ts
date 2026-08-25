@@ -3,14 +3,14 @@ import { InkfiniteDB } from '$lib/persistence/database';
 import { createDexieDocRepo, createPersistenceSink } from '$lib/persistence/repository';
 import {
 	CreateShapeCommand,
-	diffDoc,
 	EditorDocument as EditorDocumentOps,
 	EditorPageRecord,
 	SetSelectionCommand,
 	EditorShapeRecord,
-	Store,
-	type CanonicalDocumentState
+	Store
 } from '@inkfinite/core';
+import { diffDoc } from '@inkfinite/core/persistence';
+import type { CanonicalDocumentState } from '@inkfinite/core/persistence';
 import Dexie from 'dexie';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

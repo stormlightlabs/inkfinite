@@ -1,9 +1,9 @@
 import type { DocumentSnapshot, EditorReconciliationRequest } from '@inkfinite/wasm';
+import type { EditorDocument } from '@inkfinite/core';
 import {
 	createEditorReconciliationRequest,
-	fromEditorProjection,
-	type EditorDocument
-} from '@inkfinite/core';
+	fromEditorProjection
+} from '@inkfinite/core/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
 	getSharedDocumentEngineWorker,

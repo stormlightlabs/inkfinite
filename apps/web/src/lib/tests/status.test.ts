@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Observable, Observer, Subscription } from 'dexie';
-import type { DocPatch, EditorPageRecord, PersistentDocRepo } from '@inkfinite/core';
+import type { EditorPageRecord } from '@inkfinite/core';
+import type { DocPatch, PersistentDocRepo } from '@inkfinite/core/persistence';
 import { describe, expect, it, vi } from 'vitest';
 import type { InkfiniteDB } from '$lib/persistence/database';
 import { createDexieSession, type DexieAdapterOptions } from '$lib/persistence/dexie';

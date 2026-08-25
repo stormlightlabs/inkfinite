@@ -1,4 +1,4 @@
-import type { BoardMeta, DocRepo } from '../persistence/repo';
+import type { BoardMeta, DocRepo } from '@inkfinite/core/persistence';
 
 export type FileBrowserActions = {
 	open(boardId: string): Promise<void>;
@@ -105,9 +105,15 @@ function compareBoards(left: BoardMeta, right: BoardMeta, sort: FileBrowserSort)
 		case 'name-desc':
 			return compareText(right.name, left.name);
 		case 'created-desc':
-			return compareNumber(right.createdAt, left.createdAt) || compareText(left.name, right.name);
+			return (
+				compareNumber(right.createdAt, left.createdAt) ||
+				compareText(left.name, right.name)
+			);
 		case 'updated-desc':
-			return compareNumber(right.updatedAt, left.updatedAt) || compareText(left.name, right.name);
+			return (
+				compareNumber(right.updatedAt, left.updatedAt) ||
+				compareText(left.name, right.name)
+			);
 	}
 }
 

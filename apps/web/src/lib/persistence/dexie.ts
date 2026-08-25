@@ -1,19 +1,18 @@
 import {
 	createEditorReconciliationRequest,
-	diffDoc,
 	fromEditorProjection,
-	toCanonicalDocumentSnapshot
-} from '@inkfinite/core';
+	toCanonicalDocumentSnapshot,
+	diffDoc
+} from '@inkfinite/core/persistence';
+import type { InterchangeExport, SvgExport, SvgExportOptions } from '@inkfinite/core';
 import type {
 	BoardExport,
 	DocPatch,
 	EditorDocumentChange,
-	InterchangeExport,
 	PersistenceSink,
 	PersistentDocRepo,
-	SvgExport,
-	SvgExportOptions
-} from '@inkfinite/core';
+	LoadedDoc
+} from '@inkfinite/core/persistence';
 import { createStatusStore } from '@inkfinite/ui/editor';
 import type { EditorPlatformAdapter, EditorPlatformSession } from '@inkfinite/ui/editor';
 import { liveQuery } from 'dexie';
@@ -22,8 +21,6 @@ import { createDexieDocRepo, createPersistenceSink, getBoardInspectorData } from
 import { getSharedDocumentEngineWorker, renderSvgInWorker } from './document-engine';
 import type { BrowserDocumentState } from './document-engine';
 import type { PersistenceSinkOptions } from './repository';
-import type { LoadedDoc } from '@inkfinite/core';
-
 type LiveQueryFactory = typeof liveQuery;
 
 /** Test and tuning hooks for the Dexie persistence adapter. */

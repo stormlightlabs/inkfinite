@@ -1,4 +1,7 @@
-import type { BrushConfig, PersistenceStatus } from '@inkfinite/core';
+import type { BrushConfig } from '@inkfinite/core';
+import type { PersistenceStatus } from './statusbar';
+
+export type { PersistenceStatus } from './statusbar';
 
 type StatusListener = (status: PersistenceStatus) => void;
 

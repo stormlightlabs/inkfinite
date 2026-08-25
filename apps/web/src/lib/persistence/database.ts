@@ -1,4 +1,4 @@
-import type { BoardMeta } from '@inkfinite/core';
+import type { BoardMeta } from '@inkfinite/core/persistence';
 import Dexie from 'dexie';
 import type { BindingRow, CanonicalRow, MetaRow, PageRow, ShapeRow } from './repository';
 

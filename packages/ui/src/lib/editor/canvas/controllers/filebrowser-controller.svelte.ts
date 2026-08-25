@@ -1,10 +1,9 @@
-import {
-	FileBrowserVM,
-	type BoardInspectorData,
-	type FileBrowserViewModel,
-	type PersistentDocRepo
-} from '@inkfinite/core';
-import type { LoadedDoc } from '@inkfinite/core';
+import { FileBrowserVM, type FileBrowserViewModel } from '../../filebrowser/model';
+import type {
+	BoardInspectorData,
+	LoadedDoc,
+	PersistentDocRepo
+} from '@inkfinite/core/persistence';
 
 export class FileBrowserController {
 	open = $state(false);

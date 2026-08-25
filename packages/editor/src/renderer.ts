@@ -23,7 +23,6 @@ import type {
 	SnapGuide
 } from '@inkfinite/core';
 import {
-	paintForCanvas,
 	arrowBendHandleForShape,
 	arrowGeometryForShape,
 	arrowHeadGeometry,
@@ -51,6 +50,7 @@ import {
 	strokeWidthHandleId,
 	strokeWidthHandles
 } from '@inkfinite/core';
+import { paintForCanvas } from './paint.js';
 
 export interface Renderer {
 	/**

@@ -260,11 +260,13 @@ export const Modifiers = {
 	},
 
 	/**
-	 * Check if Cmd (Mac) or Ctrl (other platforms) is pressed
+	 * Check if Cmd (Mac) or Ctrl (other platforms) is pressed.
+	 *
+	 * Platform detection belongs to the host adapter, so the headless core
+	 * defaults to the non-Mac convention and accepts an explicit platform.
 	 */
-	isPrimaryModifier(modifiers: Modifiers): boolean {
-		const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC');
-		return isMac ? modifiers.meta : modifiers.ctrl;
+	isPrimaryModifier(modifiers: Modifiers, platform: 'mac' | 'other' = 'other'): boolean {
+		return platform === 'mac' ? modifiers.meta : modifiers.ctrl;
 	}
 };
 

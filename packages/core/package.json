@@ -16,6 +16,12 @@
 	},
 	"exports": {
 		".": "./dist/index.mjs",
+		"./commands": "./dist/commands.mjs",
+		"./geometry": "./dist/geometry.mjs",
+		"./interchange": "./dist/interchange.mjs",
+		"./model": "./dist/model.mjs",
+		"./persistence": "./dist/persistence.mjs",
+		"./selection": "./dist/selection.mjs",
 		"./package.json": "./package.json"
 	},
 	"main": "./dist/index.mjs",
@@ -28,7 +34,7 @@
 		"build": "tsdown",
 		"dev": "tsdown --watch",
 		"test": "vitest run",
-		"typecheck": "tsc --noEmit",
+		"typecheck": "tsc --noEmit && pnpm run build && tsc -p consumer/tsconfig.json --noEmit",
 		"prepublishOnly": "pnpm run build"
 	},
 	"devDependencies": {

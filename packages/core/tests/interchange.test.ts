@@ -5,9 +5,9 @@ import {
 	importInterchange,
 	EditorLayerRecord,
 	EditorPageRecord,
-	EditorShapeRecord,
-	type BoardExport
+	EditorShapeRecord
 } from '../src';
+import type { BoardExport } from '../src/persistence';
 
 function board(): BoardExport {
 	const page = EditorPageRecord.create('First', 'page:1');
@@ -36,7 +36,13 @@ function board(): BoardExport {
 		{ kind: 'edge', nx: 1, ny: 0 },
 		'binding:start'
 	);
-	const end = EditorBindingRecord.create('shape:arrow', text.id, 'end', { kind: 'edge', nx: -1, ny: 0 }, 'binding:end');
+	const end = EditorBindingRecord.create(
+		'shape:arrow',
+		text.id,
+		'end',
+		{ kind: 'edge', nx: -1, ny: 0 },
+		'binding:end'
+	);
 	const arrow = EditorShapeRecord.createArrow(
 		page.id,
 		250,

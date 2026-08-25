@@ -6,9 +6,9 @@ import {
 	importInterchange,
 	EditorShapeRecord,
 	validateDoc,
-	type BoardExport,
 	type ImportedAsset
 } from '../src';
+import type { BoardExport } from '../src/persistence';
 
 function fixture(path: string): string {
 	return readFileSync(new URL(`../../../fixtures/interchange/${path}`, import.meta.url), 'utf8');

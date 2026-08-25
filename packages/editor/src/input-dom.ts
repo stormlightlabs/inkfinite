@@ -60,6 +60,7 @@ export type InputAdapterConfig = {
  */
 export class InputAdapter {
 	private config: InputAdapterConfig & { preventDefault: boolean; captureKeyboard: boolean };
+	private readonly primaryModifierPlatform: 'mac' | 'other';
 	private pointerState: PointerState;
 	private boundHandlers: {
 		pointerDown: (e: PointerEvent) => void;
@@ -84,6 +85,7 @@ export class InputAdapter {
 			preventDefault: config.preventDefault ?? true,
 			captureKeyboard: config.captureKeyboard ?? true
 		};
+		this.primaryModifierPlatform = navigator.platform.toUpperCase().includes('MAC') ? 'mac' : 'other';
 
 		this.pointerState = {
 			isDown: false,
@@ -439,15 +441,15 @@ export class InputAdapter {
 			return true;
 		}
 
-		if (Modifiers.isPrimaryModifier(modifiers) && (key === 'z' || key === 'Z')) {
+		if (Modifiers.isPrimaryModifier(modifiers, this.primaryModifierPlatform) && (key === 'z' || key === 'Z')) {
 			return true;
 		}
 
-		if (Modifiers.isPrimaryModifier(modifiers) && (key === 'y' || key === 'Y')) {
+		if (Modifiers.isPrimaryModifier(modifiers, this.primaryModifierPlatform) && (key === 'y' || key === 'Y')) {
 			return true;
 		}
 
-		if (Modifiers.isPrimaryModifier(modifiers)) {
+		if (Modifiers.isPrimaryModifier(modifiers, this.primaryModifierPlatform)) {
 			if ('abgldcxvzy'.includes(key.toLowerCase()) || key === '[' || key === ']') return true;
 		}
 

@@ -70,23 +70,23 @@
 
 ### Make TypeScript core headless
 
-- [ ] Audit `@inkfinite/core` exports and classify them as domain, editor,
+- [x] Audit `@inkfinite/core` exports and classify them as domain, editor,
       browser/platform, persistence, or UI concerns
-- [ ] Move DOM and `HTMLCanvasElement`-dependent raster export helpers out of
+- [x] Move DOM and `HTMLCanvasElement`-dependent raster export helpers out of
       `@inkfinite/core`; preserve existing SVG/PNG behavior in browser and
       desktop integration tests
-- [ ] Move UI-specific file-browser and status-bar contracts out of
+- [x] Move UI-specific file-browser and status-bar contracts out of
       `@inkfinite/core` and update consumers without introducing circular
       package dependencies
-- [ ] Keep browser and desktop persistence adapters at application/platform
+- [x] Keep browser and desktop persistence adapters at application/platform
       boundaries rather than exposing them through the core root barrel;
       verify create, save, reopen, and export workflows in both hosts
-- [ ] Add explicit `@inkfinite/core` subpath exports for stable capability
+- [x] Add explicit `@inkfinite/core` subpath exports for stable capability
       groups such as model, geometry, commands, selection, and interchange,
       with package-consumer typecheck coverage
-- [ ] Reduce the root `@inkfinite/core` export surface to the intentionally
+- [x] Reduce the root `@inkfinite/core` export surface to the intentionally
       supported convenience API
-- [ ] Add an import-boundary lint rule or test preventing core from depending
+- [x] Add an import-boundary lint rule or test preventing core from depending
       on DOM, Svelte, application, or platform-specific modules
 
 ### Decompose the editor implementation

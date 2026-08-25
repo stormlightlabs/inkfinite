@@ -1,14 +1,15 @@
+import type { InterchangeExport, SvgExport, SvgExportOptions } from '@inkfinite/core';
 import type {
 	BoardExport,
 	BoardInspectorData,
-	FileHandle,
-	InterchangeExport,
-	SvgExport,
-	SvgExportOptions,
+	LoadedDoc,
 	PersistenceSink,
-	PersistenceStatus,
 	PersistentDocRepo
-} from '@inkfinite/core';
+} from '@inkfinite/core/persistence';
+import type { PersistenceStatus } from './statusbar';
+
+/** A desktop document handle exposed to the shared editor surface. */
+export type FileHandle = { path: string; name: string; modifiedAt?: number };
 import type { StatusStore } from './status';
 
 /** Runtime selected by an application composition root. */
@@ -104,12 +105,12 @@ export interface InterchangeFileAccess {
  * the editor package.
  */
 export interface DesktopDocumentRepo extends PersistentDocRepo {
-	openDraft(): Promise<{ boardId: string; doc: import('@inkfinite/core').LoadedDoc }>;
+	openDraft(): Promise<{ boardId: string; doc: LoadedDoc }>;
 	isDraft(): boolean;
 	getCurrentFile(): FileHandle | null;
-	openPath(path: string): Promise<{ boardId: string; doc: import('@inkfinite/core').LoadedDoc }>;
+	openPath(path: string): Promise<{ boardId: string; doc: LoadedDoc }>;
 	importSvg(): Promise<{
-		doc: import('@inkfinite/core').LoadedDoc;
+		doc: LoadedDoc;
 		warnings: string[];
 		omitted_image_count: number;
 		shape_ids: string[];
@@ -117,18 +118,16 @@ export interface DesktopDocumentRepo extends PersistentDocRepo {
 	importSvgPath(
 		path: string
 	): Promise<{
-		doc: import('@inkfinite/core').LoadedDoc;
+		doc: LoadedDoc;
 		warnings: string[];
 		omitted_image_count: number;
 		shape_ids: string[];
 	} | null>;
 	openFromDialog(
 		prepareToOpen?: () => Promise<void>
-	): Promise<{ boardId: string; doc: import('@inkfinite/core').LoadedDoc }>;
+	): Promise<{ boardId: string; doc: LoadedDoc }>;
 	/** Opens the native dialog, then waits for pending editor writes before saving the selected path. */
-	saveAs(
-		prepareToSave?: () => Promise<void>
-	): Promise<{ boardId: string; doc: import('@inkfinite/core').LoadedDoc }>;
+	saveAs(prepareToSave?: () => Promise<void>): Promise<{ boardId: string; doc: LoadedDoc }>;
 	getWorkspaceDir(): Promise<string | null>;
 	setWorkspaceDir(path: string | null): Promise<void>;
 	pickWorkspaceDir(): Promise<string | null>;
@@ -136,15 +135,10 @@ export interface DesktopDocumentRepo extends PersistentDocRepo {
 	getProposal(): LiveProposal | null;
 	subscribeProposal(listener: (update: ProposalUpdate) => void): () => void;
 	/** Receives document snapshots committed by the live CLI or trusted sync peers. */
-	subscribeLiveDocument(
-		listener: (doc: import('@inkfinite/core').LoadedDoc) => void
-	): () => void;
+	subscribeLiveDocument(listener: (doc: LoadedDoc) => void): () => void;
 	/** Receives authenticated live CLI navigation without changing document history. */
 	subscribeAgentUi(listener: (control: AgentUiControl) => void): () => void;
-	acceptProposal(
-		proposalId: string,
-		operationPositions?: number[]
-	): Promise<import('@inkfinite/core').LoadedDoc>;
+	acceptProposal(proposalId: string, operationPositions?: number[]): Promise<LoadedDoc>;
 	rejectProposal(proposalId: string): Promise<void>;
 
 	/** Publishes the current page, selection, and visible world-space rectangle. */
@@ -161,15 +155,12 @@ export type EditorPlatformSession = {
 	inspectBoard?: (boardId: string) => Promise<BoardInspectorData>;
 	setActiveBoard?: (boardId: string | null) => void;
 	/** Supplies the current editor document to a Rust-backed browser session and returns its projection. */
-	setActiveDocument?: (
-		boardId: string,
-		doc: import('@inkfinite/core').LoadedDoc
-	) => Promise<import('@inkfinite/core').LoadedDoc | null>;
+	setActiveDocument?: (boardId: string, doc: LoadedDoc) => Promise<LoadedDoc | null>;
 	/** Opens dropped canonical `.inkfinite` bytes as a new browser board. */
 	importCanonicalDocument?: (args: {
 		name: string;
 		source: Uint8Array;
-	}) => Promise<{ boardId: string; doc: import('@inkfinite/core').LoadedDoc }>;
+	}) => Promise<{ boardId: string; doc: LoadedDoc }>;
 	/** Commits browser SVG bytes through the active Rust document session. */
 	commitSvgImport?: (args: {
 		boardId: string;
@@ -178,7 +169,7 @@ export type EditorPlatformSession = {
 		pageId?: string;
 		layerId?: string;
 	}) => Promise<{
-		doc: import('@inkfinite/core').LoadedDoc;
+		doc: LoadedDoc;
 		warnings: Array<{ code: string; message: string; count: number }>;
 		omittedImageCount: number;
 		shapeIds: string[];

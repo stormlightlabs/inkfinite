@@ -1,14 +1,11 @@
 <script lang="ts">
 	import { Button, Icon, Sheet } from '../../index';
 	import type { DesktopDocumentRepo } from '../platform';
-	import type {
-		BoardInspectorData,
-		BoardMeta,
-		FileBrowserSort,
-		FileBrowserViewModel,
-		PersistenceStatus
-	} from '@inkfinite/core';
-	import { BoardStatsOps, FileBrowserVM } from '@inkfinite/core';
+	import type { BoardInspectorData, BoardMeta } from '@inkfinite/core/persistence';
+	import type { FileBrowserSort, FileBrowserViewModel } from './model';
+	import { FileBrowserVM } from './model';
+	import { BoardStatsOps } from '@inkfinite/core/persistence';
+	import type { PersistenceStatus } from '../statusbar';
 	import type { StatusStore } from '../status';
 	import type { Snippet } from 'svelte';
 

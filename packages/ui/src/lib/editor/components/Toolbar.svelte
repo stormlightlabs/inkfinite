@@ -5,7 +5,8 @@
 		Store,
 		ToolId
 	} from '@inkfinite/core';
-	import { exportToSVG, exportViewportToPNG } from '@inkfinite/core';
+	import { exportToSVG } from '@inkfinite/core';
+	import { exportViewportToPNG } from '@inkfinite/editor/export';
 	import { fade } from 'svelte/transition';
 	import { BrushPopover, ContextMenu, Icon, type ContextMenuEntry } from '../../index';
 	import { TOOLS } from '../constants';

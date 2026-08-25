@@ -20,6 +20,25 @@ describe('exportToSVG', () => {
 		expect(svg).toContain('</svg>');
 	});
 
+	it('serializes embedded image bytes without browser globals', () => {
+		const { state, pageId } = createTestState();
+		const assetId = 'asset:pixel';
+		const image = EditorShapeRecord.createImage(pageId, 0, 0, { w: 1, h: 1, assetId });
+		state.doc.assets = {
+			[assetId]: {
+				id: assetId,
+				name: 'pixel.png',
+				mediaType: 'image/png',
+				digest: 'digest:pixel',
+				bytes: [0, 1, 2]
+			}
+		};
+		state.doc.shapes[image.id] = image;
+		state.doc.pages[pageId].shapeIds.push(image.id);
+
+		expect(exportToSVG(state)).toContain('data:image/png;base64,AAEC');
+	});
+
 	it('should export variable-width strokes as outlined paths', () => {
 		const { state, pageId } = createTestState();
 		const stroke = EditorShapeRecord.createStroke(pageId, 0, 0, {
@@ -47,7 +66,13 @@ describe('exportToSVG', () => {
 
 	it('omits the synthetic background when transparent output is requested', () => {
 		const { state, pageId } = createTestState();
-		const rect = EditorShapeRecord.createRect(pageId, 10, 20, { w: 100, h: 50, fill: 'red', stroke: 'black', radius: 0 });
+		const rect = EditorShapeRecord.createRect(pageId, 10, 20, {
+			w: 100,
+			h: 50,
+			fill: 'red',
+			stroke: 'black',
+			radius: 0
+		});
 		state.doc.shapes[rect.id] = rect;
 		state.doc.pages[pageId].shapeIds.push(rect.id);
 
@@ -60,7 +85,13 @@ describe('exportToSVG', () => {
 	it('should export SVG with a rectangle shape', () => {
 		const { state, pageId } = createTestState();
 
-		const rect = EditorShapeRecord.createRect(pageId, 10, 20, { w: 100, h: 50, fill: 'red', stroke: 'black', radius: 0 });
+		const rect = EditorShapeRecord.createRect(pageId, 10, 20, {
+			w: 100,
+			h: 50,
+			fill: 'red',
+			stroke: 'black',
+			radius: 0
+		});
 
 		state.doc.shapes[rect.id] = rect;
 		state.doc.pages[pageId].shapeIds.push(rect.id);
@@ -204,7 +235,13 @@ describe('exportToSVG', () => {
 
 	it('should export semantic metadata for ordinary shapes', () => {
 		const { state, pageId } = createTestState();
-		const rect = EditorShapeRecord.createRect(pageId, 10, 20, { w: 100, h: 50, fill: 'red', stroke: 'black', radius: 0 });
+		const rect = EditorShapeRecord.createRect(pageId, 10, 20, {
+			w: 100,
+			h: 50,
+			fill: 'red',
+			stroke: 'black',
+			radius: 0
+		});
 		rect.metadata = {
 			name: 'Gateway',
 			title: null,
@@ -233,7 +270,12 @@ describe('exportToSVG', () => {
 	it('should export SVG with an ellipse shape', () => {
 		const { state, pageId } = createTestState();
 
-		const ellipse = EditorShapeRecord.createEllipse(pageId, 10, 20, { w: 100, h: 50, fill: 'blue', stroke: 'green' });
+		const ellipse = EditorShapeRecord.createEllipse(pageId, 10, 20, {
+			w: 100,
+			h: 50,
+			fill: 'blue',
+			stroke: 'green'
+		});
 
 		state.doc.shapes[ellipse.id] = ellipse;
 		state.doc.pages[pageId].shapeIds.push(ellipse.id);
@@ -378,7 +420,13 @@ describe('exportToSVG', () => {
 	it('should export only selected shapes when selectedOnly is true', () => {
 		const { state, pageId } = createTestState();
 
-		const rect1 = EditorShapeRecord.createRect(pageId, 0, 0, { w: 50, h: 50, fill: 'red', stroke: 'black', radius: 0 });
+		const rect1 = EditorShapeRecord.createRect(pageId, 0, 0, {
+			w: 50,
+			h: 50,
+			fill: 'red',
+			stroke: 'black',
+			radius: 0
+		});
 		const rect2 = EditorShapeRecord.createRect(pageId, 100, 100, {
 			w: 50,
 			h: 50,

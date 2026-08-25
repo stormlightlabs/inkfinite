@@ -1,13 +1,7 @@
 <script lang="ts">
-	import type {
-		CursorState,
-		CursorStore,
-		EditorState,
-		PersistenceStatus,
-		Store,
-		Viewport
-	} from '@inkfinite/core';
-	import { Camera, EditorState as EditorStateOps, buildStatusBarVM } from '@inkfinite/core';
+	import type { CursorState, CursorStore, EditorState, Store, Viewport } from '@inkfinite/core';
+	import { Camera, EditorState as EditorStateOps } from '@inkfinite/core';
+	import { buildStatusBarVM, type PersistenceStatus } from '../statusbar';
 	import Dialog from '../../components/Dialog.svelte';
 	import Icon from '../../components/Icon.svelte';
 	import { HELP_LINKS, KEYBOARD_TIPS } from '../constants';
