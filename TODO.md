@@ -91,29 +91,29 @@
 
 ### Decompose the editor implementation
 
-- [ ] Split `packages/editor/src/renderer.ts` into renderer lifecycle, scene
+- [x] Split `packages/editor/src/renderer.ts` into renderer lifecycle, scene
       traversal, shape rendering, text/assets, and overlay responsibilities
       without changing its public API or rendering fixtures
-- [ ] Keep one exhaustive shape-render dispatch point and require existing
+- [x] Keep one exhaustive shape-render dispatch point and require existing
       rendering coverage to pass for every supported shape kind
-- [ ] Centralize Canvas path, transform, effect, and paint helpers shared by
+- [x] Centralize Canvas path, transform, effect, and paint helpers shared by
       shape renderers; verify Canvas and SVG output remain consistent for the
       supported effects subset
-- [ ] Move renderer caches and image-loading behavior behind focused helpers
+- [x] Move renderer caches and image-loading behavior behind focused helpers
       with explicit lifetimes and preserve redraw behavior for asynchronously
       loaded assets
-- [ ] Extract keyboard shortcut resolution from `EditorRuntime` into a pure,
+- [x] Extract keyboard shortcut resolution from `EditorRuntime` into a pure,
       independently tested module
-- [ ] Define a small host-request boundary for clipboard, board-browser,
+- [x] Define a small host-request boundary for clipboard, board-browser,
       command-palette, shortcut-panel, undo, and redo requests, with tests for
       browser-host dispatch
-- [ ] Move reusable document operations out of the runtime so keyboard
+- [x] Move reusable document operations out of the runtime so keyboard
       shortcuts, menus, context menus, and the command palette dispatch the same
       editor commands
-- [ ] Keep `EditorRuntime` focused on gestures, interaction state, command
+- [x] Keep `EditorRuntime` focused on gestures, interaction state, command
       routing, previews, and transaction boundaries; preserve gesture and undo
       transaction semantics in runtime tests
-- [ ] Keep the DOM input adapter limited to browser-event normalization and
+- [x] Keep the DOM input adapter limited to browser-event normalization and
       dispatch, retaining pointer-capture, pressure, wheel, and keyboard
       coverage
 

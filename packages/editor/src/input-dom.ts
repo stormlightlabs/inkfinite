@@ -7,6 +7,7 @@ import {
 	type Vec2,
 	type Viewport
 } from './runtime.js';
+import { shouldPreventKeyboardDefault, type PrimaryModifierPlatform } from './shortcuts.js';
 
 /**
  * Pointer state tracked by the input adapter
@@ -60,7 +61,7 @@ export type InputAdapterConfig = {
  */
 export class InputAdapter {
 	private config: InputAdapterConfig & { preventDefault: boolean; captureKeyboard: boolean };
-	private readonly primaryModifierPlatform: 'mac' | 'other';
+	private readonly primaryModifierPlatform: PrimaryModifierPlatform;
 	private pointerState: PointerState;
 	private boundHandlers: {
 		pointerDown: (e: PointerEvent) => void;
@@ -342,7 +343,10 @@ export class InputAdapter {
 
 		this.config.onAction(Action.keyDown(e.key, e.code, modifiers, e.repeat));
 
-		if (this.config.preventDefault && this.shouldPreventDefault(e)) {
+		if (
+			this.config.preventDefault &&
+			shouldPreventKeyboardDefault(e.key, e.code, modifiers, this.primaryModifierPlatform)
+		) {
 			e.preventDefault();
 		}
 	}
@@ -404,58 +408,6 @@ export class InputAdapter {
 		this.config.onCursorUpdate(this.pendingCursorWorld, this.pendingCursorScreen);
 		this.pendingCursorWorld = null;
 		this.pendingCursorScreen = null;
-	}
-
-	/**
-	 * Determine if default behavior should be prevented for a key event
-	 *
-	 * Prevents default for:
-	 * - Space (scroll)
-	 * - Arrow keys (scroll)
-	 * - Backspace/Delete (navigation)
-	 * - Cmd/Ctrl+B (board browser), Cmd/Ctrl+Z, Cmd/Ctrl+Y (browser undo/redo)
-	 * - Camera shortcuts (+, -, 0, Shift+1, Shift+2)
-	 * - Tab (focus change)
-	 */
-	private shouldPreventDefault(e: KeyboardEvent): boolean {
-		const key = e.key;
-		const modifiers = Modifiers.fromEvent(e);
-
-		if (key === ' ' || key.startsWith('Arrow')) {
-			return true;
-		}
-
-		if (key === 'Backspace' || key === 'Delete') {
-			return true;
-		}
-
-		if (key === 'Tab') {
-			return true;
-		}
-
-		if (key === '+' || key === '=' || key === '-' || key === '_' || key === '0') {
-			return true;
-		}
-
-		if (modifiers.shift && (e.code === 'Digit1' || e.code === 'Digit2')) {
-			return true;
-		}
-
-		if (Modifiers.isPrimaryModifier(modifiers, this.primaryModifierPlatform) && (key === 'z' || key === 'Z')) {
-			return true;
-		}
-
-		if (Modifiers.isPrimaryModifier(modifiers, this.primaryModifierPlatform) && (key === 'y' || key === 'Y')) {
-			return true;
-		}
-
-		if (Modifiers.isPrimaryModifier(modifiers, this.primaryModifierPlatform)) {
-			if ('abgldcxvzy'.includes(key.toLowerCase()) || key === '[' || key === ']') return true;
-		}
-
-		if (key === '?' || (key === '/' && e.shiftKey)) return true;
-
-		return false;
 	}
 }
 

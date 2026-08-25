@@ -1,26 +1,18 @@
 import {
 	type Action,
-	EditorBindingRecord,
 	Camera,
-	duplicateAndConnectSelection,
-	type CommandKind,
-	createId,
 	EditorState,
 	getSelectionScopeShapes,
-	groupShapes,
-	reorderShapes,
-	reorderShapesToEdge,
-	routeAction,
-	setShapesLocked,
-	translateShapes,
-	ungroupShapes,
-	EditorShapeRecord,
 	hitTestPoint,
+	routeAction,
 	selectionTarget,
+	type CommandKind,
 	type PathTopologyEdit,
 	type Store,
 	type Tool
 } from '@inkfinite/core';
+import { dispatchHostRequest, type EditorHostRequests } from './host.js';
+import { resolveKeyboardShortcut } from './shortcuts.js';
 
 /** Grid settings consumed by the editor runtime. */
 export type SnapSettings = {
@@ -48,7 +40,7 @@ export type RuntimeTransactionDraft = {
 };
 
 /** Dependencies supplied by a UI adapter. */
-export type EditorRuntimeOptions = {
+export type EditorRuntimeOptions = EditorHostRequests & {
 	store: Store;
 	tools: Map<EditorState['ui']['toolId'], Tool>;
 	selectionTool: SelectionTool;
@@ -69,6 +61,8 @@ export type EditorRuntimeOptions = {
 	onCopyRequested?: () => void;
 	onCutRequested?: () => void;
 	onPasteRequested?: () => void;
+	/** Optional grouped host boundary; legacy callback fields remain supported. */
+	host?: EditorHostRequests;
 	onHandleHover?: (handle: string | null) => void;
 	onInteractionChanged?: () => void;
 	onSnappedWorldChanged?: (world: { x: number; y: number }) => void;
@@ -83,6 +77,7 @@ export type EditorRuntimeOptions = {
  */
 export class EditorRuntime {
 	private readonly options: EditorRuntimeOptions;
+	private readonly hostRequests: EditorHostRequests;
 	private gestureStart: EditorState | null = null;
 	private pointerDown = false;
 	private spaceHeld = false;
@@ -124,6 +119,7 @@ export class EditorRuntime {
 
 	constructor(options: EditorRuntimeOptions) {
 		this.options = options;
+		this.hostRequests = { ...options, ...options.host };
 	}
 
 	/** Returns the local interaction state needed by cursor and overlay adapters. */
@@ -197,17 +193,9 @@ export class EditorRuntime {
 		}
 
 		const before = store.getState();
-		const shortcut = applyKeyboardShortcut(before, routedAction, {
-			onBrowseRequested: this.options.onBrowseRequested,
-			onShortcutsRequested: this.options.onShortcutsRequested,
-			onCommandPaletteRequested: this.options.onCommandPaletteRequested,
-			onUndoRequested: this.options.onUndoRequested,
-			onRedoRequested: this.options.onRedoRequested,
-			onCopyRequested: this.options.onCopyRequested,
-			onCutRequested: this.options.onCutRequested,
-			onPasteRequested: this.options.onPasteRequested
-		});
-		const after = shortcut ?? routeAction(before, routedAction, this.options.tools);
+		const shortcut = resolveKeyboardShortcut(before, routedAction);
+		if (shortcut.request) dispatchHostRequest(shortcut.request, this.hostRequests);
+		const after = shortcut.state ?? routeAction(before, routedAction, this.options.tools);
 
 		if (!statesEqual(before, after)) {
 			const kind = commandKind(before, after);
@@ -294,219 +282,6 @@ function snapAction(action: Action, snap: SnapSettings): Action {
 			y: Math.round(action.world.y / gridSize) * gridSize
 		}
 	};
-}
-
-function applyKeyboardShortcut(
-	state: EditorState,
-	action: Action,
-	handlers: {
-		onBrowseRequested?: () => void;
-		onShortcutsRequested?: () => void;
-		onCommandPaletteRequested?: () => void;
-		onUndoRequested?: () => void;
-		onRedoRequested?: () => void;
-		onCopyRequested?: () => void;
-		onCutRequested?: () => void;
-		onPasteRequested?: () => void;
-	}
-): EditorState | null {
-	if (action.type !== 'key-down') return null;
-	const primary = action.modifiers.meta || action.modifiers.ctrl;
-	if (action.key === '?' || (action.key === '/' && action.modifiers.shift)) {
-		handlers.onShortcutsRequested?.();
-		return null;
-	}
-	if (primary && ['k', 'K'].includes(action.key)) {
-		handlers.onCommandPaletteRequested?.();
-		return null;
-	}
-	if (primary && ['z', 'Z'].includes(action.key)) {
-		if (action.modifiers.shift) handlers.onRedoRequested?.();
-		else handlers.onUndoRequested?.();
-		return null;
-	}
-	if (primary && ['y', 'Y'].includes(action.key)) {
-		handlers.onRedoRequested?.();
-		return null;
-	}
-	if (primary && ['b', 'B'].includes(action.key)) {
-		handlers.onBrowseRequested?.();
-		return null;
-	}
-	if (primary && ['c', 'C'].includes(action.key)) {
-		handlers.onCopyRequested?.();
-		return null;
-	}
-	if (primary && ['x', 'X'].includes(action.key)) {
-		handlers.onCutRequested?.();
-		return null;
-	}
-	if (primary && ['v', 'V'].includes(action.key)) {
-		handlers.onPasteRequested?.();
-		return null;
-	}
-	if (primary && ['a', 'A'].includes(action.key)) {
-		const selectionIds = getSelectionScopeShapes(state).map((shape) => shape.id);
-		return selectionIds.length === 0 || selectionIds.every((id) => state.ui.selectionIds.includes(id))
-			? null
-			: { ...state, ui: { ...state.ui, selectionIds } };
-	}
-	if (state.ui.selectionIds.length === 0) return null;
-
-	if (action.key.startsWith('Arrow')) {
-		const step = action.modifiers.shift ? 10 : 1;
-		const delta = arrowDelta(action.key, step);
-		if (delta) {
-			const next = translateShapes(state, state.ui.selectionIds, delta);
-			return next === state ? null : next;
-		}
-	}
-	if (primary && action.modifiers.alt && ['d', 'D'].includes(action.key)) {
-		return duplicateAndConnectSelection(state);
-	}
-	if (primary && ['d', 'D'].includes(action.key)) return duplicateSelection(state);
-	if (primary && ['g', 'G'].includes(action.key)) {
-		return action.modifiers.shift
-			? nullableState(ungroupShapes(state, state.ui.selectionIds), state)
-			: nullableState(groupShapes(state, state.ui.selectionIds), state);
-	}
-	if (primary && action.modifiers.shift && ['l', 'L'].includes(action.key)) {
-		const locked = state.ui.selectionIds.every((id) => state.doc.shapes[id]?.locked);
-		return nullableState(setShapesLocked(state, state.ui.selectionIds, !locked), state);
-	}
-	if (primary && action.key === ']') {
-		return action.modifiers.shift
-			? nullableState(reorderShapesToEdge(state, state.ui.selectionIds, 'front'), state)
-			: reorderSelection(state, 'forward');
-	}
-	if (primary && action.key === '[') {
-		return action.modifiers.shift
-			? nullableState(reorderShapesToEdge(state, state.ui.selectionIds, 'back'), state)
-			: reorderSelection(state, 'backward');
-	}
-	return null;
-}
-
-function nullableState(next: EditorState, previous: EditorState): EditorState | null {
-	return next === previous ? null : next;
-}
-
-function arrowDelta(key: string, step: number): { x: number; y: number } | null {
-	switch (key) {
-		case 'ArrowLeft':
-			return { x: -step, y: 0 };
-		case 'ArrowRight':
-			return { x: step, y: 0 };
-		case 'ArrowUp':
-			return { x: 0, y: -step };
-		case 'ArrowDown':
-			return { x: 0, y: step };
-		default:
-			return null;
-	}
-}
-
-function duplicateSelection(state: EditorState): EditorState | null {
-	const selectedIds = new Set(state.ui.selectionIds);
-	const roots = state.ui.selectionIds.filter((id) => !hasSelectedAncestor(state, id, selectedIds));
-	if (roots.length === 0) return null;
-	const included = Object.values(state.doc.shapes).filter(
-		(shape) => roots.includes(shape.id) || roots.some((root) => hasAncestor(shape, root, state))
-	);
-	const mapping = new Map(included.map((shape) => [shape.id, createId('shape')]));
-	const shapes = { ...state.doc.shapes };
-	for (const source of included) {
-		const copy = EditorShapeRecord.clone(source);
-		const id = mapping.get(source.id)!;
-		const parentId = source.groupId ? mapping.get(source.groupId) : undefined;
-		const copied = {
-			...copy,
-			id,
-			x: copy.x + 12,
-			y: copy.y + 12,
-			editorTransform: copy.editorTransform
-				? { ...copy.editorTransform, e: copy.editorTransform.e + 12, f: copy.editorTransform.f + 12 }
-				: undefined,
-			...(parentId ? { groupId: parentId } : { groupId: undefined })
-		};
-		shapes[id] = copied;
-		if (copied.type === 'text' && copied.props.textPath) {
-			const pathId = mapping.get(copied.props.textPath.pathId);
-			if (pathId) copied.props = { ...copied.props, textPath: { ...copied.props.textPath, pathId } };
-		}
-	}
-	const pages = { ...state.doc.pages };
-	const layers = state.doc.layers ? { ...state.doc.layers } : undefined;
-	const copiedIds = included.map((shape) => mapping.get(shape.id)!);
-	const rootCopies = roots.map((id) => mapping.get(id)).filter((id): id is string => Boolean(id));
-	for (const page of Object.values(pages)) {
-		const added = copiedIds.filter((id) => shapes[id]?.pageId === page.id);
-		if (added.length > 0) pages[page.id] = { ...page, shapeIds: [...page.shapeIds, ...added] };
-	}
-	if (layers) {
-		for (const layer of Object.values(layers)) {
-			const added = copiedIds.filter((id) => shapes[id]?.layerId === layer.id);
-			if (added.length > 0) layers[layer.id] = { ...layer, shapeIds: [...layer.shapeIds, ...added] };
-		}
-	}
-	const bindings = { ...state.doc.bindings };
-	for (const binding of Object.values(state.doc.bindings)) {
-		const fromShapeId = mapping.get(binding.fromShapeId);
-		if (!fromShapeId) continue;
-		const id = createId('binding');
-		const toShapeId = mapping.get(binding.toShapeId) ?? binding.toShapeId;
-		bindings[id] = { ...EditorBindingRecord.clone(binding), id, fromShapeId, toShapeId };
-	}
-	for (const source of included) {
-		const id = mapping.get(source.id);
-		const copy = id ? shapes[id] : undefined;
-		if (!id || !copy || copy.type !== 'arrow' || source.type !== 'arrow') continue;
-		const copiedBindings = Object.values(bindings).filter((binding) => binding.fromShapeId === id);
-		const handleBinding = (handle: 'start' | 'end') => {
-			const originalBindingId = source.props[handle].bindingId;
-			const original = originalBindingId ? state.doc.bindings[originalBindingId] : undefined;
-			const copied = copiedBindings.find(
-				(binding) =>
-					original &&
-					binding.toShapeId === (mapping.get(original.toShapeId) ?? original.toShapeId) &&
-					binding.handle === handle
-			);
-			return copied ? { kind: 'bound' as const, bindingId: copied.id } : { kind: 'free' as const };
-		};
-		shapes[id] = { ...copy, props: { ...copy.props, start: handleBinding('start'), end: handleBinding('end') } };
-	}
-	return {
-		...state,
-		doc: { ...state.doc, pages, shapes, bindings, ...(layers ? { layers } : {}) },
-		ui: { ...state.ui, selectionIds: rootCopies }
-	};
-}
-
-function reorderSelection(state: EditorState, direction: 'forward' | 'backward'): EditorState | null {
-	const next = reorderShapes(state, state.ui.selectionIds, direction);
-	return next === state ? null : next;
-}
-
-function hasSelectedAncestor(state: EditorState, id: string, selected: ReadonlySet<string>): boolean {
-	let parentId = state.doc.shapes[id]?.groupId;
-	while (parentId) {
-		if (selected.has(parentId)) return true;
-		parentId = state.doc.shapes[parentId]?.groupId;
-	}
-	return false;
-}
-
-function hasAncestor(
-	shape: import('@inkfinite/core').EditorShapeRecord,
-	ancestorId: string,
-	state: EditorState
-): boolean {
-	let parentId = shape.groupId;
-	while (parentId) {
-		if (parentId === ancestorId) return true;
-		parentId = state.doc.shapes[parentId]?.groupId;
-	}
-	return false;
 }
 
 function describeAction(action: Action, kind: CommandKind): string {

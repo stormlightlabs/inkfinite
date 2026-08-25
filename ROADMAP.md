@@ -92,17 +92,18 @@ using one broad root barrel as the primary internal dependency surface.
 
 ### Editor decomposition
 
-Keep the existing editor architecture while splitting large implementation
-modules by responsibility.
+The editor implementation keeps one Canvas renderer API while splitting its
+internals by responsibility. `renderer.ts` owns the render loop and lifecycle;
+scene traversal, shape drawing, text and assets, Canvas helpers, renderer
+resources, and overlays live in focused modules under `packages/editor/src/renderer/`.
+Shape drawing uses one exhaustive dispatch point, and renderer caches and image
+loading belong to each renderer instance.
 
-Separate renderer lifecycle and scene traversal from shape drawing, text and
-asset rendering, effects, and editor overlays. Keep shape dispatch exhaustive
-and centralized rather than introducing a renderer class hierarchy.
-
-Reduce the editor runtime to interaction state, command routing, and transaction
-boundaries. Keyboard shortcuts, host requests, and reusable document commands
-should be independently testable and shared by keyboard, menu, command-palette,
-and context-menu entry points.
+`EditorRuntime` owns gestures, interaction state, command routing, previews, and
+transaction boundaries. Pure keyboard shortcut resolution and the host request
+adapter are independently tested. Keyboard, menu, command-palette, and
+context-menu entry points use the shared editor document operations rather than
+runtime-local copies.
 
 Break large inspector components into capability-focused sections without
 moving domain behavior into Svelte components.
