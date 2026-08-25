@@ -1,4 +1,4 @@
-import { Action, EditorState, ShapeRecord, Store, type Tool } from '@inkfinite/core';
+import { Action, EditorState, EditorShapeRecord, Store, type Tool } from '@inkfinite/core';
 import { describe, expect, it, vi } from 'vitest';
 import { EditorRuntime, type SelectionTool } from '../src/runtime';
 
@@ -33,14 +33,14 @@ function createRuntime(store: Store, options: Partial<ConstructorParameters<type
 function selectedStore() {
 	const state = EditorState.create();
 	state.doc.pages.page = { id: 'page', name: 'Page', shapeIds: ['one', 'two'] };
-	state.doc.shapes.one = ShapeRecord.createRect(
+	state.doc.shapes.one = EditorShapeRecord.createRect(
 		'page',
 		0,
 		0,
 		{ w: 10, h: 10, fill: '#000', stroke: '#000', radius: 0 },
 		'one'
 	);
-	state.doc.shapes.two = ShapeRecord.createRect(
+	state.doc.shapes.two = EditorShapeRecord.createRect(
 		'page',
 		20,
 		0,

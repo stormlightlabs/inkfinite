@@ -1,6 +1,6 @@
 import type { Vec2 } from '../math';
 import { createCardShapes } from '../cards';
-import { ShapeRecord, type ShapeRecord as Shape } from '../model';
+import { EditorShapeRecord, type EditorShapeRecord as Shape } from '../editor-model';
 
 import { registry } from './registry';
 import type { Stencil, StencilCategory } from './types';
@@ -10,15 +10,15 @@ const PLACEHOLDER_PAGE_ID = 'placeholder_page';
 type StencilDefinition = Omit<Stencil, 'spawn'> & { spawn: (at: Vec2) => Shape[] };
 
 function rect(at: Vec2, width: number, height: number, radius = 0, fill = '#ffffff', stroke = '#1f2937') {
-	return ShapeRecord.createRect(PLACEHOLDER_PAGE_ID, at.x, at.y, { w: width, h: height, fill, stroke, radius });
+	return EditorShapeRecord.createRect(PLACEHOLDER_PAGE_ID, at.x, at.y, { w: width, h: height, fill, stroke, radius });
 }
 
 function ellipse(at: Vec2, width: number, height: number, fill = '#ffffff', stroke = '#1f2937') {
-	return ShapeRecord.createEllipse(PLACEHOLDER_PAGE_ID, at.x, at.y, { w: width, h: height, fill, stroke });
+	return EditorShapeRecord.createEllipse(PLACEHOLDER_PAGE_ID, at.x, at.y, { w: width, h: height, fill, stroke });
 }
 
 function line(at: Vec2, x: number, y: number, width: number, height: number, stroke = '#1f2937') {
-	return ShapeRecord.createLine(PLACEHOLDER_PAGE_ID, at.x + x, at.y + y, {
+	return EditorShapeRecord.createLine(PLACEHOLDER_PAGE_ID, at.x + x, at.y + y, {
 		a: { x: 0, y: 0 },
 		b: { x: width, y: height },
 		stroke,
@@ -27,7 +27,7 @@ function line(at: Vec2, x: number, y: number, width: number, height: number, str
 }
 
 function text(at: Vec2, x: number, y: number, value: string, width: number, fontSize = 16) {
-	return ShapeRecord.createText(PLACEHOLDER_PAGE_ID, at.x + x, at.y + y, {
+	return EditorShapeRecord.createText(PLACEHOLDER_PAGE_ID, at.x + x, at.y + y, {
 		text: value,
 		fontSize,
 		fontFamily: 'sans-serif',
@@ -37,7 +37,7 @@ function text(at: Vec2, x: number, y: number, value: string, width: number, font
 }
 
 function reference(at: Vec2, referenceType: 'url' | 'file' | 'page', value: string, label: string) {
-	return ShapeRecord.createReference(PLACEHOLDER_PAGE_ID, at.x, at.y, { w: 280, h: 72, referenceType, value, label });
+	return EditorShapeRecord.createReference(PLACEHOLDER_PAGE_ID, at.x, at.y, { w: 280, h: 72, referenceType, value, label });
 }
 
 function stencil(

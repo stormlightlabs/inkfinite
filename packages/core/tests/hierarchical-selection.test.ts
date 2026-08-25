@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { Action, EditorState, PageRecord, SelectTool, ShapeRecord, Store, hitTestPoint, shapeBounds } from '../src';
+import { Action, EditorState, EditorPageRecord, SelectTool, EditorShapeRecord, Store, hitTestPoint, shapeBounds } from '../src';
 
 const modifiers = { ctrl: false, shift: false, alt: false, meta: false };
 const buttons = { left: true, middle: false, right: false };
 const buttonsUp = { left: false, middle: false, right: false };
 
 function nestedState() {
-	const page = PageRecord.create('Page', 'page:one');
-	const container = ShapeRecord.createContainer(page.id, 100, 50, { w: 100, h: 80 }, 'shape:container');
+	const page = EditorPageRecord.create('Page', 'page:one');
+	const container = EditorShapeRecord.createContainer(page.id, 100, 50, { w: 100, h: 80 }, 'shape:container');
 	container.editorTransform = { a: 2, b: 0, c: 0, d: 2, e: 100, f: 50 };
-	const child = ShapeRecord.createRect(
+	const child = EditorShapeRecord.createRect(
 		page.id,
 		120,
 		70,
@@ -29,9 +29,9 @@ function multiParentState() {
 	const state = nestedState();
 	const page = state.doc.pages['page:one']!;
 	const layer = state.doc.layers?.[page.layerIds?.[0] ?? ''];
-	const sibling = ShapeRecord.createContainer(page.id, 300, 40, { w: 100, h: 80 }, 'shape:sibling');
+	const sibling = EditorShapeRecord.createContainer(page.id, 300, 40, { w: 100, h: 80 }, 'shape:sibling');
 	sibling.editorTransform = { a: 1, b: 0, c: 0, d: 1, e: 300, f: 40 };
-	const siblingChild = ShapeRecord.createRect(
+	const siblingChild = EditorShapeRecord.createRect(
 		page.id,
 		320,
 		60,

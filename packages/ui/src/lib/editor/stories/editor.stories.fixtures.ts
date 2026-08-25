@@ -2,8 +2,8 @@ import {
 	CursorStore,
 	EditorState,
 	FileBrowserVM,
-	PageRecord,
-	ShapeRecord,
+	EditorPageRecord,
+	EditorShapeRecord,
 	Store,
 	type BoardMeta,
 	type DocRepo,
@@ -45,8 +45,8 @@ export function createStoryFileBrowser(boards: BoardMeta[] = storyBoards) {
 /** Creates an editor store with a selected arrow so arrow controls are visible. */
 export function createStoryStore(): Store {
 	const state = EditorState.create();
-	const page = PageRecord.create('Sketch', 'page:story');
-	const arrow = ShapeRecord.createArrow(
+	const page = EditorPageRecord.create('Sketch', 'page:story');
+	const arrow = EditorShapeRecord.createArrow(
 		page.id,
 		120,
 		90,
@@ -125,7 +125,7 @@ export function createStoryPlatform(): EditorPlatformAdapter {
 
 function createEditorDocument(): EditorStateType {
 	const state = EditorState.create();
-	const page = PageRecord.create('Untitled', 'page:story-editor');
+	const page = EditorPageRecord.create('Untitled', 'page:story-editor');
 	state.doc.pages[page.id] = page;
 	state.ui.currentPageId = page.id;
 	return state;

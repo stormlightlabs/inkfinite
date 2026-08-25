@@ -56,15 +56,15 @@
 
 ### Clarify model ownership
 
-- [ ] Document the dependency direction between the canonical Rust document,
+- [x] Document the dependency direction between the canonical Rust document,
       generated bindings, TypeScript editor model, editor runtime, UI, and apps
-- [ ] Rename or reorganize TypeScript editor-model types so they cannot be
+- [x] Rename or reorganize TypeScript editor-model types so they cannot be
       confused with canonical Rust records; update affected tests and public
       imports without changing serialized document behavior
-- [ ] Put canonical-to-editor projection and editor-to-canonical reconciliation
+- [x] Put canonical-to-editor projection and editor-to-canonical reconciliation
       adapters behind an explicit TypeScript module boundary, with round-trip
       coverage for projection -> edit -> canonical transaction
-- [ ] Keep generated bindings generated; remove hand-maintained duplicates of
+- [x] Keep generated bindings generated; remove hand-maintained duplicates of
       Rust-owned contract types where unnecessary and verify binding generation
       remains reproducible
 

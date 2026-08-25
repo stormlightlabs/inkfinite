@@ -1,4 +1,9 @@
 import type { DocumentSnapshot, EditorReconciliationRequest } from '@inkfinite/wasm';
+import {
+	createEditorReconciliationRequest,
+	fromEditorProjection,
+	type EditorDocument
+} from '@inkfinite/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
 	getSharedDocumentEngineWorker,
@@ -68,6 +73,33 @@ describe('compiled document engine worker', () => {
 		state = await worker.applyEditorPatches(request);
 		expect(state.editor_projection.shapes['shape:rect']).toBeDefined();
 		expect(state.can_undo).toBe(true);
+
+		const projected = fromEditorProjection(state.editor_projection, state.snapshot);
+		const beforeEdit: EditorDocument = {
+			pages: projected.pages,
+			layers: projected.layers,
+			shapes: projected.shapes,
+			bindings: projected.bindings,
+			...(projected.assets ? { assets: projected.assets } : {})
+		};
+		const shape = beforeEdit.shapes['shape:rect'];
+		if (!shape) throw new Error('Expected the created rectangle in the editor projection');
+		const afterEdit: EditorDocument = {
+			...beforeEdit,
+			shapes: { ...beforeEdit.shapes, [shape.id]: { ...shape, x: 14, y: 15 } }
+		};
+		const moveRequest = createEditorReconciliationRequest(beforeEdit, afterEdit, {
+			actor_id: 'browser',
+			origin: 'human',
+			transaction_id: 'transaction:move',
+			description: 'Move rectangle',
+			timestamp: 2
+		});
+		state = await worker.applyEditorPatches(moveRequest);
+		expect(state.snapshot.document.shapes['shape:rect']?.transform.translation).toEqual({
+			x: 14,
+			y: 15
+		});
 
 		state = await worker.applyEditorPatches({
 			...request,

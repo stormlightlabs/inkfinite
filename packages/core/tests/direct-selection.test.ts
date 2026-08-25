@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Action, DirectSelectTool, Modifiers, PageRecord, ShapeRecord, Store, hitTestPoint, shapeBounds } from '../src';
-import type { PathProps, PathSelection } from '../src/model';
+import { Action, DirectSelectTool, Modifiers, EditorPageRecord, EditorShapeRecord, Store, hitTestPoint, shapeBounds } from '../src';
+import type { PathProps, PathSelection } from '../src/editor-model';
 
 const modifiers = Modifiers.create();
 const buttons = { left: true, middle: false, right: false };
@@ -19,7 +19,7 @@ function pointerUp(x: number, y: number) {
 }
 
 function createPathState() {
-	const page = PageRecord.create('Page', 'page:direct-selection');
+	const page = EditorPageRecord.create('Page', 'page:direct-selection');
 	const geometry: PathProps = {
 		subpaths: [
 			{
@@ -42,7 +42,7 @@ function createPathState() {
 		fill_rule: 'nonzero',
 		fill: '#fff'
 	};
-	const path = ShapeRecord.createPath(page.id, 0, 0, geometry, 'path:direct');
+	const path = EditorShapeRecord.createPath(page.id, 0, 0, geometry, 'path:direct');
 	page.shapeIds = [path.id];
 	const state = new Store({
 		doc: { pages: { [page.id]: page }, shapes: { [path.id]: path }, bindings: {} },
@@ -136,8 +136,8 @@ describe('DirectSelectTool', () => {
 	});
 
 	it('updates bounds and hit regions during a path-edit preview', () => {
-		const page = PageRecord.create('Page', 'page:direct-preview');
-		const path = ShapeRecord.createPath(
+		const page = EditorPageRecord.create('Page', 'page:direct-preview');
+		const path = EditorShapeRecord.createPath(
 			page.id,
 			0,
 			0,
@@ -185,8 +185,8 @@ describe('DirectSelectTool', () => {
 	});
 
 	it('edits stroke width points independently from the stroke path points', () => {
-		const page = PageRecord.create('Page', 'page:direct-width');
-		const stroke = ShapeRecord.createStroke(
+		const page = EditorPageRecord.create('Page', 'page:direct-width');
+		const stroke = EditorShapeRecord.createStroke(
 			page.id,
 			0,
 			0,

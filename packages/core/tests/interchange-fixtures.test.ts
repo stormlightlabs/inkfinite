@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
-	BindingRecord,
+	EditorBindingRecord,
 	exportInterchange,
 	importInterchange,
-	ShapeRecord,
+	EditorShapeRecord,
 	validateDoc,
 	type BoardExport,
 	type ImportedAsset
@@ -30,14 +30,14 @@ function mixedBoard(): BoardExport {
 		locked: false,
 		opacity: 1
 	};
-	const frame = ShapeRecord.createContainer(
+	const frame = EditorShapeRecord.createContainer(
 		page.id,
 		0,
 		0,
 		{ w: 500, h: 300, title: 'Mixed content', fill: '#f8fafc', stroke: '#94a3b8' },
 		'frame'
 	);
-	const card = ShapeRecord.createMarkdown(
+	const card = EditorShapeRecord.createMarkdown(
 		page.id,
 		40,
 		60,
@@ -60,21 +60,21 @@ function mixedBoard(): BoardExport {
 		digest: 'sha256:pixel',
 		bytes: [137, 80, 78, 71]
 	};
-	const image = ShapeRecord.createImage(
+	const image = EditorShapeRecord.createImage(
 		page.id,
 		260,
 		60,
 		{ w: 120, h: 90, assetId: asset.id, caption: 'Raster asset' },
 		'image'
 	);
-	const link = ShapeRecord.createReference(
+	const link = EditorShapeRecord.createReference(
 		page.id,
 		140,
 		210,
 		{ w: 220, h: 60, referenceType: 'url', value: 'https://example.com', label: 'External link' },
 		'link'
 	);
-	const svgPath = ShapeRecord.createPath(
+	const svgPath = EditorShapeRecord.createPath(
 		page.id,
 		420,
 		210,
@@ -125,8 +125,8 @@ function mixedBoard(): BoardExport {
 		handle: 'end' as const,
 		anchor: { kind: 'edge' as const, nx: -1, ny: 0 }
 	};
-	const relation = BindingRecord.createRelation('card', 'link', 'references', 'binding:relation');
-	const arrow = ShapeRecord.createArrow(
+	const relation = EditorBindingRecord.createRelation('card', 'link', 'references', 'binding:relation');
+	const arrow = EditorShapeRecord.createArrow(
 		page.id,
 		0,
 		0,

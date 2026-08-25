@@ -1,11 +1,11 @@
 import {
-	BindingRecord,
+	EditorBindingRecord,
 	createId,
-	ShapeRecord,
+	EditorShapeRecord,
 	shapeBounds,
 	type EditorState,
 	type ImportedAsset,
-	type ShapeRecord as Shape,
+	type EditorShapeRecord as Shape,
 	type Vec2
 } from '@inkfinite/core';
 
@@ -18,7 +18,7 @@ export type ClipboardPayload = {
 	kind: typeof CLIPBOARD_KIND;
 	version: 1 | 2;
 	shapes: Shape[];
-	bindings: BindingRecord[];
+	bindings: EditorBindingRecord[];
 	rootIds: string[];
 	assets: ImportedAsset[];
 };
@@ -52,12 +52,12 @@ export function createClipboardPayload(state: EditorState): ClipboardPayload | n
 		.filter((id) => includedIds.has(id))
 		.map((id) => state.doc.shapes[id])
 		.filter((shape): shape is Shape => Boolean(shape))
-		.map((shape) => ShapeRecord.clone(shape));
+		.map((shape) => EditorShapeRecord.clone(shape));
 	const bindings = Object.values(state.doc.bindings)
 		.filter(
 			(binding) => includedIds.has(binding.fromShapeId) && includedIds.has(binding.toShapeId)
 		)
-		.map((binding) => BindingRecord.clone(binding));
+		.map((binding) => EditorBindingRecord.clone(binding));
 	const assetIds = new Set(
 		shapes.flatMap((shape) => (shape.type === 'image' ? [shape.props.assetId] : []))
 	);
@@ -320,7 +320,7 @@ export function pasteClipboard(
 	for (const source of payload.shapes) {
 		const id = mapping.get(source.id);
 		if (!id) continue;
-		const copy = ShapeRecord.clone(source);
+		const copy = EditorShapeRecord.clone(source);
 		const translated = copy.editorTransform
 			? {
 					...copy,
@@ -350,7 +350,7 @@ export function pasteClipboard(
 						...translated.props,
 						textPath: { ...translated.props.textPath, pathId }
 					}
-				} as ShapeRecord;
+				} as EditorShapeRecord;
 			}
 		}
 		if (payload.rootIds.includes(source.id)) pastedIds.push(id);
@@ -363,7 +363,7 @@ export function pasteClipboard(
 		if (!fromShapeId || !toShapeId) continue;
 		const id = createId('binding');
 		bindingMapping.set(binding.id, id);
-		bindings[id] = { ...BindingRecord.clone(binding), id, fromShapeId, toShapeId };
+		bindings[id] = { ...EditorBindingRecord.clone(binding), id, fromShapeId, toShapeId };
 	}
 	for (const source of payload.shapes) {
 		const id = mapping.get(source.id);
@@ -425,14 +425,14 @@ export function pasteText(
 	if (!pageId || !page || !text) return state;
 	const point = position ?? { x: 0, y: 0 };
 	const shape = markdown
-		? ShapeRecord.createMarkdown(pageId, point.x, point.y, {
+		? EditorShapeRecord.createMarkdown(pageId, point.x, point.y, {
 				md: text,
 				w: 320,
 				fontSize: 16,
 				fontFamily: 'Instrument Sans Variable',
 				color: '#1e1e1e'
 			})
-		: ShapeRecord.createText(pageId, point.x, point.y, {
+		: EditorShapeRecord.createText(pageId, point.x, point.y, {
 				text,
 				fontSize: 20,
 				fontFamily: 'Instrument Sans Variable',
@@ -470,7 +470,7 @@ export async function pasteImage(
 	const width = Math.max(1, size.width * scale);
 	const height = Math.max(1, size.height * scale);
 	const point = position ?? { x: 0, y: 0 };
-	const image = ShapeRecord.createImage(pageId, point.x, point.y, {
+	const image = EditorShapeRecord.createImage(pageId, point.x, point.y, {
 		w: width,
 		h: height,
 		assetId: asset.id
@@ -565,7 +565,9 @@ function parsePayload(text: string): ClipboardPayload | null {
 			kind: CLIPBOARD_KIND,
 			version: value.version,
 			shapes: value.shapes as Shape[],
-			bindings: Array.isArray(value.bindings) ? (value.bindings as BindingRecord[]) : [],
+			bindings: Array.isArray(value.bindings)
+				? (value.bindings as EditorBindingRecord[])
+				: [],
 			rootIds: Array.isArray(value.rootIds) ? value.rootIds : [],
 			assets: Array.isArray(value.assets) ? (value.assets as ImportedAsset[]) : []
 		};

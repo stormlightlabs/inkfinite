@@ -1,5 +1,5 @@
 import type { Camera } from "./camera";
-import type { PathTopologyEdit, ShapeRecord } from "./model";
+import type { PathTopologyEdit, EditorShapeRecord } from "./editor-model";
 import type { EditorState } from "./reactivity";
 
 export type CommandKind = "doc" | "ui" | "camera";
@@ -85,7 +85,7 @@ export class CreateShapeCommand implements Command {
   readonly name: string;
   readonly kind = "doc" as const;
 
-  constructor(private readonly shape: ShapeRecord, private readonly pageId: string) {
+  constructor(private readonly shape: EditorShapeRecord, private readonly pageId: string) {
     this.name = `Create ${shape.type}`;
   }
 
@@ -136,8 +136,8 @@ export class UpdateShapeCommand implements Command {
 
   constructor(
     private readonly shapeId: string,
-    private readonly before: ShapeRecord,
-    private readonly after: ShapeRecord,
+    private readonly before: EditorShapeRecord,
+    private readonly after: EditorShapeRecord,
   ) {
     this.name = `Update ${after.type}`;
   }
@@ -158,7 +158,7 @@ export class DeleteShapesCommand implements Command {
   readonly name: string;
   readonly kind = "doc" as const;
 
-  constructor(private readonly shapes: ShapeRecord[], private readonly pageId: string) {
+  constructor(private readonly shapes: EditorShapeRecord[], private readonly pageId: string) {
     this.name = shapes.length === 1 ? `Delete ${shapes[0].type}` : `Delete ${shapes.length} shapes`;
   }
 

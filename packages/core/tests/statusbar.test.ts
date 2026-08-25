@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CursorState as CursorStateOps } from "../src/cursor";
-import { ShapeRecord } from "../src/model";
-import type { ShapeRecord as ShapeRecordType } from "../src/model";
+import { EditorShapeRecord } from "../src/editor-model";
+import type { EditorShapeRecord as ShapeRecordType } from "../src/editor-model";
 import { EditorState } from "../src/reactivity";
 import {
   buildStatusBarVM,
@@ -40,7 +40,7 @@ describe("Status bar selectors", () => {
     });
 
     it("describes a single selected shape", () => {
-      const rect = ShapeRecord.createRect(
+      const rect = EditorShapeRecord.createRect(
         "page-1",
         10,
         20,
@@ -52,14 +52,14 @@ describe("Status bar selectors", () => {
     });
 
     it("summarizes multiple selections with combined bounds and mixed kind", () => {
-      const rect = ShapeRecord.createRect(
+      const rect = EditorShapeRecord.createRect(
         "page-1",
         10,
         20,
         { w: 40, h: 20, fill: "#000", stroke: "#fff", radius: 0 },
         "shape-rect",
       );
-      const ellipse = ShapeRecord.createEllipse(
+      const ellipse = EditorShapeRecord.createEllipse(
         "page-1",
         100,
         50,
@@ -72,14 +72,14 @@ describe("Status bar selectors", () => {
     });
 
     it("marks kind when all selected shapes match", () => {
-      const rectA = ShapeRecord.createRect(
+      const rectA = EditorShapeRecord.createRect(
         "page-1",
         0,
         0,
         { w: 10, h: 10, fill: "#000", stroke: "#fff", radius: 0 },
         "shape-1",
       );
-      const rectB = ShapeRecord.createRect(
+      const rectB = EditorShapeRecord.createRect(
         "page-1",
         20,
         20,
@@ -101,7 +101,7 @@ describe("Status bar selectors", () => {
 
   describe("buildStatusBarVM", () => {
     it("composes slices into a status bar view model", () => {
-      const rect = ShapeRecord.createRect(
+      const rect = EditorShapeRecord.createRect(
         "page-1",
         0,
         0,

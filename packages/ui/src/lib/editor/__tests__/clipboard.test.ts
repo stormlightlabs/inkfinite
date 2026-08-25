@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-	BindingRecord,
-	LayerRecord,
-	PageRecord,
-	ShapeRecord,
+	EditorBindingRecord,
+	EditorLayerRecord,
+	EditorPageRecord,
+	EditorShapeRecord,
 	type EditorState
 } from '@inkfinite/core';
 import {
@@ -15,8 +15,8 @@ import {
 } from '../clipboard';
 
 function state(): EditorState {
-	const page = PageRecord.create('Page 1', 'page:test');
-	const layer = LayerRecord.create(page.id, 'Default', 'layer:test');
+	const page = EditorPageRecord.create('Page 1', 'page:test');
+	const layer = EditorLayerRecord.create(page.id, 'Default', 'layer:test');
 	page.layerIds = [layer.id];
 	return {
 		doc: {
@@ -131,14 +131,14 @@ describe('clipboard selections', () => {
 	it('keeps hierarchy, assets, bindings, and root selection on paste', () => {
 		const before = state();
 		const pageId = before.ui.currentPageId!;
-		const group = ShapeRecord.createContainer(
+		const group = EditorShapeRecord.createContainer(
 			pageId,
 			10,
 			20,
 			{ w: 100, h: 80 },
 			'shape:group'
 		);
-		const image = ShapeRecord.createImage(
+		const image = EditorShapeRecord.createImage(
 			pageId,
 			20,
 			30,
@@ -151,7 +151,7 @@ describe('clipboard selections', () => {
 		before.doc.shapes[image.id] = image;
 		before.doc.pages[pageId].shapeIds = [group.id, image.id];
 		before.doc.layers!['layer:test'].shapeIds = [group.id];
-		const target = ShapeRecord.createRect(
+		const target = EditorShapeRecord.createRect(
 			pageId,
 			200,
 			0,
@@ -162,7 +162,7 @@ describe('clipboard selections', () => {
 		before.doc.shapes[target.id] = target;
 		before.doc.pages[pageId].shapeIds.push(target.id);
 		before.doc.layers!['layer:test'].shapeIds.push(target.id);
-		const binding = BindingRecord.create(
+		const binding = EditorBindingRecord.create(
 			'shape:target',
 			'shape:group',
 			'end',

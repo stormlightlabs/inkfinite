@@ -1,7 +1,7 @@
 import { shapeBounds } from '../geom';
 import { paintColor } from '../paint';
 import { clamp, Vec2 } from '../math';
-import { BindingRecord, ensureDocumentLayers, ShapeRecord, type ArrowShape, type ShapeRecord as Shape } from '../model';
+import { EditorBindingRecord, ensureDocumentLayers, EditorShapeRecord, type ArrowShape, type EditorShapeRecord as Shape } from '../editor-model';
 import type { BoardExport } from '../persistence/document';
 import type { InterchangeExport, InterchangeImport } from '../interchange';
 import {
@@ -67,7 +67,7 @@ export function importExcalidraw(root: JsonObject, fileName: string): Interchang
 
 		switch (type) {
 			case 'rectangle':
-				shape = ShapeRecord.createRect(
+				shape = EditorShapeRecord.createRect(
 					pageId,
 					origin.x,
 					origin.y,
@@ -82,7 +82,7 @@ export function importExcalidraw(root: JsonObject, fileName: string): Interchang
 				);
 				break;
 			case 'ellipse':
-				shape = ShapeRecord.createEllipse(
+				shape = EditorShapeRecord.createEllipse(
 					pageId,
 					origin.x,
 					origin.y,
@@ -92,7 +92,7 @@ export function importExcalidraw(root: JsonObject, fileName: string): Interchang
 				break;
 			case 'line': {
 				const points = excalidrawPoints(element.points, `element ${id}.points`);
-				shape = ShapeRecord.createLine(
+				shape = EditorShapeRecord.createLine(
 					pageId,
 					origin.x,
 					origin.y,
@@ -113,7 +113,7 @@ export function importExcalidraw(root: JsonObject, fileName: string): Interchang
 			}
 			case 'arrow': {
 				const points = excalidrawPoints(element.points, `element ${id}.points`);
-				shape = ShapeRecord.createArrow(
+				shape = EditorShapeRecord.createArrow(
 					pageId,
 					origin.x,
 					origin.y,
@@ -161,11 +161,11 @@ export function importExcalidraw(root: JsonObject, fileName: string): Interchang
 					digest: assetId,
 					bytes: data.bytes
 				};
-				shape = ShapeRecord.createImage(pageId, origin.x, origin.y, { w: width, h: height, assetId }, shapeId);
+				shape = EditorShapeRecord.createImage(pageId, origin.x, origin.y, { w: width, h: height, assetId }, shapeId);
 				break;
 			}
 			case 'text':
-				shape = ShapeRecord.createText(
+				shape = EditorShapeRecord.createText(
 					pageId,
 					origin.x,
 					origin.y,
@@ -185,7 +185,7 @@ export function importExcalidraw(root: JsonObject, fileName: string): Interchang
 			case 'freedraw': {
 				const points = excalidrawPointTuples(element.points, `element ${id}.points`);
 				const pressures = Array.isArray(element.pressures) ? element.pressures : [];
-				shape = ShapeRecord.createStroke(
+				shape = EditorShapeRecord.createStroke(
 					pageId,
 					origin.x,
 					origin.y,
@@ -212,7 +212,7 @@ export function importExcalidraw(root: JsonObject, fileName: string): Interchang
 			}
 			case 'embeddable': {
 				const url = typeof element.link === 'string' ? element.link : '';
-				shape = ShapeRecord.createMarkdown(
+				shape = EditorShapeRecord.createMarkdown(
 					pageId,
 					origin.x,
 					origin.y,
@@ -233,7 +233,7 @@ export function importExcalidraw(root: JsonObject, fileName: string): Interchang
 			}
 			case 'frame':
 			case 'magicframe':
-				shape = ShapeRecord.createContainer(
+				shape = EditorShapeRecord.createContainer(
 					pageId,
 					origin.x,
 					origin.y,
@@ -283,7 +283,7 @@ export function importExcalidraw(root: JsonObject, fileName: string): Interchang
 				warnings.add('excalidraw-dangling-binding', 'Bindings to omitted or missing elements were removed.');
 				continue;
 			}
-			const binding = BindingRecord.create(
+			const binding = EditorBindingRecord.create(
 				shape.id,
 				target.id,
 				handle,

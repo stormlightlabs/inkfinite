@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Action } from "../src/actions";
 import { resolveArrowEndpoints } from "../src/geom";
-import { BindingRecord, PageRecord, ShapeRecord } from "../src/model";
+import { EditorBindingRecord, EditorPageRecord, EditorShapeRecord } from "../src/editor-model";
 import { EditorState } from "../src/reactivity";
 import { SelectTool } from "../src/tools/select";
 
@@ -10,14 +10,14 @@ describe("Arrow binding behavior", () => {
     it("should preserve bindings when an arrow is moved (dragged)", () => {
       let state = EditorState.create();
 
-      const page = PageRecord.create("Test Page");
+      const page = EditorPageRecord.create("Test Page");
       state = {
         ...state,
         doc: { ...state.doc, pages: { [page.id]: page } },
         ui: { ...state.ui, currentPageId: page.id },
       };
 
-      const rectStart = ShapeRecord.createRect(page.id, 50, 50, {
+      const rectStart = EditorShapeRecord.createRect(page.id, 50, 50, {
         w: 50,
         h: 50,
         fill: "#fff",
@@ -25,7 +25,7 @@ describe("Arrow binding behavior", () => {
         radius: 0,
       });
 
-      const rectEnd = ShapeRecord.createRect(page.id, 250, 50, {
+      const rectEnd = EditorShapeRecord.createRect(page.id, 250, 50, {
         w: 50,
         h: 50,
         fill: "#fff",
@@ -33,14 +33,14 @@ describe("Arrow binding behavior", () => {
         radius: 0,
       });
 
-      const arrow = ShapeRecord.createArrow(page.id, 100, 75, {
+      const arrow = EditorShapeRecord.createArrow(page.id, 100, 75, {
         points: [{ x: 0, y: 0 }, { x: 150, y: 0 }],
         start: { kind: "bound", bindingId: "binding-start" },
         end: { kind: "bound", bindingId: "binding-end" },
         style: { stroke: "#000", width: 2, headEnd: true },
       });
 
-      const bindingStart = BindingRecord.create(
+      const bindingStart = EditorBindingRecord.create(
         arrow.id,
         rectStart.id,
         "start",
@@ -48,7 +48,7 @@ describe("Arrow binding behavior", () => {
         "binding-start",
       );
 
-      const bindingEnd = BindingRecord.create(
+      const bindingEnd = EditorBindingRecord.create(
         arrow.id,
         rectEnd.id,
         "end",
@@ -117,23 +117,23 @@ describe("Arrow binding behavior", () => {
     it("should NOT remove bindings when dragging an endpoint handle", () => {
       let state = EditorState.create();
 
-      const page = PageRecord.create("Test Page");
+      const page = EditorPageRecord.create("Test Page");
       state = {
         ...state,
         doc: { ...state.doc, pages: { [page.id]: page } },
         ui: { ...state.ui, currentPageId: page.id },
       };
 
-      const rect = ShapeRecord.createRect(page.id, 250, 50, { w: 50, h: 50, fill: "#fff", stroke: "#000", radius: 0 });
+      const rect = EditorShapeRecord.createRect(page.id, 250, 50, { w: 50, h: 50, fill: "#fff", stroke: "#000", radius: 0 });
 
-      const arrow = ShapeRecord.createArrow(page.id, 100, 75, {
+      const arrow = EditorShapeRecord.createArrow(page.id, 100, 75, {
         points: [{ x: 0, y: 0 }, { x: 150, y: 0 }],
         start: { kind: "free" },
         end: { kind: "bound", bindingId: "binding-end" },
         style: { stroke: "#000", width: 2, headEnd: true },
       });
 
-      const binding = BindingRecord.create(arrow.id, rect.id, "end", { kind: "edge", nx: -1, ny: 0 }, "binding-end");
+      const binding = EditorBindingRecord.create(arrow.id, rect.id, "end", { kind: "edge", nx: -1, ny: 0 }, "binding-end");
 
       state = {
         ...state,
@@ -189,23 +189,23 @@ describe("Arrow binding behavior", () => {
     it("should be able to click and drag arrow endpoint handles when arrow is bound", () => {
       let state = EditorState.create();
 
-      const page = PageRecord.create("Test Page");
+      const page = EditorPageRecord.create("Test Page");
       state = {
         ...state,
         doc: { ...state.doc, pages: { [page.id]: page } },
         ui: { ...state.ui, currentPageId: page.id },
       };
 
-      const rect = ShapeRecord.createRect(page.id, 250, 50, { w: 50, h: 50, fill: "#fff", stroke: "#000", radius: 0 });
+      const rect = EditorShapeRecord.createRect(page.id, 250, 50, { w: 50, h: 50, fill: "#fff", stroke: "#000", radius: 0 });
 
-      const arrow = ShapeRecord.createArrow(page.id, 100, 75, {
+      const arrow = EditorShapeRecord.createArrow(page.id, 100, 75, {
         points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
         start: { kind: "free" },
         end: { kind: "bound", bindingId: "binding-end" },
         style: { stroke: "#000", width: 2, headEnd: true },
       });
 
-      const binding = BindingRecord.create(arrow.id, rect.id, "end", { kind: "center" }, "binding-end");
+      const binding = EditorBindingRecord.create(arrow.id, rect.id, "end", { kind: "center" }, "binding-end");
 
       state = {
         ...state,
@@ -264,14 +264,14 @@ describe("Arrow binding behavior", () => {
     it("should position arrow endpoints with offset to account for stroke widths", () => {
       let state = EditorState.create();
 
-      const page = PageRecord.create("Test Page");
+      const page = EditorPageRecord.create("Test Page");
       state = {
         ...state,
         doc: { ...state.doc, pages: { [page.id]: page } },
         ui: { ...state.ui, currentPageId: page.id },
       };
 
-      const rect = ShapeRecord.createRect(page.id, 200, 100, {
+      const rect = EditorShapeRecord.createRect(page.id, 200, 100, {
         w: 100,
         h: 100,
         fill: "#fff",
@@ -279,14 +279,14 @@ describe("Arrow binding behavior", () => {
         radius: 0,
       });
 
-      const arrow = ShapeRecord.createArrow(page.id, 100, 150, {
+      const arrow = EditorShapeRecord.createArrow(page.id, 100, 150, {
         points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
         start: { kind: "free" },
         end: { kind: "bound", bindingId: "binding-end" },
         style: { stroke: "#000", width: 2, headEnd: true },
       });
 
-      const binding = BindingRecord.create(arrow.id, rect.id, "end", { kind: "edge", nx: -1, ny: 0 }, "binding-end");
+      const binding = EditorBindingRecord.create(arrow.id, rect.id, "end", { kind: "edge", nx: -1, ny: 0 }, "binding-end");
 
       state = {
         ...state,
@@ -311,14 +311,14 @@ describe("Arrow binding behavior", () => {
     it("should apply offset for arrows with different stroke widths", () => {
       let state = EditorState.create();
 
-      const page = PageRecord.create("Test Page");
+      const page = EditorPageRecord.create("Test Page");
       state = {
         ...state,
         doc: { ...state.doc, pages: { [page.id]: page } },
         ui: { ...state.ui, currentPageId: page.id },
       };
 
-      const rect = ShapeRecord.createRect(page.id, 200, 100, {
+      const rect = EditorShapeRecord.createRect(page.id, 200, 100, {
         w: 100,
         h: 100,
         fill: "#fff",
@@ -326,14 +326,14 @@ describe("Arrow binding behavior", () => {
         radius: 0,
       });
 
-      const arrow = ShapeRecord.createArrow(page.id, 100, 150, {
+      const arrow = EditorShapeRecord.createArrow(page.id, 100, 150, {
         points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
         start: { kind: "free" },
         end: { kind: "bound", bindingId: "binding-end" },
         style: { stroke: "#000", width: 4, headEnd: true },
       });
 
-      const binding = BindingRecord.create(arrow.id, rect.id, "end", { kind: "edge", nx: -1, ny: 0 }, "binding-end");
+      const binding = EditorBindingRecord.create(arrow.id, rect.id, "end", { kind: "edge", nx: -1, ny: 0 }, "binding-end");
 
       state = {
         ...state,
@@ -358,14 +358,14 @@ describe("Arrow binding behavior", () => {
     it("should not apply offset for center anchors", () => {
       let state = EditorState.create();
 
-      const page = PageRecord.create("Test Page");
+      const page = EditorPageRecord.create("Test Page");
       state = {
         ...state,
         doc: { ...state.doc, pages: { [page.id]: page } },
         ui: { ...state.ui, currentPageId: page.id },
       };
 
-      const rect = ShapeRecord.createRect(page.id, 200, 100, {
+      const rect = EditorShapeRecord.createRect(page.id, 200, 100, {
         w: 100,
         h: 100,
         fill: "#fff",
@@ -373,14 +373,14 @@ describe("Arrow binding behavior", () => {
         radius: 0,
       });
 
-      const arrow = ShapeRecord.createArrow(page.id, 100, 150, {
+      const arrow = EditorShapeRecord.createArrow(page.id, 100, 150, {
         points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
         start: { kind: "free" },
         end: { kind: "bound", bindingId: "binding-end" },
         style: { stroke: "#000", width: 2, headEnd: true },
       });
 
-      const binding = BindingRecord.create(arrow.id, rect.id, "end", { kind: "center" }, "binding-end");
+      const binding = EditorBindingRecord.create(arrow.id, rect.id, "end", { kind: "center" }, "binding-end");
 
       state = {
         ...state,
@@ -404,14 +404,14 @@ describe("Arrow binding behavior", () => {
     it("should preserve intermediate points when dragging bound endpoints", () => {
       let state = EditorState.create();
 
-      const page = PageRecord.create("Test Page");
+      const page = EditorPageRecord.create("Test Page");
       state = {
         ...state,
         doc: { ...state.doc, pages: { [page.id]: page } },
         ui: { ...state.ui, currentPageId: page.id },
       };
 
-      const rect = ShapeRecord.createRect(page.id, 300, 100, {
+      const rect = EditorShapeRecord.createRect(page.id, 300, 100, {
         w: 100,
         h: 100,
         fill: "#fff",
@@ -419,14 +419,14 @@ describe("Arrow binding behavior", () => {
         radius: 0,
       });
 
-      const arrow = ShapeRecord.createArrow(page.id, 100, 100, {
+      const arrow = EditorShapeRecord.createArrow(page.id, 100, 100, {
         points: [{ x: 0, y: 0 }, { x: 100, y: 50 }, { x: 200, y: 0 }],
         start: { kind: "free" },
         end: { kind: "bound", bindingId: "binding-end" },
         style: { stroke: "#000", width: 2, headEnd: true },
       });
 
-      const binding = BindingRecord.create(arrow.id, rect.id, "end", { kind: "center" }, "binding-end");
+      const binding = EditorBindingRecord.create(arrow.id, rect.id, "end", { kind: "center" }, "binding-end");
 
       state = {
         ...state,

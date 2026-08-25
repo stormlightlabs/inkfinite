@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Camera } from '../src/camera';
 import { CreateShapeCommand } from '../src/history';
-import { PageRecord, ShapeRecord } from '../src/model';
+import { EditorPageRecord, EditorShapeRecord } from '../src/editor-model';
 import {
 	EditorState as EditorStateOps,
 	getAllPages,
@@ -31,8 +31,8 @@ describe('EditorState', () => {
 	describe('clone', () => {
 		it('should deep clone editor state', () => {
 			const state = EditorStateOps.create();
-			const page = PageRecord.create('Page 1', 'page1');
-			const shape = ShapeRecord.createRect(
+			const page = EditorPageRecord.create('Page 1', 'page1');
+			const shape = EditorShapeRecord.createRect(
 				'page1',
 				0,
 				0,
@@ -128,7 +128,7 @@ describe('Store', () => {
 
 		it('should update document', () => {
 			const store = new Store();
-			const page = PageRecord.create('Page 1', 'page1');
+			const page = EditorPageRecord.create('Page 1', 'page1');
 
 			store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
 
@@ -250,8 +250,8 @@ describe('Invariants', () => {
 
 		it('should repair invalid currentPageId to first page when pages exist', () => {
 			const store = new Store();
-			const page1 = PageRecord.create('Page 1', 'page1');
-			const page2 = PageRecord.create('Page 2', 'page2');
+			const page1 = EditorPageRecord.create('Page 1', 'page1');
+			const page2 = EditorPageRecord.create('Page 2', 'page2');
 
 			store.setState((state) => ({
 				...state,
@@ -265,7 +265,7 @@ describe('Invariants', () => {
 
 		it('should keep valid currentPageId', () => {
 			const store = new Store();
-			const page = PageRecord.create('Page 1', 'page1');
+			const page = EditorPageRecord.create('Page 1', 'page1');
 
 			store.setState((state) => ({
 				...state,
@@ -293,8 +293,8 @@ describe('Invariants', () => {
 
 		it('should remove non-existent shapes from selection', () => {
 			const store = new Store();
-			const page = PageRecord.create('Page 1', 'page1');
-			const shape = ShapeRecord.createRect(
+			const page = EditorPageRecord.create('Page 1', 'page1');
+			const shape = EditorShapeRecord.createRect(
 				'page1',
 				0,
 				0,
@@ -316,17 +316,17 @@ describe('Invariants', () => {
 
 		it('should remove shapes not on current page from selection', () => {
 			const store = new Store();
-			const page1 = PageRecord.create('Page 1', 'page1');
-			const page2 = PageRecord.create('Page 2', 'page2');
+			const page1 = EditorPageRecord.create('Page 1', 'page1');
+			const page2 = EditorPageRecord.create('Page 2', 'page2');
 
-			const shape1 = ShapeRecord.createRect(
+			const shape1 = EditorShapeRecord.createRect(
 				'page1',
 				0,
 				0,
 				{ w: 100, h: 50, fill: '#fff', stroke: '#000', radius: 0 },
 				'shape1'
 			);
-			const shape2 = ShapeRecord.createRect(
+			const shape2 = EditorShapeRecord.createRect(
 				'page2',
 				0,
 				0,
@@ -349,15 +349,15 @@ describe('Invariants', () => {
 
 		it('should keep valid selection', () => {
 			const store = new Store();
-			const page = PageRecord.create('Page 1', 'page1');
-			const shape1 = ShapeRecord.createRect(
+			const page = EditorPageRecord.create('Page 1', 'page1');
+			const shape1 = EditorShapeRecord.createRect(
 				'page1',
 				0,
 				0,
 				{ w: 100, h: 50, fill: '#fff', stroke: '#000', radius: 0 },
 				'shape1'
 			);
-			const shape2 = ShapeRecord.createRect(
+			const shape2 = EditorShapeRecord.createRect(
 				'page1',
 				50,
 				50,
@@ -379,8 +379,8 @@ describe('Invariants', () => {
 
 		it('should maintain reference equality when no repair needed', () => {
 			const store = new Store();
-			const page = PageRecord.create('Page 1', 'page1');
-			const shape = ShapeRecord.createRect(
+			const page = EditorPageRecord.create('Page 1', 'page1');
+			const shape = EditorShapeRecord.createRect(
 				'page1',
 				0,
 				0,
@@ -409,8 +409,8 @@ describe('Invariants', () => {
 	describe('invariant repair on deletion', () => {
 		it('should clear selection when selected shape is deleted', () => {
 			const store = new Store();
-			const page = PageRecord.create('Page 1', 'page1');
-			const shape1 = ShapeRecord.createRect(
+			const page = EditorPageRecord.create('Page 1', 'page1');
+			const shape1 = EditorShapeRecord.createRect(
 				'page1',
 				0,
 				0,
@@ -437,8 +437,8 @@ describe('Invariants', () => {
 
 		it('should update currentPageId when current page is deleted', () => {
 			const store = new Store();
-			const page1 = PageRecord.create('Page 1', 'page1');
-			const page2 = PageRecord.create('Page 2', 'page2');
+			const page1 = EditorPageRecord.create('Page 1', 'page1');
+			const page2 = EditorPageRecord.create('Page 2', 'page2');
 
 			store.setState((state) => ({
 				...state,
@@ -465,7 +465,7 @@ describe('Selectors', () => {
 
 		it('should return current page', () => {
 			const state = EditorStateOps.create();
-			const page = PageRecord.create('Page 1', 'page1');
+			const page = EditorPageRecord.create('Page 1', 'page1');
 
 			state.doc.pages = { page1: page };
 			state.ui.currentPageId = 'page1';
@@ -496,7 +496,7 @@ describe('Selectors', () => {
 
 		it('should return empty array for empty page', () => {
 			const state = EditorStateOps.create();
-			const page = PageRecord.create('Page 1', 'page1');
+			const page = EditorPageRecord.create('Page 1', 'page1');
 
 			state.doc.pages = { page1: page };
 			state.ui.currentPageId = 'page1';
@@ -508,15 +508,15 @@ describe('Selectors', () => {
 
 		it('should return all shapes on current page', () => {
 			const state = EditorStateOps.create();
-			const page = PageRecord.create('Page 1', 'page1');
-			const shape1 = ShapeRecord.createRect(
+			const page = EditorPageRecord.create('Page 1', 'page1');
+			const shape1 = EditorShapeRecord.createRect(
 				'page1',
 				0,
 				0,
 				{ w: 100, h: 50, fill: '#fff', stroke: '#000', radius: 0 },
 				'shape1'
 			);
-			const shape2 = ShapeRecord.createEllipse(
+			const shape2 = EditorShapeRecord.createEllipse(
 				'page1',
 				50,
 				50,
@@ -538,8 +538,8 @@ describe('Selectors', () => {
 
 		it('should filter out undefined shapes', () => {
 			const state = EditorStateOps.create();
-			const page = PageRecord.create('Page 1', 'page1');
-			const shape1 = ShapeRecord.createRect(
+			const page = EditorPageRecord.create('Page 1', 'page1');
+			const shape1 = EditorShapeRecord.createRect(
 				'page1',
 				0,
 				0,
@@ -560,17 +560,17 @@ describe('Selectors', () => {
 
 		it('should not include shapes from other pages', () => {
 			const state = EditorStateOps.create();
-			const page1 = PageRecord.create('Page 1', 'page1');
-			const page2 = PageRecord.create('Page 2', 'page2');
+			const page1 = EditorPageRecord.create('Page 1', 'page1');
+			const page2 = EditorPageRecord.create('Page 2', 'page2');
 
-			const shape1 = ShapeRecord.createRect(
+			const shape1 = EditorShapeRecord.createRect(
 				'page1',
 				0,
 				0,
 				{ w: 100, h: 50, fill: '#fff', stroke: '#000', radius: 0 },
 				'shape1'
 			);
-			const shape2 = ShapeRecord.createRect(
+			const shape2 = EditorShapeRecord.createRect(
 				'page2',
 				0,
 				0,
@@ -602,22 +602,22 @@ describe('Selectors', () => {
 
 		it('should return selected shapes', () => {
 			const state = EditorStateOps.create();
-			const page = PageRecord.create('Page 1', 'page1');
-			const shape1 = ShapeRecord.createRect(
+			const page = EditorPageRecord.create('Page 1', 'page1');
+			const shape1 = EditorShapeRecord.createRect(
 				'page1',
 				0,
 				0,
 				{ w: 100, h: 50, fill: '#fff', stroke: '#000', radius: 0 },
 				'shape1'
 			);
-			const shape2 = ShapeRecord.createEllipse(
+			const shape2 = EditorShapeRecord.createEllipse(
 				'page1',
 				50,
 				50,
 				{ w: 75, h: 75, fill: '#000', stroke: '#fff' },
 				'shape2'
 			);
-			const shape3 = ShapeRecord.createLine(
+			const shape3 = EditorShapeRecord.createLine(
 				'page1',
 				100,
 				100,
@@ -640,7 +640,7 @@ describe('Selectors', () => {
 
 		it('should filter out undefined shapes', () => {
 			const state = EditorStateOps.create();
-			const shape1 = ShapeRecord.createRect(
+			const shape1 = EditorShapeRecord.createRect(
 				'page1',
 				0,
 				0,
@@ -692,8 +692,8 @@ describe('Selectors', () => {
 
 		it('should return all pages', () => {
 			const state = EditorStateOps.create();
-			const page1 = PageRecord.create('Page 1', 'page1');
-			const page2 = PageRecord.create('Page 2', 'page2');
+			const page1 = EditorPageRecord.create('Page 1', 'page1');
+			const page2 = EditorPageRecord.create('Page 2', 'page2');
 
 			state.doc.pages = { page1, page2 };
 
@@ -715,7 +715,7 @@ describe('Selectors', () => {
 
 		it('should return shape by ID', () => {
 			const state = EditorStateOps.create();
-			const shape = ShapeRecord.createRect(
+			const shape = EditorShapeRecord.createRect(
 				'page1',
 				0,
 				0,
@@ -736,7 +736,7 @@ describe('Integration scenarios', () => {
 	it('should handle complete workflow: create page, add shapes, select shapes', () => {
 		const store = new Store();
 
-		const page = PageRecord.create('Page 1', 'page1');
+		const page = EditorPageRecord.create('Page 1', 'page1');
 		store.setState((state) => ({
 			...state,
 			doc: { ...state.doc, pages: { page1: page } },
@@ -746,14 +746,14 @@ describe('Integration scenarios', () => {
 		let state = store.getState();
 		expect(getCurrentPage(state)?.name).toBe('Page 1');
 
-		const shape1 = ShapeRecord.createRect(
+		const shape1 = EditorShapeRecord.createRect(
 			'page1',
 			0,
 			0,
 			{ w: 100, h: 50, fill: '#fff', stroke: '#000', radius: 0 },
 			'shape1'
 		);
-		const shape2 = ShapeRecord.createEllipse(
+		const shape2 = EditorShapeRecord.createEllipse(
 			'page1',
 			50,
 			50,
@@ -808,7 +808,7 @@ describe('History integration', () => {
 	describe('executeCommand', () => {
 		it('should execute command and add to history', () => {
 			const store = new Store();
-			const page = PageRecord.create('Page 1', 'page1');
+			const page = EditorPageRecord.create('Page 1', 'page1');
 
 			store.setState((state) => ({
 				...state,
@@ -816,7 +816,7 @@ describe('History integration', () => {
 				ui: { ...state.ui, currentPageId: 'page1' }
 			}));
 
-			const shape = ShapeRecord.createRect('page1', 10, 20, {
+			const shape = EditorShapeRecord.createRect('page1', 10, 20, {
 				w: 100,
 				h: 50,
 				fill: '#fff',
@@ -839,12 +839,12 @@ describe('History integration', () => {
 			store.subscribe(listener);
 			listener.mockClear();
 
-			const page = PageRecord.create('Page 1', 'page1');
+			const page = EditorPageRecord.create('Page 1', 'page1');
 			store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
 
 			listener.mockClear();
 
-			const shape = ShapeRecord.createRect('page1', 10, 20, {
+			const shape = EditorShapeRecord.createRect('page1', 10, 20, {
 				w: 100,
 				h: 50,
 				fill: '#fff',
@@ -862,11 +862,11 @@ describe('History integration', () => {
 	describe('undo', () => {
 		it('should undo last command', () => {
 			const store = new Store();
-			const page = PageRecord.create('Page 1', 'page1');
+			const page = EditorPageRecord.create('Page 1', 'page1');
 
 			store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
 
-			const shape = ShapeRecord.createRect('page1', 10, 20, {
+			const shape = EditorShapeRecord.createRect('page1', 10, 20, {
 				w: 100,
 				h: 50,
 				fill: '#fff',
@@ -897,10 +897,10 @@ describe('History integration', () => {
 
 			store.subscribe(listener);
 
-			const page = PageRecord.create('Page 1', 'page1');
+			const page = EditorPageRecord.create('Page 1', 'page1');
 			store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
 
-			const shape = ShapeRecord.createRect('page1', 10, 20, {
+			const shape = EditorShapeRecord.createRect('page1', 10, 20, {
 				w: 100,
 				h: 50,
 				fill: '#fff',
@@ -922,11 +922,11 @@ describe('History integration', () => {
 	describe('redo', () => {
 		it('should redo last undone command', () => {
 			const store = new Store();
-			const page = PageRecord.create('Page 1', 'page1');
+			const page = EditorPageRecord.create('Page 1', 'page1');
 
 			store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
 
-			const shape = ShapeRecord.createRect('page1', 10, 20, {
+			const shape = EditorShapeRecord.createRect('page1', 10, 20, {
 				w: 100,
 				h: 50,
 				fill: '#fff',
@@ -958,10 +958,10 @@ describe('History integration', () => {
 
 			store.subscribe(listener);
 
-			const page = PageRecord.create('Page 1', 'page1');
+			const page = EditorPageRecord.create('Page 1', 'page1');
 			store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
 
-			const shape = ShapeRecord.createRect('page1', 10, 20, {
+			const shape = EditorShapeRecord.createRect('page1', 10, 20, {
 				w: 100,
 				h: 50,
 				fill: '#fff',
@@ -991,11 +991,11 @@ describe('History integration', () => {
 
 		it('should return true after executing command', () => {
 			const store = new Store();
-			const page = PageRecord.create('Page 1', 'page1');
+			const page = EditorPageRecord.create('Page 1', 'page1');
 
 			store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
 
-			const shape = ShapeRecord.createRect('page1', 10, 20, {
+			const shape = EditorShapeRecord.createRect('page1', 10, 20, {
 				w: 100,
 				h: 50,
 				fill: '#fff',
@@ -1012,11 +1012,11 @@ describe('History integration', () => {
 
 		it('should return true for redo after undo', () => {
 			const store = new Store();
-			const page = PageRecord.create('Page 1', 'page1');
+			const page = EditorPageRecord.create('Page 1', 'page1');
 
 			store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
 
-			const shape = ShapeRecord.createRect('page1', 10, 20, {
+			const shape = EditorShapeRecord.createRect('page1', 10, 20, {
 				w: 100,
 				h: 50,
 				fill: '#fff',
@@ -1045,11 +1045,11 @@ describe('History integration', () => {
 
 		it('should return updated history after commands', () => {
 			const store = new Store();
-			const page = PageRecord.create('Page 1', 'page1');
+			const page = EditorPageRecord.create('Page 1', 'page1');
 
 			store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
 
-			const shape = ShapeRecord.createRect('page1', 10, 20, {
+			const shape = EditorShapeRecord.createRect('page1', 10, 20, {
 				w: 100,
 				h: 50,
 				fill: '#fff',
@@ -1070,11 +1070,11 @@ describe('History integration', () => {
 	describe('clearHistory', () => {
 		it('should clear all history', () => {
 			const store = new Store();
-			const page = PageRecord.create('Page 1', 'page1');
+			const page = EditorPageRecord.create('Page 1', 'page1');
 
 			store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
 
-			const shape = ShapeRecord.createRect('page1', 10, 20, {
+			const shape = EditorShapeRecord.createRect('page1', 10, 20, {
 				w: 100,
 				h: 50,
 				fill: '#fff',
@@ -1097,11 +1097,11 @@ describe('History integration', () => {
 	describe('history with multiple commands', () => {
 		it('should handle multiple commands', () => {
 			const store = new Store();
-			const page = PageRecord.create('Page 1', 'page1');
+			const page = EditorPageRecord.create('Page 1', 'page1');
 
 			store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
 
-			const shape1 = ShapeRecord.createRect(
+			const shape1 = EditorShapeRecord.createRect(
 				'page1',
 				10,
 				20,
@@ -1109,7 +1109,7 @@ describe('History integration', () => {
 				'shape1'
 			);
 
-			const shape2 = ShapeRecord.createRect(
+			const shape2 = EditorShapeRecord.createRect(
 				'page1',
 				30,
 				40,
@@ -1146,11 +1146,11 @@ describe('History integration', () => {
 
 		it('should clear redo stack when new command is executed', () => {
 			const store = new Store();
-			const page = PageRecord.create('Page 1', 'page1');
+			const page = EditorPageRecord.create('Page 1', 'page1');
 
 			store.setState((state) => ({ ...state, doc: { ...state.doc, pages: { page1: page } } }));
 
-			const shape1 = ShapeRecord.createRect(
+			const shape1 = EditorShapeRecord.createRect(
 				'page1',
 				10,
 				20,
@@ -1158,7 +1158,7 @@ describe('History integration', () => {
 				'shape1'
 			);
 
-			const shape2 = ShapeRecord.createRect(
+			const shape2 = EditorShapeRecord.createRect(
 				'page1',
 				30,
 				40,

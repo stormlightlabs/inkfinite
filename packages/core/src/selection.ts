@@ -1,5 +1,5 @@
 import { computeNormalizedAnchor, shapeCenter } from './geom';
-import { BindingRecord, createId, ShapeRecord, type ShapeRecord as ShapeRecordType } from './model';
+import { EditorBindingRecord, createId, EditorShapeRecord, type EditorShapeRecord as ShapeRecordType } from './editor-model';
 import type { EditorState } from './reactivity';
 
 /** World-space offset used when a selection is duplicated and connected. */
@@ -81,14 +81,14 @@ export function duplicateAndConnectSelection(
 		const copyCenter = shapeCenter(copy);
 		const arrowId = createId('shape');
 		const startAnchor = computeNormalizedAnchor(copyCenter, source);
-		const startBinding = BindingRecord.create(arrowId, source.id, 'start', { kind: 'edge', ...startAnchor });
+		const startBinding = EditorBindingRecord.create(arrowId, source.id, 'start', { kind: 'edge', ...startAnchor });
 		const endAnchor = computeNormalizedAnchor(sourceCenter, copy);
-		const endBinding = BindingRecord.create(arrowId, copy.id, 'end', { kind: 'edge', ...endAnchor });
+		const endBinding = EditorBindingRecord.create(arrowId, copy.id, 'end', { kind: 'edge', ...endAnchor });
 		const style =
 			source.type === 'arrow'
 				? { ...source.props.style, headStart: false, headEnd: true }
 				: { stroke: '#2563eb', width: 2, headEnd: true };
-		const arrow = ShapeRecord.createArrow(
+		const arrow = EditorShapeRecord.createArrow(
 			source.pageId,
 			0,
 			0,
@@ -123,7 +123,7 @@ function duplicateState(state: EditorState, offset: DuplicateConnectOffset): Dup
 	const shapes = { ...state.doc.shapes };
 
 	for (const source of included) {
-		const copy = ShapeRecord.clone(source);
+		const copy = EditorShapeRecord.clone(source);
 		const id = mapping.get(source.id)!;
 		const parentId = source.groupId ? mapping.get(source.groupId) : undefined;
 		const copied = {
@@ -167,7 +167,7 @@ function duplicateState(state: EditorState, offset: DuplicateConnectOffset): Dup
 		if (!fromShapeId) continue;
 		const id = createId('binding');
 		const toShapeId = mapping.get(binding.toShapeId) ?? binding.toShapeId;
-		bindings[id] = { ...BindingRecord.clone(binding), id, fromShapeId, toShapeId };
+		bindings[id] = { ...EditorBindingRecord.clone(binding), id, fromShapeId, toShapeId };
 	}
 	for (const source of included) {
 		const id = mapping.get(source.id);

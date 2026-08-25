@@ -1,10 +1,10 @@
-import { EditorState, ShapeRecord, Store } from '@inkfinite/core';
+import { EditorState, EditorShapeRecord, Store } from '@inkfinite/core';
 
 export function createStoreWithRect(): Store {
 	const store = new Store();
 	const base = EditorState.create();
 	const pageId = 'page:rect';
-	const rect = ShapeRecord.createRect(
+	const rect = EditorShapeRecord.createRect(
 		pageId,
 		0,
 		0,
@@ -27,7 +27,7 @@ export function createStoreWithLine(): Store {
 	const store = new Store();
 	const base = EditorState.create();
 	const pageId = 'page:line';
-	const line = ShapeRecord.createLine(
+	const line = EditorShapeRecord.createLine(
 		pageId,
 		0,
 		0,

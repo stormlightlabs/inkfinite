@@ -20,7 +20,7 @@ import {
 import { nearestPointOnPath, pathLength } from '../path-metrics';
 import { Box2, clamp, Mat3, type Vec2, Vec2 as Vec2Ops } from '../math';
 import { duplicateAndConnectSelection } from '../selection';
-import { BindingRecord, createId, ShapeRecord } from '../model';
+import { EditorBindingRecord, createId, EditorShapeRecord } from '../editor-model';
 import { EditorState, getCurrentPage, getSelectionScopeShapes, selectionTarget, type ToolId } from '../reactivity';
 import { snapAngle, type SnapResult } from '../snapping';
 import type { Tool } from './base';
@@ -36,7 +36,7 @@ type SelectToolState = {
 	/** Initial positions of shapes being dragged (shape id -> {x, y}) */
 	initialShapePositions: Map<string, Vec2>;
 	/** Full shape snapshots used to preview nested affine movement. */
-	initialShapes: Map<string, ShapeRecord>;
+	initialShapes: Map<string, EditorShapeRecord>;
 	/** Marquee selection start point in world coordinates */
 	marqueeStart: Vec2 | null;
 	/** Marquee selection end point in world coordinates */
@@ -48,7 +48,7 @@ type SelectToolState = {
 	/** Bounds snapshot at the time handle drag started */
 	handleStartBounds: Box2 | null;
 	/** Initial shapes snapshot for handle drags */
-	handleInitialShapes: Map<string, ShapeRecord>;
+	handleInitialShapes: Map<string, EditorShapeRecord>;
 	/** Rotation pivot in world coordinates */
 	rotationCenter: Vec2 | null;
 	/** Starting angle for rotation handle */
@@ -79,7 +79,7 @@ type HandleKind =
 export type SelectSnapContext = {
 	state: EditorState;
 	selectionIds: string[];
-	initialShapes: ReadonlyMap<string, ShapeRecord>;
+	initialShapes: ReadonlyMap<string, EditorShapeRecord>;
 	leadPosition: Vec2;
 	delta: Vec2;
 };
@@ -204,7 +204,7 @@ export class SelectTool implements Tool {
 		return hitShapeId ? this.handleShapeClick(state, hitShapeId, action) : this.handleEmptyClick(state, action);
 	}
 
-	private hitTestHandle(state: EditorState, point: Vec2): { handle: HandleKind; shape: ShapeRecord } | null {
+	private hitTestHandle(state: EditorState, point: Vec2): { handle: HandleKind; shape: EditorShapeRecord } | null {
 		if (state.ui.selectionIds.length !== 1) {
 			return null;
 		}
@@ -278,15 +278,15 @@ export class SelectTool implements Tool {
 		this.toolState.cyclePendingTarget = null;
 	}
 
-	private beginHandleDrag(state: EditorState, shape: ShapeRecord, handle: HandleKind, point: Vec2): EditorState {
+	private beginHandleDrag(state: EditorState, shape: EditorShapeRecord, handle: HandleKind, point: Vec2): EditorState {
 		this.toolState.activeHandle = handle;
 		this.toolState.handleShapeId = shape.id;
 		this.toolState.handleStartBounds = shapeBounds(shape);
 		this.toolState.handleInitialShapes.clear();
-		this.toolState.handleInitialShapes.set(shape.id, ShapeRecord.clone(shape));
+		this.toolState.handleInitialShapes.set(shape.id, EditorShapeRecord.clone(shape));
 		for (const descendant of Object.values(state.doc.shapes)) {
 			if (hasSelectedAncestor(descendant, [shape.id], state)) {
-				this.toolState.handleInitialShapes.set(descendant.id, ShapeRecord.clone(descendant));
+				this.toolState.handleInitialShapes.set(descendant.id, EditorShapeRecord.clone(descendant));
 			}
 		}
 		this.toolState.isDragging = false;
@@ -352,13 +352,13 @@ export class SelectTool implements Tool {
 			const shape = selectionState.doc.shapes[id];
 			if (shape) {
 				this.toolState.initialShapePositions.set(id, { x: shape.x, y: shape.y });
-				this.toolState.initialShapes.set(id, ShapeRecord.clone(shape));
+				this.toolState.initialShapes.set(id, EditorShapeRecord.clone(shape));
 			}
 		}
 		for (const shape of Object.values(selectionState.doc.shapes)) {
 			if (!selectionIds.includes(shape.id) && hasSelectedAncestor(shape, selectionIds, selectionState)) {
 				this.toolState.initialShapePositions.set(shape.id, { x: shape.x, y: shape.y });
-				this.toolState.initialShapes.set(shape.id, ShapeRecord.clone(shape));
+				this.toolState.initialShapes.set(shape.id, EditorShapeRecord.clone(shape));
 			}
 		}
 
@@ -428,7 +428,7 @@ export class SelectTool implements Tool {
 			this.toolState.activeHandle === 'rotate'
 				? action.world
 				: this.snapHandlePoint(action.world, state, [shapeId]);
-		let updated: ShapeRecord | null = null;
+		let updated: EditorShapeRecord | null = null;
 		if (this.toolState.activeHandle === 'rotate') {
 			updated = this.rotateShape(state, initialShape, snappedPoint, action.modifiers.shift);
 		} else if (this.toolState.activeHandle === 'arrow-label') {
@@ -826,7 +826,7 @@ export class SelectTool implements Tool {
 		return snapped;
 	}
 
-	private getHandlePositions(state: EditorState, shape: ShapeRecord): Array<{ id: HandleKind; position: Vec2 }> {
+	private getHandlePositions(state: EditorState, shape: EditorShapeRecord): Array<{ id: HandleKind; position: Vec2 }> {
 		const handles: Array<{ id: HandleKind; position: Vec2 }> = [];
 		if (shape.type === 'text' && shape.props.textPath) {
 			const position = textPathAnchorForShape(state, shape);
@@ -893,12 +893,12 @@ export class SelectTool implements Tool {
 	}
 
 	private resizeRectLikeShape(
-		initial: ShapeRecord,
+		initial: EditorShapeRecord,
 		_bounds: Box2,
 		pointer: Vec2,
 		handle: HandleKind,
 		modifiers: { shift: boolean; alt: boolean }
-	): ShapeRecord | null {
+	): EditorShapeRecord | null {
 		if (
 			initial.type !== 'rect' &&
 			initial.type !== 'ellipse' &&
@@ -987,15 +987,15 @@ export class SelectTool implements Tool {
 		const translated = [...matrix] as Mat3;
 		translated[6] += matrix[0] * minX + matrix[3] * minY;
 		translated[7] += matrix[1] * minX + matrix[4] * minY;
-		let resized: ShapeRecord;
+		let resized: EditorShapeRecord;
 		if (initial.type === 'text') resized = { ...initial, props: { ...initial.props, w: width } };
 		else if (initial.type === 'markdown')
 			resized = { ...initial, props: { ...initial.props, w: width, h: height } };
-		else resized = { ...initial, props: { ...initial.props, w: width, h: height } } as ShapeRecord;
+		else resized = { ...initial, props: { ...initial.props, w: width, h: height } } as EditorShapeRecord;
 		return updateShapeTransform(resized, translated);
 	}
 
-	private adjustArrowLabel(state: EditorState, initial: ShapeRecord, pointer: Vec2): ShapeRecord | null {
+	private adjustArrowLabel(state: EditorState, initial: EditorShapeRecord, pointer: Vec2): EditorShapeRecord | null {
 		if (
 			initial.type !== 'arrow' ||
 			!initial.props.points ||
@@ -1023,7 +1023,7 @@ export class SelectTool implements Tool {
 		};
 	}
 
-	private adjustTextPath(state: EditorState, initial: ShapeRecord, pointer: Vec2): ShapeRecord | null {
+	private adjustTextPath(state: EditorState, initial: EditorShapeRecord, pointer: Vec2): EditorShapeRecord | null {
 		if (initial.type !== 'text' || !initial.props.textPath) return null;
 		const path = supportingPathForText(state, initial);
 		if (!path) return null;
@@ -1038,11 +1038,11 @@ export class SelectTool implements Tool {
 
 	private resizeLineShape(
 		state: EditorState,
-		initial: ShapeRecord,
+		initial: EditorShapeRecord,
 		pointer: Vec2,
 		handle: HandleKind,
 		constrainAngle: boolean
-	): ShapeRecord | null {
+	): EditorShapeRecord | null {
 		if (initial.type !== 'line' && initial.type !== 'arrow') {
 			return null;
 		}
@@ -1113,10 +1113,10 @@ export class SelectTool implements Tool {
 
 	private rotateShape(
 		state: EditorState,
-		initial: ShapeRecord,
+		initial: EditorShapeRecord,
 		pointer: Vec2,
 		constrainAngle: boolean
-	): ShapeRecord | null {
+	): EditorShapeRecord | null {
 		if (!this.toolState.rotationCenter || this.toolState.rotationStartAngle === null) return null;
 		const currentAngle = Math.atan2(
 			pointer.y - this.toolState.rotationCenter.y,
@@ -1169,7 +1169,7 @@ export class SelectTool implements Tool {
 	 * Try to add a point to an arrow segment at the clicked location
 	 * Returns updated state if successful, null otherwise
 	 */
-	private tryAddPointToArrowSegment(state: EditorState, arrow: ShapeRecord, clickWorld: Vec2): EditorState | null {
+	private tryAddPointToArrowSegment(state: EditorState, arrow: EditorShapeRecord, clickWorld: Vec2): EditorState | null {
 		if (arrow.type !== 'arrow' || !arrow.props.points || arrow.props.points.length < 2) {
 			return null;
 		}
@@ -1241,7 +1241,7 @@ export class SelectTool implements Tool {
 			const targetShape = state.doc.shapes[hitShapeId];
 			if (targetShape) {
 				const anchor = computeNormalizedAnchor(endpointWorld, targetShape);
-				const binding = BindingRecord.create(arrowId, hitShapeId, handle, {
+				const binding = EditorBindingRecord.create(arrowId, hitShapeId, handle, {
 					kind: 'edge',
 					nx: anchor.nx,
 					ny: anchor.ny
@@ -1268,9 +1268,9 @@ function duplicateSelectionForDrag(state: EditorState): EditorState {
 	for (const [oldId, newId] of mapping) {
 		const original = state.doc.shapes[oldId];
 		if (!original) continue;
-		const copy = ShapeRecord.clone(original);
+		const copy = EditorShapeRecord.clone(original);
 		const nextGroupId = copy.groupId ? mapping.get(copy.groupId) : undefined;
-		const cloned: ShapeRecord = { ...copy, id: newId, ...(nextGroupId ? { groupId: nextGroupId } : {}) };
+		const cloned: EditorShapeRecord = { ...copy, id: newId, ...(nextGroupId ? { groupId: nextGroupId } : {}) };
 		if (cloned.type === 'arrow') {
 			cloned.props = { ...cloned.props, start: { ...cloned.props.start }, end: { ...cloned.props.end } };
 		}
@@ -1293,7 +1293,7 @@ function duplicateSelectionForDrag(state: EditorState): EditorState {
 		const id = createId('binding');
 		bindingMapping.set(binding.id, id);
 		bindings[id] = {
-			...BindingRecord.clone(binding),
+			...EditorBindingRecord.clone(binding),
 			id,
 			fromShapeId,
 			toShapeId: mapping.get(binding.toShapeId) ?? binding.toShapeId
@@ -1337,7 +1337,7 @@ function constrainAxis(delta: Vec2): Vec2 {
 	return { x: 0, y: delta.y };
 }
 
-function hasSelectedAncestor(shape: ShapeRecord, selectedIds: string[], state: EditorState): boolean {
+function hasSelectedAncestor(shape: EditorShapeRecord, selectedIds: string[], state: EditorState): boolean {
 	let parentId = shape.groupId;
 	while (parentId) {
 		if (selectedIds.includes(parentId)) return true;
@@ -1353,7 +1353,7 @@ function removeSelectedDescendants(state: EditorState, ids: string[]): string[] 
 	});
 }
 
-function updateShapeTransform(shape: ShapeRecord, matrix: Mat3): ShapeRecord {
+function updateShapeTransform(shape: EditorShapeRecord, matrix: Mat3): EditorShapeRecord {
 	return {
 		...shape,
 		x: matrix[6],
@@ -1363,7 +1363,7 @@ function updateShapeTransform(shape: ShapeRecord, matrix: Mat3): ShapeRecord {
 	};
 }
 
-function translateShape(shape: ShapeRecord, delta: Vec2): ShapeRecord {
+function translateShape(shape: EditorShapeRecord, delta: Vec2): EditorShapeRecord {
 	const matrix = [...shapeTransform(shape)] as Mat3;
 	matrix[6] += delta.x;
 	matrix[7] += delta.y;

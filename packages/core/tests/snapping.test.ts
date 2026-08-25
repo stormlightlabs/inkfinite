@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { snapAngle, snapPoint, snapTranslation } from '../src/snapping';
-import { PageRecord, ShapeRecord } from '../src/model';
+import { EditorPageRecord, EditorShapeRecord } from '../src/editor-model';
 import { EditorState } from '../src/reactivity';
 
 const options = { snapEnabled: true, gridEnabled: false, gridSize: 25, snapDistance: 8 };
 
-function stateWithShapes(shapes: ReturnType<typeof ShapeRecord.createRect>[]) {
-	const page = PageRecord.create('Snap page', 'page:snap');
+function stateWithShapes(shapes: ReturnType<typeof EditorShapeRecord.createRect>[]) {
+	const page = EditorPageRecord.create('Snap page', 'page:snap');
 	page.shapeIds = shapes.map((shape) => shape.id);
 	return {
 		...EditorState.create(),
@@ -21,7 +21,7 @@ function stateWithShapes(shapes: ReturnType<typeof ShapeRecord.createRect>[]) {
 
 describe('geometry snapping', () => {
 	it('snaps a point to object edges and reports alignment guides', () => {
-		const target = ShapeRecord.createRect(
+		const target = EditorShapeRecord.createRect(
 			'page:snap',
 			100,
 			50,
@@ -41,14 +41,14 @@ describe('geometry snapping', () => {
 	});
 
 	it('snaps a moving selection to another shape while retaining its lead offset', () => {
-		const moving = ShapeRecord.createRect(
+		const moving = EditorShapeRecord.createRect(
 			'page:snap',
 			92,
 			20,
 			{ w: 20, h: 20, fill: '', stroke: '', radius: 0 },
 			'shape:moving'
 		);
-		const target = ShapeRecord.createRect(
+		const target = EditorShapeRecord.createRect(
 			'page:snap',
 			100,
 			20,

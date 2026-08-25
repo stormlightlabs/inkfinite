@@ -1,10 +1,10 @@
-import { EditorState, LayerRecord, PageRecord, cardToContentObject, contentObjectToCard, stencils } from '../src';
+import { EditorState, EditorLayerRecord, EditorPageRecord, cardToContentObject, contentObjectToCard, stencils } from '../src';
 import { describe, expect, it } from 'vitest';
 
 function stateForLayer({ visible = true, locked = false, opacity = 1 } = {}) {
 	const state = EditorState.create();
-	const page = PageRecord.create('Page', 'page');
-	const layer = { ...LayerRecord.create(page.id, 'Active', 'layer'), visible, locked, opacity };
+	const page = EditorPageRecord.create('Page', 'page');
+	const layer = { ...EditorLayerRecord.create(page.id, 'Active', 'layer'), visible, locked, opacity };
 	return {
 		...state,
 		doc: {

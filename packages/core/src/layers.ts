@@ -1,11 +1,11 @@
 import type { EditorState } from './reactivity';
-import { createId, type LayerRecord } from './model';
+import { createId, type EditorLayerRecord } from './editor-model';
 
 /** Required handling for shapes when deleting a non-empty layer. */
 export type LayerDeleteDisposition = { kind: 'move'; destinationLayerId: string } | { kind: 'delete' };
 
 /** Returns whether a layer can receive newly created or moved shapes. */
-export function isWritableLayer(layer: LayerRecord | undefined): layer is LayerRecord {
+export function isWritableLayer(layer: EditorLayerRecord | undefined): layer is EditorLayerRecord {
 	return Boolean(layer?.visible && !layer.locked);
 }
 
@@ -30,7 +30,7 @@ export function createLayer(state: EditorState, name = 'Layer'): EditorState {
 	if (!pageId) return state;
 	const page = state.doc.pages[pageId];
 	if (!page) return state;
-	const layer: LayerRecord = {
+	const layer: EditorLayerRecord = {
 		id: createId('layer'),
 		pageId,
 		name: name.trim() || 'Layer',
@@ -54,7 +54,7 @@ export function createLayer(state: EditorState, name = 'Layer'): EditorState {
 export function patchLayer(
 	state: EditorState,
 	layerId: string,
-	patch: Partial<Pick<LayerRecord, 'name' | 'visible' | 'locked' | 'opacity'>>
+	patch: Partial<Pick<EditorLayerRecord, 'name' | 'visible' | 'locked' | 'opacity'>>
 ): EditorState {
 	const layer = state.doc.layers?.[layerId];
 	if (!layer) return state;

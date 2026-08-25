@@ -1,6 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { createEditorReconciliationRequest, createId } from '@inkfinite/core';
+import {
+	createEditorReconciliationRequest,
+	createId,
+	fromCanonicalDocumentSnapshot,
+	fromEditorProjection
+} from '@inkfinite/core';
 import type {
 	BoardExport,
 	BoardMeta,
@@ -8,26 +13,22 @@ import type {
 	DocPatch,
 	FileHandle,
 	LoadedDoc,
-	LayerRecord as EditorLayerRecord,
-	PageRecord as EditorPageRecord,
-	BindingRecord as EditorBindingRecord,
+	EditorLayerRecord,
+	EditorPageRecord,
 	PersistenceSink,
 	PersistenceStatus,
-	PersistentDocRepo,
-	ShapeRecord as EditorShapeRecord
+	PersistentDocRepo
 } from '@inkfinite/core';
 import type {
 	ChangeHash,
 	CommitResult,
 	DocumentSnapshot,
-	JsonValue,
 	Query,
 	QueryResult,
 	Proposal,
-	ShapeRecord,
 	TransactionDraft
 } from '@inkfinite/bindings';
-import type { EditorPatch, EditorProjection, EditorTransform } from '@inkfinite/bindings/editor';
+import type { EditorPatch, EditorProjection } from '@inkfinite/bindings/editor';
 
 const ACTOR_ID = 'actor:desktop';
 
@@ -438,8 +439,8 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 			updatedAt: modifiedAt ?? currentBoard?.updatedAt ?? Date.now()
 		};
 		currentDoc = status.editor_projection
-			? loadedDocFromProjection(status.editor_projection, status.snapshot)
-			: loadedDocFromSnapshot(status.snapshot);
+			? fromEditorProjection(status.editor_projection, status.snapshot)
+			: fromCanonicalDocumentSnapshot(status.snapshot);
 		if (!isDraft) {
 			boardFiles.set(currentBoard.id, currentFile);
 			boardFiles.set(boardIdForPath(status.path), currentFile);
@@ -451,8 +452,8 @@ export function createDesktopSessionRepo(fileOps: DesktopFileOps, opts: { api?: 
 		currentStatus = status;
 		currentFile = { path: status.path, name: fileName(status.path), modifiedAt: Date.now() };
 		currentDoc = status.editor_projection
-			? loadedDocFromProjection(status.editor_projection, status.snapshot)
-			: loadedDocFromSnapshot(status.snapshot);
+			? fromEditorProjection(status.editor_projection, status.snapshot)
+			: fromCanonicalDocumentSnapshot(status.snapshot);
 		if (currentBoard && currentFile && !currentIsDraft) {
 			currentBoard = { ...currentBoard, updatedAt: Date.now() };
 			boardFiles.set(currentBoard.id, currentFile);
@@ -1029,277 +1030,6 @@ async function listDocumentEntries(fileOps: DesktopFileOps, directory: string) {
 		seen.add(entry.path);
 		return true;
 	});
-}
-
-function loadedDocFromProjection(projection: EditorProjection, snapshot?: DocumentSnapshot): LoadedDoc {
-	const pages: Record<string, EditorPageRecord> = {};
-	const layers: Record<string, EditorLayerRecord> = {};
-	const shapes: Record<string, EditorShapeRecord> = {};
-	const bindings: Record<string, EditorBindingRecord> = {};
-
-	for (const pageId of projection.order.page_ids) {
-		const page = projection.pages[pageId];
-		if (!page) continue;
-		pages[page.id] = { id: page.id, name: page.name, shapeIds: [...page.shape_ids], layerIds: [...page.layer_ids] };
-	}
-	for (const layer of Object.values(projection.layers)) {
-		layers[layer.id] = {
-			id: layer.id,
-			pageId: layer.page_id,
-			name: layer.name,
-			shapeIds: [...layer.shape_ids],
-			visible: layer.visible,
-			locked: layer.locked,
-			opacity: layer.opacity
-		};
-	}
-	for (const shape of Object.values(projection.shapes)) {
-		shapes[shape.id] = {
-			id: shape.id,
-			type: shape.type as EditorShapeRecord['type'],
-			pageId: shape.page_id,
-			x: shape.x,
-			y: shape.y,
-			rot: shape.rot,
-			editorTransform: shape.transform,
-			opacity: shape.opacity,
-			...(shape.fill_opacity !== null ? { fillOpacity: shape.fill_opacity } : {}),
-			...(shape.stroke_opacity !== null ? { strokeOpacity: shape.stroke_opacity } : {}),
-			...(shape.group_id ? { groupId: shape.group_id } : {}),
-			layerId: shape.layer_id,
-			locked: shape.locked,
-			agentEditable: shape.agent_editable,
-			props: shape.props as EditorShapeRecord['props']
-		} as EditorShapeRecord;
-	}
-	for (const binding of Object.values(projection.bindings)) {
-		bindings[binding.id] = {
-			id: binding.id,
-			type: binding.type as 'arrow-end',
-			fromShapeId: binding.from_shape_id,
-			toShapeId: binding.to_shape_id,
-			handle: binding.handle as 'start' | 'end',
-			anchor:
-				binding.anchor.kind === 'center'
-					? { kind: 'center' }
-					: { kind: 'edge', nx: binding.anchor.x, ny: binding.anchor.y }
-		};
-	}
-	const assets = Object.fromEntries(
-		Object.values(snapshot?.document.assets ?? {}).flatMap((asset) =>
-			asset.source.kind === 'embedded'
-				? [
-						[
-							asset.id,
-							{
-								id: asset.id,
-								name: asset.name,
-								mediaType: asset.media_type,
-								digest: asset.digest,
-								bytes: [...asset.source.bytes]
-							}
-						]
-					]
-				: []
-		)
-	);
-	return {
-		pages,
-		layers,
-		shapes,
-		bindings,
-		...(Object.keys(assets).length > 0 ? { assets } : {}),
-		order: {
-			pageIds: [...projection.order.page_ids],
-			shapeOrder: Object.fromEntries(
-				Object.entries(projection.order.shape_order).map(([pageId, shapeIds]) => [pageId, [...shapeIds]])
-			),
-			layers
-		}
-	};
-}
-
-function loadedDocFromSnapshot(snapshot: DocumentSnapshot): LoadedDoc {
-	const pages: Record<string, EditorPageRecord> = {};
-	const layers: Record<string, EditorLayerRecord> = {};
-	const shapes: Record<string, EditorShapeRecord> = {};
-	const bindings: Record<string, EditorBindingRecord> = {};
-	const shapeOrder: Record<string, string[]> = {};
-
-	for (const pageId of snapshot.document.page_ids) {
-		const page = snapshot.document.pages[pageId];
-		if (!page) continue;
-		const flattened: string[] = [];
-		for (const layerId of page.layer_ids) {
-			const layer = snapshot.document.layers[layerId];
-			if (!layer) continue;
-			const layerShapeIds: string[] = [];
-			for (const shapeId of layer.shape_ids) {
-				flattenShape(
-					snapshot,
-					page.id,
-					layer.id,
-					shapeId,
-					undefined,
-					identityEditorTransform(),
-					layerShapeIds,
-					shapes
-				);
-			}
-			flattened.push(...layerShapeIds);
-			layers[layer.id] = {
-				id: layer.id,
-				pageId: page.id,
-				name: layer.name,
-				shapeIds: layerShapeIds,
-				visible: layer.visible,
-				locked: layer.locked,
-				opacity: layer.opacity
-			};
-		}
-		pages[page.id] = { id: page.id, name: page.name, shapeIds: flattened, layerIds: [...page.layer_ids] };
-		shapeOrder[page.id] = [...flattened];
-	}
-
-	for (const binding of Object.values(snapshot.document.bindings)) {
-		bindings[binding.id] = {
-			id: binding.id,
-			type: binding.kind as 'arrow-end',
-			fromShapeId: binding.source_shape_id,
-			toShapeId: binding.target_shape_id,
-			handle: binding.source_handle as 'start' | 'end',
-			anchor:
-				binding.anchor.kind === 'center'
-					? { kind: 'center' }
-					: { kind: 'edge', nx: binding.anchor.x, ny: binding.anchor.y }
-		};
-	}
-
-	const assets = Object.fromEntries(
-		Object.values(snapshot.document.assets).flatMap((asset) =>
-			asset.source.kind === 'embedded'
-				? [
-						[
-							asset.id,
-							{
-								id: asset.id,
-								name: asset.name,
-								mediaType: asset.media_type,
-								digest: asset.digest,
-								bytes: [...asset.source.bytes]
-							}
-						]
-					]
-				: []
-		)
-	);
-	return {
-		pages,
-		layers,
-		shapes,
-		bindings,
-		...(Object.keys(assets).length > 0 ? { assets } : {}),
-		order: { pageIds: [...snapshot.document.page_ids], shapeOrder, layers }
-	};
-}
-
-function flattenShape(
-	snapshot: DocumentSnapshot,
-	pageId: string,
-	layerId: string,
-	shapeId: string,
-	groupId: string | undefined,
-	parentTransform: EditorTransform,
-	flattened: string[],
-	shapes: Record<string, EditorShapeRecord>
-) {
-	const shape = snapshot.document.shapes[shapeId];
-	if (!shape) return;
-	const worldTransform = multiplyEditorTransforms(parentTransform, nativeEditorTransform(shape));
-	flattened.push(shape.id);
-	shapes[shape.id] = { ...editorShapeFromSnapshot(shape, pageId, groupId, worldTransform), layerId };
-	for (const childId of shape.child_ids) {
-		flattenShape(
-			snapshot,
-			pageId,
-			layerId,
-			childId,
-			shape.kind === 'container' ? shape.id : groupId,
-			worldTransform,
-			flattened,
-			shapes
-		);
-	}
-}
-
-function editorShapeFromSnapshot(
-	shape: ShapeRecord,
-	pageId: string,
-	groupId: string | undefined,
-	worldTransform = nativeEditorTransform(shape)
-): EditorShapeRecord {
-	const properties = { ...(shape.properties as Record<string, JsonValue>) };
-	if ('width' in properties) {
-		properties.w = properties.width;
-		delete properties.width;
-	}
-	if ('height' in properties) {
-		properties.h = properties.height;
-		delete properties.height;
-	}
-	if (shape.kind === 'stroke' && shape.style.stroke_opacity !== null) {
-		const strokeStyle = properties.style;
-		properties.style = {
-			...(typeof strokeStyle === 'object' && strokeStyle !== null && !Array.isArray(strokeStyle)
-				? strokeStyle
-				: {}),
-			opacity: shape.style.stroke_opacity
-		};
-	}
-	return {
-		id: shape.id,
-		type: shape.kind as EditorShapeRecord['type'],
-		pageId,
-		x: worldTransform.e,
-		y: worldTransform.f,
-		rot: Math.atan2(worldTransform.b, worldTransform.a),
-		editorTransform: worldTransform,
-		opacity: shape.style.opacity,
-		...(shape.style.fill_opacity !== null ? { fillOpacity: shape.style.fill_opacity } : {}),
-		...(shape.style.stroke_opacity !== null ? { strokeOpacity: shape.style.stroke_opacity } : {}),
-		...(groupId ? { groupId } : {}),
-		locked: shape.metadata.locked,
-		agentEditable: shape.metadata.agent_editable,
-		props: properties as EditorShapeRecord['props']
-	} as EditorShapeRecord;
-}
-
-function identityEditorTransform(): EditorTransform {
-	return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
-}
-
-function nativeEditorTransform(shape: ShapeRecord): EditorTransform {
-	const cos = Math.cos(shape.transform.rotation);
-	const sin = Math.sin(shape.transform.rotation);
-	return {
-		a: cos * shape.transform.scale_x,
-		b: sin * shape.transform.scale_x,
-		c: -sin * shape.transform.scale_y,
-		d: cos * shape.transform.scale_y,
-		e: shape.transform.translation.x,
-		f: shape.transform.translation.y
-	};
-}
-
-function multiplyEditorTransforms(parent: EditorTransform, child: EditorTransform): EditorTransform {
-	return {
-		a: parent.a * child.a + parent.c * child.b,
-		b: parent.b * child.a + parent.d * child.b,
-		c: parent.a * child.c + parent.c * child.d,
-		d: parent.b * child.c + parent.d * child.d,
-		e: parent.a * child.e + parent.c * child.f + parent.e,
-		f: parent.b * child.e + parent.d * child.f + parent.f
-	};
 }
 
 function applyPatch(doc: LoadedDoc, patch: DocPatch): LoadedDoc {

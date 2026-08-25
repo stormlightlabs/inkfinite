@@ -13,9 +13,9 @@ describe("Core exports", () => {
   });
 
   it("should export model types and functions", () => {
-    expect(core.ShapeRecord).toBeDefined();
-    expect(core.PageRecord).toBeDefined();
-    expect(core.Document).toBeDefined();
+    expect(core.EditorShapeRecord).toBeDefined();
+    expect(core.EditorPageRecord).toBeDefined();
+    expect(core.EditorDocument).toBeDefined();
   });
 
   it("should export reactivity functions", () => {

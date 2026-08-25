@@ -1,5 +1,5 @@
 import type { Action } from "../actions";
-import { createId, ShapeRecord } from "../model";
+import { createId, EditorShapeRecord } from "../editor-model";
 import type { EditorState, ToolId } from "../reactivity";
 import { canCreateShapeOnActiveLayer, getCurrentPage } from "../reactivity";
 import type { Tool } from "./base";
@@ -38,7 +38,7 @@ export class MarkdownTool implements Tool {
 
     const shapeId = createId("shape");
 
-    const shape = ShapeRecord.createMarkdown(currentPage.id, action.world.x, action.world.y, {
+    const shape = EditorShapeRecord.createMarkdown(currentPage.id, action.world.x, action.world.y, {
       md: "# Markdown\n\nEdit me...",
       w: 300,
       h: 200,

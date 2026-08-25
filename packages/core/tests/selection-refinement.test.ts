@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { Action, Modifiers, PointerButtons } from '../src/actions';
 import { convertSelectedShapes, duplicateAndConnectSelection, duplicateSelection } from '../src/selection';
-import { PageRecord, ShapeRecord } from '../src/model';
+import { EditorPageRecord, EditorShapeRecord } from '../src/editor-model';
 import { EditorState } from '../src/reactivity';
 import { RectTool, SelectTool } from '../src/tools';
 
 const down = PointerButtons.create(true, false, false);
 function selectionState() {
-	const page = PageRecord.create('Selection page', 'page:selection');
-	const shape = ShapeRecord.createRect(page.id, 0, 0, { w: 40, h: 30, fill: '', stroke: '', radius: 0 }, 'shape:one');
+	const page = EditorPageRecord.create('Selection page', 'page:selection');
+	const shape = EditorShapeRecord.createRect(page.id, 0, 0, { w: 40, h: 30, fill: '', stroke: '', radius: 0 }, 'shape:one');
 	page.shapeIds = [shape.id];
 	return {
 		...EditorState.create(),
@@ -68,15 +68,15 @@ describe('selection and movement refinements', () => {
 	});
 
 	it('cycles through overlapping shapes on repeated clicks at one point', () => {
-		const page = PageRecord.create('Overlap page', 'page:overlap');
-		const back = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Overlap page', 'page:overlap');
+		const back = EditorShapeRecord.createRect(
 			page.id,
 			0,
 			0,
 			{ w: 40, h: 30, fill: '', stroke: '', radius: 0 },
 			'shape:back'
 		);
-		const front = ShapeRecord.createRect(
+		const front = EditorShapeRecord.createRect(
 			page.id,
 			0,
 			0,
@@ -126,22 +126,22 @@ describe('selection and movement refinements', () => {
 	});
 
 	it('cycles independently inside a nested selection scope', () => {
-		const page = PageRecord.create('Nested page', 'page:nested');
-		const frame = ShapeRecord.createContainer(
+		const page = EditorPageRecord.create('Nested page', 'page:nested');
+		const frame = EditorShapeRecord.createContainer(
 			page.id,
 			0,
 			0,
 			{ w: 50, h: 50, fill: '', stroke: '', radius: 0 },
 			'shape:frame'
 		);
-		const back = ShapeRecord.createRect(
+		const back = EditorShapeRecord.createRect(
 			page.id,
 			0,
 			0,
 			{ w: 40, h: 30, fill: '', stroke: '', radius: 0 },
 			'shape:nested-back'
 		);
-		const front = ShapeRecord.createRect(
+		const front = EditorShapeRecord.createRect(
 			page.id,
 			0,
 			0,
@@ -245,7 +245,7 @@ describe('selection and movement refinements', () => {
 
 	it('does not convert shapes that participate in a connector binding', () => {
 		const state = selectionState() as EditorState;
-		const arrow = ShapeRecord.createArrow(
+		const arrow = EditorShapeRecord.createArrow(
 			state.doc.pages['page:selection']!.id,
 			0,
 			0,
@@ -275,7 +275,7 @@ describe('selection and movement refinements', () => {
 
 	it('uses Shift and Alt for square centered rectangle creation', () => {
 		const tool = new RectTool();
-		const page = PageRecord.create('Draw page', 'page:draw');
+		const page = EditorPageRecord.create('Draw page', 'page:draw');
 		const state = {
 			...EditorState.create(),
 			doc: { pages: { [page.id]: page }, shapes: {}, bindings: {} },

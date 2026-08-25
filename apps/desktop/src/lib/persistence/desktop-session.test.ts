@@ -1,4 +1,4 @@
-import { PageRecord, ShapeRecord, type BoardExport, type DesktopFileOps, type FileHandle } from '@inkfinite/core';
+import { EditorPageRecord, EditorShapeRecord, type BoardExport, type DesktopFileOps, type FileHandle } from '@inkfinite/core';
 import type { ChangeHash, DocumentSnapshot, Proposal, ShapeProperties, TransactionDraft } from '@inkfinite/bindings';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createDesktopSessionRepo } from '$lib/persistence/desktop-session';
@@ -721,8 +721,8 @@ describe('Rust-backed desktop session repository', () => {
 
 	it('imports editable canvas content into the Rust-backed canonical document', async () => {
 		fileOps.setSavePath('/tmp/imported.inkfinite');
-		const page = PageRecord.create('Imported canvas', 'page:imported');
-		const shape = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Imported canvas', 'page:imported');
+		const shape = EditorShapeRecord.createRect(
 			page.id,
 			12,
 			24,

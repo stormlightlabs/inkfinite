@@ -1,5 +1,5 @@
 import { Vec2 } from "../math";
-import { ShapeRecord } from "../model";
+import { EditorShapeRecord } from "../editor-model";
 
 export type StencilCategory = "Flowchart" | "Diagrams" | "UI" | "Content" | "Etc";
 
@@ -13,5 +13,5 @@ export interface Stencil {
    * Create the shapes for this stencil at the given position.
    * If multiple shapes are returned, they should ideally share a groupId.
    */
-  spawn: (atPoint: Vec2) => ShapeRecord[];
+  spawn: (atPoint: Vec2) => EditorShapeRecord[];
 }

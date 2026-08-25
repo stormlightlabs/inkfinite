@@ -1,4 +1,4 @@
-import { createId, type ShapeRecord } from '../model';
+import { createId, type EditorShapeRecord } from '../editor-model';
 import { canCreateShapeOnActiveLayer, type EditorState } from '../reactivity';
 import type { Stencil } from './types';
 
@@ -43,7 +43,7 @@ export function insertStencil(
 	const insertedIds: string[] = [];
 	const selectionIds: string[] = [];
 	for (const spawnedShape of spawned) {
-		const shape: ShapeRecord = {
+		const shape: EditorShapeRecord = {
 			...spawnedShape,
 			pageId,
 			...(activeLayerId ? { layerId: activeLayerId } : {}),

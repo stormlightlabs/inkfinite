@@ -1,12 +1,12 @@
 import { shapeBounds } from '../geom';
 import { paintColor } from '../paint';
 import {
-	BindingRecord,
+	EditorBindingRecord,
 	ensureDocumentLayers,
-	ShapeRecord,
+	EditorShapeRecord,
 	type BindingAnchor,
-	type ShapeRecord as Shape
-} from '../model';
+	type EditorShapeRecord as Shape
+} from '../editor-model';
 import type { BoardExport } from '../persistence/document';
 import type { InterchangeExport, InterchangeImport } from '../interchange';
 import {
@@ -99,7 +99,7 @@ export function importJsonCanvas(root: JsonObject, fileName: string): Interchang
 		switch (type) {
 			case 'text': {
 				if (typeof node.text !== 'string') throw new Error(`nodes[${index}].text must be a string.`);
-				shape = ShapeRecord.createMarkdown(
+				shape = EditorShapeRecord.createMarkdown(
 					pageId,
 					x,
 					y,
@@ -113,7 +113,7 @@ export function importJsonCanvas(root: JsonObject, fileName: string): Interchang
 				const subpath = typeof node.subpath === 'string' ? node.subpath : '';
 				if (subpath && !subpath.startsWith('#'))
 					warnings.add('json-canvas-file-subpath', 'File subpaths must start with # and were ignored.');
-				shape = ShapeRecord.createReference(
+				shape = EditorShapeRecord.createReference(
 					pageId,
 					x,
 					y,
@@ -139,7 +139,7 @@ export function importJsonCanvas(root: JsonObject, fileName: string): Interchang
 						'json-canvas-link-card',
 						'Non-http JSON Canvas links were imported as Markdown cards.'
 					);
-					shape = ShapeRecord.createMarkdown(
+					shape = EditorShapeRecord.createMarkdown(
 						pageId,
 						x,
 						y,
@@ -147,7 +147,7 @@ export function importJsonCanvas(root: JsonObject, fileName: string): Interchang
 						inkId('json-canvas', id)
 					);
 				} else {
-					shape = ShapeRecord.createReference(
+					shape = EditorShapeRecord.createReference(
 						pageId,
 						x,
 						y,
@@ -167,7 +167,7 @@ export function importJsonCanvas(root: JsonObject, fileName: string): Interchang
 	}
 
 	for (const group of groupNodes) {
-		const frame = ShapeRecord.createContainer(
+		const frame = EditorShapeRecord.createContainer(
 			pageId,
 			group.x,
 			group.y,
@@ -242,21 +242,21 @@ export function importJsonCanvas(root: JsonObject, fileName: string): Interchang
 		}
 		const start = sidePoint(from, optionalSide(edge.fromSide));
 		const end = sidePoint(to, optionalSide(edge.toSide));
-		const startBinding = BindingRecord.create(
+		const startBinding = EditorBindingRecord.create(
 			inkId('json-canvas-edge', id),
 			from.id,
 			'start',
 			anchorForSide(optionalSide(edge.fromSide)),
 			inkId('json-canvas-binding-start', id)
 		);
-		const endBinding = BindingRecord.create(
+		const endBinding = EditorBindingRecord.create(
 			inkId('json-canvas-edge', id),
 			to.id,
 			'end',
 			anchorForSide(optionalSide(edge.toSide)),
 			inkId('json-canvas-binding-end', id)
 		);
-		const arrow = ShapeRecord.createArrow(
+		const arrow = EditorShapeRecord.createArrow(
 			pageId,
 			start.x,
 			start.y,

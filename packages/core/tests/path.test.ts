@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { hitTestPath, pathGeometryBounds, pointInPath, pointNearPath, shapeBounds } from '../src/geom';
-import { ShapeRecord, type PathGeometry } from '../src/model';
+import { EditorShapeRecord, type PathGeometry } from '../src/editor-model';
 
 describe('native path geometry', () => {
 	const geometry: PathGeometry = {
@@ -27,7 +27,7 @@ describe('native path geometry', () => {
 	});
 
 	it('applies the path shape transform to bounds and hits', () => {
-		const shape = ShapeRecord.createPath('page', 10, 20, { ...geometry, fill: '#fff', stroke: '#000' }, 'path');
+		const shape = EditorShapeRecord.createPath('page', 10, 20, { ...geometry, fill: '#fff', stroke: '#000' }, 'path');
 		const bounds = shapeBounds(shape);
 		expect(bounds.min.x).toBe(10);
 		expect(bounds.min.y).toBe(20);
@@ -65,7 +65,7 @@ describe('native path geometry', () => {
 	});
 
 	it('hits open path strokes with width and selection tolerance', () => {
-		const shape = ShapeRecord.createPath(
+		const shape = EditorShapeRecord.createPath(
 			'page',
 			0,
 			0,

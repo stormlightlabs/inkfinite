@@ -1,11 +1,11 @@
 import {
 	createId,
-	ShapeRecord,
+	EditorShapeRecord,
 	type ContainerShape,
-	type Document,
+	type EditorDocument,
 	type ShapeMetadata,
-	type ShapeRecord as Shape
-} from './model';
+	type EditorShapeRecord as Shape
+} from './editor-model';
 import { creationStylePolicy, type CanvasAppearance } from './style-policy';
 
 /** User-editable fields carried by a card container. */
@@ -59,19 +59,19 @@ export function createCardShapes(
 	appearance: CanvasAppearance = 'light'
 ): Shape[] {
 	const styles = creationStylePolicy(appearance);
-	const container = ShapeRecord.createContainer(
+	const container = EditorShapeRecord.createContainer(
 		pageId,
 		x,
 		y,
 		{ w: 320, h: 220, ...styles.card.container },
 		id
 	);
-	const title = ShapeRecord.createText(pageId, x + 16, y + 16, {
+	const title = EditorShapeRecord.createText(pageId, x + 16, y + 16, {
 		text: fields.title,
 		...styles.card.title,
 		w: 288
 	});
-	const body = ShapeRecord.createMarkdown(pageId, x + 16, y + 58, {
+	const body = EditorShapeRecord.createMarkdown(pageId, x + 16, y + 58, {
 		md: fields.body,
 		w: 288,
 		h: 140,
@@ -85,7 +85,7 @@ export function createCardShapes(
 }
 
 /** Returns card fields from a container, or `null` for another frame. */
-export function cardToContentObject(shape: Shape, document?: Document): ContentObject | null {
+export function cardToContentObject(shape: Shape, document?: EditorDocument): ContentObject | null {
 	if (shape.type !== 'container' || !shape.metadata) return null;
 	const metadata = shape.metadata;
 	if (metadata.title === null && metadata.body === null) return null;
@@ -104,7 +104,7 @@ export function cardToContentObject(shape: Shape, document?: Document): ContentO
 }
 
 /** Returns the ordinary title and body records that make up a card. */
-export function cardChildren(shape: ContainerShape, document: Document): Shape[] {
+export function cardChildren(shape: ContainerShape, document: EditorDocument): Shape[] {
 	return Object.values(document.shapes)
 		.filter((candidate) => candidate.groupId === shape.id)
 		.sort(

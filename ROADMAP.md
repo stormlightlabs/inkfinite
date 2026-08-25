@@ -70,13 +70,16 @@ other platform effects.
 
 ### Document and editor model boundaries
 
-Make the distinction between the canonical Rust document, the generated Rust
-editor projection, and the ergonomic TypeScript editor model explicit in names,
-modules, and documentation.
+The canonical Rust records and generated TypeScript contracts are distinct from
+the interactive `EditorDocument` model in `@inkfinite/core`. The editor-facing
+records use explicit `Editor*` names, while Rust-owned records retain their
+serialized names.
 
-Keep conversion between canonical and interactive representations behind a
-small projection/reconciliation boundary. Generated bindings remain generated
-contracts rather than a second hand-maintained model.
+`@inkfinite/core/src/persistence/canonical.ts` is the projection and
+reconciliation boundary. It is the path between generated Rust contracts and
+interactive editor state; browser and desktop adapters do not translate records
+independently. Generated bindings remain generated contracts rather than a
+second hand-maintained native model.
 
 ### Core package boundaries
 

@@ -1,6 +1,6 @@
 import { validatePathGeometry } from '@inkfinite/bindings';
-import type { PathCurveKind, PathHandleMode, PathTopologyOperation } from './model';
-import { ShapeRecord, type PathShape, type PathSegment, type PathSubpath } from './model';
+import type { PathCurveKind, PathHandleMode, PathTopologyOperation } from './editor-model';
+import { EditorShapeRecord, type PathShape, type PathSegment, type PathSubpath } from './editor-model';
 import type { Vec2 } from './math';
 
 /**
@@ -14,7 +14,7 @@ export function applyPathTopologyOperations(
 	operations: readonly PathTopologyOperation[]
 ): PathShape | null {
 	if (!validatePathGeometry(shape.props)) return null;
-	const preview = ShapeRecord.clone(shape) as PathShape;
+	const preview = EditorShapeRecord.clone(shape) as PathShape;
 	for (const operation of operations) {
 		if (!applyPathTopologyOperation(preview, operation)) return null;
 	}

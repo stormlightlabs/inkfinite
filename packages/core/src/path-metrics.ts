@@ -1,6 +1,6 @@
 import type { Mat3, Box2 } from './math';
 import { Box2 as Box2Ops, Mat3 as Mat3Ops } from './math';
-import type { PathGeometry, PathSegment, PathSubpath, TextPath } from './model';
+import type { PathGeometry, PathSegment, PathSubpath, TextPath } from './editor-model';
 import type { Vec2 } from './math';
 
 /** Default geometric error used by interactive path measurements. */

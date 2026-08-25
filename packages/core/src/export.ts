@@ -12,9 +12,9 @@ import type {
 	PathGeometry,
 	PathShape,
 	RectShape,
-	ShapeRecord,
+	EditorShapeRecord,
 	TextShape
-} from './model';
+} from './editor-model';
 import type { EditorState } from './reactivity';
 import { getSelectedShapes, getShapesOnCurrentPage } from './reactivity';
 
@@ -71,7 +71,7 @@ export async function exportViewportToPNG(canvas: HTMLCanvasElement): Promise<Bl
  */
 export async function exportSelectionToPNG(
 	state: EditorState,
-	renderFunction: (context: CanvasRenderingContext2D, shapes: ShapeRecord[], bounds: Box2) => void
+	renderFunction: (context: CanvasRenderingContext2D, shapes: EditorShapeRecord[], bounds: Box2) => void
 ): Promise<Blob | null> {
 	const shapes = getSelectedShapes(state);
 	if (shapes.length === 0) {
@@ -171,7 +171,7 @@ export function exportToSVG(state: EditorState, options: ExportOptions = {}): st
 /**
  * Convert a single shape to SVG markup.
  */
-function shapeToSVG(shape: ShapeRecord, state: EditorState, definitions: string[]): string | null {
+function shapeToSVG(shape: EditorShapeRecord, state: EditorState, definitions: string[]): string | null {
 	const transform = `translate(${shape.x},${shape.y})${
 		shape.rot === 0 ? '' : ` rotate(${(shape.rot * 180) / Math.PI})`
 	}`;
@@ -243,7 +243,7 @@ function shapeToSVG(shape: ShapeRecord, state: EditorState, definitions: string[
 	}
 }
 
-function withSvgEffects(shape: ShapeRecord, content: string, transform: string, definitions: string[]): string {
+function withSvgEffects(shape: EditorShapeRecord, content: string, transform: string, definitions: string[]): string {
 	const props = shape.props;
 	const safeId = shape.id.replace(/[^a-zA-Z0-9_-]/g, '-');
 	const attributes: string[] = [];
@@ -273,7 +273,7 @@ function withSvgEffects(shape: ShapeRecord, content: string, transform: string, 
 }
 
 function filterPrimitiveToSvg(
-	primitive: NonNullable<ShapeRecord['props']['filter']>['primitives'][number],
+	primitive: NonNullable<EditorShapeRecord['props']['filter']>['primitives'][number],
 	index: number,
 	filterId: string
 ): string {
@@ -418,7 +418,7 @@ function pathGeometryToSVG(geometry: PathGeometry): string {
 		.join(' ');
 }
 
-function wrapSemanticMetadata(shape: ShapeRecord, content: string): string {
+function wrapSemanticMetadata(shape: EditorShapeRecord, content: string): string {
 	const metadata = shape.metadata;
 	if (!metadata) return content;
 	const attributes = [
@@ -472,7 +472,7 @@ function textToSVG(shape: TextShape, transform: string, state: EditorState, defi
 	return `<text font-size="${fontSize}" font-family="${escapeXML(fontFamily)}" fill="${fill}"><textPath href="#${pathId}" startOffset="${svgNumber(textPath.offset)}" text-anchor="${anchor}" side="${textPath.side}" direction="${textPath.direction === 'reverse' ? 'rtl' : 'ltr'}">${escapeXML(text)}</textPath></text>`;
 }
 
-function shapeTransformToSvg(shape: ShapeRecord): string {
+function shapeTransformToSvg(shape: EditorShapeRecord): string {
 	return `translate(${svgNumber(shape.x)},${svgNumber(shape.y)})${shape.rot === 0 ? '' : ` rotate(${svgNumber((shape.rot * 180) / Math.PI)})`}`;
 }
 
@@ -499,7 +499,7 @@ function reversePathGeometry(geometry: PathGeometry): PathGeometry {
 }
 
 function strokeToSVG(
-	shape: Extract<ShapeRecord, { type: 'stroke' }>,
+	shape: Extract<EditorShapeRecord, { type: 'stroke' }>,
 	transform: string,
 	definitions: string[]
 ): string {
@@ -596,7 +596,7 @@ function escapeXML(string_: string): string {
 		.replaceAll("'", '&apos;');
 }
 
-function exportBounds(state: EditorState, shape: ShapeRecord): Box2 {
+function exportBounds(state: EditorState, shape: EditorShapeRecord): Box2 {
 	if (shape.type !== 'arrow') return shapeBoundsForState(state, shape);
 	const geometry = arrowGeometryForShape(state, shape);
 	if (!geometry) return shapeBoundsForState(state, shape);
@@ -625,7 +625,7 @@ function exportBounds(state: EditorState, shape: ShapeRecord): Box2 {
 	return Box2Ops.fromPoints(points.map((point) => localToWorld(shape, point)));
 }
 
-function getExportSelection(state: EditorState): ShapeRecord[] {
+function getExportSelection(state: EditorState): EditorShapeRecord[] {
 	const selected = new Set(state.ui.selectionIds);
 	for (const shape of getShapesOnCurrentPage(state)) {
 		if (shape.type === 'text' && shape.props.textPath && selected.has(shape.id))
@@ -636,7 +636,7 @@ function getExportSelection(state: EditorState): ShapeRecord[] {
 	);
 }
 
-function hasSelectedAncestor(shape: ShapeRecord, selected: ReadonlySet<string>, state: EditorState): boolean {
+function hasSelectedAncestor(shape: EditorShapeRecord, selected: ReadonlySet<string>, state: EditorState): boolean {
 	let parentId = shape.groupId;
 	while (parentId) {
 		if (selected.has(parentId)) return true;

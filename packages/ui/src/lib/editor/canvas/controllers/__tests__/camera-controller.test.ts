@@ -1,4 +1,11 @@
-import { Action, Camera, Modifiers, PageRecord, ShapeRecord, Store } from '@inkfinite/core';
+import {
+	Action,
+	Camera,
+	Modifiers,
+	EditorPageRecord,
+	EditorShapeRecord,
+	Store
+} from '@inkfinite/core';
 import { describe, expect, it } from 'vitest';
 
 import { CameraController } from '../camera-controller';
@@ -54,8 +61,8 @@ describe('CameraController', () => {
 	});
 
 	it('fits the current drawing inside the viewport', () => {
-		const page = PageRecord.create('Page', 'page');
-		const shape = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Page', 'page');
+		const shape = EditorShapeRecord.createRect(
 			page.id,
 			100,
 			200,
@@ -80,8 +87,8 @@ describe('CameraController', () => {
 	});
 
 	it('keeps a fitted drawing framed when the viewport changes size', () => {
-		const page = PageRecord.create('Page', 'page');
-		const shape = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Page', 'page');
+		const shape = EditorShapeRecord.createRect(
 			page.id,
 			100,
 			200,

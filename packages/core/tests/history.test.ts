@@ -9,7 +9,7 @@ import {
   SnapshotCommand,
   UpdateShapeCommand,
 } from "../src/history";
-import { PageRecord, ShapeRecord } from "../src/model";
+import { EditorPageRecord, EditorShapeRecord } from "../src/editor-model";
 import { EditorState } from "../src/reactivity";
 
 describe("History", () => {
@@ -33,7 +33,7 @@ describe("History", () => {
     it("clones before/after states so mutations do not leak", () => {
       const before = EditorState.create();
       const after = EditorState.clone(before);
-      const page = PageRecord.create("Snapshot Page");
+      const page = EditorPageRecord.create("Snapshot Page");
       after.doc.pages[page.id] = page;
       const command = new SnapshotCommand("Snapshot", "doc", before, after);
 
@@ -41,7 +41,7 @@ describe("History", () => {
       expect(result).toEqual(after);
       expect(result).not.toBe(after);
 
-      (result.doc.pages[page.id] as PageRecord).name = "Mutated";
+      (result.doc.pages[page.id] as EditorPageRecord).name = "Mutated";
       expect(after.doc.pages[page.id]?.name).toBe("Snapshot Page");
       const undoState = command.undo(after);
       expect(undoState).toEqual(before);
@@ -52,7 +52,7 @@ describe("History", () => {
     it("works with history execute/undo/redo flow", () => {
       const before = EditorState.create();
       const after = EditorState.clone(before);
-      const page = PageRecord.create("Snapshot Page");
+      const page = EditorPageRecord.create("Snapshot Page");
       after.doc.pages[page.id] = page;
       const command = new SnapshotCommand("Snapshot", "doc", before, after);
       const history = History.create();
@@ -74,8 +74,8 @@ describe("History", () => {
 
   describe("CreateShapeCommand", () => {
     it("should execute create shape command", () => {
-      const page = PageRecord.create("Test Page", "page:1");
-      const shape = ShapeRecord.createRect("page:1", 10, 20, {
+      const page = EditorPageRecord.create("Test Page", "page:1");
+      const shape = EditorShapeRecord.createRect("page:1", 10, 20, {
         w: 100,
         h: 50,
         fill: "#fff",
@@ -98,8 +98,8 @@ describe("History", () => {
     });
 
     it("should round-trip: do -> undo returns to identical state", () => {
-      const page = PageRecord.create("Test Page", "page:1");
-      const shape = ShapeRecord.createRect("page:1", 10, 20, {
+      const page = EditorPageRecord.create("Test Page", "page:1");
+      const shape = EditorShapeRecord.createRect("page:1", 10, 20, {
         w: 100,
         h: 50,
         fill: "#fff",
@@ -124,8 +124,8 @@ describe("History", () => {
     });
 
     it("should redo re-applies exactly", () => {
-      const page = PageRecord.create("Test Page", "page:1");
-      const shape = ShapeRecord.createRect("page:1", 10, 20, {
+      const page = EditorPageRecord.create("Test Page", "page:1");
+      const shape = EditorShapeRecord.createRect("page:1", 10, 20, {
         w: 100,
         h: 50,
         fill: "#fff",
@@ -155,8 +155,8 @@ describe("History", () => {
 
   describe("UpdateShapeCommand", () => {
     it("should execute update shape command", () => {
-      const page = PageRecord.create("Test Page", "page:1");
-      const shape = ShapeRecord.createRect(
+      const page = EditorPageRecord.create("Test Page", "page:1");
+      const shape = EditorShapeRecord.createRect(
         "page:1",
         10,
         20,
@@ -180,8 +180,8 @@ describe("History", () => {
     });
 
     it("should round-trip: do -> undo returns to identical state", () => {
-      const page = PageRecord.create("Test Page", "page:1");
-      const shape = ShapeRecord.createRect(
+      const page = EditorPageRecord.create("Test Page", "page:1");
+      const shape = EditorShapeRecord.createRect(
         "page:1",
         10,
         20,
@@ -210,8 +210,8 @@ describe("History", () => {
     });
 
     it("should redo re-applies exactly", () => {
-      const page = PageRecord.create("Test Page", "page:1");
-      const shape = ShapeRecord.createRect(
+      const page = EditorPageRecord.create("Test Page", "page:1");
+      const shape = EditorShapeRecord.createRect(
         "page:1",
         10,
         20,
@@ -245,15 +245,15 @@ describe("History", () => {
 
   describe("DeleteShapesCommand", () => {
     it("should execute delete shapes command", () => {
-      const page = PageRecord.create("Test Page", "page:1");
-      const shape1 = ShapeRecord.createRect("page:1", 10, 20, {
+      const page = EditorPageRecord.create("Test Page", "page:1");
+      const shape1 = EditorShapeRecord.createRect("page:1", 10, 20, {
         w: 100,
         h: 50,
         fill: "#fff",
         stroke: "#000",
         radius: 0,
       }, "shape:1");
-      const shape2 = ShapeRecord.createRect("page:1", 30, 40, {
+      const shape2 = EditorShapeRecord.createRect("page:1", 30, 40, {
         w: 200,
         h: 100,
         fill: "#fff",
@@ -282,8 +282,8 @@ describe("History", () => {
     });
 
     it("should round-trip: do -> undo returns to identical state", () => {
-      const page = PageRecord.create("Test Page", "page:1");
-      const shape = ShapeRecord.createRect(
+      const page = EditorPageRecord.create("Test Page", "page:1");
+      const shape = EditorShapeRecord.createRect(
         "page:1",
         10,
         20,
@@ -311,8 +311,8 @@ describe("History", () => {
     });
 
     it("should redo re-applies exactly", () => {
-      const page = PageRecord.create("Test Page", "page:1");
-      const shape = ShapeRecord.createRect(
+      const page = EditorPageRecord.create("Test Page", "page:1");
+      const shape = EditorShapeRecord.createRect(
         "page:1",
         10,
         20,
@@ -478,15 +478,15 @@ describe("History", () => {
     });
 
     it("should maintain command order through undo/redo", () => {
-      const page = PageRecord.create("Test Page", "page:1");
-      const shape1 = ShapeRecord.createRect("page:1", 10, 20, {
+      const page = EditorPageRecord.create("Test Page", "page:1");
+      const shape1 = EditorShapeRecord.createRect("page:1", 10, 20, {
         w: 100,
         h: 50,
         fill: "#fff",
         stroke: "#000",
         radius: 0,
       }, "shape:1");
-      const shape2 = ShapeRecord.createRect("page:1", 30, 40, {
+      const shape2 = EditorShapeRecord.createRect("page:1", 30, 40, {
         w: 200,
         h: 100,
         fill: "#fff",

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Action, Modifiers, PointerButtons } from "../src/actions";
 import { Vec2 } from "../src/math";
-import type { TextProps } from "../src/model";
+import type { TextProps } from "../src/editor-model";
 import { EditorState } from "../src/reactivity";
 import { createToolMap, routeAction, switchTool, TextTool } from "../src/tools";
 import type { Tool } from "../src/tools";

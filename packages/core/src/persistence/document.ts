@@ -1,15 +1,15 @@
 import {
-	type BindingRecord,
-	BindingRecord as BindingOps,
-	type Document,
-	type LayerRecord,
-	type PageRecord,
-	PageRecord as PageOps,
-	type ShapeRecord,
-	ShapeRecord as ShapeOps,
+	type EditorBindingRecord,
+	EditorBindingRecord as BindingOps,
+	type EditorDocument,
+	type EditorLayerRecord,
+	type EditorPageRecord,
+	EditorPageRecord as PageOps,
+	type EditorShapeRecord,
+	EditorShapeRecord as ShapeOps,
 	type ImportedAsset,
 	type PathTopologyEdit
-} from '../model';
+} from '../editor-model';
 import type { EditorProjection } from '@inkfinite/bindings/editor';
 import type { DocumentSnapshot as NativeDocumentSnapshot } from '@inkfinite/bindings/model';
 import type { BoardMeta, DocRepo } from './repo';
@@ -20,12 +20,12 @@ export type DocOrder = {
 	/** Optional per-page shape order overrides. */
 	shapeOrder?: Record<string, string[]>;
 	/** Complete layer records, stored with ordering metadata by editor adapters. */
-	layers?: Record<string, LayerRecord>;
+	layers?: Record<string, EditorLayerRecord>;
 };
 
 /** Incremental document changes accepted by persistent repositories. */
 export type DocPatch = {
-	upserts?: { pages?: PageRecord[]; shapes?: ShapeRecord[]; bindings?: BindingRecord[]; assets?: ImportedAsset[] };
+	upserts?: { pages?: EditorPageRecord[]; shapes?: EditorShapeRecord[]; bindings?: EditorBindingRecord[]; assets?: ImportedAsset[] };
 	deletes?: { pageIds?: string[]; shapeIds?: string[]; bindingIds?: string[]; assetIds?: string[] };
 	order?: Partial<DocOrder>;
 	/** Canonical path operations associated with this document change. */
@@ -34,16 +34,16 @@ export type DocPatch = {
 
 /** A complete document loaded from persistence. */
 export type LoadedDoc = {
-	pages: Record<string, PageRecord>;
-	layers?: Record<string, LayerRecord>;
-	shapes: Record<string, ShapeRecord>;
-	bindings: Record<string, BindingRecord>;
+	pages: Record<string, EditorPageRecord>;
+	layers?: Record<string, EditorLayerRecord>;
+	shapes: Record<string, EditorShapeRecord>;
+	bindings: Record<string, EditorBindingRecord>;
 	assets?: Record<string, ImportedAsset>;
 	order: DocOrder;
 };
 
 /** Portable board snapshot used by import and export flows. */
-export type BoardExport = { board: BoardMeta; doc: Document; order: DocOrder };
+export type BoardExport = { board: BoardMeta; doc: EditorDocument; order: DocOrder };
 
 /** Canonical bytes and their materialized cache stored by browser adapters. */
 export type CanonicalDocumentState = {
@@ -56,8 +56,8 @@ export type CanonicalDocumentState = {
 /** One editor document change handed to a Rust-backed browser persistence adapter. */
 export type EditorDocumentChange = {
 	boardId: string;
-	before: Document;
-	after: Document;
+	before: EditorDocument;
+	after: EditorDocument;
 	op: 'do' | 'undo' | 'redo';
 	description: string;
 	topologyEdits?: PathTopologyEdit[];
@@ -89,7 +89,7 @@ export interface PersistentDocRepo extends DocRepo {
  * identifiers explicitly. Repository adapters remain responsible for applying the
  * patch atomically.
  */
-export function diffDoc(before: Document, after: Document): DocPatch {
+export function diffDoc(before: EditorDocument, after: EditorDocument): DocPatch {
 	const patch: DocPatch = {};
 	const deletedPages = difference(Object.keys(before.pages), Object.keys(after.pages));
 	const deletedShapes = difference(Object.keys(before.shapes), Object.keys(after.shapes));

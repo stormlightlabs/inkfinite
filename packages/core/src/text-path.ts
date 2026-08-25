@@ -1,7 +1,7 @@
 import { pathLength } from './path-metrics';
 import type { EditorState } from './reactivity';
 import { getSelectedShapes } from './reactivity';
-import type { PathShape, TextShape } from './model';
+import type { PathShape, TextShape } from './editor-model';
 
 /** Return the selected text and supporting path when the attachment command applies. */
 export function textPathSelectionTargets(state: EditorState): { text: TextShape; path: PathShape } | null {

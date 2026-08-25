@@ -4,10 +4,10 @@ import { createDexieDocRepo, createPersistenceSink } from '$lib/persistence/repo
 import {
 	CreateShapeCommand,
 	diffDoc,
-	Document as DocumentOps,
-	PageRecord,
+	EditorDocument as EditorDocumentOps,
+	EditorPageRecord,
 	SetSelectionCommand,
-	ShapeRecord,
+	EditorShapeRecord,
 	Store,
 	type CanonicalDocumentState
 } from '@inkfinite/core';
@@ -62,8 +62,8 @@ describe('DocRepo (Dexie)', () => {
 		const repo = createDexieDocRepo(database);
 		const sourceId = await repo.createBoard('Source');
 
-		const page = PageRecord.create('Canvas');
-		const rect = ShapeRecord.createRect(page.id, 0, 0, {
+		const page = EditorPageRecord.create('Canvas');
+		const rect = EditorShapeRecord.createRect(page.id, 0, 0, {
 			w: 20,
 			h: 20,
 			fill: '#000',
@@ -71,10 +71,10 @@ describe('DocRepo (Dexie)', () => {
 			radius: 0
 		});
 		page.shapeIds.push(rect.id);
-		const doc = DocumentOps.create();
+		const doc = EditorDocumentOps.create();
 		doc.pages[page.id] = page;
 		doc.shapes[rect.id] = rect;
-		await repo.applyDocPatch(sourceId, diffDoc(DocumentOps.create(), doc));
+		await repo.applyDocPatch(sourceId, diffDoc(EditorDocumentOps.create(), doc));
 
 		const duplicateId = await repo.duplicateBoard(sourceId);
 		expect(duplicateId).not.toBe(sourceId);
@@ -89,8 +89,8 @@ describe('DocRepo (Dexie)', () => {
 		const repo = createDexieDocRepo(database);
 		const boardId = await repo.createBoard('Round trip');
 
-		const page = PageRecord.create('Canvas');
-		const rect = ShapeRecord.createRect(page.id, 0, 0, {
+		const page = EditorPageRecord.create('Canvas');
+		const rect = EditorShapeRecord.createRect(page.id, 0, 0, {
 			w: 100,
 			h: 80,
 			fill: '#000',
@@ -99,11 +99,11 @@ describe('DocRepo (Dexie)', () => {
 		});
 		page.shapeIds.push(rect.id);
 
-		const doc = DocumentOps.create();
+		const doc = EditorDocumentOps.create();
 		doc.pages[page.id] = page;
 		doc.shapes[rect.id] = rect;
 
-		await repo.applyDocPatch(boardId, diffDoc(DocumentOps.create(), doc));
+		await repo.applyDocPatch(boardId, diffDoc(EditorDocumentOps.create(), doc));
 
 		const loaded = await repo.loadDoc(boardId);
 		expect(loaded.pages[page.id]).toEqual(page);
@@ -116,8 +116,8 @@ describe('DocRepo (Dexie)', () => {
 		const repo = createDexieDocRepo(database);
 		const boardId = await repo.createBoard('Tx board');
 
-		const page = PageRecord.create('Tx Page');
-		const rect = ShapeRecord.createRect(page.id, 10, 10, {
+		const page = EditorPageRecord.create('Tx Page');
+		const rect = EditorShapeRecord.createRect(page.id, 10, 10, {
 			w: 50,
 			h: 50,
 			fill: '#ccc',
@@ -126,12 +126,12 @@ describe('DocRepo (Dexie)', () => {
 		});
 		page.shapeIds.push(rect.id);
 
-		const doc = DocumentOps.create();
+		const doc = EditorDocumentOps.create();
 		doc.pages[page.id] = page;
 		doc.shapes[rect.id] = rect;
 
 		const transactionSpy = vi.spyOn(database, 'transaction');
-		await repo.applyDocPatch(boardId, diffDoc(DocumentOps.create(), doc));
+		await repo.applyDocPatch(boardId, diffDoc(EditorDocumentOps.create(), doc));
 		expect(transactionSpy).toHaveBeenCalledTimes(1);
 	});
 
@@ -140,8 +140,8 @@ describe('DocRepo (Dexie)', () => {
 		const repo = createDexieDocRepo(database);
 		const boardId = await repo.createBoard('Delete board');
 
-		const page = PageRecord.create('Delete Page');
-		const rect = ShapeRecord.createRect(page.id, 0, 0, {
+		const page = EditorPageRecord.create('Delete Page');
+		const rect = EditorShapeRecord.createRect(page.id, 0, 0, {
 			w: 40,
 			h: 40,
 			fill: '#f00',
@@ -150,11 +150,11 @@ describe('DocRepo (Dexie)', () => {
 		});
 		page.shapeIds.push(rect.id);
 
-		const doc = DocumentOps.create();
+		const doc = EditorDocumentOps.create();
 		doc.pages[page.id] = page;
 		doc.shapes[rect.id] = rect;
 
-		await repo.applyDocPatch(boardId, diffDoc(DocumentOps.create(), doc));
+		await repo.applyDocPatch(boardId, diffDoc(EditorDocumentOps.create(), doc));
 		await repo.deleteBoard(boardId);
 
 		expect(await database.table('boards').toArray()).toHaveLength(0);
@@ -214,8 +214,8 @@ describe('DocRepo (Dexie)', () => {
 		const repo = createDexieDocRepo(db);
 		const boardId = await repo.createBoard('Source');
 
-		const page = PageRecord.create('Canvas');
-		const rect = ShapeRecord.createRect(page.id, 5, 5, {
+		const page = EditorPageRecord.create('Canvas');
+		const rect = EditorShapeRecord.createRect(page.id, 5, 5, {
 			w: 20,
 			h: 10,
 			fill: '#123',
@@ -224,11 +224,11 @@ describe('DocRepo (Dexie)', () => {
 		});
 		page.shapeIds.push(rect.id);
 
-		const doc = DocumentOps.create();
+		const doc = EditorDocumentOps.create();
 		doc.pages[page.id] = page;
 		doc.shapes[rect.id] = rect;
 
-		await repo.applyDocPatch(boardId, diffDoc(DocumentOps.create(), doc));
+		await repo.applyDocPatch(boardId, diffDoc(EditorDocumentOps.create(), doc));
 
 		const snapshot = await repo.exportBoard(boardId);
 		const importedId = await repo.importBoard({
@@ -255,7 +255,7 @@ describe('History persistence sink', () => {
 	it('doc command triggers exactly one persistence flush', async () => {
 		const { store, sink, applySpy, pageId } = await createStoreWithSink(repo, boardId);
 
-		const rect = ShapeRecord.createRect(pageId, 0, 0, {
+		const rect = EditorShapeRecord.createRect(pageId, 0, 0, {
 			w: 10,
 			h: 10,
 			fill: '#222',
@@ -276,7 +276,7 @@ describe('History persistence sink', () => {
 	it('undo and redo both persist document changes', async () => {
 		const { store, sink, applySpy, pageId } = await createStoreWithSink(repo, boardId);
 
-		const rect = ShapeRecord.createRect(pageId, 0, 0, {
+		const rect = EditorShapeRecord.createRect(pageId, 0, 0, {
 			w: 25,
 			h: 25,
 			fill: '#0f0',
@@ -305,7 +305,7 @@ describe('History persistence sink', () => {
 	it('ui-only commands never hit persistence', async () => {
 		const { store, sink, applySpy, pageId } = await createStoreWithSink(repo, boardId);
 
-		const rect = ShapeRecord.createRect(pageId, 0, 0, {
+		const rect = EditorShapeRecord.createRect(pageId, 0, 0, {
 			w: 15,
 			h: 15,
 			fill: '#aaa',
@@ -327,7 +327,7 @@ describe('History persistence sink', () => {
 		const { store, sink, applySpy, pageId } = await createStoreWithSink(repo, boardId);
 
 		for (let i = 0; i < 10; i++) {
-			const rect = ShapeRecord.createRect(pageId, i * 5, 0, {
+			const rect = EditorShapeRecord.createRect(pageId, i * 5, 0, {
 				w: 5,
 				h: 5,
 				fill: '#444',

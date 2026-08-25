@@ -5,12 +5,12 @@ import {
 	toCanonicalDocumentSnapshot
 } from '../src/persistence/canonical';
 import { contentObjectToCard } from '../src/cards';
-import { BindingRecord, LayerRecord, PageRecord, ShapeRecord, type Document, type PathProps } from '../src/model';
+import { EditorBindingRecord, EditorLayerRecord, EditorPageRecord, EditorShapeRecord, type EditorDocument, type PathProps } from '../src/editor-model';
 
 describe('toCanonicalDocumentSnapshot', () => {
 	it('projects browser shapes into the canonical renderer input', () => {
-		const page = PageRecord.create('Page 1', 'page:one');
-		const rect = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Page 1', 'page:one');
+		const rect = EditorShapeRecord.createRect(
 			page.id,
 			10,
 			20,
@@ -41,8 +41,8 @@ describe('toCanonicalDocumentSnapshot', () => {
 	});
 
 	it('round-trips native clip paths and filters through the canonical projection', () => {
-		const page = PageRecord.create('Page 1', 'page:effects');
-		const rect = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Page 1', 'page:effects');
+		const rect = EditorShapeRecord.createRect(
 			page.id,
 			0,
 			0,
@@ -80,15 +80,15 @@ describe('toCanonicalDocumentSnapshot', () => {
 	});
 
 	it('round-trips typed relationships through the native projection', () => {
-		const page = PageRecord.create('Page 1', 'page:one');
-		const source = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Page 1', 'page:one');
+		const source = EditorShapeRecord.createRect(
 			page.id,
 			0,
 			0,
 			{ w: 40, h: 20, fill: 'red', stroke: 'none', radius: 0 },
 			'shape:source'
 		);
-		const target = ShapeRecord.createRect(
+		const target = EditorShapeRecord.createRect(
 			page.id,
 			100,
 			0,
@@ -96,8 +96,8 @@ describe('toCanonicalDocumentSnapshot', () => {
 			'shape:target'
 		);
 		page.shapeIds = [source.id, target.id];
-		const relation = BindingRecord.createRelation(source.id, target.id, 'depends_on', 'binding:depends-on');
-		const document: Document = {
+		const relation = EditorBindingRecord.createRelation(source.id, target.id, 'depends_on', 'binding:depends-on');
+		const document: EditorDocument = {
 			pages: { [page.id]: page },
 			shapes: { [source.id]: source, [target.id]: target },
 			bindings: { [relation.id]: relation }
@@ -116,7 +116,7 @@ describe('toCanonicalDocumentSnapshot', () => {
 	});
 
 	it('persists card metadata and child ordering in the native container', () => {
-		const page = PageRecord.create('Page 1', 'page:one');
+		const page = EditorPageRecord.create('Page 1', 'page:one');
 		const cardShapes = contentObjectToCard(
 			'page:one',
 			{ x: 10, y: 20 },
@@ -153,8 +153,8 @@ describe('toCanonicalDocumentSnapshot', () => {
 	});
 
 	it('preserves object metadata in canonical projection and patches', () => {
-		const page = PageRecord.create('Page 1', 'page:one');
-		const rect = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Page 1', 'page:one');
+		const rect = EditorShapeRecord.createRect(
 			page.id,
 			10,
 			20,
@@ -176,7 +176,7 @@ describe('toCanonicalDocumentSnapshot', () => {
 			provenance: { actorId: 'actor:test', origin: 'human', timestamp: 42, source: 'seed' }
 		};
 		page.shapeIds.push(rect.id);
-		const before: Document = { pages: { [page.id]: page }, shapes: { [rect.id]: rect }, bindings: {} };
+		const before: EditorDocument = { pages: { [page.id]: page }, shapes: { [rect.id]: rect }, bindings: {} };
 		const snapshot = toCanonicalDocumentSnapshot(before, { documentId: 'document:metadata' });
 		expect(snapshot.document.shapes[rect.id]?.metadata).toMatchObject({
 			name: 'Gateway',
@@ -188,7 +188,7 @@ describe('toCanonicalDocumentSnapshot', () => {
 			provenance: { actor_id: 'actor:test', source: 'seed' }
 		});
 
-		const after: Document = {
+		const after: EditorDocument = {
 			...before,
 			shapes: {
 				[rect.id]: {
@@ -218,8 +218,8 @@ describe('toCanonicalDocumentSnapshot', () => {
 	});
 
 	it('turns editor moves into semantic Rust reconciliation patches', () => {
-		const page = PageRecord.create('Page 1', 'page:one');
-		const rect = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Page 1', 'page:one');
+		const rect = EditorShapeRecord.createRect(
 			page.id,
 			10,
 			20,
@@ -227,8 +227,8 @@ describe('toCanonicalDocumentSnapshot', () => {
 			'shape:rect'
 		);
 		page.shapeIds.push(rect.id);
-		const before: Document = { pages: { [page.id]: page }, shapes: { [rect.id]: rect }, bindings: {} };
-		const after: Document = { ...before, shapes: { [rect.id]: { ...rect, x: 30, y: 45 } } };
+		const before: EditorDocument = { pages: { [page.id]: page }, shapes: { [rect.id]: rect }, bindings: {} };
+		const after: EditorDocument = { ...before, shapes: { [rect.id]: { ...rect, x: 30, y: 45 } } };
 
 		const request = createEditorReconciliationRequest(before, after, {
 			actor_id: 'browser',
@@ -247,8 +247,8 @@ describe('toCanonicalDocumentSnapshot', () => {
 	});
 
 	it('turns a shape kind change into a native conversion patch', () => {
-		const page = PageRecord.create('Page 1', 'page:one');
-		const rect = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Page 1', 'page:one');
+		const rect = EditorShapeRecord.createRect(
 			page.id,
 			10,
 			20,
@@ -256,8 +256,8 @@ describe('toCanonicalDocumentSnapshot', () => {
 			'shape:rect'
 		);
 		page.shapeIds.push(rect.id);
-		const before: Document = { pages: { [page.id]: page }, shapes: { [rect.id]: rect }, bindings: {} };
-		const after: Document = {
+		const before: EditorDocument = { pages: { [page.id]: page }, shapes: { [rect.id]: rect }, bindings: {} };
+		const after: EditorDocument = {
 			...before,
 			shapes: { [rect.id]: { ...rect, type: 'ellipse', props: { w: 40, h: 20, fill: 'red', stroke: 'none' } } }
 		};
@@ -281,7 +281,7 @@ describe('toCanonicalDocumentSnapshot', () => {
 	});
 
 	it('routes topology edits as canonical path patches', () => {
-		const page = PageRecord.create('Page 1', 'page:one');
+		const page = EditorPageRecord.create('Page 1', 'page:one');
 		const props: PathProps = {
 			subpaths: [
 				{
@@ -296,10 +296,10 @@ describe('toCanonicalDocumentSnapshot', () => {
 			fill_rule: 'nonzero',
 			fill: '#fff'
 		};
-		const path = ShapeRecord.createPath(page.id, 0, 0, props, 'shape:path');
+		const path = EditorShapeRecord.createPath(page.id, 0, 0, props, 'shape:path');
 		page.shapeIds.push(path.id);
-		const before: Document = { pages: { [page.id]: page }, shapes: { [path.id]: path }, bindings: {} };
-		const after: Document = {
+		const before: EditorDocument = { pages: { [page.id]: page }, shapes: { [path.id]: path }, bindings: {} };
+		const after: EditorDocument = {
 			...before,
 			shapes: {
 				[path.id]: {
@@ -337,14 +337,14 @@ describe('toCanonicalDocumentSnapshot', () => {
 	});
 
 	it('reconciles page and layer structure as semantic patches', () => {
-		const page = PageRecord.create('Page 1', 'page:one');
-		const back = LayerRecord.create(page.id, 'Back', 'layer:back');
+		const page = EditorPageRecord.create('Page 1', 'page:one');
+		const back = EditorLayerRecord.create(page.id, 'Back', 'layer:back');
 		page.layerIds = [back.id];
-		const front = LayerRecord.create(page.id, 'Front', 'layer:front');
-		const nextPage = PageRecord.create('Page 2', 'page:two');
-		const nextLayer = LayerRecord.create(nextPage.id, 'Default', 'layer:two');
-		const before: Document = { pages: { [page.id]: page }, layers: { [back.id]: back }, shapes: {}, bindings: {} };
-		const after: Document = {
+		const front = EditorLayerRecord.create(page.id, 'Front', 'layer:front');
+		const nextPage = EditorPageRecord.create('Page 2', 'page:two');
+		const nextLayer = EditorLayerRecord.create(nextPage.id, 'Default', 'layer:two');
+		const before: EditorDocument = { pages: { [page.id]: page }, layers: { [back.id]: back }, shapes: {}, bindings: {} };
+		const after: EditorDocument = {
 			pages: {
 				[page.id]: { ...page, layerIds: [front.id, back.id] },
 				[nextPage.id]: { ...nextPage, layerIds: [nextLayer.id] }
@@ -378,10 +378,10 @@ describe('toCanonicalDocumentSnapshot', () => {
 	});
 
 	it('reconciles a layer deletion with a native move disposition', () => {
-		const page = PageRecord.create('Page 1', 'page:one');
-		const source = LayerRecord.create(page.id, 'Source', 'layer:source');
-		const destination = LayerRecord.create(page.id, 'Destination', 'layer:destination');
-		const shape = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Page 1', 'page:one');
+		const source = EditorLayerRecord.create(page.id, 'Source', 'layer:source');
+		const destination = EditorLayerRecord.create(page.id, 'Destination', 'layer:destination');
+		const shape = EditorShapeRecord.createRect(
 			page.id,
 			10,
 			20,
@@ -392,13 +392,13 @@ describe('toCanonicalDocumentSnapshot', () => {
 		page.layerIds = [source.id, destination.id];
 		page.shapeIds = [shape.id];
 		source.shapeIds = [shape.id];
-		const before: Document = {
+		const before: EditorDocument = {
 			pages: { [page.id]: page },
 			layers: { [source.id]: source, [destination.id]: destination },
 			shapes: { [shape.id]: shape },
 			bindings: {}
 		};
-		const after: Document = {
+		const after: EditorDocument = {
 			pages: { [page.id]: { ...page, layerIds: [destination.id], shapeIds: [shape.id] } },
 			layers: { [destination.id]: { ...destination, shapeIds: [shape.id] } },
 			shapes: { [shape.id]: { ...shape, layerId: destination.id } },

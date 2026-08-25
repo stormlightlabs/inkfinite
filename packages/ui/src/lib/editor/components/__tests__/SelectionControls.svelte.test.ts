@@ -1,10 +1,10 @@
 import {
 	EditorState,
-	PageRecord,
-	ShapeRecord,
+	EditorPageRecord,
+	EditorShapeRecord,
 	Store,
 	contentObjectToCard,
-	type ShapeRecord as Shape
+	type EditorShapeRecord as Shape
 } from '@inkfinite/core';
 import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
@@ -13,7 +13,7 @@ import SelectionControls from '../SelectionControls.svelte';
 
 function createSelectionStore(shapes: Shape[], selectionIds = shapes.map((shape) => shape.id)) {
 	const state = EditorState.create();
-	const page = PageRecord.create('Test page', 'page:test');
+	const page = EditorPageRecord.create('Test page', 'page:test');
 	state.doc.pages[page.id] = { ...page, shapeIds: shapes.map((shape) => shape.id) };
 	for (const shape of shapes) state.doc.shapes[shape.id] = shape;
 	state.ui.currentPageId = page.id;
@@ -23,7 +23,7 @@ function createSelectionStore(shapes: Shape[], selectionIds = shapes.map((shape)
 
 describe('SelectionControls', () => {
 	it('exposes boolean path controls for a closed path selection', async () => {
-		const page = PageRecord.create('Test page', 'page:test');
+		const page = EditorPageRecord.create('Test page', 'page:test');
 		const pathProps = {
 			subpaths: [
 				{
@@ -39,8 +39,8 @@ describe('SelectionControls', () => {
 			fill_rule: 'evenodd' as const,
 			fill: '#ffffff'
 		};
-		const first = ShapeRecord.createPath(page.id, 0, 0, pathProps, 'first');
-		const second = ShapeRecord.createPath(page.id, 20, 0, pathProps, 'second');
+		const first = EditorShapeRecord.createPath(page.id, 0, 0, pathProps, 'first');
+		const second = EditorShapeRecord.createPath(page.id, 20, 0, pathProps, 'second');
 		const store = createSelectionStore([first, second]);
 		const screen = render(SelectionControls, {
 			currentTool: 'select',
@@ -57,8 +57,8 @@ describe('SelectionControls', () => {
 	});
 
 	it('shows appearance and object metadata controls for a selected rectangle', async () => {
-		const page = PageRecord.create('Test page', 'page:test');
-		const rect = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Test page', 'page:test');
+		const rect = EditorShapeRecord.createRect(
 			page.id,
 			0,
 			0,
@@ -86,8 +86,8 @@ describe('SelectionControls', () => {
 	});
 
 	it('keeps contextual sections on one horizontal viewport with scroll controls', async () => {
-		const page = PageRecord.create('Test page', 'page:test');
-		const rect = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Test page', 'page:test');
+		const rect = EditorShapeRecord.createRect(
 			page.id,
 			0,
 			0,
@@ -115,8 +115,8 @@ describe('SelectionControls', () => {
 	});
 
 	it('collapses contextual actions and restores them', async () => {
-		const page = PageRecord.create('Test page', 'page:test');
-		const rect = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Test page', 'page:test');
+		const rect = EditorShapeRecord.createRect(
 			page.id,
 			0,
 			0,
@@ -144,8 +144,8 @@ describe('SelectionControls', () => {
 	});
 
 	it('projects and edits semantic metadata for ordinary objects', async () => {
-		const page = PageRecord.create('Test page', 'page:test');
-		const rect = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Test page', 'page:test');
+		const rect = EditorShapeRecord.createRect(
 			page.id,
 			0,
 			0,
@@ -211,15 +211,15 @@ describe('SelectionControls', () => {
 	});
 
 	it('shows focused typography controls for text and Markdown selections', async () => {
-		const page = PageRecord.create('Test page', 'page:test');
-		const text = ShapeRecord.createText(
+		const page = EditorPageRecord.create('Test page', 'page:test');
+		const text = EditorShapeRecord.createText(
 			page.id,
 			0,
 			0,
 			{ text: 'Title', fontSize: 24, fontFamily: 'Inter', color: '#111111' },
 			'text'
 		);
-		const markdown = ShapeRecord.createMarkdown(
+		const markdown = EditorShapeRecord.createMarkdown(
 			page.id,
 			0,
 			50,
@@ -258,15 +258,15 @@ describe('SelectionControls', () => {
 	});
 
 	it('shows mixed values and multi-selection layout actions', async () => {
-		const page = PageRecord.create('Test page', 'page:test');
-		const first = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Test page', 'page:test');
+		const first = EditorShapeRecord.createRect(
 			page.id,
 			0,
 			0,
 			{ w: 40, h: 40, fill: '#ffffff', stroke: '#111111', radius: 0 },
 			'first'
 		);
-		const second = ShapeRecord.createRect(
+		const second = EditorShapeRecord.createRect(
 			page.id,
 			60,
 			0,
@@ -302,7 +302,7 @@ describe('SelectionControls', () => {
 	});
 
 	it('edits card fields and exposes frame navigation', async () => {
-		const page = PageRecord.create('Test page', 'page:test');
+		const page = EditorPageRecord.create('Test page', 'page:test');
 		const cardShapes = contentObjectToCard(
 			'page:test',
 			{ x: 0, y: 0 },
@@ -361,15 +361,15 @@ describe('SelectionControls', () => {
 	});
 
 	it('edits image content, reuses assets, and exposes references', async () => {
-		const page = PageRecord.create('Test page', 'page:test');
-		const image = ShapeRecord.createImage(
+		const page = EditorPageRecord.create('Test page', 'page:test');
+		const image = EditorShapeRecord.createImage(
 			page.id,
 			0,
 			0,
 			{ w: 160, h: 100, assetId: 'asset:image', caption: 'Original' },
 			'image'
 		);
-		const reference = ShapeRecord.createReference(
+		const reference = EditorShapeRecord.createReference(
 			page.id,
 			200,
 			0,
@@ -431,8 +431,8 @@ describe('SelectionControls', () => {
 	});
 
 	it('keeps agent controls opt-in for desktop callers', async () => {
-		const page = PageRecord.create('Test page', 'page:test');
-		const rect = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Test page', 'page:test');
+		const rect = EditorShapeRecord.createRect(
 			page.id,
 			0,
 			0,

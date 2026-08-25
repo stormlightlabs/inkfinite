@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { graphLayout, gridShapes } from './layout';
 import { shapeBounds } from './geom';
 import { EditorState } from './reactivity';
-import { BindingRecord, PageRecord, ShapeRecord } from './model';
+import { EditorBindingRecord, EditorPageRecord, EditorShapeRecord } from './editor-model';
 
 describe('gridShapes', () => {
 	it('places selected objects in stable rows and columns', () => {
-		const page = PageRecord.create('Grid test', 'page:grid');
+		const page = EditorPageRecord.create('Grid test', 'page:grid');
 		const shapes = [
-			ShapeRecord.createRect(page.id, 120, 80, { w: 40, h: 20, fill: '#fff', stroke: '#000', radius: 0 }, 'a'),
-			ShapeRecord.createRect(page.id, 0, 0, { w: 80, h: 30, fill: '#fff', stroke: '#000', radius: 0 }, 'b'),
-			ShapeRecord.createRect(page.id, 300, 200, { w: 20, h: 50, fill: '#fff', stroke: '#000', radius: 0 }, 'c')
+			EditorShapeRecord.createRect(page.id, 120, 80, { w: 40, h: 20, fill: '#fff', stroke: '#000', radius: 0 }, 'a'),
+			EditorShapeRecord.createRect(page.id, 0, 0, { w: 80, h: 30, fill: '#fff', stroke: '#000', radius: 0 }, 'b'),
+			EditorShapeRecord.createRect(page.id, 300, 200, { w: 20, h: 50, fill: '#fff', stroke: '#000', radius: 0 }, 'c')
 		];
 		page.shapeIds = shapes.map((shape) => shape.id);
 		const state = EditorState.create();
@@ -34,18 +34,18 @@ describe('gridShapes', () => {
 
 describe('graphLayout', () => {
 	function graphState() {
-		const page = PageRecord.create('Graph test', 'page:graph');
+		const page = EditorPageRecord.create('Graph test', 'page:graph');
 		const shapes = [
-			ShapeRecord.createRect(page.id, 300, 200, { w: 40, h: 20, fill: '#fff', stroke: '#000', radius: 0 }, 'a'),
-			ShapeRecord.createRect(page.id, 0, 0, { w: 60, h: 30, fill: '#fff', stroke: '#000', radius: 0 }, 'b'),
-			ShapeRecord.createRect(page.id, 150, 300, { w: 20, h: 40, fill: '#fff', stroke: '#000', radius: 0 }, 'c')
+			EditorShapeRecord.createRect(page.id, 300, 200, { w: 40, h: 20, fill: '#fff', stroke: '#000', radius: 0 }, 'a'),
+			EditorShapeRecord.createRect(page.id, 0, 0, { w: 60, h: 30, fill: '#fff', stroke: '#000', radius: 0 }, 'b'),
+			EditorShapeRecord.createRect(page.id, 150, 300, { w: 20, h: 40, fill: '#fff', stroke: '#000', radius: 0 }, 'c')
 		];
 		page.shapeIds = shapes.map((shape) => shape.id);
 		const state = EditorState.create();
 		state.doc.pages[page.id] = page;
 		for (const shape of shapes) state.doc.shapes[shape.id] = shape;
-		state.doc.bindings.ab = BindingRecord.createRelation('a', 'b', 'depends_on', 'ab');
-		state.doc.bindings.bc = BindingRecord.createRelation('b', 'c', 'depends_on', 'bc');
+		state.doc.bindings.ab = EditorBindingRecord.createRelation('a', 'b', 'depends_on', 'ab');
+		state.doc.bindings.bc = EditorBindingRecord.createRelation('b', 'c', 'depends_on', 'bc');
 		state.ui.currentPageId = page.id;
 		return { state, shapes };
 	}
@@ -67,7 +67,7 @@ describe('graphLayout', () => {
 		const leftToRight = graphLayout(state, shapes.map((shape) => shape.id), 'tree', 'left-to-right');
 		expect(shapeBounds(leftToRight.doc.shapes.a!).min.x).toBeLessThan(shapeBounds(leftToRight.doc.shapes.b!).min.x);
 		expect(shapeBounds(leftToRight.doc.shapes.b!).min.x).toBeLessThan(shapeBounds(leftToRight.doc.shapes.c!).min.x);
-		state.doc.bindings.ca = BindingRecord.createRelation('c', 'a', 'depends_on', 'ca');
+		state.doc.bindings.ca = EditorBindingRecord.createRelation('c', 'a', 'depends_on', 'ca');
 		const first = graphLayout(state, shapes.map((shape) => shape.id), 'radial');
 		const second = graphLayout(state, shapes.map((shape) => shape.id), 'radial');
 		expect(first.doc.shapes).toEqual(second.doc.shapes);

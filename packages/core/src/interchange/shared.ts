@@ -1,4 +1,4 @@
-import { createId, LayerRecord, PageRecord, type ArrowShape, type Document, type ShapeRecord as Shape } from '../model';
+import { createId, EditorLayerRecord, EditorPageRecord, type ArrowShape, type EditorDocument, type EditorShapeRecord as Shape } from '../editor-model';
 import type { BoardExport } from '../persistence/document';
 import type { InterchangeWarning } from '../interchange';
 
@@ -8,11 +8,11 @@ export type JsonObject = Record<string, unknown>;
 /** Creates the single-page document that receives imported shapes. */
 export function blankSnapshot(fileName: string) {
 	const boardId = createId('board');
-	const page = PageRecord.create('Page 1');
-	const layer = LayerRecord.create(page.id, 'Imported');
+	const page = EditorPageRecord.create('Page 1');
+	const layer = EditorLayerRecord.create(page.id, 'Imported');
 	page.layerIds = [layer.id];
 	const timestamp = Date.now();
-	const doc: Document = { pages: { [page.id]: page }, layers: { [layer.id]: layer }, shapes: {}, bindings: {} };
+	const doc: EditorDocument = { pages: { [page.id]: page }, layers: { [layer.id]: layer }, shapes: {}, bindings: {} };
 	const snapshot: BoardExport = {
 		board: {
 			id: boardId,
@@ -27,7 +27,7 @@ export function blankSnapshot(fileName: string) {
 }
 
 /** Adds an imported shape to its document, page, and layer indexes. */
-export function addShape(document: Document, pageId: string, layerId: string, shape: Shape) {
+export function addShape(document: EditorDocument, pageId: string, layerId: string, shape: Shape) {
 	document.shapes[shape.id] = shape;
 	document.pages[pageId].shapeIds.push(shape.id);
 	document.layers![layerId].shapeIds.push(shape.id);
@@ -35,7 +35,7 @@ export function addShape(document: Document, pageId: string, layerId: string, sh
 
 /** Resolves the requested export page and records multi-page loss. */
 export function selectPage(
-	document: Document,
+	document: EditorDocument,
 	pageOrder: string[],
 	requestedPageId: string | undefined,
 	warnings: WarningCollector
@@ -49,7 +49,7 @@ export function selectPage(
 }
 
 /** Resolves one bound endpoint from an arrow. */
-export function bindingFor(document: Document, arrow: ArrowShape, handle: 'start' | 'end') {
+export function bindingFor(document: EditorDocument, arrow: ArrowShape, handle: 'start' | 'end') {
 	const endpoint = arrow.props[handle];
 	if (endpoint.kind !== 'bound' || !endpoint.bindingId) return undefined;
 	return document.bindings[endpoint.bindingId];

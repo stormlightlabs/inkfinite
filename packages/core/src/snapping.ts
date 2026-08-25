@@ -2,7 +2,7 @@ import { shapeBounds } from './geom';
 import type { Box2, Vec2 } from './math';
 import type { EditorState } from './reactivity';
 import { getInteractiveShapesOnCurrentPage } from './reactivity';
-import type { ShapeRecord } from './model';
+import type { EditorShapeRecord } from './editor-model';
 
 /** A line shown while an object is aligned to another object. */
 export type SnapGuide = {
@@ -86,7 +86,7 @@ export function snapPoint(
  */
 export function snapTranslation(
 	state: EditorState,
-	movingShapes: Iterable<ShapeRecord>,
+	movingShapes: Iterable<EditorShapeRecord>,
 	leadPosition: Vec2,
 	delta: Vec2,
 	options: SnapOptions
@@ -168,7 +168,7 @@ export function snapAngle(start: Vec2, point: Vec2, stepDeg = 15): Vec2 {
 	return { x: start.x + Math.cos(snapped) * length, y: start.y + Math.sin(snapped) * length };
 }
 
-function closestFeature(value: number, shapes: ShapeRecord[], axis: 'x' | 'y', distance: number): Feature | null {
+function closestFeature(value: number, shapes: EditorShapeRecord[], axis: 'x' | 'y', distance: number): Feature | null {
 	let match: Feature | null = null;
 	let best = distance + Number.EPSILON;
 	for (const shape of shapes) {
@@ -188,7 +188,7 @@ function closestFeature(value: number, shapes: ShapeRecord[], axis: 'x' | 'y', d
 function closestTranslationMatch(
 	moving: Box2,
 	delta: number,
-	shapes: ShapeRecord[],
+	shapes: EditorShapeRecord[],
 	axis: 'x' | 'y',
 	distance: number
 ): { delta: number; position: number; kind: SnapGuide['kind'] } | null {
@@ -212,7 +212,7 @@ function closestTranslationMatch(
 function equalGapMatch(
 	moving: Box2,
 	delta: number,
-	shapes: ShapeRecord[],
+	shapes: EditorShapeRecord[],
 	axis: 'x' | 'y',
 	distance: number
 ): { delta: number; position: number } | null {

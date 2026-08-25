@@ -8,7 +8,7 @@
 		moveLayer,
 		patchLayer,
 		type EditorState,
-		type LayerRecord,
+		type EditorLayerRecord,
 		type Store
 	} from '@inkfinite/core';
 	import { tick, untrack } from 'svelte';
@@ -169,7 +169,7 @@
 		setPanelPosition(left, top);
 	}
 
-	function selectLayer(layer: LayerRecord) {
+	function selectLayer(layer: EditorLayerRecord) {
 		commit('Select Layer', activateLayer(editorState, layer.id));
 	}
 
@@ -177,12 +177,12 @@
 		renamingLayerId = layerId;
 	}
 
-	function finishRename(layer: LayerRecord, value: string) {
+	function finishRename(layer: EditorLayerRecord, value: string) {
 		commit('Rename Layer', patchLayer(editorState, layer.id, { name: value }));
 		renamingLayerId = null;
 	}
 
-	function openMenu(layer: LayerRecord, event: MouseEvent | PointerEvent) {
+	function openMenu(layer: EditorLayerRecord, event: MouseEvent | PointerEvent) {
 		event.preventDefault();
 		event.stopPropagation();
 		menuLayerId = layer.id;
@@ -196,12 +196,12 @@
 		menuOpen = true;
 	}
 
-	function beginDelete(layer: LayerRecord) {
+	function beginDelete(layer: EditorLayerRecord) {
 		deletingLayerId = layer.id;
 		deleteDestinationId = nearestWritableDestination(layer.id)?.id ?? null;
 	}
 
-	function nearestWritableDestination(sourceId: string): LayerRecord | null {
+	function nearestWritableDestination(sourceId: string): EditorLayerRecord | null {
 		const sourceIndex = layers.findIndex((layer) => layer.id === sourceId);
 		return (
 			[...layers]

@@ -2,8 +2,8 @@ import type { Camera } from './camera';
 import { Camera as CameraOps } from './camera';
 import { History } from './history';
 import type { Command, HistoryAppliedEvent, HistoryEntry, HistoryOperation, HistoryState } from './history';
-import type { Document, LayerRecord, PageRecord, PathSelection, ShapeRecord } from './model';
-import { Document as DocumentOps, ensureDocumentLayers } from './model';
+import type { EditorDocument, EditorLayerRecord, EditorPageRecord, PathSelection, EditorShapeRecord } from './editor-model';
+import { EditorDocument as DocumentOps, ensureDocumentLayers } from './editor-model';
 
 type Listener<Value> = (value: Value) => void;
 
@@ -63,7 +63,7 @@ export type UIState = {
 	bindingPreview?: BindingPreview;
 };
 
-export type EditorState = { doc: Document; ui: UIState; camera: Camera };
+export type EditorState = { doc: EditorDocument; ui: UIState; camera: Camera };
 
 export const EditorState = {
 	/**
@@ -371,7 +371,7 @@ function enforceInvariants(state: EditorState): EditorState {
  * @param state - Editor state
  * @returns Current page or null if no page is selected
  */
-export function getCurrentPage(state: EditorState): PageRecord | null {
+export function getCurrentPage(state: EditorState): EditorPageRecord | null {
 	if (state.ui.currentPageId === null) {
 		return null;
 	}
@@ -394,7 +394,7 @@ export function canCreateShapeOnActiveLayer(state: EditorState): boolean {
  * @param state - Editor state
  * @returns Array of shapes on current page (empty if no page selected)
  */
-export function getShapesOnCurrentPage(state: EditorState): ShapeRecord[] {
+export function getShapesOnCurrentPage(state: EditorState): EditorShapeRecord[] {
 	const currentPage = getCurrentPage(state);
 	if (!currentPage) {
 		return [];
@@ -404,19 +404,19 @@ export function getShapesOnCurrentPage(state: EditorState): ShapeRecord[] {
 	if (!layers || !currentPage.layerIds?.length) {
 		return currentPage.shapeIds
 			.map((id) => state.doc.shapes[id])
-			.filter((shape): shape is ShapeRecord => shape !== undefined);
+			.filter((shape): shape is EditorShapeRecord => shape !== undefined);
 	}
 	return currentPage.layerIds.flatMap((layerId) => {
 		const layer = layers[layerId];
 		if (!layer?.visible) return [];
 		return layer.shapeIds
 			.map((id) => state.doc.shapes[id])
-			.filter((shape): shape is ShapeRecord => shape !== undefined);
+			.filter((shape): shape is EditorShapeRecord => shape !== undefined);
 	});
 }
 
 /** Returns visible, unlocked shapes in draw order for hit testing and selection. */
-export function getInteractiveShapesOnCurrentPage(state: EditorState): ShapeRecord[] {
+export function getInteractiveShapesOnCurrentPage(state: EditorState): EditorShapeRecord[] {
 	const currentPage = getCurrentPage(state);
 	if (!currentPage) return [];
 	const shapes = getShapesOnCurrentPage(state);
@@ -424,7 +424,7 @@ export function getInteractiveShapesOnCurrentPage(state: EditorState): ShapeReco
 }
 
 /** Returns the direct children of the active container selection scope. */
-export function getSelectionScopeShapes(state: EditorState): ShapeRecord[] {
+export function getSelectionScopeShapes(state: EditorState): EditorShapeRecord[] {
 	const path = getContainerPath(state);
 	const parentId = path.at(-1);
 	const shapes = getInteractiveShapesOnCurrentPage(state);
@@ -454,11 +454,11 @@ export function selectionTarget(state: EditorState, shapeId: string): string | n
 }
 
 /** Returns whether a shape and all of its ancestors can participate in editing. */
-function isShapeInteractive(state: EditorState, shape: ShapeRecord): boolean {
+function isShapeInteractive(state: EditorState, shape: EditorShapeRecord): boolean {
 	return isShapeInteractiveInDocument(state.doc, shape);
 }
 
-function isShapeInteractiveInDocument(document: Document, shape: ShapeRecord): boolean {
+function isShapeInteractiveInDocument(document: EditorDocument, shape: EditorShapeRecord): boolean {
 	if (shape.locked) return false;
 	if (shape.layerId) {
 		const layer = document.layers?.[shape.layerId];
@@ -475,7 +475,7 @@ function isShapeInteractiveInDocument(document: Document, shape: ShapeRecord): b
 
 function normalizePathSelection(
 	selection: PathSelection | undefined,
-	document: Document,
+	document: EditorDocument,
 	pageId: string | null
 ): PathSelection | undefined {
 	if (!selection || !pageId) return undefined;
@@ -490,7 +490,7 @@ function normalizePathSelection(
 	return { pathId: selection.pathId, anchors };
 }
 
-function normalizeContainerPath(state: EditorState, document: Document, pageId: string | null): string[] {
+function normalizeContainerPath(state: EditorState, document: EditorDocument, pageId: string | null): string[] {
 	if (!pageId) return [];
 	const path: string[] = [];
 	for (const id of state.ui.containerPath ?? []) {
@@ -504,15 +504,15 @@ function normalizeContainerPath(state: EditorState, document: Document, pageId: 
 }
 
 /** Returns the current page's layers in back-to-front order. */
-export function getLayersOnCurrentPage(state: EditorState): LayerRecord[] {
+export function getLayersOnCurrentPage(state: EditorState): EditorLayerRecord[] {
 	const page = getCurrentPage(state);
 	if (!page || !state.doc.layers) return [];
 	return (page.layerIds ?? [])
 		.map((id) => state.doc.layers?.[id])
-		.filter((layer): layer is LayerRecord => Boolean(layer));
+		.filter((layer): layer is EditorLayerRecord => Boolean(layer));
 }
 
-function getInteractiveShapeIds(document: Document, page: PageRecord): string[] {
+function getInteractiveShapeIds(document: EditorDocument, page: EditorPageRecord): string[] {
 	const ids =
 		!document.layers || !page.layerIds?.length
 			? page.shapeIds
@@ -532,10 +532,10 @@ function getInteractiveShapeIds(document: Document, page: PageRecord): string[] 
  * @param state - Editor state
  * @returns Array of selected shapes (empty if no selection)
  */
-export function getSelectedShapes(state: EditorState): ShapeRecord[] {
+export function getSelectedShapes(state: EditorState): EditorShapeRecord[] {
 	return state.ui.selectionIds
 		.map((id) => state.doc.shapes[id])
-		.filter((shape): shape is ShapeRecord => shape !== undefined);
+		.filter((shape): shape is EditorShapeRecord => shape !== undefined);
 }
 
 /**
@@ -555,7 +555,7 @@ export function isShapeSelected(state: EditorState, shapeId: string): boolean {
  * @param state - Editor state
  * @returns Array of all pages
  */
-export function getAllPages(state: EditorState): PageRecord[] {
+export function getAllPages(state: EditorState): EditorPageRecord[] {
 	return Object.values(state.doc.pages);
 }
 
@@ -566,6 +566,6 @@ export function getAllPages(state: EditorState): PageRecord[] {
  * @param shapeId - Shape ID
  * @returns Shape or undefined if not found
  */
-export function getShape(state: EditorState, shapeId: string): ShapeRecord | undefined {
+export function getShape(state: EditorState, shapeId: string): EditorShapeRecord | undefined {
 	return state.doc.shapes[shapeId];
 }

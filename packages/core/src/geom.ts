@@ -4,7 +4,7 @@ import { Box2 as Box2Ops, Mat3, Vec2 as Vec2Ops } from './math';
 import { arrowHeadGeometry, arrowLabelPlacement } from './arrow-geometry';
 import type {
 	ArrowShape,
-	BindingRecord,
+	EditorBindingRecord,
 	BrushConfig,
 	EllipseShape,
 	LineShape,
@@ -17,12 +17,12 @@ import type {
 	PathShape,
 	RectShape,
 	ResolvedArrowGeometry,
-	ShapeRecord,
+	EditorShapeRecord,
 	StrokePoint,
 	StrokeShape,
 	StrokeWidthPoint,
 	TextShape
-} from './model';
+} from './editor-model';
 import type { EditorState } from './reactivity';
 import { getInteractiveShapesOnCurrentPage, getShapesOnCurrentPage } from './reactivity';
 import {
@@ -36,7 +36,7 @@ import {
 const strokeOutlineCache = new WeakMap<StrokeShape, Vec2[]>();
 
 /** Return the affine matrix that maps a shape's local geometry to world space. */
-export function shapeTransform(shape: ShapeRecord): Mat3 {
+export function shapeTransform(shape: EditorShapeRecord): Mat3 {
 	if (shape.editorTransform) {
 		return [
 			shape.editorTransform.a,
@@ -54,18 +54,18 @@ export function shapeTransform(shape: ShapeRecord): Mat3 {
 }
 
 /** Transform one local point through a shape's complete world transform. */
-export function localToWorld(shape: ShapeRecord, point: Vec2): Vec2 {
+export function localToWorld(shape: EditorShapeRecord, point: Vec2): Vec2 {
 	return Mat3.transformPoint(shapeTransform(shape), point);
 }
 
 /** Transform one world point into shape-local coordinates. */
-export function worldToLocal(point: Vec2, shape: ShapeRecord): Vec2 {
+export function worldToLocal(point: Vec2, shape: EditorShapeRecord): Vec2 {
 	const inverse = Mat3.invert(shapeTransform(shape));
 	return inverse ? Mat3.transformPoint(inverse, point) : { x: point.x - shape.x, y: point.y - shape.y };
 }
 
 /** Returns local geometry bounds without applying the shape transform. */
-export function localShapeBounds(shape: ShapeRecord): Box2 {
+export function localShapeBounds(shape: EditorShapeRecord): Box2 {
 	switch (shape.type) {
 		case 'rect':
 		case 'ellipse':
@@ -130,7 +130,7 @@ export function localShapeBounds(shape: ShapeRecord): Box2 {
 	}
 }
 
-function transformLocalBounds(shape: ShapeRecord, bounds: Box2): Box2 {
+function transformLocalBounds(shape: EditorShapeRecord, bounds: Box2): Box2 {
 	const corners = [
 		bounds.min,
 		{ x: bounds.max.x, y: bounds.min.y },
@@ -141,7 +141,7 @@ function transformLocalBounds(shape: ShapeRecord, bounds: Box2): Box2 {
 }
 
 /** Get the axis-aligned bounding box of a shape in world coordinates. */
-export function shapeBounds(shape: ShapeRecord): Box2 {
+export function shapeBounds(shape: EditorShapeRecord): Box2 {
 	return transformLocalBounds(shape, localShapeBounds(shape));
 }
 
@@ -168,7 +168,7 @@ export function textPathLayoutForShape(
 }
 
 /** Return the world-space bounds of a shape, resolving attached text through its path. */
-export function shapeBoundsForState(state: EditorState, shape: ShapeRecord): Box2 {
+export function shapeBoundsForState(state: EditorState, shape: EditorShapeRecord): Box2 {
 	if (shape.type !== 'text') return shapeBounds(shape);
 	const attached = textPathLayoutForShape(state, shape);
 	if (!attached) return shapeBounds(shape);
@@ -797,7 +797,7 @@ export function hitTestPoint(state: EditorState, worldPoint: Vec2, tolerance = 5
 	return hitTestPoints(state, worldPoint, tolerance)[0] ?? null;
 }
 
-function hitTestShape(state: EditorState, shape: ShapeRecord, worldPoint: Vec2, tolerance: number): boolean {
+function hitTestShape(state: EditorState, shape: EditorShapeRecord, worldPoint: Vec2, tolerance: number): boolean {
 	const localPoint = worldToLocal(worldPoint, shape);
 	if (shape.props.clipPath && !pointInPath(localPoint, shape.props.clipPath)) return false;
 	if (shape.props.maskEffect && !pointInPath(localPoint, shape.props.maskEffect.geometry)) return false;
@@ -866,7 +866,7 @@ function hitTestShape(state: EditorState, shape: ShapeRecord, worldPoint: Vec2, 
  * @param shape - The shape to get center for
  * @returns Center point in world coordinates
  */
-export function shapeCenter(shape: ShapeRecord): Vec2 {
+export function shapeCenter(shape: EditorShapeRecord): Vec2 {
 	const bounds = shapeBounds(shape);
 	return { x: (bounds.min.x + bounds.max.x) / 2, y: (bounds.min.y + bounds.max.y) / 2 };
 }
@@ -880,7 +880,7 @@ export function shapeCenter(shape: ShapeRecord): Vec2 {
  * @param offset - Optional offset distance to push the anchor point away from the shape (default: 0)
  * @returns World coordinates of the anchor point
  */
-export function computeEdgeAnchor(shape: ShapeRecord, nx: number, ny: number, offset = 0): Vec2 {
+export function computeEdgeAnchor(shape: EditorShapeRecord, nx: number, ny: number, offset = 0): Vec2 {
 	const bounds = shapeBounds(shape);
 	const centerX = (bounds.min.x + bounds.max.x) / 2;
 	const centerY = (bounds.min.y + bounds.max.y) / 2;
@@ -914,7 +914,7 @@ export function computeEdgeAnchor(shape: ShapeRecord, nx: number, ny: number, of
  * @param shape - Target shape to anchor to
  * @returns Normalized coordinates {nx, ny} in [-1, 1]
  */
-export function computeNormalizedAnchor(point: Vec2, shape: ShapeRecord): { nx: number; ny: number } {
+export function computeNormalizedAnchor(point: Vec2, shape: EditorShapeRecord): { nx: number; ny: number } {
 	const bounds = shapeBounds(shape);
 	const centerX = (bounds.min.x + bounds.max.x) / 2;
 	const centerY = (bounds.min.y + bounds.max.y) / 2;
@@ -928,7 +928,7 @@ export function computeNormalizedAnchor(point: Vec2, shape: ShapeRecord): { nx: 
 }
 
 /** Pre-indexed bindings keyed by their source shape ID for repeated geometry work. */
-export type BindingIndex = ReadonlyMap<string, readonly BindingRecord[]>;
+export type BindingIndex = ReadonlyMap<string, readonly EditorBindingRecord[]>;
 
 /**
  * Resolve arrow endpoints considering bindings

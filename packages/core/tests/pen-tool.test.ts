@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { PageRecord, Store } from "../src";
+import { EditorPageRecord, Store } from "../src";
 import type { Action } from "../src/actions";
 import { Modifiers, PointerButtons } from "../src/actions";
 import { PenTool } from "../src/tools/pen";
@@ -78,7 +78,7 @@ describe("PenTool", () => {
     it("should initialize with clean state on enter", () => {
       const tool = new PenTool();
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
+      const page = EditorPageRecord.create("Page 1", "page:1");
 
       store.setState((state) => ({
         ...state,
@@ -95,7 +95,7 @@ describe("PenTool", () => {
     it("should clean up draft stroke on exit", () => {
       const tool = new PenTool();
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
+      const page = EditorPageRecord.create("Page 1", "page:1");
 
       store.setState((state) => ({
         ...state,
@@ -118,7 +118,7 @@ describe("PenTool", () => {
     it("should create stroke on pointer down", () => {
       const tool = new PenTool();
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
+      const page = EditorPageRecord.create("Page 1", "page:1");
 
       store.setState((state) => ({
         ...state,
@@ -144,7 +144,7 @@ describe("PenTool", () => {
     it("should retain hardware pressure samples when available", () => {
       const tool = new PenTool();
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
+      const page = EditorPageRecord.create("Page 1", "page:1");
 
       store.setState((state) => ({
         ...state,
@@ -168,7 +168,7 @@ describe("PenTool", () => {
     it("should add points on pointer move", () => {
       const tool = new PenTool();
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
+      const page = EditorPageRecord.create("Page 1", "page:1");
 
       store.setState((state) => ({
         ...state,
@@ -195,7 +195,7 @@ describe("PenTool", () => {
     it("coalesces pointer updates within the same frame", () => {
       const tool = new PenTool();
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
+      const page = EditorPageRecord.create("Page 1", "page:1");
 
       store.setState((state) => ({
         ...state,
@@ -224,7 +224,7 @@ describe("PenTool", () => {
     it("flushes pending points on pointer up even without a new frame", () => {
       const tool = new PenTool();
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
+      const page = EditorPageRecord.create("Page 1", "page:1");
 
       store.setState((state) => ({
         ...state,
@@ -254,7 +254,7 @@ describe("PenTool", () => {
     it("applies injected stroke style when creating strokes", () => {
       const tool = new PenTool(undefined, () => ({ color: "#88c0d0", opacity: 0.75 }));
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
+      const page = EditorPageRecord.create("Page 1", "page:1");
 
       store.setState((state) => ({
         ...state,
@@ -279,7 +279,7 @@ describe("PenTool", () => {
     it("should not add point if moved less than minimum distance", () => {
       const tool = new PenTool();
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
+      const page = EditorPageRecord.create("Page 1", "page:1");
 
       store.setState((state) => ({
         ...state,
@@ -305,7 +305,7 @@ describe("PenTool", () => {
     it("should finalize stroke on pointer up", () => {
       const tool = new PenTool();
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
+      const page = EditorPageRecord.create("Page 1", "page:1");
 
       store.setState((state) => ({
         ...state,
@@ -332,7 +332,7 @@ describe("PenTool", () => {
     it("should delete stroke if too few points on pointer up", () => {
       const tool = new PenTool();
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
+      const page = EditorPageRecord.create("Page 1", "page:1");
 
       store.setState((state) => ({
         ...state,
@@ -351,7 +351,7 @@ describe("PenTool", () => {
     it("should cancel stroke on Escape key", () => {
       const tool = new PenTool();
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
+      const page = EditorPageRecord.create("Page 1", "page:1");
 
       store.setState((state) => ({
         ...state,
@@ -375,7 +375,7 @@ describe("PenTool", () => {
     it("should ignore other keys", () => {
       const tool = new PenTool();
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
+      const page = EditorPageRecord.create("Page 1", "page:1");
 
       store.setState((state) => ({
         ...state,
@@ -407,7 +407,7 @@ describe("PenTool", () => {
     it("should handle pointer move without drawing", () => {
       const tool = new PenTool();
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
+      const page = EditorPageRecord.create("Page 1", "page:1");
 
       store.setState((state) => ({
         ...state,
@@ -424,7 +424,7 @@ describe("PenTool", () => {
     it("should select created stroke", () => {
       const tool = new PenTool();
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
+      const page = EditorPageRecord.create("Page 1", "page:1");
 
       store.setState((state) => ({
         ...state,

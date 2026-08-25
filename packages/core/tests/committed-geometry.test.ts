@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { boundsFromOutline, computeOutline, pathGeometryBounds } from '../src/geom';
-import type { BrushConfig, PathGeometry, StrokePoint } from '../src/model';
+import type { BrushConfig, PathGeometry, StrokePoint } from '../src/editor-model';
 import fixture from '../../../fixtures/native/geometry/committed.json';
 
 type BoundsFixture = { x: number; y: number; width: number; height: number };

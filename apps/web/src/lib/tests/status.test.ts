@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Observable, Observer, Subscription } from 'dexie';
-import type { DocPatch, PageRecord, PersistentDocRepo } from '@inkfinite/core';
+import type { DocPatch, EditorPageRecord, PersistentDocRepo } from '@inkfinite/core';
 import { describe, expect, it, vi } from 'vitest';
 import type { InkfiniteDB } from '$lib/persistence/database';
 import { createDexieSession, type DexieAdapterOptions } from '$lib/persistence/dexie';
@@ -97,7 +97,9 @@ function createStatusTracker(overrides?: {
 }
 
 function buildPatch(): DocPatch {
-	return { upserts: { pages: [{ id: 'page:1', name: 'Page 1', shapeIds: [] } as PageRecord] } };
+	return {
+		upserts: { pages: [{ id: 'page:1', name: 'Page 1', shapeIds: [] } as EditorPageRecord] }
+	};
 }
 
 describe('Dexie editor adapter', () => {

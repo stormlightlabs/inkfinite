@@ -1,6 +1,6 @@
 import {
 	type Action,
-	BindingRecord,
+	EditorBindingRecord,
 	Camera,
 	duplicateAndConnectSelection,
 	type CommandKind,
@@ -14,7 +14,7 @@ import {
 	setShapesLocked,
 	translateShapes,
 	ungroupShapes,
-	ShapeRecord,
+	EditorShapeRecord,
 	hitTestPoint,
 	selectionTarget,
 	type PathTopologyEdit,
@@ -416,7 +416,7 @@ function duplicateSelection(state: EditorState): EditorState | null {
 	const mapping = new Map(included.map((shape) => [shape.id, createId('shape')]));
 	const shapes = { ...state.doc.shapes };
 	for (const source of included) {
-		const copy = ShapeRecord.clone(source);
+		const copy = EditorShapeRecord.clone(source);
 		const id = mapping.get(source.id)!;
 		const parentId = source.groupId ? mapping.get(source.groupId) : undefined;
 		const copied = {
@@ -455,7 +455,7 @@ function duplicateSelection(state: EditorState): EditorState | null {
 		if (!fromShapeId) continue;
 		const id = createId('binding');
 		const toShapeId = mapping.get(binding.toShapeId) ?? binding.toShapeId;
-		bindings[id] = { ...BindingRecord.clone(binding), id, fromShapeId, toShapeId };
+		bindings[id] = { ...EditorBindingRecord.clone(binding), id, fromShapeId, toShapeId };
 	}
 	for (const source of included) {
 		const id = mapping.get(source.id);
@@ -496,7 +496,11 @@ function hasSelectedAncestor(state: EditorState, id: string, selected: ReadonlyS
 	return false;
 }
 
-function hasAncestor(shape: import('@inkfinite/core').ShapeRecord, ancestorId: string, state: EditorState): boolean {
+function hasAncestor(
+	shape: import('@inkfinite/core').EditorShapeRecord,
+	ancestorId: string,
+	state: EditorState
+): boolean {
 	let parentId = shape.groupId;
 	while (parentId) {
 		if (parentId === ancestorId) return true;

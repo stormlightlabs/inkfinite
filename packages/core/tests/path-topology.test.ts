@@ -4,18 +4,18 @@ import {
 	Action,
 	DirectSelectTool,
 	Modifiers,
-	PageRecord,
-	ShapeRecord,
+	EditorPageRecord,
+	EditorShapeRecord,
 	Store,
 	applyPathTopologyOperations
 } from '../src';
-import type { PathProps, PathTopologyOperation } from '../src/model';
+import type { PathProps, PathTopologyOperation } from '../src/editor-model';
 
 const buttons = { left: true, middle: false, right: false };
 const modifiers = Modifiers.create();
 
 function createPath() {
-	const page = PageRecord.create('Page', 'page:path-topology');
+	const page = EditorPageRecord.create('Page', 'page:path-topology');
 	const props: PathProps = {
 		subpaths: [
 			{
@@ -36,7 +36,7 @@ function createPath() {
 		fill_rule: 'nonzero',
 		fill: '#fff'
 	};
-	const path = ShapeRecord.createPath(page.id, 0, 0, props, 'path:topology');
+	const path = EditorShapeRecord.createPath(page.id, 0, 0, props, 'path:topology');
 	page.shapeIds = [path.id];
 	const state = new Store({
 		doc: { pages: { [page.id]: page }, shapes: { [path.id]: path }, bindings: {} },
@@ -54,8 +54,8 @@ function createPath() {
 describe('path topology previews', () => {
 	it('matches the shared topology fixtures', () => {
 		for (const testCase of fixture.cases) {
-			const page = PageRecord.create('Page', `page:${testCase.name}`);
-			const path = ShapeRecord.createPath(
+			const page = EditorPageRecord.create('Page', `page:${testCase.name}`);
+			const path = EditorShapeRecord.createPath(
 				page.id,
 				0,
 				0,
@@ -121,8 +121,8 @@ describe('path topology previews', () => {
 		expect(closed?.type).toBe('path');
 		if (closed?.type === 'path') expect(closed.props.subpaths[0]?.closed).toBe(true);
 
-		const joinPage = PageRecord.create('Page', 'page:path-join');
-		const joinPath = ShapeRecord.createPath(
+		const joinPage = EditorPageRecord.create('Page', 'page:path-join');
+		const joinPath = EditorShapeRecord.createPath(
 			joinPage.id,
 			0,
 			0,

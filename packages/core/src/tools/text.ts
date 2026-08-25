@@ -1,5 +1,5 @@
 import type { Action } from "../actions";
-import { createId, ShapeRecord } from "../model";
+import { createId, EditorShapeRecord } from "../editor-model";
 import type { EditorState, ToolId } from "../reactivity";
 import { canCreateShapeOnActiveLayer, getCurrentPage } from "../reactivity";
 import type { Tool } from "./base";
@@ -46,7 +46,7 @@ export class TextTool implements Tool {
 
     const shapeId = createId("shape");
 
-    const shape = ShapeRecord.createText(currentPage.id, action.world.x, action.world.y, {
+    const shape = EditorShapeRecord.createText(currentPage.id, action.world.x, action.world.y, {
       text: "Text",
       ...creationStylePolicy(this.getAppearance()).text,
     }, shapeId);

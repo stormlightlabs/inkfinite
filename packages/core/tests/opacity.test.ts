@@ -1,11 +1,11 @@
-import { Document, PageRecord, ShapeRecord, validateDoc } from '../src/model';
+import { EditorDocument, EditorPageRecord, EditorShapeRecord, validateDoc } from '../src/editor-model';
 import { describe, expect, it } from 'vitest';
 
 describe('shape opacity', () => {
 	it('accepts finite values from zero to one and rejects values outside the range', () => {
-		const doc = Document.create();
-		const page = PageRecord.create('Page', 'page');
-		const shape = ShapeRecord.createRect(
+		const doc = EditorDocument.create();
+		const page = EditorPageRecord.create('Page', 'page');
+		const shape = EditorShapeRecord.createRect(
 			page.id,
 			0,
 			0,

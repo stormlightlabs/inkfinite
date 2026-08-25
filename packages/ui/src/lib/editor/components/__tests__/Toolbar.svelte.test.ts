@@ -1,4 +1,4 @@
-import { PageRecord, ShapeRecord, Store } from '@inkfinite/core';
+import { EditorPageRecord, EditorShapeRecord, Store } from '@inkfinite/core';
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -6,8 +6,8 @@ import { createBrushStore } from '../../status';
 import Toolbar from '../Toolbar.svelte';
 
 function createSelectedRectStore() {
-	const page = PageRecord.create('Page', 'page');
-	const shape = ShapeRecord.createRect(
+	const page = EditorPageRecord.create('Page', 'page');
+	const shape = EditorShapeRecord.createRect(
 		page.id,
 		0,
 		0,
@@ -262,8 +262,8 @@ describe('Editor Toolbar', () => {
 	});
 
 	it('changes selected colors and opacity through labeled undoable controls', async () => {
-		const page = PageRecord.create('Page', 'page');
-		const shape = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Page', 'page');
+		const shape = EditorShapeRecord.createRect(
 			page.id,
 			0,
 			0,

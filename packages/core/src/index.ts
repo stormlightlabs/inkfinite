@@ -11,7 +11,7 @@ export * from './interchange';
 export * from './layers';
 export * from './layout';
 export * from './math';
-export * from './model';
+export * from './editor-model';
 export type {
 	GradientSpread,
 	GradientStop,

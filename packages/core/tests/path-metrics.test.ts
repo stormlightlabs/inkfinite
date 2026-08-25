@@ -10,7 +10,7 @@ import {
 	transformPathGeometry,
 	trimPathGeometry
 } from '../src/path-metrics';
-import type { PathGeometry } from '../src/model';
+import type { PathGeometry } from '../src/editor-model';
 
 const line: PathGeometry = {
 	subpaths: [

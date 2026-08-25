@@ -1,4 +1,4 @@
-import { EditorState, PageRecord, ShapeRecord, Store } from '@inkfinite/core';
+import { EditorState, EditorPageRecord, EditorShapeRecord, Store } from '@inkfinite/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MarkdownEditorController } from '$editor/canvas/controllers/markdown-controller.svelte';
 
@@ -16,8 +16,8 @@ describe('MarkdownEditorController', () => {
 
 	describe('start', () => {
 		it('should start editing a markdown shape', () => {
-			const page = PageRecord.create('Test Page', 'page1');
-			const shape = ShapeRecord.createMarkdown(
+			const page = EditorPageRecord.create('Test Page', 'page1');
+			const shape = EditorShapeRecord.createMarkdown(
 				'page1',
 				100,
 				200,
@@ -47,8 +47,8 @@ describe('MarkdownEditorController', () => {
 		});
 
 		it('should not start editing if shape is not markdown', () => {
-			const page = PageRecord.create('Test Page', 'page1');
-			const shape = ShapeRecord.createRect(
+			const page = EditorPageRecord.create('Test Page', 'page1');
+			const shape = EditorShapeRecord.createRect(
 				'page1',
 				100,
 				200,
@@ -82,8 +82,8 @@ describe('MarkdownEditorController', () => {
 		});
 
 		it('should compute layout when editing', () => {
-			const page = PageRecord.create('Test Page', 'page1');
-			const shape = ShapeRecord.createMarkdown(
+			const page = EditorPageRecord.create('Test Page', 'page1');
+			const shape = EditorShapeRecord.createMarkdown(
 				'page1',
 				100,
 				200,
@@ -116,8 +116,8 @@ describe('MarkdownEditorController', () => {
 		});
 
 		it('should handle auto-computed height', () => {
-			const page = PageRecord.create('Test Page', 'page1');
-			const shape = ShapeRecord.createMarkdown(
+			const page = EditorPageRecord.create('Test Page', 'page1');
+			const shape = EditorShapeRecord.createMarkdown(
 				'page1',
 				100,
 				200,
@@ -141,8 +141,8 @@ describe('MarkdownEditorController', () => {
 
 	describe('handleInput', () => {
 		it('should update current value on input', () => {
-			const page = PageRecord.create('Test Page', 'page1');
-			const shape = ShapeRecord.createMarkdown(
+			const page = EditorPageRecord.create('Test Page', 'page1');
+			const shape = EditorShapeRecord.createMarkdown(
 				'page1',
 				100,
 				200,
@@ -187,8 +187,8 @@ describe('MarkdownEditorController', () => {
 
 	describe('handleKeyDown', () => {
 		beforeEach(() => {
-			const page = PageRecord.create('Test Page', 'page1');
-			const shape = ShapeRecord.createMarkdown(
+			const page = EditorPageRecord.create('Test Page', 'page1');
+			const shape = EditorShapeRecord.createMarkdown(
 				'page1',
 				100,
 				200,
@@ -311,8 +311,8 @@ describe('MarkdownEditorController', () => {
 
 	describe('commit', () => {
 		it('should update markdown content and create history entry', () => {
-			const page = PageRecord.create('Test Page', 'page1');
-			const shape = ShapeRecord.createMarkdown(
+			const page = EditorPageRecord.create('Test Page', 'page1');
+			const shape = EditorShapeRecord.createMarkdown(
 				'page1',
 				100,
 				200,
@@ -348,8 +348,8 @@ describe('MarkdownEditorController', () => {
 		});
 
 		it('should not update if value is unchanged', () => {
-			const page = PageRecord.create('Test Page', 'page1');
-			const shape = ShapeRecord.createMarkdown(
+			const page = EditorPageRecord.create('Test Page', 'page1');
+			const shape = EditorShapeRecord.createMarkdown(
 				'page1',
 				100,
 				200,
@@ -390,8 +390,8 @@ describe('MarkdownEditorController', () => {
 
 	describe('cancel', () => {
 		it('should stop editing without saving', () => {
-			const page = PageRecord.create('Test Page', 'page1');
-			const shape = ShapeRecord.createMarkdown(
+			const page = EditorPageRecord.create('Test Page', 'page1');
+			const shape = EditorShapeRecord.createMarkdown(
 				'page1',
 				100,
 				200,
@@ -428,8 +428,8 @@ describe('MarkdownEditorController', () => {
 
 	describe('handleBlur', () => {
 		it('should commit on blur', () => {
-			const page = PageRecord.create('Test Page', 'page1');
-			const shape = ShapeRecord.createMarkdown(
+			const page = EditorPageRecord.create('Test Page', 'page1');
+			const shape = EditorShapeRecord.createMarkdown(
 				'page1',
 				100,
 				200,

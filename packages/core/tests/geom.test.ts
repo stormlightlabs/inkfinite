@@ -1,25 +1,25 @@
 import { describe, expect, it } from "vitest";
 import {
-  BindingRecord,
+  EditorBindingRecord,
   computeEdgeAnchor,
   computeNormalizedAnchor,
   computeOrthogonalPath,
   hitTestPoint,
-  PageRecord,
+  EditorPageRecord,
   pointInEllipse,
   pointInRect,
   pointNearSegment,
   resolveArrowEndpoints,
   shapeBounds,
   shapeCenter,
-  ShapeRecord,
+  EditorShapeRecord,
   Store,
 } from "../src";
 
 describe("Geometry", () => {
   describe("shapeBounds", () => {
     it("should return correct bounds for rect without rotation", () => {
-      const rect = ShapeRecord.createRect("page:1", 100, 200, { w: 50, h: 30, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 100, 200, { w: 50, h: 30, fill: "", stroke: "", radius: 0 });
 
       const bounds = shapeBounds(rect);
 
@@ -28,7 +28,7 @@ describe("Geometry", () => {
     });
 
     it("should return correct bounds for rect with rotation", () => {
-      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
       rect.rot = Math.PI / 4;
 
       const bounds = shapeBounds(rect);
@@ -40,7 +40,7 @@ describe("Geometry", () => {
     });
 
     it("should return correct bounds for ellipse without rotation", () => {
-      const ellipse = ShapeRecord.createEllipse("page:1", 50, 50, { w: 100, h: 80, fill: "", stroke: "" });
+      const ellipse = EditorShapeRecord.createEllipse("page:1", 50, 50, { w: 100, h: 80, fill: "", stroke: "" });
 
       const bounds = shapeBounds(ellipse);
 
@@ -49,7 +49,7 @@ describe("Geometry", () => {
     });
 
     it("should return correct bounds for line", () => {
-      const line = ShapeRecord.createLine("page:1", 10, 10, {
+      const line = EditorShapeRecord.createLine("page:1", 10, 10, {
         a: { x: 0, y: 0 },
         b: { x: 100, y: 50 },
         stroke: "",
@@ -63,7 +63,7 @@ describe("Geometry", () => {
     });
 
     it("should return correct bounds for arrow", () => {
-      const arrow = ShapeRecord.createArrow("page:1", 20, 30, {
+      const arrow = EditorShapeRecord.createArrow("page:1", 20, 30, {
         points: [{ x: 10, y: 10 }, { x: 50, y: 60 }],
         start: { kind: "free" },
         end: { kind: "free" },
@@ -77,7 +77,7 @@ describe("Geometry", () => {
     });
 
     it("should return correct bounds for text", () => {
-      const text = ShapeRecord.createText("page:1", 100, 100, {
+      const text = EditorShapeRecord.createText("page:1", 100, 100, {
         text: "Hello",
         fontSize: 16,
         fontFamily: "Arial",
@@ -93,7 +93,7 @@ describe("Geometry", () => {
     });
 
     it("should return correct bounds for text without explicit width", () => {
-      const text = ShapeRecord.createText("page:1", 100, 100, {
+      const text = EditorShapeRecord.createText("page:1", 100, 100, {
         text: "Hello",
         fontSize: 20,
         fontFamily: "Arial",
@@ -110,7 +110,7 @@ describe("Geometry", () => {
 
   describe("pointInRect", () => {
     it("should return true for point inside rect", () => {
-      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
 
       expect(pointInRect({ x: 150, y: 125 }, rect)).toBe(true);
       expect(pointInRect({ x: 100, y: 100 }, rect)).toBe(true);
@@ -118,7 +118,7 @@ describe("Geometry", () => {
     });
 
     it("should return false for point outside rect", () => {
-      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
 
       expect(pointInRect({ x: 99, y: 125 }, rect)).toBe(false);
       expect(pointInRect({ x: 201, y: 125 }, rect)).toBe(false);
@@ -127,7 +127,7 @@ describe("Geometry", () => {
     });
 
     it("should handle rotated rectangles", () => {
-      const rect = ShapeRecord.createRect("page:1", 0, 0, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 0, 0, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
       rect.rot = Math.PI / 4;
 
       const centerInLocal = { x: 50, y: 25 };
@@ -146,27 +146,27 @@ describe("Geometry", () => {
 
   describe("pointInEllipse", () => {
     it("should return true for point inside ellipse", () => {
-      const ellipse = ShapeRecord.createEllipse("page:1", 100, 100, { w: 100, h: 80, fill: "", stroke: "" });
+      const ellipse = EditorShapeRecord.createEllipse("page:1", 100, 100, { w: 100, h: 80, fill: "", stroke: "" });
 
       expect(pointInEllipse({ x: 150, y: 140 }, ellipse)).toBe(true);
     });
 
     it("should return false for point outside ellipse", () => {
-      const ellipse = ShapeRecord.createEllipse("page:1", 100, 100, { w: 100, h: 80, fill: "", stroke: "" });
+      const ellipse = EditorShapeRecord.createEllipse("page:1", 100, 100, { w: 100, h: 80, fill: "", stroke: "" });
 
       expect(pointInEllipse({ x: 100, y: 100 }, ellipse)).toBe(false);
       expect(pointInEllipse({ x: 200, y: 180 }, ellipse)).toBe(false);
     });
 
     it("should handle point at center of ellipse", () => {
-      const ellipse = ShapeRecord.createEllipse("page:1", 100, 100, { w: 100, h: 80, fill: "", stroke: "" });
+      const ellipse = EditorShapeRecord.createEllipse("page:1", 100, 100, { w: 100, h: 80, fill: "", stroke: "" });
 
       const center = { x: 150, y: 140 };
       expect(pointInEllipse(center, ellipse)).toBe(true);
     });
 
     it("should handle rotated ellipses", () => {
-      const ellipse = ShapeRecord.createEllipse("page:1", 0, 0, { w: 100, h: 50, fill: "", stroke: "" });
+      const ellipse = EditorShapeRecord.createEllipse("page:1", 0, 0, { w: 100, h: 50, fill: "", stroke: "" });
       ellipse.rot = Math.PI / 2;
 
       const centerInLocal = { x: 50, y: 25 };
@@ -288,7 +288,7 @@ describe("Geometry", () => {
 
   describe("pointInRect - edge cases", () => {
     it("should handle point exactly on rect boundary", () => {
-      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
 
       expect(pointInRect({ x: 100, y: 125 }, rect)).toBe(true);
       expect(pointInRect({ x: 200, y: 125 }, rect)).toBe(true);
@@ -297,28 +297,28 @@ describe("Geometry", () => {
     });
 
     it("should handle zero-size rectangles", () => {
-      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 0, h: 0, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 100, 100, { w: 0, h: 0, fill: "", stroke: "", radius: 0 });
 
       expect(pointInRect({ x: 100, y: 100 }, rect)).toBe(true);
       expect(pointInRect({ x: 100.1, y: 100 }, rect)).toBe(false);
     });
 
     it("should handle negative coordinates", () => {
-      const rect = ShapeRecord.createRect("page:1", -100, -100, { w: 50, h: 50, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", -100, -100, { w: 50, h: 50, fill: "", stroke: "", radius: 0 });
 
       expect(pointInRect({ x: -75, y: -75 }, rect)).toBe(true);
       expect(pointInRect({ x: -101, y: -75 }, rect)).toBe(false);
     });
 
     it("should handle very small rectangles", () => {
-      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 0.1, h: 0.1, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 100, 100, { w: 0.1, h: 0.1, fill: "", stroke: "", radius: 0 });
 
       expect(pointInRect({ x: 100.05, y: 100.05 }, rect)).toBe(true);
       expect(pointInRect({ x: 100.2, y: 100.05 }, rect)).toBe(false);
     });
 
     it("should handle 90 degree rotation", () => {
-      const rect = ShapeRecord.createRect("page:1", 0, 0, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 0, 0, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
       rect.rot = Math.PI / 2;
 
       const center = { x: -25, y: 50 };
@@ -326,7 +326,7 @@ describe("Geometry", () => {
     });
 
     it("should handle 180 degree rotation", () => {
-      const rect = ShapeRecord.createRect("page:1", 0, 0, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 0, 0, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
       rect.rot = Math.PI;
 
       const center = { x: -50, y: -25 };
@@ -336,34 +336,34 @@ describe("Geometry", () => {
 
   describe("pointInEllipse - edge cases", () => {
     it("should handle point exactly on ellipse boundary", () => {
-      const ellipse = ShapeRecord.createEllipse("page:1", 100, 100, { w: 100, h: 80, fill: "", stroke: "" });
+      const ellipse = EditorShapeRecord.createEllipse("page:1", 100, 100, { w: 100, h: 80, fill: "", stroke: "" });
 
       const rightEdge = { x: 200, y: 140 };
       expect(pointInEllipse(rightEdge, ellipse)).toBe(true);
     });
 
     it("should handle very small ellipse", () => {
-      const ellipse = ShapeRecord.createEllipse("page:1", 100, 100, { w: 0.2, h: 0.2, fill: "", stroke: "" });
+      const ellipse = EditorShapeRecord.createEllipse("page:1", 100, 100, { w: 0.2, h: 0.2, fill: "", stroke: "" });
 
       expect(pointInEllipse({ x: 100.1, y: 100.1 }, ellipse)).toBe(true);
       expect(pointInEllipse({ x: 100.2, y: 100.1 }, ellipse)).toBe(false);
     });
 
     it("should handle circle (equal width and height)", () => {
-      const circle = ShapeRecord.createEllipse("page:1", 100, 100, { w: 100, h: 100, fill: "", stroke: "" });
+      const circle = EditorShapeRecord.createEllipse("page:1", 100, 100, { w: 100, h: 100, fill: "", stroke: "" });
 
       expect(pointInEllipse({ x: 150, y: 150 }, circle)).toBe(true);
       expect(pointInEllipse({ x: 200, y: 150 }, circle)).toBe(true);
     });
 
     it("should handle negative coordinates", () => {
-      const ellipse = ShapeRecord.createEllipse("page:1", -100, -100, { w: 100, h: 80, fill: "", stroke: "" });
+      const ellipse = EditorShapeRecord.createEllipse("page:1", -100, -100, { w: 100, h: 80, fill: "", stroke: "" });
 
       expect(pointInEllipse({ x: -50, y: -60 }, ellipse)).toBe(true);
     });
 
     it("should handle very flat ellipse", () => {
-      const ellipse = ShapeRecord.createEllipse("page:1", 100, 100, { w: 200, h: 10, fill: "", stroke: "" });
+      const ellipse = EditorShapeRecord.createEllipse("page:1", 100, 100, { w: 200, h: 10, fill: "", stroke: "" });
 
       const center = { x: 200, y: 105 };
       expect(pointInEllipse(center, ellipse)).toBe(true);
@@ -373,7 +373,7 @@ describe("Geometry", () => {
     });
 
     it("should handle very tall ellipse", () => {
-      const ellipse = ShapeRecord.createEllipse("page:1", 100, 100, { w: 10, h: 200, fill: "", stroke: "" });
+      const ellipse = EditorShapeRecord.createEllipse("page:1", 100, 100, { w: 10, h: 200, fill: "", stroke: "" });
 
       const center = { x: 105, y: 200 };
       expect(pointInEllipse(center, ellipse)).toBe(true);
@@ -385,7 +385,7 @@ describe("Geometry", () => {
 
   describe("shapeBounds - edge cases", () => {
     it("should handle negative width/height gracefully", () => {
-      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: -50, h: -30, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 100, 100, { w: -50, h: -30, fill: "", stroke: "", radius: 0 });
 
       const bounds = shapeBounds(rect);
       expect(bounds.min.x).toBeDefined();
@@ -395,7 +395,7 @@ describe("Geometry", () => {
     });
 
     it("should handle zero-size shapes", () => {
-      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 0, h: 0, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 100, 100, { w: 0, h: 0, fill: "", stroke: "", radius: 0 });
 
       const bounds = shapeBounds(rect);
       expect(bounds.min).toEqual({ x: 100, y: 100 });
@@ -403,7 +403,7 @@ describe("Geometry", () => {
     });
 
     it("should handle line with same start and end points", () => {
-      const line = ShapeRecord.createLine("page:1", 100, 100, {
+      const line = EditorShapeRecord.createLine("page:1", 100, 100, {
         a: { x: 0, y: 0 },
         b: { x: 0, y: 0 },
         stroke: "",
@@ -416,7 +416,7 @@ describe("Geometry", () => {
     });
 
     it("should handle multiple rotations", () => {
-      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
       rect.rot = Math.PI * 2;
 
       const bounds = shapeBounds(rect);
@@ -427,7 +427,7 @@ describe("Geometry", () => {
     });
 
     it("should handle very large shapes", () => {
-      const rect = ShapeRecord.createRect("page:1", 0, 0, { w: 100_000, h: 100_000, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 0, 0, { w: 100_000, h: 100_000, fill: "", stroke: "", radius: 0 });
 
       const bounds = shapeBounds(rect);
       expect(bounds.max.x).toBe(100_000);
@@ -435,7 +435,7 @@ describe("Geometry", () => {
     });
 
     it("should handle line with rotation", () => {
-      const line = ShapeRecord.createLine("page:1", 100, 100, {
+      const line = EditorShapeRecord.createLine("page:1", 100, 100, {
         a: { x: 0, y: 0 },
         b: { x: 100, y: 0 },
         stroke: "",
@@ -452,8 +452,8 @@ describe("Geometry", () => {
   describe("hitTestPoint", () => {
     it("should return shape id for point inside rect", () => {
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
-      const rect = ShapeRecord.createRect("page:1", 100, 100, {
+      const page = EditorPageRecord.create("Page 1", "page:1");
+      const rect = EditorShapeRecord.createRect("page:1", 100, 100, {
         w: 100,
         h: 50,
         fill: "#ff0000",
@@ -475,8 +475,8 @@ describe("Geometry", () => {
 
     it("should return null for point outside all shapes", () => {
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
-      const rect = ShapeRecord.createRect("page:1", 100, 100, {
+      const page = EditorPageRecord.create("Page 1", "page:1");
+      const rect = EditorShapeRecord.createRect("page:1", 100, 100, {
         w: 100,
         h: 50,
         fill: "#ff0000",
@@ -498,15 +498,15 @@ describe("Geometry", () => {
 
     it("should return topmost shape for overlapping shapes", () => {
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
-      const rect1 = ShapeRecord.createRect("page:1", 100, 100, {
+      const page = EditorPageRecord.create("Page 1", "page:1");
+      const rect1 = EditorShapeRecord.createRect("page:1", 100, 100, {
         w: 200,
         h: 200,
         fill: "#ff0000",
         stroke: "#000000",
         radius: 0,
       }, "shape:1");
-      const rect2 = ShapeRecord.createRect("page:1", 150, 150, {
+      const rect2 = EditorShapeRecord.createRect("page:1", 150, 150, {
         w: 100,
         h: 100,
         fill: "#00ff00",
@@ -532,8 +532,8 @@ describe("Geometry", () => {
 
     it("should hit test ellipse shapes", () => {
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
-      const ellipse = ShapeRecord.createEllipse("page:1", 100, 100, {
+      const page = EditorPageRecord.create("Page 1", "page:1");
+      const ellipse = EditorShapeRecord.createEllipse("page:1", 100, 100, {
         w: 100,
         h: 80,
         fill: "#00ff00",
@@ -558,8 +558,8 @@ describe("Geometry", () => {
 
     it("should hit test line shapes with tolerance", () => {
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
-      const line = ShapeRecord.createLine("page:1", 100, 100, {
+      const page = EditorPageRecord.create("Page 1", "page:1");
+      const line = EditorShapeRecord.createLine("page:1", 100, 100, {
         a: { x: 0, y: 0 },
         b: { x: 100, y: 100 },
         stroke: "#000000",
@@ -580,8 +580,8 @@ describe("Geometry", () => {
 
     it("should hit test arrow shapes with tolerance", () => {
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
-      const arrow = ShapeRecord.createArrow("page:1", 100, 100, {
+      const page = EditorPageRecord.create("Page 1", "page:1");
+      const arrow = EditorShapeRecord.createArrow("page:1", 100, 100, {
         points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
         start: { kind: "free" },
         end: { kind: "free" },
@@ -602,8 +602,8 @@ describe("Geometry", () => {
 
     it("should hit test text shapes", () => {
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
-      const text = ShapeRecord.createText("page:1", 100, 100, {
+      const page = EditorPageRecord.create("Page 1", "page:1");
+      const text = EditorShapeRecord.createText("page:1", 100, 100, {
         text: "Hello",
         fontSize: 16,
         fontFamily: "Arial",
@@ -625,8 +625,8 @@ describe("Geometry", () => {
 
     it("should respect tolerance parameter for lines", () => {
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
-      const line = ShapeRecord.createLine("page:1", 0, 0, {
+      const page = EditorPageRecord.create("Page 1", "page:1");
+      const line = EditorShapeRecord.createLine("page:1", 0, 0, {
         a: { x: 0, y: 0 },
         b: { x: 100, y: 0 },
         stroke: "#000000",
@@ -661,21 +661,21 @@ describe("Geometry", () => {
 
     it("should handle multiple shape types on same page", () => {
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
-      const rect = ShapeRecord.createRect("page:1", 0, 0, {
+      const page = EditorPageRecord.create("Page 1", "page:1");
+      const rect = EditorShapeRecord.createRect("page:1", 0, 0, {
         w: 100,
         h: 100,
         fill: "#ff0000",
         stroke: "#000000",
         radius: 0,
       }, "shape:1");
-      const ellipse = ShapeRecord.createEllipse("page:1", 200, 0, {
+      const ellipse = EditorShapeRecord.createEllipse("page:1", 200, 0, {
         w: 100,
         h: 100,
         fill: "#00ff00",
         stroke: "#000000",
       }, "shape:2");
-      const line = ShapeRecord.createLine("page:1", 0, 200, {
+      const line = EditorShapeRecord.createLine("page:1", 0, 200, {
         a: { x: 0, y: 0 },
         b: { x: 100, y: 100 },
         stroke: "#000000",
@@ -702,7 +702,7 @@ describe("Geometry", () => {
 
   describe("shapeCenter", () => {
     it("should return center of rect shape", () => {
-      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
 
       const center = shapeCenter(rect);
 
@@ -710,7 +710,7 @@ describe("Geometry", () => {
     });
 
     it("should return center of ellipse shape", () => {
-      const ellipse = ShapeRecord.createEllipse("page:1", 100, 100, { w: 80, h: 60, fill: "", stroke: "" });
+      const ellipse = EditorShapeRecord.createEllipse("page:1", 100, 100, { w: 80, h: 60, fill: "", stroke: "" });
 
       const center = shapeCenter(ellipse);
 
@@ -718,7 +718,7 @@ describe("Geometry", () => {
     });
 
     it("should return center of line shape", () => {
-      const line = ShapeRecord.createLine("page:1", 100, 100, {
+      const line = EditorShapeRecord.createLine("page:1", 100, 100, {
         a: { x: 0, y: 0 },
         b: { x: 100, y: 50 },
         stroke: "",
@@ -731,7 +731,7 @@ describe("Geometry", () => {
     });
 
     it("should return center of arrow shape", () => {
-      const arrow = ShapeRecord.createArrow("page:1", 50, 50, {
+      const arrow = EditorShapeRecord.createArrow("page:1", 50, 50, {
         points: [{ x: -50, y: -50 }, { x: 50, y: 50 }],
         start: { kind: "free" },
         end: { kind: "free" },
@@ -744,7 +744,7 @@ describe("Geometry", () => {
     });
 
     it("should handle rotated shapes", () => {
-      const rect = ShapeRecord.createRect("page:1", 0, 0, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 0, 0, { w: 100, h: 50, fill: "", stroke: "", radius: 0 });
       rect.rot = Math.PI / 4;
 
       const center = shapeCenter(rect);
@@ -756,8 +756,8 @@ describe("Geometry", () => {
   describe("resolveArrowEndpoints", () => {
     it("should return arrow's own endpoints when no bindings exist", () => {
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
-      const arrow = ShapeRecord.createArrow("page:1", 100, 100, {
+      const page = EditorPageRecord.create("Page 1", "page:1");
+      const arrow = EditorShapeRecord.createArrow("page:1", 100, 100, {
         points: [{ x: 0, y: 0 }, { x: 100, y: 50 }],
         start: { kind: "free" },
         end: { kind: "free" },
@@ -778,22 +778,22 @@ describe("Geometry", () => {
 
     it("should resolve start endpoint when bound to a shape", () => {
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
-      const targetRect = ShapeRecord.createRect(
+      const page = EditorPageRecord.create("Page 1", "page:1");
+      const targetRect = EditorShapeRecord.createRect(
         "page:1",
         100,
         100,
         { w: 100, h: 100, fill: "", stroke: "", radius: 0 },
         "rect:1",
       );
-      const arrow = ShapeRecord.createArrow("page:1", 300, 300, {
+      const arrow = EditorShapeRecord.createArrow("page:1", 300, 300, {
         points: [{ x: -150, y: -150 }, { x: 100, y: 100 }],
         start: { kind: "free" },
         end: { kind: "free" },
         style: { stroke: "", width: 2 },
       }, "arrow:1");
 
-      const binding = BindingRecord.create(arrow.id, targetRect.id, "start", { kind: "center" }, "binding:1");
+      const binding = EditorBindingRecord.create(arrow.id, targetRect.id, "start", { kind: "center" }, "binding:1");
 
       store.setState((state) => ({
         ...state,
@@ -814,22 +814,22 @@ describe("Geometry", () => {
 
     it("should resolve end endpoint when bound to a shape", () => {
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
-      const targetRect = ShapeRecord.createRect(
+      const page = EditorPageRecord.create("Page 1", "page:1");
+      const targetRect = EditorShapeRecord.createRect(
         "page:1",
         200,
         200,
         { w: 100, h: 100, fill: "", stroke: "", radius: 0 },
         "rect:1",
       );
-      const arrow = ShapeRecord.createArrow("page:1", 50, 50, {
+      const arrow = EditorShapeRecord.createArrow("page:1", 50, 50, {
         points: [{ x: 0, y: 0 }, { x: 200, y: 200 }],
         start: { kind: "free" },
         end: { kind: "free" },
         style: { stroke: "", width: 2 },
       }, "arrow:1");
 
-      const binding = BindingRecord.create(arrow.id, targetRect.id, "end", { kind: "center" }, "binding:1");
+      const binding = EditorBindingRecord.create(arrow.id, targetRect.id, "end", { kind: "center" }, "binding:1");
 
       store.setState((state) => ({
         ...state,
@@ -849,30 +849,30 @@ describe("Geometry", () => {
 
     it("should resolve both endpoints when both are bound", () => {
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
-      const rect1 = ShapeRecord.createRect(
+      const page = EditorPageRecord.create("Page 1", "page:1");
+      const rect1 = EditorShapeRecord.createRect(
         "page:1",
         100,
         100,
         { w: 100, h: 100, fill: "", stroke: "", radius: 0 },
         "rect:1",
       );
-      const rect2 = ShapeRecord.createRect(
+      const rect2 = EditorShapeRecord.createRect(
         "page:1",
         300,
         300,
         { w: 100, h: 100, fill: "", stroke: "", radius: 0 },
         "rect:2",
       );
-      const arrow = ShapeRecord.createArrow("page:1", 0, 0, {
+      const arrow = EditorShapeRecord.createArrow("page:1", 0, 0, {
         points: [{ x: 0, y: 0 }, { x: 100, y: 100 }],
         start: { kind: "free" },
         end: { kind: "free" },
         style: { stroke: "", width: 2 },
       }, "arrow:1");
 
-      const binding1 = BindingRecord.create(arrow.id, rect1.id, "start", { kind: "center" }, "binding:1");
-      const binding2 = BindingRecord.create(arrow.id, rect2.id, "end", { kind: "center" }, "binding:2");
+      const binding1 = EditorBindingRecord.create(arrow.id, rect1.id, "start", { kind: "center" }, "binding:1");
+      const binding2 = EditorBindingRecord.create(arrow.id, rect2.id, "end", { kind: "center" }, "binding:2");
 
       store.setState((state) => ({
         ...state,
@@ -893,15 +893,15 @@ describe("Geometry", () => {
 
     it("should ignore bindings to missing shapes", () => {
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
-      const arrow = ShapeRecord.createArrow("page:1", 100, 100, {
+      const page = EditorPageRecord.create("Page 1", "page:1");
+      const arrow = EditorShapeRecord.createArrow("page:1", 100, 100, {
         points: [{ x: 0, y: 0 }, { x: 100, y: 50 }],
         start: { kind: "free" },
         end: { kind: "free" },
         style: { stroke: "", width: 2 },
       }, "arrow:1");
 
-      const binding = BindingRecord.create(arrow.id, "nonexistent:1", "start", { kind: "center" }, "binding:1");
+      const binding = EditorBindingRecord.create(arrow.id, "nonexistent:1", "start", { kind: "center" }, "binding:1");
 
       store.setState((state) => ({
         ...state,
@@ -930,8 +930,8 @@ describe("Geometry", () => {
 
     it("should return null for non-arrow shapes", () => {
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
-      const rect = ShapeRecord.createRect(
+      const page = EditorPageRecord.create("Page 1", "page:1");
+      const rect = EditorShapeRecord.createRect(
         "page:1",
         100,
         100,
@@ -953,22 +953,22 @@ describe("Geometry", () => {
 
     it("should handle bound arrows when target shape moves", () => {
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
-      const targetRect = ShapeRecord.createRect(
+      const page = EditorPageRecord.create("Page 1", "page:1");
+      const targetRect = EditorShapeRecord.createRect(
         "page:1",
         100,
         100,
         { w: 100, h: 100, fill: "", stroke: "", radius: 0 },
         "rect:1",
       );
-      const arrow = ShapeRecord.createArrow("page:1", 50, 50, {
+      const arrow = EditorShapeRecord.createArrow("page:1", 50, 50, {
         points: [{ x: 0, y: 0 }, { x: 100, y: 100 }],
         start: { kind: "free" },
         end: { kind: "free" },
         style: { stroke: "", width: 2 },
       }, "arrow:1");
 
-      const binding = BindingRecord.create(arrow.id, targetRect.id, "end", { kind: "center" }, "binding:1");
+      const binding = EditorBindingRecord.create(arrow.id, targetRect.id, "end", { kind: "center" }, "binding:1");
 
       store.setState((state) => ({
         ...state,
@@ -999,22 +999,22 @@ describe("Geometry", () => {
 
     it("should resolve edge anchors correctly", () => {
       const store = new Store();
-      const page = PageRecord.create("Test Page", "page:1");
-      const targetRect = ShapeRecord.createRect(
+      const page = EditorPageRecord.create("Test Page", "page:1");
+      const targetRect = EditorShapeRecord.createRect(
         page.id,
         100,
         100,
         { w: 100, h: 100, fill: "", stroke: "", radius: 0 },
         "rect:1",
       );
-      const arrow = ShapeRecord.createArrow(page.id, 0, 0, {
+      const arrow = EditorShapeRecord.createArrow(page.id, 0, 0, {
         points: [{ x: 0, y: 0 }, { x: 100, y: 100 }],
         start: { kind: "free" },
         end: { kind: "free" },
         style: { stroke: "#000", width: 2 },
       }, "arrow:1");
 
-      const binding = BindingRecord.create(arrow.id, targetRect.id, "end", { kind: "edge", nx: 1, ny: 0 });
+      const binding = EditorBindingRecord.create(arrow.id, targetRect.id, "end", { kind: "edge", nx: 1, ny: 0 });
 
       store.setState((state) => ({
         ...state,
@@ -1035,14 +1035,14 @@ describe("Geometry", () => {
 
   describe("computeEdgeAnchor", () => {
     it("should compute center anchor correctly", () => {
-      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 100, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 100, fill: "", stroke: "", radius: 0 });
       const anchor = computeEdgeAnchor(rect, 0, 0);
 
       expect(anchor).toEqual({ x: 150, y: 150 });
     });
 
     it("should compute edge anchors correctly", () => {
-      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 100, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 100, fill: "", stroke: "", radius: 0 });
 
       expect(computeEdgeAnchor(rect, -1, -1)).toEqual({ x: 100, y: 100 });
       expect(computeEdgeAnchor(rect, 1, -1)).toEqual({ x: 200, y: 100 });
@@ -1055,7 +1055,7 @@ describe("Geometry", () => {
 
   describe("computeNormalizedAnchor", () => {
     it("should compute normalized anchor for center point", () => {
-      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 100, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 100, fill: "", stroke: "", radius: 0 });
       const anchor = computeNormalizedAnchor({ x: 150, y: 150 }, rect);
 
       expect(anchor.nx).toBeCloseTo(0, 5);
@@ -1063,7 +1063,7 @@ describe("Geometry", () => {
     });
 
     it("should compute normalized anchor for edge points", () => {
-      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 100, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 100, fill: "", stroke: "", radius: 0 });
 
       const topLeft = computeNormalizedAnchor({ x: 100, y: 100 }, rect);
       expect(topLeft.nx).toBeCloseTo(-1, 5);
@@ -1079,7 +1079,7 @@ describe("Geometry", () => {
     });
 
     it("should clamp normalized anchor values to [-1, 1]", () => {
-      const rect = ShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 100, fill: "", stroke: "", radius: 0 });
+      const rect = EditorShapeRecord.createRect("page:1", 100, 100, { w: 100, h: 100, fill: "", stroke: "", radius: 0 });
 
       const far = computeNormalizedAnchor({ x: 300, y: 300 }, rect);
       expect(far.nx).toBe(1);

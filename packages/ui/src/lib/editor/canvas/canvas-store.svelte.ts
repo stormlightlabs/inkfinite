@@ -22,12 +22,12 @@ import {
 	hitTestPoint,
 	selectionTarget,
 	LineTool,
-	LayerRecord,
+	EditorLayerRecord,
 	exportInterchange,
 	exportToSVG,
 	importInterchange,
 	MarkdownTool,
-	PageRecord,
+	EditorPageRecord,
 	PenTool,
 	RectTool,
 	SelectTool,
@@ -132,8 +132,8 @@ export function createCanvasController(
 	let overlayViewport = $state<Viewport>({ width: 1, height: 1 });
 	let renderer: Renderer | null = null;
 	let inputAdapter: InputAdapter | null = null;
-	const initialPage = PageRecord.create('Page 1');
-	const initialLayer = LayerRecord.create(initialPage.id, 'Default');
+	const initialPage = EditorPageRecord.create('Page 1');
+	const initialLayer = EditorLayerRecord.create(initialPage.id, 'Default');
 	const handleResize = () => {
 		overlayViewport = measureViewport(canvas);
 		camera.refit();

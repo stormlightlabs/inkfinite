@@ -1,4 +1,4 @@
-import type { ArrowLabel, ArrowStyle, PathGeometry } from './model';
+import type { ArrowLabel, ArrowStyle, PathGeometry } from './editor-model';
 import type { Vec2 } from './math';
 import { pathLength, pointAtPathDistance, trimPathGeometry } from './path-metrics';
 

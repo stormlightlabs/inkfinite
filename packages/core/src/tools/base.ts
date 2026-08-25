@@ -1,5 +1,5 @@
 import type { Action } from "../actions";
-import type { PathTopologyEdit } from "../model";
+import type { PathTopologyEdit } from "../editor-model";
 import type { EditorState, ToolId } from "../reactivity";
 
 /**

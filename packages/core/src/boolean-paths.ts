@@ -2,8 +2,8 @@ import polygonClipping, { type MultiPolygon, type Pair, type Ring } from 'polygo
 import { flattenPath, transformPathGeometry } from './path-metrics';
 import { Mat3 } from './math';
 import type { Mat3 as Mat3Type } from './math';
-import { ensureDocumentLayers, ShapeRecord } from './model';
-import type { Document, PathGeometry, PathShape, ShapeRecord as Shape } from './model';
+import { ensureDocumentLayers, EditorShapeRecord } from './editor-model';
+import type { EditorDocument, PathGeometry, PathShape, EditorShapeRecord as Shape } from './editor-model';
 import type { EditorState } from './reactivity';
 import { shapeTransform } from './geom';
 
@@ -51,7 +51,7 @@ export function applyBooleanPathOperation(
 		.filter((subpath): subpath is NonNullable<typeof subpath> => subpath !== null);
 	if (subpaths.length === 0) return null;
 
-	const first = ShapeRecord.clone(paths[0]!) as PathShape;
+	const first = EditorShapeRecord.clone(paths[0]!) as PathShape;
 	first.props = { ...first.props, subpaths };
 	const removed = new Set(paths.slice(1).map((path) => path.id));
 	const shapes = Object.fromEntries(
@@ -78,7 +78,7 @@ export function applyBooleanPathOperation(
 			([, binding]) => !removed.has(binding.fromShapeId) && !removed.has(binding.toShapeId)
 		)
 	);
-	const document: Document = { ...state.doc, pages, shapes, bindings, ...(layers ? { layers } : {}) };
+	const document: EditorDocument = { ...state.doc, pages, shapes, bindings, ...(layers ? { layers } : {}) };
 	return {
 		...state,
 		doc: ensureDocumentLayers(document),

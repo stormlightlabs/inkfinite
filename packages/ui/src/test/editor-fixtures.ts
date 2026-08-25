@@ -1,8 +1,8 @@
 import {
 	EditorState,
 	FileBrowserVM,
-	PageRecord,
-	ShapeRecord,
+	EditorPageRecord,
+	EditorShapeRecord,
 	Store,
 	type BoardMeta,
 	type DocRepo
@@ -31,8 +31,8 @@ export function createFileBrowserFixture(boards: BoardMeta[] = testBoards) {
 /** Creates a store with one selected arrow for editor control tests. */
 export function createSelectedArrowStore(): Store {
 	const state = EditorState.create();
-	const page = PageRecord.create('Test page', 'page:test');
-	const arrow = ShapeRecord.createArrow(
+	const page = EditorPageRecord.create('Test page', 'page:test');
+	const arrow = EditorShapeRecord.createArrow(
 		page.id,
 		10,
 		20,

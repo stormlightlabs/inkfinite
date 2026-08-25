@@ -15,14 +15,14 @@ import {
 import type { Vec2 } from '../math';
 import { applyPathTopologyOperations } from '../path-topology';
 import {
-	ShapeRecord,
+	EditorShapeRecord,
 	type PathAnchorRef,
 	type PathControlRef,
 	type PathShape,
 	type StrokeShape,
 	type PathTopologyEdit,
 	type PathTopologyOperation
-} from '../model';
+} from '../editor-model';
 import { EditorState, getSelectionScopeShapes, selectionTarget, type ToolId } from '../reactivity';
 import type { Tool } from './base';
 
@@ -524,7 +524,7 @@ export class DirectSelectTool implements Tool {
 			activeHandle:
 				kind === 'anchor' ? { kind, ref: ref as PathAnchorRef } : { kind, ref: ref as PathControlRef },
 			dragStartWorld: point,
-			initialShape: ShapeRecord.clone(path) as PathShape,
+			initialShape: EditorShapeRecord.clone(path) as PathShape,
 			initialStroke: null
 		};
 	}
@@ -536,7 +536,7 @@ export class DirectSelectTool implements Tool {
 			activeHandle: { kind: 'width', index },
 			dragStartWorld: point,
 			initialShape: null,
-			initialStroke: ShapeRecord.clone(stroke) as StrokeShape
+			initialStroke: EditorShapeRecord.clone(stroke) as StrokeShape
 		};
 	}
 
@@ -606,7 +606,7 @@ function moveAnchors(
 			: { x: 0, y: rawDelta.y }
 		: rawDelta;
 	const selected = new Set(anchors.map(anchorKey));
-	const updated = ShapeRecord.clone(initial) as PathShape;
+	const updated = EditorShapeRecord.clone(initial) as PathShape;
 
 	for (const anchor of anchors) {
 		const segment = updated.props.subpaths[anchor.subpathIndex]?.segments[anchor.segmentIndex];
@@ -630,7 +630,7 @@ function moveAnchors(
 }
 
 function moveControl(initial: PathShape, control: PathControlRef, point: Vec2): PathShape | null {
-	const updated = ShapeRecord.clone(initial) as PathShape;
+	const updated = EditorShapeRecord.clone(initial) as PathShape;
 	const segment = updated.props.subpaths[control.subpathIndex]?.segments[control.segmentIndex];
 	if (!segment || segment.type === 'move' || segment.type === 'line') return null;
 	const position = worldToLocal(point, initial);

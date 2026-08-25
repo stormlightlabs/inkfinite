@@ -1,4 +1,4 @@
-import { EditorState, ShapeRecord, Store } from '@inkfinite/core';
+import { EditorState, EditorShapeRecord, Store } from '@inkfinite/core';
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -7,7 +7,7 @@ import LayerPanel from '../LayerPanel.svelte';
 function editorStore() {
 	const state = EditorState.create();
 	state.doc.pages.page = { id: 'page', name: 'Page', shapeIds: ['shape'] };
-	state.doc.shapes.shape = ShapeRecord.createRect(
+	state.doc.shapes.shape = EditorShapeRecord.createRect(
 		'page',
 		0,
 		0,

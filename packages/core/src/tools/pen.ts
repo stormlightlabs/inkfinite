@@ -1,6 +1,6 @@
 import type { Action } from "../actions";
-import type { BrushConfig, StrokePoint, StrokeStyle } from "../model";
-import { createId, ShapeRecord } from "../model";
+import type { BrushConfig, StrokePoint, StrokeStyle } from "../editor-model";
+import { createId, EditorShapeRecord } from "../editor-model";
 import type { EditorState, ToolId } from "../reactivity";
 import { canCreateShapeOnActiveLayer, getCurrentPage } from "../reactivity";
 import type { Tool } from "../tools/base";
@@ -114,7 +114,7 @@ export class PenTool implements Tool {
 
     const strokeStyle = { ...this.getStrokeStyle() };
 
-    const shape = ShapeRecord.createStroke(currentPage.id, 0, 0, {
+    const shape = EditorShapeRecord.createStroke(currentPage.id, 0, 0, {
       points: [firstPoint],
       brush: this.getBrush(),
       style: strokeStyle,

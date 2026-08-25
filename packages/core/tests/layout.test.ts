@@ -3,7 +3,7 @@ import {
 	distributeShapes,
 	EditorState,
 	groupShapes,
-	ShapeRecord,
+	EditorShapeRecord,
 	stackShapes,
 	tidyShapes,
 	ungroupShapes
@@ -15,9 +15,9 @@ function stateWithShapes() {
 	state.doc.pages.page = { id: 'page', name: 'Page', shapeIds: [] };
 	state.ui.currentPageId = 'page';
 	const shapes = [
-		ShapeRecord.createRect('page', 30, 20, { w: 10, h: 10, fill: '#000', stroke: '#000', radius: 0 }, 'one'),
-		ShapeRecord.createRect('page', 0, 0, { w: 20, h: 10, fill: '#000', stroke: '#000', radius: 0 }, 'two'),
-		ShapeRecord.createRect('page', 80, 40, { w: 10, h: 20, fill: '#000', stroke: '#000', radius: 0 }, 'three')
+		EditorShapeRecord.createRect('page', 30, 20, { w: 10, h: 10, fill: '#000', stroke: '#000', radius: 0 }, 'one'),
+		EditorShapeRecord.createRect('page', 0, 0, { w: 20, h: 10, fill: '#000', stroke: '#000', radius: 0 }, 'two'),
+		EditorShapeRecord.createRect('page', 80, 40, { w: 10, h: 20, fill: '#000', stroke: '#000', radius: 0 }, 'three')
 	];
 	state.doc.shapes = Object.fromEntries(shapes.map((shape) => [shape.id, shape]));
 	state.doc.pages.page.shapeIds = shapes.map((shape) => shape.id);

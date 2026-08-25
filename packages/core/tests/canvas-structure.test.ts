@@ -4,9 +4,9 @@ import {
 	computeCurvedPath,
 	exportToSVG,
 	FrameTool,
-	PageRecord,
+	EditorPageRecord,
 	SelectTool,
-	ShapeRecord,
+	EditorShapeRecord,
 	Store,
 	type EditorState
 } from '../src';
@@ -16,8 +16,8 @@ const down = { left: true, middle: false, right: false };
 const up = { left: false, middle: false, right: false };
 
 function frameState(): EditorState {
-	const page = PageRecord.create('Canvas', 'page:canvas');
-	const card = ShapeRecord.createRect(
+	const page = EditorPageRecord.create('Canvas', 'page:canvas');
+	const card = EditorShapeRecord.createRect(
 		page.id,
 		20,
 		30,
@@ -57,7 +57,7 @@ describe('canvas structure', () => {
 
 	it('exports a selected frame together with its descendants and title', () => {
 		let state = frameState();
-		const frame = ShapeRecord.createContainer(
+		const frame = EditorShapeRecord.createContainer(
 			'page:canvas',
 			0,
 			0,

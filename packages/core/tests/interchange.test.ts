@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
-	BindingRecord,
+	EditorBindingRecord,
 	exportInterchange,
 	importInterchange,
-	LayerRecord,
-	PageRecord,
-	ShapeRecord,
+	EditorLayerRecord,
+	EditorPageRecord,
+	EditorShapeRecord,
 	type BoardExport
 } from '../src';
 
 function board(): BoardExport {
-	const page = PageRecord.create('First', 'page:1');
-	const layer = LayerRecord.create(page.id, 'Default', 'layer:1');
+	const page = EditorPageRecord.create('First', 'page:1');
+	const layer = EditorLayerRecord.create(page.id, 'Default', 'layer:1');
 	page.layerIds = [layer.id];
-	const markdown = ShapeRecord.createMarkdown(
+	const markdown = EditorShapeRecord.createMarkdown(
 		page.id,
 		10,
 		20,
@@ -21,7 +21,7 @@ function board(): BoardExport {
 		'shape:card'
 	);
 	markdown.layerId = layer.id;
-	const text = ShapeRecord.createText(
+	const text = EditorShapeRecord.createText(
 		page.id,
 		400,
 		40,
@@ -29,15 +29,15 @@ function board(): BoardExport {
 		'shape:target'
 	);
 	text.layerId = layer.id;
-	const start = BindingRecord.create(
+	const start = EditorBindingRecord.create(
 		'shape:arrow',
 		markdown.id,
 		'start',
 		{ kind: 'edge', nx: 1, ny: 0 },
 		'binding:start'
 	);
-	const end = BindingRecord.create('shape:arrow', text.id, 'end', { kind: 'edge', nx: -1, ny: 0 }, 'binding:end');
-	const arrow = ShapeRecord.createArrow(
+	const end = EditorBindingRecord.create('shape:arrow', text.id, 'end', { kind: 'edge', nx: -1, ny: 0 }, 'binding:end');
+	const arrow = EditorShapeRecord.createArrow(
 		page.id,
 		250,
 		80,

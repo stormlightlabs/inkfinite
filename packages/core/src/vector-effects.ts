@@ -1,6 +1,6 @@
 import { localToWorld, worldToLocal } from './geom';
 import type { EditorState } from './reactivity';
-import type { PathGeometry, PathSegment, ShapeRecord } from './model';
+import type { PathGeometry, PathSegment, EditorShapeRecord } from './editor-model';
 import type { Vec2 } from './math';
 
 /** Returns whether the current selection can make one path clip another shape. */
@@ -20,14 +20,14 @@ export function canClipSelection(state: EditorState): boolean {
  */
 export function clipSelection(state: EditorState): EditorState | null {
 	if (!canClipSelection(state)) return null;
-	const selected = state.ui.selectionIds.map((id) => state.doc.shapes[id]).filter(Boolean) as ShapeRecord[];
+	const selected = state.ui.selectionIds.map((id) => state.doc.shapes[id]).filter(Boolean) as EditorShapeRecord[];
 	const source = selected.find((shape) => shape.type === 'path');
 	const target = selected.find((shape) => shape.type !== 'path');
 	if (!source || source.type !== 'path' || !target) return null;
 
 	const clipPath = transformGeometry(source.props, (point) => worldToLocal(localToWorld(source, point), target));
 	const shapes = { ...state.doc.shapes };
-	shapes[target.id] = { ...target, props: { ...target.props, clipPath } } as ShapeRecord;
+	shapes[target.id] = { ...target, props: { ...target.props, clipPath } } as EditorShapeRecord;
 	delete shapes[source.id];
 	const pages = Object.fromEntries(
 		Object.entries(state.doc.pages).map(([id, page]) => [
@@ -57,7 +57,7 @@ export function clipSelection(state: EditorState): EditorState | null {
 export function removeClipFromSelection(state: EditorState): EditorState | null {
 	const targets = state.ui.selectionIds
 		.map((id) => state.doc.shapes[id])
-		.filter((shape): shape is ShapeRecord =>
+		.filter((shape): shape is EditorShapeRecord =>
 			Boolean(shape?.props && 'clipPath' in shape.props && shape.props.clipPath)
 		);
 	if (targets.length === 0) return null;
@@ -66,7 +66,7 @@ export function removeClipFromSelection(state: EditorState): EditorState | null 
 	for (const target of targets) {
 		const props = { ...target.props } as Record<string, unknown>;
 		delete props.clipPath;
-		shapes[target.id] = { ...target, props } as ShapeRecord;
+		shapes[target.id] = { ...target, props } as EditorShapeRecord;
 	}
 	return { ...state, doc: { ...state.doc, shapes }, ui: { ...state.ui, selectionIds: [...targetIds] } };
 }

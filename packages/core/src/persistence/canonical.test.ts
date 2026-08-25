@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LayerRecord, PageRecord, ShapeRecord } from '../model';
+import { EditorLayerRecord, EditorPageRecord, EditorShapeRecord } from '../editor-model';
 import { fromCanonicalDocumentSnapshot, fromEditorProjection, toCanonicalDocumentSnapshot } from './canonical';
 import type { EditorProjection } from '@inkfinite/bindings/editor';
 
@@ -78,12 +78,12 @@ describe('canonical editor projection', () => {
 	it('traverses imported root containers and retains independently addressable descendants', () => {
 		const pageId = 'page:svg';
 		const layerId = 'layer:svg';
-		const page = PageRecord.create('SVG', pageId);
-		const layer = LayerRecord.create(pageId, 'Imported', layerId);
+		const page = EditorPageRecord.create('SVG', pageId);
+		const layer = EditorLayerRecord.create(pageId, 'Imported', layerId);
 		page.layerIds = [layerId];
-		const root = ShapeRecord.createContainer(pageId, 10, 20, { w: 100, h: 80 }, 'shape:svg:root');
-		const group = ShapeRecord.createContainer(pageId, 5, 6, { w: 40, h: 30 }, 'shape:svg:group');
-		const child = ShapeRecord.createRect(
+		const root = EditorShapeRecord.createContainer(pageId, 10, 20, { w: 100, h: 80 }, 'shape:svg:root');
+		const group = EditorShapeRecord.createContainer(pageId, 5, 6, { w: 40, h: 30 }, 'shape:svg:group');
+		const child = EditorShapeRecord.createRect(
 			pageId,
 			2,
 			3,

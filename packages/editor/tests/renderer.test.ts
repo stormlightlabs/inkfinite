@@ -1,4 +1,4 @@
-import { PageRecord, ShapeRecord, Store } from '@inkfinite/core';
+import { EditorPageRecord, EditorShapeRecord, Store } from '@inkfinite/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRenderer } from '../src/renderer';
 
@@ -115,8 +115,8 @@ describe('Renderer', () => {
 				return scheduledFrames.length;
 			});
 			const store = new Store();
-			const page = PageRecord.create('Page', 'page');
-			const text = ShapeRecord.createText(
+			const page = EditorPageRecord.create('Page', 'page');
+			const text = EditorShapeRecord.createText(
 				page.id,
 				0,
 				0,
@@ -158,15 +158,15 @@ describe('Renderer', () => {
 					alphaWrites.push(value);
 				}
 			});
-			const page = PageRecord.create('Page', 'page');
-			const visible = ShapeRecord.createRect(
+			const page = EditorPageRecord.create('Page', 'page');
+			const visible = EditorShapeRecord.createRect(
 				'page',
 				0,
 				0,
 				{ w: 10, h: 10, fill: '#fff', stroke: '#000', radius: 0 },
 				'visible'
 			);
-			const hidden = ShapeRecord.createRect(
+			const hidden = EditorShapeRecord.createRect(
 				'page',
 				20,
 				0,
@@ -241,9 +241,9 @@ describe('Renderer', () => {
 			vi.mocked(context.stroke).mockImplementation(() => {
 				strokeAlphas.push(alpha);
 			});
-			const page = PageRecord.create('Page', 'page');
+			const page = EditorPageRecord.create('Page', 'page');
 			const shape = {
-				...ShapeRecord.createRect(
+				...EditorShapeRecord.createRect(
 					page.id,
 					0,
 					0,
@@ -302,15 +302,15 @@ describe('Renderer', () => {
 				scheduledFrames.push(callback);
 				return scheduledFrames.length;
 			});
-			const page = PageRecord.create('Page 1', 'page:1');
-			const visible = ShapeRecord.createRect(
+			const page = EditorPageRecord.create('Page 1', 'page:1');
+			const visible = EditorShapeRecord.createRect(
 				'page:1',
 				0,
 				0,
 				{ w: 50, h: 50, fill: '#fff', stroke: '#000', radius: 0 },
 				'shape:visible'
 			);
-			const selectedOffscreen = ShapeRecord.createRect(
+			const selectedOffscreen = EditorShapeRecord.createRect(
 				'page:1',
 				10_000,
 				10_000,
@@ -349,8 +349,8 @@ describe('Renderer', () => {
 		it('should render scene with rect shape', async () => {
 			const store = new Store();
 
-			const page = PageRecord.create('Page 1', 'page:1');
-			const rect = ShapeRecord.createRect(
+			const page = EditorPageRecord.create('Page 1', 'page:1');
+			const rect = EditorShapeRecord.createRect(
 				'page:1',
 				100,
 				100,
@@ -378,8 +378,8 @@ describe('Renderer', () => {
 		it('should render scene with ellipse shape', async () => {
 			const store = new Store();
 
-			const page = PageRecord.create('Page 1', 'page:1');
-			const ellipse = ShapeRecord.createEllipse(
+			const page = EditorPageRecord.create('Page 1', 'page:1');
+			const ellipse = EditorShapeRecord.createEllipse(
 				'page:1',
 				100,
 				100,
@@ -410,8 +410,8 @@ describe('Renderer', () => {
 				scheduledFrames.push(callback);
 				return scheduledFrames.length;
 			});
-			const page = PageRecord.create('Page 1', 'page:1');
-			const path = ShapeRecord.createPath(
+			const page = EditorPageRecord.create('Page 1', 'page:1');
+			const path = EditorShapeRecord.createPath(
 				'page:1',
 				0,
 				0,
@@ -466,8 +466,8 @@ describe('Renderer', () => {
 				scheduledFrames.push(callback);
 				return scheduledFrames.length;
 			});
-			const page = PageRecord.create('Page 1', 'page:1');
-			const path = ShapeRecord.createPath(
+			const page = EditorPageRecord.create('Page 1', 'page:1');
+			const path = EditorShapeRecord.createPath(
 				page.id,
 				0,
 				0,
@@ -510,8 +510,8 @@ describe('Renderer', () => {
 		it('should render scene with line shape', async () => {
 			const store = new Store();
 
-			const page = PageRecord.create('Page 1', 'page:1');
-			const line = ShapeRecord.createLine(
+			const page = EditorPageRecord.create('Page 1', 'page:1');
+			const line = EditorShapeRecord.createLine(
 				'page:1',
 				0,
 				0,
@@ -539,8 +539,8 @@ describe('Renderer', () => {
 		it('should render scene with arrow shape', async () => {
 			const store = new Store();
 
-			const page = PageRecord.create('Page 1', 'page:1');
-			const arrow = ShapeRecord.createArrow(
+			const page = EditorPageRecord.create('Page 1', 'page:1');
+			const arrow = EditorShapeRecord.createArrow(
 				'page:1',
 				0,
 				0,
@@ -568,8 +568,8 @@ describe('Renderer', () => {
 		it('should render scene with text shape', async () => {
 			const store = new Store();
 
-			const page = PageRecord.create('Page 1', 'page:1');
-			const text = ShapeRecord.createText(
+			const page = EditorPageRecord.create('Page 1', 'page:1');
+			const text = EditorShapeRecord.createText(
 				'page:1',
 				100,
 				100,
@@ -597,8 +597,8 @@ describe('Renderer', () => {
 		it('should render text shape with word wrapping', async () => {
 			const store = new Store();
 
-			const page = PageRecord.create('Page 1', 'page:1');
-			const text = ShapeRecord.createText(
+			const page = EditorPageRecord.create('Page 1', 'page:1');
+			const text = EditorShapeRecord.createText(
 				'page:1',
 				100,
 				100,
@@ -632,15 +632,15 @@ describe('Renderer', () => {
 		it('should render multiple shapes', async () => {
 			const store = new Store();
 
-			const page = PageRecord.create('Page 1', 'page:1');
-			const rect = ShapeRecord.createRect(
+			const page = EditorPageRecord.create('Page 1', 'page:1');
+			const rect = EditorShapeRecord.createRect(
 				'page:1',
 				100,
 				100,
 				{ w: 200, h: 100, fill: '#ff0000', stroke: '#000000', radius: 0 },
 				'shape:1'
 			);
-			const ellipse = ShapeRecord.createEllipse(
+			const ellipse = EditorShapeRecord.createEllipse(
 				'page:1',
 				400,
 				200,
@@ -667,8 +667,8 @@ describe('Renderer', () => {
 
 		it('traces selected arrows instead of drawing a rectangular outline', async () => {
 			const store = new Store();
-			const page = PageRecord.create('Page 1', 'page:1');
-			const arrow = ShapeRecord.createArrow(
+			const page = EditorPageRecord.create('Page 1', 'page:1');
+			const arrow = EditorShapeRecord.createArrow(
 				page.id,
 				0,
 				0,
@@ -696,8 +696,8 @@ describe('Renderer', () => {
 		it('renders a dashed outline for selected shapes', async () => {
 			const store = new Store();
 
-			const page = PageRecord.create('Page 1', 'page:1');
-			const rect = ShapeRecord.createRect(
+			const page = EditorPageRecord.create('Page 1', 'page:1');
+			const rect = EditorShapeRecord.createRect(
 				'page:1',
 				100,
 				100,
@@ -733,8 +733,8 @@ describe('Renderer', () => {
 				scheduledFrames.push(callback);
 				return scheduledFrames.length;
 			});
-			const page = PageRecord.create('Page', 'page:direct-render');
-			const path = ShapeRecord.createPath(
+			const page = EditorPageRecord.create('Page', 'page:direct-render');
+			const path = EditorShapeRecord.createPath(
 				page.id,
 				0,
 				0,
@@ -790,7 +790,7 @@ describe('Renderer', () => {
 		it('should update render when store changes', async () => {
 			const store = new Store();
 
-			const page = PageRecord.create('Page 1', 'page:1');
+			const page = EditorPageRecord.create('Page 1', 'page:1');
 
 			store.setState((state) => ({
 				...state,
@@ -802,7 +802,7 @@ describe('Renderer', () => {
 
 			await new Promise((resolve) => setTimeout(resolve, 50));
 
-			const rect = ShapeRecord.createRect(
+			const rect = EditorShapeRecord.createRect(
 				'page:1',
 				100,
 				100,
@@ -827,8 +827,8 @@ describe('Renderer', () => {
 		it('should apply camera transform correctly', async () => {
 			const store = new Store();
 
-			const page = PageRecord.create('Page 1', 'page:1');
-			const rect = ShapeRecord.createRect(
+			const page = EditorPageRecord.create('Page 1', 'page:1');
+			const rect = EditorShapeRecord.createRect(
 				'page:1',
 				0,
 				0,
@@ -857,8 +857,8 @@ describe('Renderer', () => {
 		it('should handle rounded rectangle', async () => {
 			const store = new Store();
 
-			const page = PageRecord.create('Page 1', 'page:1');
-			const rect = ShapeRecord.createRect(
+			const page = EditorPageRecord.create('Page 1', 'page:1');
+			const rect = EditorShapeRecord.createRect(
 				'page:1',
 				100,
 				100,
@@ -886,8 +886,8 @@ describe('Renderer', () => {
 		it('should render shapes with rotation', async () => {
 			const store = new Store();
 
-			const page = PageRecord.create('Page 1', 'page:1');
-			const rect = ShapeRecord.createRect(
+			const page = EditorPageRecord.create('Page 1', 'page:1');
+			const rect = EditorShapeRecord.createRect(
 				'page:1',
 				100,
 				100,

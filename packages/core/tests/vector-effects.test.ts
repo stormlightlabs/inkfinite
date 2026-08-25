@@ -2,19 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { Camera } from '../src/camera';
 import { clipSelection, removeClipFromSelection } from '../src/vector-effects';
 import { EditorState } from '../src/reactivity';
-import { PageRecord, ShapeRecord } from '../src/model';
+import { EditorPageRecord, EditorShapeRecord } from '../src/editor-model';
 
 describe('vector effects', () => {
 	it('turns a selected path into local clip geometry and removes the source', () => {
-		const page = PageRecord.create('Page 1', 'page:effects');
-		const target = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Page 1', 'page:effects');
+		const target = EditorShapeRecord.createRect(
 			page.id,
 			100,
 			50,
 			{ w: 80, h: 60, fill: 'red', stroke: 'none', radius: 0 },
 			'shape:target'
 		);
-		const source = ShapeRecord.createPath(
+		const source = EditorShapeRecord.createPath(
 			page.id,
 			110,
 			60,

@@ -1,3 +1,12 @@
+/**
+ * The only TypeScript adapter boundary between generated Rust contracts and
+ * the interactive editor document.
+ *
+ * The adapter reads canonical snapshots and Rust editor projections, materializes
+ * `EditorDocument` values for tools, and emits generated reconciliation patches.
+ * It never defines or serializes a second native document contract.
+ */
+
 import type {
 	EditorPatch,
 	EditorProjection,
@@ -22,12 +31,12 @@ import type {
 import type { BoardExport, DocOrder, LoadedDoc } from './document';
 import {
 	ensureDocumentLayers,
-	type Document,
-	type LayerRecord,
+	type EditorDocument,
+	type EditorLayerRecord,
 	type PathTopologyEdit,
 	type ShapeMetadata,
-	type ShapeRecord
-} from '../model';
+	type EditorShapeRecord
+} from '../editor-model';
 
 const FORMAT_ID = 'inkfinite.document';
 const FORMAT_VERSION = 2;
@@ -45,11 +54,11 @@ export type CanonicalSnapshotOptions = { documentId: string; heads?: readonly st
  * rebuild this hierarchy in TypeScript.
  */
 export function toCanonicalDocumentSnapshot(
-	input: BoardExport | Document,
+	input: BoardExport | EditorDocument,
 	options?: CanonicalSnapshotOptions
 ): NativeDocumentSnapshot {
 	const board = isBoardExport(input) ? input : undefined;
-	const source: Document = isBoardExport(input) ? input.doc : input;
+	const source: EditorDocument = isBoardExport(input) ? input.doc : input;
 	const document = ensureDocumentLayers(source);
 	const documentId = options?.documentId ?? board?.board.id ?? 'document:browser';
 	const order = options?.order ?? board?.order;
@@ -143,10 +152,10 @@ export function toCanonicalDocumentSnapshot(
  * drawable records and ordering, not binary content.
  */
 export function fromEditorProjection(projection: EditorProjection, snapshot?: NativeDocumentSnapshot): LoadedDoc {
-	const pages: Record<string, import('../model').PageRecord> = {};
-	const layers: Record<string, LayerRecord> = {};
-	const shapes: Record<string, ShapeRecord> = {};
-	const bindings: Record<string, import('../model').BindingRecord> = {};
+	const pages: Record<string, import('../editor-model').EditorPageRecord> = {};
+	const layers: Record<string, EditorLayerRecord> = {};
+	const shapes: Record<string, EditorShapeRecord> = {};
+	const bindings: Record<string, import('../editor-model').EditorBindingRecord> = {};
 
 	for (const pageId of projection.order.page_ids) {
 		const page = projection.pages[pageId];
@@ -167,7 +176,7 @@ export function fromEditorProjection(projection: EditorProjection, snapshot?: Na
 	for (const shape of Object.values(projection.shapes)) {
 		shapes[shape.id] = {
 			id: shape.id,
-			type: shape.type as ShapeRecord['type'],
+			type: shape.type as EditorShapeRecord['type'],
 			pageId: shape.page_id,
 			x: shape.x,
 			y: shape.y,
@@ -181,17 +190,17 @@ export function fromEditorProjection(projection: EditorProjection, snapshot?: Na
 			locked: shape.locked,
 			agentEditable: shape.agent_editable,
 			metadata: fromNativeMetadata(shape.metadata),
-			props: editorProperties(shape.props as ShapeProperties) as ShapeRecord['props'],
+			props: editorProperties(shape.props as ShapeProperties) as EditorShapeRecord['props'],
 			...(shape.resolved_geometry ? { resolvedGeometry: shape.resolved_geometry } : {})
-		} as ShapeRecord;
+		} as EditorShapeRecord;
 	}
 	for (const binding of Object.values(projection.bindings)) {
 		bindings[binding.id] = {
 			id: binding.id,
-			type: binding.type as import('../model').BindingType,
+			type: binding.type as import('../editor-model').BindingType,
 			fromShapeId: binding.from_shape_id,
 			toShapeId: binding.to_shape_id,
-			handle: binding.handle as import('../model').BindingHandle,
+			handle: binding.handle as import('../editor-model').BindingHandle,
 			anchor:
 				binding.anchor.kind === 'center'
 					? { kind: 'center' }
@@ -236,10 +245,10 @@ export function fromEditorProjection(projection: EditorProjection, snapshot?: Na
 }
 
 export function fromCanonicalDocumentSnapshot(snapshot: NativeDocumentSnapshot): LoadedDoc {
-	const pages: Record<string, import('../model').PageRecord> = {};
-	const layers: Record<string, LayerRecord> = {};
-	const shapes: Record<string, ShapeRecord> = {};
-	const bindings: Record<string, import('../model').BindingRecord> = {};
+	const pages: Record<string, import('../editor-model').EditorPageRecord> = {};
+	const layers: Record<string, EditorLayerRecord> = {};
+	const shapes: Record<string, EditorShapeRecord> = {};
+	const bindings: Record<string, import('../editor-model').EditorBindingRecord> = {};
 
 	for (const pageId of snapshot.document.page_ids) {
 		const page = snapshot.document.pages[pageId];
@@ -276,10 +285,10 @@ export function fromCanonicalDocumentSnapshot(snapshot: NativeDocumentSnapshot):
 	for (const binding of Object.values(snapshot.document.bindings)) {
 		bindings[binding.id] = {
 			id: binding.id,
-			type: binding.kind as import('../model').BindingType,
+			type: binding.kind as import('../editor-model').BindingType,
 			fromShapeId: binding.source_shape_id,
 			toShapeId: binding.target_shape_id,
-			handle: binding.source_handle as import('../model').BindingHandle,
+			handle: binding.source_handle as import('../editor-model').BindingHandle,
 			anchor:
 				binding.anchor.kind === 'center'
 					? { kind: 'center' }
@@ -318,8 +327,8 @@ export function fromCanonicalDocumentSnapshot(snapshot: NativeDocumentSnapshot):
 
 /** Builds one semantic Rust reconciliation request from an editor document change. */
 export function createEditorReconciliationRequest(
-	before: Document,
-	after: Document,
+	before: EditorDocument,
+	after: EditorDocument,
 	options: Omit<EditorReconciliationRequest, 'patches'> & { topologyEdits?: PathTopologyEdit[] }
 ): EditorReconciliationRequest {
 	const { topologyEdits = [], ...requestOptions } = options;
@@ -489,10 +498,10 @@ function editorShape(
 	layerId: string,
 	groupId: string | undefined,
 	transform: Affine
-): ShapeRecord {
+): EditorShapeRecord {
 	return {
 		id: native.id,
-		type: native.kind as ShapeRecord['type'],
+		type: native.kind as EditorShapeRecord['type'],
 		pageId,
 		x: transform.e,
 		y: transform.f,
@@ -507,7 +516,7 @@ function editorShape(
 		agentEditable: native.metadata.agent_editable,
 		metadata: fromNativeMetadata(native.metadata),
 		props: editorProperties(native.properties)
-	} as ShapeRecord;
+	} as EditorShapeRecord;
 }
 
 function fromNativeMetadata(metadata: SemanticMetadata): ShapeMetadata {
@@ -532,7 +541,7 @@ function fromNativeMetadata(metadata: SemanticMetadata): ShapeMetadata {
 	};
 }
 
-function shapeMetadata(shape: ShapeRecord): ShapeMetadata {
+function shapeMetadata(shape: EditorShapeRecord): ShapeMetadata {
 	if (shape.metadata) {
 		return {
 			...shape.metadata,
@@ -619,11 +628,11 @@ function editorProperties(properties: ShapeProperties): ShapeProperties {
 	return result;
 }
 
-function cloneProperties(properties: ShapeRecord['props']): ShapeProperties {
+function cloneProperties(properties: EditorShapeRecord['props']): ShapeProperties {
 	return JSON.parse(JSON.stringify(properties)) as ShapeProperties;
 }
 
-function shapeStyle(shape: ShapeRecord): ShapeStyle {
+function shapeStyle(shape: EditorShapeRecord): ShapeStyle {
 	return {
 		opacity: clampOpacity(shape.opacity),
 		fill_opacity: shape.fillOpacity === undefined ? null : clampOpacity(shape.fillOpacity),
@@ -631,20 +640,20 @@ function shapeStyle(shape: ShapeRecord): ShapeStyle {
 	};
 }
 
-function shapeParent(shape: ShapeRecord, document: Document): ShapeParent {
+function shapeParent(shape: EditorShapeRecord, document: EditorDocument): ShapeParent {
 	return shape.groupId
 		? { kind: 'shape', id: shape.groupId }
 		: { kind: 'layer', id: shape.layerId ?? findShapeLayer(shape.id, document) };
 }
 
-function findShapeLayer(shapeId: string, document: Document): string {
+function findShapeLayer(shapeId: string, document: EditorDocument): string {
 	for (const layer of Object.values(document.layers ?? {})) {
 		if (layer.shapeIds.includes(shapeId)) return layer.id;
 	}
 	throw new Error(`Shape ${shapeId} has no owning layer`);
 }
 
-function nativeLayer(layer: LayerRecord): NativeLayerRecord {
+function nativeLayer(layer: EditorLayerRecord): NativeLayerRecord {
 	return {
 		id: layer.id,
 		page_id: layer.pageId,
@@ -657,7 +666,7 @@ function nativeLayer(layer: LayerRecord): NativeLayerRecord {
 	};
 }
 
-function deletedLayerMoves(before: Document, after: Document): Map<string, string> {
+function deletedLayerMoves(before: EditorDocument, after: EditorDocument): Map<string, string> {
 	const destinations = new Map<string, string>();
 	for (const layer of Object.values(before.layers ?? {})) {
 		if (after.layers?.[layer.id]) continue;
@@ -679,10 +688,10 @@ function orderAnchorFor(id: string, ids: string[]) {
 }
 
 function shapePatch(
-	before: ShapeRecord,
-	after: ShapeRecord,
-	beforeDocument: Document,
-	afterDocument: Document,
+	before: EditorShapeRecord,
+	after: EditorShapeRecord,
+	beforeDocument: EditorDocument,
+	afterDocument: EditorDocument,
 	skipDeletedLayerParent: boolean,
 	skipProperties: boolean
 ): EditorPatch | null {
@@ -748,7 +757,7 @@ function shapePatch(
 	};
 }
 
-function editorTransform(shape: ShapeRecord, previous?: ShapeRecord): EditorTransform {
+function editorTransform(shape: EditorShapeRecord, previous?: EditorShapeRecord): EditorTransform {
 	const current = shape.editorTransform ? { ...shape.editorTransform } : transformFromRotation(shape.rot, 1, 1);
 	if (previous && !shape.editorTransform && Math.abs(shape.rot - previous.rot) > 1e-9) {
 		const previousTransform = previous.editorTransform ?? transformFromRotation(previous.rot, 1, 1);
@@ -772,8 +781,8 @@ function siblingOrderChanged(
 	shapeId: string,
 	beforeParent: ShapeParent,
 	afterParent: ShapeParent,
-	before: Document,
-	after: Document
+	before: EditorDocument,
+	after: EditorDocument
 ): boolean {
 	if (JSON.stringify(beforeParent) !== JSON.stringify(afterParent)) return true;
 	const beforeSiblings = siblings(beforeParent, before);
@@ -781,14 +790,14 @@ function siblingOrderChanged(
 	return JSON.stringify(beforeSiblings) !== JSON.stringify(afterSiblings) && afterSiblings.includes(shapeId);
 }
 
-function siblings(parent: ShapeParent, document: Document): string[] {
+function siblings(parent: ShapeParent, document: EditorDocument): string[] {
 	if (parent.kind === 'layer') return document.layers?.[parent.id]?.shapeIds ?? [];
 	return Object.values(document.shapes)
 		.filter((shape) => shape.groupId === parent.id)
 		.map((shape) => shape.id);
 }
 
-function orderAnchor(shapeId: string, parent: ShapeParent, document: Document) {
+function orderAnchor(shapeId: string, parent: ShapeParent, document: EditorDocument) {
 	const ids = siblings(parent, document).filter((id) => id !== shapeId);
 	const index = siblings(parent, document).indexOf(shapeId);
 	return index <= 0
@@ -796,7 +805,7 @@ function orderAnchor(shapeId: string, parent: ShapeParent, document: Document) {
 		: { position: 'after' as const, sibling_id: ids[index - 1] ?? ids.at(-1)! };
 }
 
-function nativePropertiesForShape(shape: ShapeRecord): ShapeProperties {
+function nativePropertiesForShape(shape: EditorShapeRecord): ShapeProperties {
 	const properties = JSON.parse(JSON.stringify(shape.props)) as ShapeProperties;
 	if ('clipPath' in properties) {
 		properties.clip_path = properties.clipPath;
@@ -822,7 +831,7 @@ function nativePropertiesForShape(shape: ShapeRecord): ShapeProperties {
 	return properties;
 }
 
-function nativeTransform(shape: ShapeRecord, document: Document): Transform {
+function nativeTransform(shape: EditorShapeRecord, document: EditorDocument): Transform {
 	const world = editorTransform(shape);
 	const parent = shape.groupId ? document.shapes[shape.groupId] : undefined;
 	const parentWorld = parent ? editorTransform(parent) : identityAffine();
@@ -862,7 +871,7 @@ function sameAffine(left: Affine, right: Affine): boolean {
 	].every(([a, b]) => Math.abs(a - b) <= 1e-9 * (1 + Math.max(Math.abs(a), Math.abs(b))));
 }
 
-function orderedChildren(shape: ShapeRecord, document: Document): string[] {
+function orderedChildren(shape: EditorShapeRecord, document: EditorDocument): string[] {
 	const layer = shape.layerId ? document.layers?.[shape.layerId] : undefined;
 	const order = layer?.shapeIds ?? document.pages[shape.pageId]?.shapeIds ?? [];
 	const children = order.filter((id) => document.shapes[id]?.groupId === shape.id);
@@ -872,7 +881,7 @@ function orderedChildren(shape: ShapeRecord, document: Document): string[] {
 		.map((candidate) => candidate.id);
 }
 
-function nativeAsset(asset: import('../model').ImportedAsset): NativeAssetRecord {
+function nativeAsset(asset: import('../editor-model').ImportedAsset): NativeAssetRecord {
 	return {
 		id: asset.id,
 		name: asset.name,
@@ -884,7 +893,7 @@ function nativeAsset(asset: import('../model').ImportedAsset): NativeAssetRecord
 	};
 }
 
-function nativeBinding(binding: import('../model').BindingRecord): NativeBindingRecord {
+function nativeBinding(binding: import('../editor-model').EditorBindingRecord): NativeBindingRecord {
 	return {
 		id: binding.id,
 		kind: binding.type,
@@ -900,7 +909,7 @@ function nativeBinding(binding: import('../model').BindingRecord): NativeBinding
 	};
 }
 
-function nativeShape(shape: ShapeRecord, layerId: string, document: Document): NativeShapeRecord {
+function nativeShape(shape: EditorShapeRecord, layerId: string, document: EditorDocument): NativeShapeRecord {
 	const metadata = toNativeMetadata(shape.metadata, {
 		locked: shape.locked ?? false,
 		agentEditable: shape.agentEditable ?? true
@@ -928,7 +937,7 @@ function provenance(): Provenance {
 	return { actor_id: BROWSER_ACTOR, origin: 'human', timestamp: 0, source: null };
 }
 
-function layerOwners(layers: Record<string, LayerRecord>): Map<string, string> {
+function layerOwners(layers: Record<string, EditorLayerRecord>): Map<string, string> {
 	const owners = new Map<string, string>();
 	for (const layer of Object.values(layers)) {
 		for (const shapeId of layer.shapeIds) owners.set(shapeId, layer.id);
@@ -951,6 +960,6 @@ function optionalOpacity(value: number | undefined): number | null {
 	return value === undefined ? null : clampOpacity(value);
 }
 
-function isBoardExport(input: BoardExport | Document): input is BoardExport {
+function isBoardExport(input: BoardExport | EditorDocument): input is BoardExport {
 	return 'board' in input && 'doc' in input;
 }

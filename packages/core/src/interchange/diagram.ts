@@ -1,7 +1,7 @@
 import { graphLayout } from '../layout';
 import { shapeBounds } from '../geom';
 import { EditorState } from '../reactivity';
-import { BindingRecord, ShapeRecord, type ArrowShape, type MarkdownProps, type ShapeMetadata } from '../model';
+import { EditorBindingRecord, EditorShapeRecord, type ArrowShape, type MarkdownProps, type ShapeMetadata } from '../editor-model';
 import type { BoardExport } from '../persistence/document';
 import type { InterchangeImport } from '../interchange';
 import { addShape, blankSnapshot, inkId, WarningCollector } from './shared';
@@ -664,7 +664,7 @@ function materializeDiagram(parsed: ParsedDiagram, fileName: string): Interchang
 	for (const group of groupsInOrder) {
 		const id = inkId(`${parsed.format}-group`, group.key);
 		groupIds.set(group.key, id);
-		const shape = ShapeRecord.createContainer(
+		const shape = EditorShapeRecord.createContainer(
 			pageId,
 			0,
 			0,
@@ -697,7 +697,7 @@ function materializeDiagram(parsed: ParsedDiagram, fileName: string): Interchang
 			bg: node.style.fill ?? DEFAULT_NODE_FILL,
 			border: node.style.stroke ?? DEFAULT_NODE_STROKE
 		};
-		const shape = ShapeRecord.createMarkdown(pageId, 0, 0, props, id);
+		const shape = EditorShapeRecord.createMarkdown(pageId, 0, 0, props, id);
 		shape.layerId = layerId;
 		const groupId = node.groupPath.length > 0 ? groupIds.get(node.groupPath.join('.')) : undefined;
 		if (groupId) shape.groupId = groupId;
@@ -722,9 +722,9 @@ function materializeDiagram(parsed: ParsedDiagram, fileName: string): Interchang
 			`${parsed.format}-edge`,
 			`${Object.keys(snapshot.doc.shapes).length + edgesForDocument(snapshot.doc).length}`
 		);
-		const startBinding = BindingRecord.create(edgeId, sourceId, 'start', { kind: 'center' }, `${edgeId}:start`);
-		const endBinding = BindingRecord.create(edgeId, targetId, 'end', { kind: 'center' }, `${edgeId}:end`);
-		const arrow = ShapeRecord.createArrow(
+		const startBinding = EditorBindingRecord.create(edgeId, sourceId, 'start', { kind: 'center' }, `${edgeId}:start`);
+		const endBinding = EditorBindingRecord.create(edgeId, targetId, 'end', { kind: 'center' }, `${edgeId}:end`);
+		const arrow = EditorShapeRecord.createArrow(
 			pageId,
 			0,
 			0,

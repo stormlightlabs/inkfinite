@@ -1,15 +1,15 @@
 import {
-	BindingRecord as BindingOps,
+	EditorBindingRecord as BindingOps,
 	BoardStatsOps,
 	createId,
 	fromCanonicalDocumentSnapshot,
 	fromEditorProjection,
-	LayerRecord as LayerOps,
-	PageRecord as PageOps,
-	ShapeRecord as ShapeOps
+	EditorLayerRecord as LayerOps,
+	EditorPageRecord as PageOps,
+	EditorShapeRecord as ShapeOps
 } from '@inkfinite/core';
 import type {
-	BindingRecord,
+	EditorBindingRecord,
 	BoardExport,
 	BoardInspectorData,
 	BoardMeta,
@@ -17,27 +17,27 @@ import type {
 	CanonicalDocumentState,
 	DocOrder,
 	DocPatch,
-	Document,
+	EditorDocument,
 	LoadedDoc,
-	LayerRecord,
+	EditorLayerRecord,
 	ImportedAsset,
-	PageRecord,
+	EditorPageRecord,
 	PersistenceSink,
 	PersistentDocRepo,
 	SchemaInfo,
-	ShapeRecord,
+	EditorShapeRecord,
 	Timestamp
 } from '@inkfinite/core';
 import Dexie from 'dexie';
 
 /** IndexedDB row for a page scoped to its board. */
-export type PageRow = PageRecord & { boardId: string; updatedAt: Timestamp };
+export type PageRow = EditorPageRecord & { boardId: string; updatedAt: Timestamp };
 
 /** IndexedDB row for a shape scoped to its board. */
-export type ShapeRow = ShapeRecord & { boardId: string; updatedAt: Timestamp };
+export type ShapeRow = EditorShapeRecord & { boardId: string; updatedAt: Timestamp };
 
 /** IndexedDB row for a binding scoped to its board. */
-export type BindingRow = BindingRecord & { boardId: string; updatedAt: Timestamp };
+export type BindingRow = EditorBindingRecord & { boardId: string; updatedAt: Timestamp };
 
 /** Canonical Rust document bytes and its derived materialized cache. */
 export type CanonicalRow = {
@@ -234,17 +234,17 @@ export function createDexieDocRepo(
 			meta().get(assetsKey(boardId))
 		]);
 
-		const docPages: Record<string, PageRecord> = {};
+		const docPages: Record<string, EditorPageRecord> = {};
 		for (const row of pageRows) {
 			docPages[row.id] = clonePageRow(row);
 		}
 
-		const docShapes: Record<string, ShapeRecord> = {};
+		const docShapes: Record<string, EditorShapeRecord> = {};
 		for (const row of shapeRows) {
 			docShapes[row.id] = cloneShapeRow(row);
 		}
 
-		const docBindings: Record<string, BindingRecord> = {};
+		const docBindings: Record<string, EditorBindingRecord> = {};
 		for (const row of bindingRows) {
 			docBindings[row.id] = cloneBindingRow(row);
 		}
@@ -271,7 +271,7 @@ export function createDexieDocRepo(
 			shapeOrder:
 				(shapeOrderRow?.value as Record<string, string[]> | undefined) ??
 				fallbackShapeOrder,
-			layers: layersRow?.value as Record<string, LayerRecord> | undefined
+			layers: layersRow?.value as Record<string, EditorLayerRecord> | undefined
 		};
 	}
 
@@ -363,7 +363,7 @@ export function createDexieDocRepo(
 		}
 
 		const { pages, layers, shapes, bindings, assets, order } = await loadDoc(boardId);
-		const doc: Document = {
+		const doc: EditorDocument = {
 			pages,
 			...(layers ? { layers } : {}),
 			...(assets ? { assets } : {}),
@@ -523,22 +523,22 @@ export function createPersistenceSink(
 	return { enqueueDocPatch, flush };
 }
 
-function clonePageRow(row: PageRow): PageRecord {
+function clonePageRow(row: PageRow): EditorPageRecord {
 	const { boardId: _boardId, updatedAt: _updatedAt, ...rest } = row;
 	return PageOps.clone(rest);
 }
 
-function cloneShapeRow(row: ShapeRow): ShapeRecord {
+function cloneShapeRow(row: ShapeRow): EditorShapeRecord {
 	const { boardId: _boardId, updatedAt: _updatedAt, ...rest } = row;
-	return ShapeOps.clone(rest as ShapeRecord);
+	return ShapeOps.clone(rest as EditorShapeRecord);
 }
 
-function cloneBindingRow(row: BindingRow): BindingRecord {
+function cloneBindingRow(row: BindingRow): EditorBindingRecord {
 	const { boardId: _boardId, updatedAt: _updatedAt, ...rest } = row;
 	return BindingOps.clone(rest);
 }
 
-function deriveDocOrderFromDocument(doc: Document): DocOrder {
+function deriveDocOrderFromDocument(doc: EditorDocument): DocOrder {
 	return {
 		pageIds: Object.keys(doc.pages),
 		shapeOrder: shapeOrderFromPagesRecords(doc.pages),
@@ -546,7 +546,9 @@ function deriveDocOrderFromDocument(doc: Document): DocOrder {
 	};
 }
 
-function shapeOrderFromPagesRecords(pages: Record<string, PageRecord>): Record<string, string[]> {
+function shapeOrderFromPagesRecords(
+	pages: Record<string, EditorPageRecord>
+): Record<string, string[]> {
 	return Object.fromEntries(Object.values(pages).map((page) => [page.id, [...page.shapeIds]]));
 }
 

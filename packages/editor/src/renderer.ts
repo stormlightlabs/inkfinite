@@ -2,7 +2,7 @@ import type {
 	ArrowLabel,
 	ArrowShape,
 	BindingIndex,
-	BindingRecord,
+	EditorBindingRecord,
 	Camera,
 	CursorState,
 	EditorState,
@@ -14,7 +14,7 @@ import type {
 	PathShape,
 	RectShape,
 	TextPathLayout,
-	ShapeRecord,
+	EditorShapeRecord,
 	Store,
 	StrokeShape,
 	TextShape,
@@ -262,7 +262,7 @@ function drawScene(
 	drawGrid(context, state.camera, viewport, snapSettings, theme);
 
 	const shapes = getShapesOnCurrentPage(state);
-	const bindingsBySource = new Map<string, BindingRecord[]>();
+	const bindingsBySource = new Map<string, EditorBindingRecord[]>();
 	for (const binding of Object.values(state.doc.bindings)) {
 		const bindings = bindingsBySource.get(binding.fromShapeId);
 		if (bindings) bindings.push(binding);
@@ -334,7 +334,7 @@ function getExpandedViewportBounds(camera: Camera, viewport: Viewport): VisibleB
 
 function isShapeVisible(
 	state: EditorState,
-	shape: ShapeRecord,
+	shape: EditorShapeRecord,
 	viewport: VisibleBounds,
 	bindingsBySource?: BindingIndex
 ): boolean {
@@ -543,7 +543,7 @@ function drawBindingPreview(context: CanvasRenderingContext2D, state: EditorStat
 function drawShape(
 	context: CanvasRenderingContext2D,
 	state: EditorState,
-	shape: ShapeRecord,
+	shape: EditorShapeRecord,
 	bindingsBySource?: BindingIndex,
 	theme: 'light' | 'dark' = 'light',
 	textLayoutCache = new LruCache<string, string[]>(512),
@@ -618,8 +618,8 @@ function drawShape(
 }
 
 /** Apply the native clip, mask, and filter subset before drawing one shape. */
-function applyShapeEffects(context: CanvasRenderingContext2D, shape: ShapeRecord) {
-	const props = shape.props as ShapeRecord['props'] & {
+function applyShapeEffects(context: CanvasRenderingContext2D, shape: EditorShapeRecord) {
+	const props = shape.props as EditorShapeRecord['props'] & {
 		clipPath?: PathGeometry;
 		maskEffect?: { geometry: PathGeometry; opacity?: number };
 		filter?: {
@@ -682,7 +682,7 @@ function filterToCanvas(filter: FilterEffect): string {
 function drawImage(
 	context: CanvasRenderingContext2D,
 	state: EditorState,
-	shape: Extract<ShapeRecord, { type: 'image' }>,
+	shape: Extract<EditorShapeRecord, { type: 'image' }>,
 	onImageLoaded?: () => void
 ) {
 	const asset = state.doc.assets?.[shape.props.assetId];
@@ -739,7 +739,7 @@ function drawImage(
 	}
 }
 
-function drawReference(context: CanvasRenderingContext2D, shape: Extract<ShapeRecord, { type: 'reference' }>) {
+function drawReference(context: CanvasRenderingContext2D, shape: Extract<EditorShapeRecord, { type: 'reference' }>) {
 	const { w, h, referenceType, value, label } = shape.props;
 	const accent = referenceType === 'url' ? '#2563eb' : referenceType === 'file' ? '#16a34a' : '#7c3aed';
 	context.fillStyle = '#f8fafc';
@@ -861,7 +861,7 @@ function drawLine(context: CanvasRenderingContext2D, shape: LineShape) {
 	}
 }
 
-function drawContainer(context: CanvasRenderingContext2D, shape: Extract<ShapeRecord, { type: 'container' }>) {
+function drawContainer(context: CanvasRenderingContext2D, shape: Extract<EditorShapeRecord, { type: 'container' }>) {
 	const { w = 0, h = 0, title, fill, stroke, radius = 0 } = shape.props;
 	const shapeAlpha = context.globalAlpha;
 	context.beginPath();
@@ -1490,7 +1490,7 @@ const SELECTION_COLOR = '#34d399';
 function drawSelection(
 	context: CanvasRenderingContext2D,
 	state: EditorState,
-	shapes: ShapeRecord[],
+	shapes: EditorShapeRecord[],
 	handleState?: HandleRenderState,
 	bindingsBySource?: BindingIndex,
 	theme: 'light' | 'dark' = 'light'
@@ -1641,7 +1641,7 @@ const TEXT_HANDLE_OFFSET = 7;
 function drawHandles(
 	context: CanvasRenderingContext2D,
 	state: EditorState,
-	shape: ShapeRecord,
+	shape: EditorShapeRecord,
 	handleState?: HandleRenderState,
 	bindingsBySource?: BindingIndex,
 	theme: 'light' | 'dark' = 'light'
@@ -1769,7 +1769,11 @@ function drawStrokeEditingHandles(
 	context.restore();
 }
 
-function getHandlesForShape(state: EditorState, shape: ShapeRecord, bindingsBySource?: BindingIndex): HandleVisual[] {
+function getHandlesForShape(
+	state: EditorState,
+	shape: EditorShapeRecord,
+	bindingsBySource?: BindingIndex
+): HandleVisual[] {
 	const handles: HandleVisual[] = [];
 	if (shape.type === 'text' && shape.props.textPath) {
 		const position = textPathAnchorForShape(state, shape);
@@ -1848,7 +1852,7 @@ function getHandlesForShape(state: EditorState, shape: ShapeRecord, bindingsBySo
 	return handles;
 }
 
-function applyShapeTransform(context: CanvasRenderingContext2D, shape: ShapeRecord): void {
+function applyShapeTransform(context: CanvasRenderingContext2D, shape: EditorShapeRecord): void {
 	const matrix = shapeTransform(shape);
 	if (shape.editorTransform && typeof context.transform === 'function') {
 		context.transform(matrix[0], matrix[1], matrix[3], matrix[4], matrix[6], matrix[7]);

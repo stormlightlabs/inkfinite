@@ -6,7 +6,7 @@ import {
 	moveLayer,
 	patchLayer,
 	reorderShapes,
-	ShapeRecord,
+	EditorShapeRecord,
 	Store,
 	ensureDocumentLayers
 } from '../src';
@@ -15,14 +15,14 @@ import { describe, expect, it } from 'vitest';
 function layeredState() {
 	const state = EditorState.create();
 	state.doc.pages.page = { id: 'page', name: 'Page', shapeIds: ['back', 'front'] };
-	state.doc.shapes.back = ShapeRecord.createRect(
+	state.doc.shapes.back = EditorShapeRecord.createRect(
 		'page',
 		0,
 		0,
 		{ w: 10, h: 10, fill: '#000', stroke: '#000', radius: 0 },
 		'back'
 	);
-	state.doc.shapes.front = ShapeRecord.createRect(
+	state.doc.shapes.front = EditorShapeRecord.createRect(
 		'page',
 		20,
 		0,
@@ -46,7 +46,7 @@ describe('layers', () => {
 		const original = layeredState();
 		const withSecond = createLayer(original, 'Foreground');
 		const activeLayerId = withSecond.ui.activeLayerId!;
-		const shape = ShapeRecord.createRect(
+		const shape = EditorShapeRecord.createRect(
 			'page',
 			40,
 			0,
@@ -92,7 +92,7 @@ describe('layers', () => {
 		const original = layeredState();
 		const foregroundState = createLayer(original, 'Foreground');
 		const foreground = foregroundState.ui.activeLayerId!;
-		const foregroundShape = ShapeRecord.createRect(
+		const foregroundShape = EditorShapeRecord.createRect(
 			'page',
 			0,
 			0,

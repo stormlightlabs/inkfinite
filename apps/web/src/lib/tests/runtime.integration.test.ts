@@ -2,8 +2,8 @@ import {
 	Action,
 	DirectSelectTool,
 	EditorState,
-	PageRecord,
-	ShapeRecord,
+	EditorPageRecord,
+	EditorShapeRecord,
 	SnapshotCommand,
 	Store,
 	type PathProps,
@@ -58,7 +58,7 @@ class DragTool implements Tool {
 
 describe('editor runtime Rust commit boundary', () => {
 	it('commits one direct-edit gesture as one undoable transaction', () => {
-		const page = PageRecord.create('Page', 'page:direct-runtime');
+		const page = EditorPageRecord.create('Page', 'page:direct-runtime');
 		const geometry: PathProps = {
 			subpaths: [
 				{
@@ -74,7 +74,7 @@ describe('editor runtime Rust commit boundary', () => {
 			fill_rule: 'nonzero',
 			fill: '#fff'
 		};
-		const path = ShapeRecord.createPath(page.id, 0, 0, geometry, 'path:direct-runtime');
+		const path = EditorShapeRecord.createPath(page.id, 0, 0, geometry, 'path:direct-runtime');
 		page.shapeIds = [path.id];
 		const store = new Store({
 			doc: { pages: { [page.id]: page }, shapes: { [path.id]: path }, bindings: {} },

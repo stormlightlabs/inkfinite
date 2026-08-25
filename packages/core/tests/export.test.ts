@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { exportToSVG } from '../src/export';
-import { PageRecord, ShapeRecord } from '../src/model';
+import { EditorPageRecord, EditorShapeRecord } from '../src/editor-model';
 import { EditorState } from '../src/reactivity';
 
 function createTestState() {
 	const state = EditorState.create();
-	const page = PageRecord.create('Test Page');
+	const page = EditorPageRecord.create('Test Page');
 	state.doc.pages[page.id] = page;
 	state.ui.currentPageId = page.id;
 	return { state, pageId: page.id };
@@ -22,7 +22,7 @@ describe('exportToSVG', () => {
 
 	it('should export variable-width strokes as outlined paths', () => {
 		const { state, pageId } = createTestState();
-		const stroke = ShapeRecord.createStroke(pageId, 0, 0, {
+		const stroke = EditorShapeRecord.createStroke(pageId, 0, 0, {
 			points: [
 				[0, 0],
 				[100, 0]
@@ -47,7 +47,7 @@ describe('exportToSVG', () => {
 
 	it('omits the synthetic background when transparent output is requested', () => {
 		const { state, pageId } = createTestState();
-		const rect = ShapeRecord.createRect(pageId, 10, 20, { w: 100, h: 50, fill: 'red', stroke: 'black', radius: 0 });
+		const rect = EditorShapeRecord.createRect(pageId, 10, 20, { w: 100, h: 50, fill: 'red', stroke: 'black', radius: 0 });
 		state.doc.shapes[rect.id] = rect;
 		state.doc.pages[pageId].shapeIds.push(rect.id);
 
@@ -60,7 +60,7 @@ describe('exportToSVG', () => {
 	it('should export SVG with a rectangle shape', () => {
 		const { state, pageId } = createTestState();
 
-		const rect = ShapeRecord.createRect(pageId, 10, 20, { w: 100, h: 50, fill: 'red', stroke: 'black', radius: 0 });
+		const rect = EditorShapeRecord.createRect(pageId, 10, 20, { w: 100, h: 50, fill: 'red', stroke: 'black', radius: 0 });
 
 		state.doc.shapes[rect.id] = rect;
 		state.doc.pages[pageId].shapeIds.push(rect.id);
@@ -77,7 +77,7 @@ describe('exportToSVG', () => {
 
 	it('should export text on path as a native SVG textPath reference', () => {
 		const { state, pageId } = createTestState();
-		const path = ShapeRecord.createPath(pageId, 10, 20, {
+		const path = EditorShapeRecord.createPath(pageId, 10, 20, {
 			subpaths: [
 				{
 					segments: [
@@ -91,7 +91,7 @@ describe('exportToSVG', () => {
 			stroke: '#555555',
 			stroke_width: 2
 		});
-		const text = ShapeRecord.createText(pageId, 0, 0, {
+		const text = EditorShapeRecord.createText(pageId, 0, 0, {
 			text: 'Along the line',
 			fontSize: 16,
 			fontFamily: 'sans-serif',
@@ -114,7 +114,7 @@ describe('exportToSVG', () => {
 
 	it('should export gradient definitions without flattening their stops', () => {
 		const { state, pageId } = createTestState();
-		const rect = ShapeRecord.createRect(pageId, 0, 0, {
+		const rect = EditorShapeRecord.createRect(pageId, 0, 0, {
 			w: 100,
 			h: 50,
 			fill: {
@@ -147,7 +147,7 @@ describe('exportToSVG', () => {
 
 	it('should export native clipping, masks, and filters', () => {
 		const { state, pageId } = createTestState();
-		const rect = ShapeRecord.createRect(pageId, 10, 20, {
+		const rect = EditorShapeRecord.createRect(pageId, 10, 20, {
 			w: 100,
 			h: 50,
 			fill: 'red',
@@ -204,7 +204,7 @@ describe('exportToSVG', () => {
 
 	it('should export semantic metadata for ordinary shapes', () => {
 		const { state, pageId } = createTestState();
-		const rect = ShapeRecord.createRect(pageId, 10, 20, { w: 100, h: 50, fill: 'red', stroke: 'black', radius: 0 });
+		const rect = EditorShapeRecord.createRect(pageId, 10, 20, { w: 100, h: 50, fill: 'red', stroke: 'black', radius: 0 });
 		rect.metadata = {
 			name: 'Gateway',
 			title: null,
@@ -233,7 +233,7 @@ describe('exportToSVG', () => {
 	it('should export SVG with an ellipse shape', () => {
 		const { state, pageId } = createTestState();
 
-		const ellipse = ShapeRecord.createEllipse(pageId, 10, 20, { w: 100, h: 50, fill: 'blue', stroke: 'green' });
+		const ellipse = EditorShapeRecord.createEllipse(pageId, 10, 20, { w: 100, h: 50, fill: 'blue', stroke: 'green' });
 
 		state.doc.shapes[ellipse.id] = ellipse;
 		state.doc.pages[pageId].shapeIds.push(ellipse.id);
@@ -249,7 +249,7 @@ describe('exportToSVG', () => {
 	it('should export SVG with a line shape', () => {
 		const { state, pageId } = createTestState();
 
-		const line = ShapeRecord.createLine(pageId, 0, 0, {
+		const line = EditorShapeRecord.createLine(pageId, 0, 0, {
 			a: { x: 0, y: 0 },
 			b: { x: 100, y: 100 },
 			stroke: 'red',
@@ -272,7 +272,7 @@ describe('exportToSVG', () => {
 	it('should export SVG with an arrow shape', () => {
 		const { state, pageId } = createTestState();
 
-		const arrow = ShapeRecord.createArrow(pageId, 0, 0, {
+		const arrow = EditorShapeRecord.createArrow(pageId, 0, 0, {
 			points: [
 				{ x: 0, y: 0 },
 				{ x: 100, y: 0 }
@@ -294,7 +294,7 @@ describe('exportToSVG', () => {
 
 	it('should export curved arrows as native quadratic commands', () => {
 		const { state, pageId } = createTestState();
-		const arrow = ShapeRecord.createArrow(pageId, 0, 0, {
+		const arrow = EditorShapeRecord.createArrow(pageId, 0, 0, {
 			points: [
 				{ x: 0, y: 0 },
 				{ x: 100, y: 0 }
@@ -316,7 +316,7 @@ describe('exportToSVG', () => {
 	it('should export SVG with a text shape', () => {
 		const { state, pageId } = createTestState();
 
-		const text = ShapeRecord.createText(pageId, 10, 20, {
+		const text = EditorShapeRecord.createText(pageId, 10, 20, {
 			text: 'Hello World',
 			fontSize: 16,
 			fontFamily: 'Arial',
@@ -336,7 +336,7 @@ describe('exportToSVG', () => {
 
 	it('should export native path commands and fill rules', () => {
 		const { state, pageId } = createTestState();
-		const path = ShapeRecord.createPath(
+		const path = EditorShapeRecord.createPath(
 			pageId,
 			10,
 			20,
@@ -378,8 +378,8 @@ describe('exportToSVG', () => {
 	it('should export only selected shapes when selectedOnly is true', () => {
 		const { state, pageId } = createTestState();
 
-		const rect1 = ShapeRecord.createRect(pageId, 0, 0, { w: 50, h: 50, fill: 'red', stroke: 'black', radius: 0 });
-		const rect2 = ShapeRecord.createRect(pageId, 100, 100, {
+		const rect1 = EditorShapeRecord.createRect(pageId, 0, 0, { w: 50, h: 50, fill: 'red', stroke: 'black', radius: 0 });
+		const rect2 = EditorShapeRecord.createRect(pageId, 100, 100, {
 			w: 50,
 			h: 50,
 			fill: 'blue',
@@ -401,7 +401,7 @@ describe('exportToSVG', () => {
 	it('should escape XML special characters in shape properties', () => {
 		const { state, pageId } = createTestState();
 
-		const text = ShapeRecord.createText(pageId, 0, 0, {
+		const text = EditorShapeRecord.createText(pageId, 0, 0, {
 			text: "<script>alert('XSS')</script>",
 			fontSize: 16,
 			fontFamily: 'Arial',

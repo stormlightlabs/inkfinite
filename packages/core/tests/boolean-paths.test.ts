@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { applyBooleanPathOperation, canBooleanPathSelection, PageRecord, ShapeRecord } from '../src';
+import { applyBooleanPathOperation, canBooleanPathSelection, EditorPageRecord, EditorShapeRecord } from '../src';
 import type { EditorState } from '../src';
 
 function rectangle(pageId: string, x: number, y: number, size: number, id: string) {
-	return ShapeRecord.createPath(
+	return EditorShapeRecord.createPath(
 		pageId,
 		x,
 		y,
@@ -28,7 +28,7 @@ function rectangle(pageId: string, x: number, y: number, size: number, id: strin
 }
 
 function stateFor(paths: ReturnType<typeof rectangle>[]): EditorState {
-	const page = PageRecord.create('Boolean paths', 'page:boolean');
+	const page = EditorPageRecord.create('Boolean paths', 'page:boolean');
 	page.shapeIds = paths.map((path) => path.id);
 	return {
 		doc: {

@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { Action } from '../src/actions';
 import {
 	arrowGeometryForShape,
-	BindingRecord,
+	EditorBindingRecord,
 	EditorState,
 	SnapshotCommand,
-	PageRecord,
+	EditorPageRecord,
 	SelectTool,
-	ShapeRecord,
+	EditorShapeRecord,
 	Store
 } from '../src';
 
@@ -34,8 +34,8 @@ function pointerUp(world: { x: number; y: number }) {
 
 describe('curved arrow bend editing', () => {
 	it('stores bend state through the direct manipulation handle', () => {
-		const page = PageRecord.create('Curved arrows', 'page:curved');
-		const arrow = ShapeRecord.createArrow(
+		const page = EditorPageRecord.create('Curved arrows', 'page:curved');
+		const arrow = EditorShapeRecord.createArrow(
 			page.id,
 			100,
 			100,
@@ -88,15 +88,15 @@ describe('curved arrow bend editing', () => {
 	});
 
 	it('keeps bound endpoints resolved while the bend changes', () => {
-		const page = PageRecord.create('Bound curve', 'page:bound-curve');
-		const target = ShapeRecord.createRect(
+		const page = EditorPageRecord.create('Bound curve', 'page:bound-curve');
+		const target = EditorShapeRecord.createRect(
 			page.id,
 			200,
 			-25,
 			{ w: 50, h: 50, fill: '#fff', stroke: '#000', radius: 0 },
 			'rect:target'
 		);
-		const arrow = ShapeRecord.createArrow(
+		const arrow = EditorShapeRecord.createArrow(
 			page.id,
 			0,
 			0,
@@ -112,7 +112,7 @@ describe('curved arrow bend editing', () => {
 			},
 			'arrow:bound-curve'
 		);
-		const binding = BindingRecord.create(
+		const binding = EditorBindingRecord.create(
 			arrow.id,
 			target.id,
 			'end',
@@ -158,8 +158,8 @@ describe('curved arrow bend editing', () => {
 	});
 
 	it('round-trips curved routing through history and document serialization', () => {
-		const page = PageRecord.create('History curve', 'page:history-curve');
-		const arrow = ShapeRecord.createArrow(
+		const page = EditorPageRecord.create('History curve', 'page:history-curve');
+		const arrow = EditorShapeRecord.createArrow(
 			page.id,
 			0,
 			0,

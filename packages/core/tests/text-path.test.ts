@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { attachTextPathSelection, shapeBoundsForState } from '../src';
-import { PageRecord, ShapeRecord } from '../src/model';
+import { EditorPageRecord, EditorShapeRecord } from '../src/editor-model';
 import { EditorState, Store } from '../src/reactivity';
 import { SnapshotCommand } from '../src/history';
 
 function createTextPathState() {
 	const state = EditorState.create();
-	const page = PageRecord.create('Text path');
+	const page = EditorPageRecord.create('Text path');
 	state.doc.pages[page.id] = page;
 	state.ui.currentPageId = page.id;
-	const path = ShapeRecord.createPath(page.id, 20, 40, {
+	const path = EditorShapeRecord.createPath(page.id, 20, 40, {
 		subpaths: [
 			{
 				segments: [
@@ -23,7 +23,7 @@ function createTextPathState() {
 		stroke: '#000000',
 		stroke_width: 2
 	});
-	const text = ShapeRecord.createText(page.id, 0, 0, {
+	const text = EditorShapeRecord.createText(page.id, 0, 0, {
 		text: 'Label',
 		fontSize: 16,
 		fontFamily: 'sans-serif',

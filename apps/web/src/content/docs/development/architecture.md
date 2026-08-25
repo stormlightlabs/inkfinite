@@ -68,30 +68,49 @@ back through Tauri.
 See [Web editor](/docs/platforms/web/) and [Desktop editor](/docs/platforms/desktop/) for the
 application-specific behavior.
 
-## Document model and editor projection
+## Dependency direction and model ownership
 
-The most important internal distinction is between the Rust document contract and the TypeScript
-editor model.
+Rust owns the canonical document and all operations that can change it. `inkfinite-core` defines
+`Document`, `ShapeRecord`, `PageRecord`, `LayerRecord`, and `BindingRecord`, validates them, applies
+transactions, and owns Automerge state, native files, sessions, and headless rendering.
 
-`inkfinite-core` owns the native document session. Its shapes have a registry `kind`, a parent
-relation, a parent-relative transform, ordered container children, kind-specific properties,
-semantic metadata, common style, and a record version. Semantic metadata includes optional names,
-roles, descriptions, sources, links, tags, custom JSON fields, and provenance. Binding records can
-also carry an optional relation type with source and target shape IDs. The query API filters those
-records by type and direction.
-Pages own ordered layers. Layers own ordered root shapes.
-Containers can own nested shapes and optionally apply free, stack, or grid layout.
+The binding generator is the only path from those Rust contracts to TypeScript contract types:
 
-`@inkfinite/core` is the interactive projection used by tools and Canvas rendering. It keeps the
-shape data in the form the current editor expects: page and layer draw-order arrays, shape `x`/`y`
-coordinates, rotation, optional grouping and layer IDs, and shape-specific properties. It also owns
-editor geometry, actions, tools, stencils, interchange helpers, and browser-side persistence
-utilities.
+```text
+inkfinite-core Rust model and services
+        │
+        └── generate-bindings ──> @inkfinite/bindings
+                                      │
+                                      └── generated snapshots, projections, patches, and protocols
+```
 
-These are not two canonical file formats. The desktop and browser persistence adapters translate
-between the generated Rust contracts in `@inkfinite/bindings` and the editor projection returned by
-Rust sessions. The frontend keeps the projected state for low-latency interaction. Rust remains
-authoritative for the native session and `.inkfinite` file.
+`@inkfinite/core/src/editor-model.ts` owns the interactive model. Its public records are named
+`EditorDocument`, `EditorShapeRecord`, `EditorPageRecord`, `EditorLayerRecord`, and
+`EditorBindingRecord` so they cannot be mistaken for the generated Rust records. These values use
+editor property names, world-space transforms, flat draw order, and the mutable shape union needed
+by tools and Canvas rendering. They are not another serialized document contract.
+
+`@inkfinite/core/src/persistence/canonical.ts` is the TypeScript adapter boundary. It converts Rust
+snapshots and generated Rust editor projections into the interactive model, and turns completed
+editor changes into generated `EditorPatch` requests. Browser and desktop adapters call this module
+instead of translating records themselves. The adapter preserves native property names and
+hierarchy only at the Rust boundary; it does not write `.inkfinite` bytes.
+
+The package dependency direction is:
+
+```text
+@inkfinite/bindings ──> @inkfinite/core/editor-model + canonical adapter
+                                  │
+                                  └──> @inkfinite/editor ──> @inkfinite/ui ──> web and desktop apps
+
+Rust inkfinite-wasm ──> web app persistence adapter
+Rust Tauri commands ──> desktop app persistence adapter
+```
+
+`@inkfinite/editor` owns normalized input, interaction state, commands, and Canvas rendering. The
+UI package owns Svelte presentation and inspector controls. Applications own browser storage,
+filesystem access, Tauri or WASM calls, and composition. No UI, editor runtime, or application code
+owns canonical records or applies native transactions directly.
 
 For the record structure, see [Document model](/docs/concepts/document-model/). The [native path
 geometry guide](/docs/development/native-path-geometry/) documents the path representation used by
@@ -204,4 +223,5 @@ Rust types are serialized with Serde, described with Schemars, and exported to T
 verifies that checked-in generated contracts still match Rust.
 
 This generated boundary is used for document, transaction, protocol, and browser WASM payloads. The
-hand-written `@inkfinite/core` editor types remain a separate interaction-oriented representation.
+hand-written `@inkfinite/core` `Editor*` types remain a separate interaction-oriented
+representation; `persistence/canonical.ts` is the only adapter between the two.

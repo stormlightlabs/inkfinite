@@ -2,7 +2,7 @@ import type { Action } from '../actions';
 import { computeNormalizedAnchor, hitTestPoint, shapeBounds } from '../geom';
 import { Vec2 } from '../math';
 import { snapAngle } from '../snapping';
-import { BindingRecord, createId, ShapeRecord } from '../model';
+import { EditorBindingRecord, createId, EditorShapeRecord } from '../editor-model';
 import type { EditorState, ToolId } from '../reactivity';
 import { canCreateShapeOnActiveLayer, getCurrentPage } from '../reactivity';
 import type { Tool } from '../tools/base';
@@ -148,7 +148,7 @@ export class RectTool implements Tool {
 
 		const shapeId = createId('shape');
 
-		const shape = ShapeRecord.createRect(
+		const shape = EditorShapeRecord.createRect(
 			currentPage.id,
 			action.world.x,
 			action.world.y,
@@ -292,7 +292,7 @@ export class FrameTool implements Tool {
 		const page = getCurrentPage(state);
 		if (!page) return state;
 		const id = createId('shape');
-		const shape = ShapeRecord.createContainer(
+		const shape = EditorShapeRecord.createContainer(
 			page.id,
 			action.world.x,
 			action.world.y,
@@ -435,7 +435,7 @@ export class EllipseTool implements Tool {
 
 		const shapeId = createId('shape');
 
-		const shape = ShapeRecord.createEllipse(
+		const shape = EditorShapeRecord.createEllipse(
 			currentPage.id,
 			action.world.x,
 			action.world.y,
@@ -597,7 +597,7 @@ export class LineTool implements Tool {
 
 		const shapeId = createId('shape');
 
-		const shape = ShapeRecord.createLine(
+		const shape = EditorShapeRecord.createLine(
 			currentPage.id,
 			action.world.x,
 			action.world.y,
@@ -756,7 +756,7 @@ export class ArrowTool implements Tool {
 
 		const shapeId = createId('shape');
 
-		const shape = ShapeRecord.createArrow(
+		const shape = EditorShapeRecord.createArrow(
 			currentPage.id,
 			action.world.x,
 			action.world.y,
@@ -919,7 +919,7 @@ export class ArrowTool implements Tool {
 			const targetShape = state.doc.shapes[startHitId];
 			if (targetShape) {
 				const anchor = computeNormalizedAnchor(startWorld, targetShape);
-				const binding = BindingRecord.create(arrowId, startHitId, 'start', {
+				const binding = EditorBindingRecord.create(arrowId, startHitId, 'start', {
 					kind: 'edge',
 					nx: anchor.nx,
 					ny: anchor.ny
@@ -937,7 +937,7 @@ export class ArrowTool implements Tool {
 			const targetShape = state.doc.shapes[endHitId];
 			if (targetShape) {
 				const anchor = computeNormalizedAnchor(endWorld, targetShape);
-				const binding = BindingRecord.create(arrowId, endHitId, 'end', {
+				const binding = EditorBindingRecord.create(arrowId, endHitId, 'end', {
 					kind: 'edge',
 					nx: anchor.nx,
 					ny: anchor.ny

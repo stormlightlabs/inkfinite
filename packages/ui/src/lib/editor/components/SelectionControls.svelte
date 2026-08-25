@@ -6,7 +6,7 @@
 		MarkdownShape,
 		PaintValue,
 		ShapeMetadata,
-		ShapeRecord,
+		EditorShapeRecord,
 		Store,
 		TextShape,
 		ToolId
@@ -162,7 +162,7 @@
 	);
 	let cardTargets = $derived(
 		selectedShapes.filter(
-			(shape): shape is Extract<ShapeRecord, { type: 'container' }> =>
+			(shape): shape is Extract<EditorShapeRecord, { type: 'container' }> =>
 				shape.type === 'container' &&
 				shape.metadata?.title !== null &&
 				shape.metadata?.title !== undefined
@@ -181,7 +181,8 @@
 	});
 	let imageTargets = $derived(
 		selectedShapes.filter(
-			(shape): shape is Extract<ShapeRecord, { type: 'image' }> => shape.type === 'image'
+			(shape): shape is Extract<EditorShapeRecord, { type: 'image' }> =>
+				shape.type === 'image'
 		)
 	);
 	let imageTarget = $derived(imageTargets.length === 1 ? imageTargets[0] : undefined);
@@ -297,7 +298,7 @@
 		return { value: shared ?? true, mixed: values.length > 1 && shared === null };
 	}
 
-	function filterPreset(shape: ShapeRecord | undefined): string {
+	function filterPreset(shape: EditorShapeRecord | undefined): string {
 		const primitive = shape?.props.filter?.primitives[0];
 		return primitive?.type ?? 'none';
 	}
@@ -309,7 +310,7 @@
 				? ({
 						...shape,
 						props: { ...shape.props, maskEffect: { ...shape.props.maskEffect, mode } }
-					} as ShapeRecord)
+					} as EditorShapeRecord)
 				: shape
 		);
 	}
@@ -337,11 +338,11 @@
 						: undefined;
 		updateSelectedShapes(
 			'Set filter',
-			(shape) => ({ ...shape, props: { ...shape.props, filter } }) as ShapeRecord
+			(shape) => ({ ...shape, props: { ...shape.props, filter } }) as EditorShapeRecord
 		);
 	}
 
-	function metadataForShape(shape: ShapeRecord): ShapeMetadata {
+	function metadataForShape(shape: EditorShapeRecord): ShapeMetadata {
 		return (
 			shape.metadata ?? {
 				name: null,
@@ -359,7 +360,7 @@
 		);
 	}
 
-	function shapeSupportsFill(shape: ShapeRecord): boolean {
+	function shapeSupportsFill(shape: EditorShapeRecord): boolean {
 		return (
 			shape.type === 'rect' ||
 			shape.type === 'ellipse' ||
@@ -370,7 +371,7 @@
 		);
 	}
 
-	function shapeSupportsStroke(shape: ShapeRecord): boolean {
+	function shapeSupportsStroke(shape: EditorShapeRecord): boolean {
 		return (
 			shape.type === 'rect' ||
 			shape.type === 'ellipse' ||
@@ -383,7 +384,7 @@
 		);
 	}
 
-	function shapeSupportsFillOpacity(shape: ShapeRecord): boolean {
+	function shapeSupportsFillOpacity(shape: EditorShapeRecord): boolean {
 		return (
 			shape.type === 'rect' ||
 			shape.type === 'ellipse' ||
@@ -395,7 +396,7 @@
 		);
 	}
 
-	function shapeSupportsStrokeOpacity(shape: ShapeRecord): boolean {
+	function shapeSupportsStrokeOpacity(shape: EditorShapeRecord): boolean {
 		return (
 			shape.type === 'rect' ||
 			shape.type === 'ellipse' ||
@@ -408,7 +409,7 @@
 		);
 	}
 
-	function getFillPaint(shape: ShapeRecord): PaintValue | null {
+	function getFillPaint(shape: EditorShapeRecord): PaintValue | null {
 		switch (shape.type) {
 			case 'text':
 				return shape.props.color;
@@ -424,7 +425,7 @@
 		}
 	}
 
-	function getStrokePaint(shape: ShapeRecord): PaintValue | null {
+	function getStrokePaint(shape: EditorShapeRecord): PaintValue | null {
 		switch (shape.type) {
 			case 'arrow':
 				return shape.props.style.stroke;
@@ -443,7 +444,10 @@
 		}
 	}
 
-	function updateSelectedShapes(label: string, update: (shape: ShapeRecord) => ShapeRecord) {
+	function updateSelectedShapes(
+		label: string,
+		update: (shape: EditorShapeRecord) => EditorShapeRecord
+	) {
 		const state = store.getState();
 		if (state.ui.selectionIds.length === 0) return;
 		const before = EditorState.clone(state);
@@ -468,14 +472,20 @@
 		updateSelectedShapes('Set fill paint', (shape) => {
 			switch (shape.type) {
 				case 'text':
-					return { ...shape, props: { ...shape.props, color: paint } } as ShapeRecord;
+					return {
+						...shape,
+						props: { ...shape.props, color: paint }
+					} as EditorShapeRecord;
 				case 'rect':
 				case 'ellipse':
 				case 'path':
 				case 'container':
-					return { ...shape, props: { ...shape.props, fill: paint } } as ShapeRecord;
+					return {
+						...shape,
+						props: { ...shape.props, fill: paint }
+					} as EditorShapeRecord;
 				case 'markdown':
-					return { ...shape, props: { ...shape.props, bg: paint } } as ShapeRecord;
+					return { ...shape, props: { ...shape.props, bg: paint } } as EditorShapeRecord;
 				default:
 					return shape;
 			}
@@ -489,20 +499,26 @@
 					return {
 						...shape,
 						props: { ...shape.props, style: { ...shape.props.style, stroke: paint } }
-					} as ShapeRecord;
+					} as EditorShapeRecord;
 				case 'stroke':
 					return {
 						...shape,
 						props: { ...shape.props, style: { ...shape.props.style, color: paint } }
-					} as ShapeRecord;
+					} as EditorShapeRecord;
 				case 'rect':
 				case 'ellipse':
 				case 'line':
 				case 'path':
 				case 'container':
-					return { ...shape, props: { ...shape.props, stroke: paint } } as ShapeRecord;
+					return {
+						...shape,
+						props: { ...shape.props, stroke: paint }
+					} as EditorShapeRecord;
 				case 'markdown':
-					return { ...shape, props: { ...shape.props, border: paint } } as ShapeRecord;
+					return {
+						...shape,
+						props: { ...shape.props, border: paint }
+					} as EditorShapeRecord;
 				default:
 					return shape;
 			}
@@ -539,7 +555,7 @@
 			shapes[shapeId] = {
 				...shape,
 				props: { ...shape.props, [field]: value }
-			} as ShapeRecord;
+			} as EditorShapeRecord;
 		}
 		store.executeCommand(
 			new SnapshotCommand(
@@ -570,7 +586,7 @@
 							...shape.props,
 							textPath: { ...shape.props.textPath, [field]: value }
 						}
-					} as ShapeRecord)
+					} as EditorShapeRecord)
 				: shape
 		);
 	}
@@ -597,7 +613,7 @@
 						? { customMetadata: { ...fields.customMetadata } }
 						: {})
 				}
-			} as ShapeRecord;
+			} as EditorShapeRecord;
 		});
 	}
 
@@ -649,7 +665,7 @@
 		};
 		const shapes = {
 			...state.doc.shapes,
-			[cardTarget.id]: { ...cardTarget, metadata: nextMetadata } as ShapeRecord
+			[cardTarget.id]: { ...cardTarget, metadata: nextMetadata } as EditorShapeRecord
 		};
 		for (const shape of Object.values(state.doc.shapes)) {
 			if (shape.groupId !== cardTarget.id) continue;
@@ -670,7 +686,7 @@
 
 	function updateImageFields(
 		label: string,
-		fields: Partial<Extract<ShapeRecord, { type: 'image' }>['props']>
+		fields: Partial<Extract<EditorShapeRecord, { type: 'image' }>['props']>
 	) {
 		updateSelectedShapes(label, (shape) =>
 			shape.type === 'image' ? { ...shape, props: { ...shape.props, ...fields } } : shape
@@ -700,7 +716,7 @@
 	}
 
 	function updateReferenceFields(
-		fields: Partial<Extract<ShapeRecord, { type: 'reference' }>['props']>
+		fields: Partial<Extract<EditorShapeRecord, { type: 'reference' }>['props']>
 	) {
 		updateSelectedShapes('Update reference', (shape) =>
 			shape.type === 'reference' ? { ...shape, props: { ...shape.props, ...fields } } : shape

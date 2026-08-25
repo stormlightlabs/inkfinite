@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Action } from "../src/actions";
-import { BindingRecord, PageRecord, ShapeRecord } from "../src/model";
+import { EditorBindingRecord, EditorPageRecord, EditorShapeRecord } from "../src/editor-model";
 import { EditorState } from "../src/reactivity";
 import { SelectTool } from "../src/tools/select";
 
@@ -9,13 +9,13 @@ describe("Arrow multi-point editing", () => {
     it("should allow dragging an intermediate point", () => {
       let state = EditorState.create();
 
-      const page = PageRecord.create("Test Page");
+      const page = EditorPageRecord.create("Test Page");
       state = {
         ...state,
         doc: { ...state.doc, pages: { [page.id]: page } },
         ui: { ...state.ui, currentPageId: page.id },
       };
-      const arrow = ShapeRecord.createArrow(page.id, 100, 100, {
+      const arrow = EditorShapeRecord.createArrow(page.id, 100, 100, {
         points: [{ x: 0, y: 0 }, { x: 50, y: 50 }, { x: 100, y: 0 }],
         start: { kind: "free" },
         end: { kind: "free" },
@@ -77,7 +77,7 @@ describe("Arrow multi-point editing", () => {
     it("should preserve bindings when dragging intermediate points", () => {
       let state = EditorState.create();
 
-      const page = PageRecord.create("Test Page");
+      const page = EditorPageRecord.create("Test Page");
       state = {
         ...state,
         doc: { ...state.doc, pages: { [page.id]: page } },
@@ -85,7 +85,7 @@ describe("Arrow multi-point editing", () => {
       };
 
       // Create a target shape
-      const targetRect = ShapeRecord.createRect(page.id, 300, 100, {
+      const targetRect = EditorShapeRecord.createRect(page.id, 300, 100, {
         w: 100,
         h: 100,
         fill: "#fff",
@@ -93,14 +93,14 @@ describe("Arrow multi-point editing", () => {
         radius: 0,
       });
 
-      const arrow = ShapeRecord.createArrow(page.id, 100, 100, {
+      const arrow = EditorShapeRecord.createArrow(page.id, 100, 100, {
         points: [{ x: 0, y: 0 }, { x: 100, y: 50 }, { x: 200, y: 0 }],
         start: { kind: "free" },
         end: { kind: "bound", bindingId: "binding-1" },
         style: { stroke: "#000", width: 2, headEnd: true },
       });
 
-      const binding = BindingRecord.create(arrow.id, targetRect.id, "end", { kind: "center" }, "binding-1");
+      const binding = EditorBindingRecord.create(arrow.id, targetRect.id, "end", { kind: "center" }, "binding-1");
 
       state = {
         ...state,
@@ -153,13 +153,13 @@ describe("Arrow multi-point editing", () => {
     it("should add a point when Alt+clicking on a segment", () => {
       let state = EditorState.create();
 
-      const page = PageRecord.create("Test Page");
+      const page = EditorPageRecord.create("Test Page");
       state = {
         ...state,
         doc: { ...state.doc, pages: { [page.id]: page } },
         ui: { ...state.ui, currentPageId: page.id },
       };
-      const arrow = ShapeRecord.createArrow(page.id, 100, 100, {
+      const arrow = EditorShapeRecord.createArrow(page.id, 100, 100, {
         points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
         start: { kind: "free" },
         end: { kind: "free" },
@@ -204,13 +204,13 @@ describe("Arrow multi-point editing", () => {
     it("should not add a point when Alt+clicking far from any segment", () => {
       let state = EditorState.create();
 
-      const page = PageRecord.create("Test Page");
+      const page = EditorPageRecord.create("Test Page");
       state = {
         ...state,
         doc: { ...state.doc, pages: { [page.id]: page } },
         ui: { ...state.ui, currentPageId: page.id },
       };
-      const arrow = ShapeRecord.createArrow(page.id, 100, 100, {
+      const arrow = EditorShapeRecord.createArrow(page.id, 100, 100, {
         points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
         start: { kind: "free" },
         end: { kind: "free" },
@@ -253,13 +253,13 @@ describe("Arrow multi-point editing", () => {
     it("should remove an intermediate point when Delete is pressed while dragging", () => {
       let state = EditorState.create();
 
-      const page = PageRecord.create("Test Page");
+      const page = EditorPageRecord.create("Test Page");
       state = {
         ...state,
         doc: { ...state.doc, pages: { [page.id]: page } },
         ui: { ...state.ui, currentPageId: page.id },
       };
-      const arrow = ShapeRecord.createArrow(page.id, 100, 100, {
+      const arrow = EditorShapeRecord.createArrow(page.id, 100, 100, {
         points: [{ x: 0, y: 0 }, { x: 50, y: 50 }, { x: 100, y: 0 }],
         start: { kind: "free" },
         end: { kind: "free" },
@@ -305,13 +305,13 @@ describe("Arrow multi-point editing", () => {
     it("should not remove points if it would leave less than 2 points", () => {
       let state = EditorState.create();
 
-      const page = PageRecord.create("Test Page");
+      const page = EditorPageRecord.create("Test Page");
       state = {
         ...state,
         doc: { ...state.doc, pages: { [page.id]: page } },
         ui: { ...state.ui, currentPageId: page.id },
       };
-      const arrow = ShapeRecord.createArrow(page.id, 100, 100, {
+      const arrow = EditorShapeRecord.createArrow(page.id, 100, 100, {
         points: [{ x: 0, y: 0 }, { x: 50, y: 50 }, { x: 100, y: 0 }],
         start: { kind: "free" },
         end: { kind: "free" },

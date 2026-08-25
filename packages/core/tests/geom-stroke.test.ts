@@ -5,12 +5,12 @@ import {
   strokeWidthHandles,
   hitTestPoint,
   hitTestStroke,
-  PageRecord,
+  EditorPageRecord,
   shapeBounds,
-  ShapeRecord,
+  EditorShapeRecord,
   Store,
 } from "../src";
-import type { StrokePoint } from "../src/model";
+import type { StrokePoint } from "../src/editor-model";
 
 describe("Stroke Geometry", () => {
   describe("computeOutline", () => {
@@ -77,7 +77,7 @@ describe("Stroke Geometry", () => {
       const bounds = boundsFromOutline(outline);
       expect(bounds.max.y - bounds.min.y).toBeGreaterThan(10);
 
-      const stroke = ShapeRecord.createStroke("page:1", 0, 0, {
+      const stroke = EditorShapeRecord.createStroke("page:1", 0, 0, {
         points,
         brush,
         style: { color: "#000000", opacity: 1 },
@@ -132,7 +132,7 @@ describe("Stroke Geometry", () => {
     it("should return correct bounds for stroke shape", () => {
       const points: StrokePoint[] = [[0, 0], [100, 50], [200, 0]];
 
-      const stroke = ShapeRecord.createStroke("page:1", 50, 100, {
+      const stroke = EditorShapeRecord.createStroke("page:1", 50, 100, {
         points,
         brush: { size: 16, thinning: 0.5, smoothing: 0.5, streamline: 0.5, simulatePressure: true },
         style: { color: "#000000", opacity: 1.0 },
@@ -152,7 +152,7 @@ describe("Stroke Geometry", () => {
     it("should handle stroke with insufficient points", () => {
       const points: StrokePoint[] = [[0, 0]];
 
-      const stroke = ShapeRecord.createStroke("page:1", 100, 100, {
+      const stroke = EditorShapeRecord.createStroke("page:1", 100, 100, {
         points,
         brush: { size: 16, thinning: 0.5, smoothing: 0.5, streamline: 0.5, simulatePressure: true },
         style: { color: "#000000", opacity: 1.0 },
@@ -169,7 +169,7 @@ describe("Stroke Geometry", () => {
     it("should return true for point inside stroke outline", () => {
       const points: StrokePoint[] = [[0, 0], [100, 0]];
 
-      const stroke = ShapeRecord.createStroke("page:1", 100, 100, {
+      const stroke = EditorShapeRecord.createStroke("page:1", 100, 100, {
         points,
         brush: { size: 20, thinning: 0.5, smoothing: 0.5, streamline: 0.5, simulatePressure: true },
         style: { color: "#000000", opacity: 1.0 },
@@ -183,7 +183,7 @@ describe("Stroke Geometry", () => {
     it("should return false for point outside stroke bounds", () => {
       const points: StrokePoint[] = [[0, 0], [100, 0]];
 
-      const stroke = ShapeRecord.createStroke("page:1", 100, 100, {
+      const stroke = EditorShapeRecord.createStroke("page:1", 100, 100, {
         points,
         brush: { size: 16, thinning: 0.5, smoothing: 0.5, streamline: 0.5, simulatePressure: true },
         style: { color: "#000000", opacity: 1.0 },
@@ -198,7 +198,7 @@ describe("Stroke Geometry", () => {
     it("should return false for stroke with insufficient points", () => {
       const points: StrokePoint[] = [[0, 0]];
 
-      const stroke = ShapeRecord.createStroke("page:1", 100, 100, {
+      const stroke = EditorShapeRecord.createStroke("page:1", 100, 100, {
         points,
         brush: { size: 16, thinning: 0.5, smoothing: 0.5, streamline: 0.5, simulatePressure: true },
         style: { color: "#000000", opacity: 1.0 },
@@ -214,11 +214,11 @@ describe("Stroke Geometry", () => {
   describe("hitTestPoint with strokes", () => {
     it("should hit test stroke shapes", () => {
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
+      const page = EditorPageRecord.create("Page 1", "page:1");
 
       const points: StrokePoint[] = [[0, 0], [100, 0]];
 
-      const stroke = ShapeRecord.createStroke("page:1", 100, 100, {
+      const stroke = EditorShapeRecord.createStroke("page:1", 100, 100, {
         points,
         brush: { size: 20, thinning: 0.5, smoothing: 0.5, streamline: 0.5, simulatePressure: true },
         style: { color: "#000000", opacity: 1.0 },
@@ -241,11 +241,11 @@ describe("Stroke Geometry", () => {
 
     it("should return null for point outside stroke", () => {
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
+      const page = EditorPageRecord.create("Page 1", "page:1");
 
       const points: StrokePoint[] = [[0, 0], [100, 0]];
 
-      const stroke = ShapeRecord.createStroke("page:1", 100, 100, {
+      const stroke = EditorShapeRecord.createStroke("page:1", 100, 100, {
         points,
         brush: { size: 16, thinning: 0.5, smoothing: 0.5, streamline: 0.5, simulatePressure: true },
         style: { color: "#000000", opacity: 1.0 },
@@ -268,9 +268,9 @@ describe("Stroke Geometry", () => {
 
     it("should handle stroke with other shape types", () => {
       const store = new Store();
-      const page = PageRecord.create("Page 1", "page:1");
+      const page = EditorPageRecord.create("Page 1", "page:1");
 
-      const rect = ShapeRecord.createRect("page:1", 0, 0, {
+      const rect = EditorShapeRecord.createRect("page:1", 0, 0, {
         w: 50,
         h: 50,
         fill: "#ff0000",
@@ -280,7 +280,7 @@ describe("Stroke Geometry", () => {
 
       const points: StrokePoint[] = [[0, 0], [100, 0]];
 
-      const stroke = ShapeRecord.createStroke("page:1", 100, 100, {
+      const stroke = EditorShapeRecord.createStroke("page:1", 100, 100, {
         points,
         brush: { size: 20, thinning: 0.5, smoothing: 0.5, streamline: 0.5, simulatePressure: true },
         style: { color: "#000000", opacity: 1.0 },

@@ -4,7 +4,7 @@ import {
   computePolylineLength,
   getPointAtDistance,
 } from "../src/geom";
-import type { ArrowShape } from "../src/model";
+import type { ArrowShape } from "../src/editor-model";
 
 describe("Arrow label placement under zoom/pan", () => {
   it("should maintain label position relative to arrow when zooming", () => {

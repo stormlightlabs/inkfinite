@@ -5,28 +5,28 @@ import {
   type ArrowProps,
   type EllipseProps,
   type LineProps,
-  PageRecord,
+  EditorPageRecord,
   type RectProps,
-  ShapeRecord,
+  EditorShapeRecord,
   type TextProps,
-} from "./model";
+} from "./editor-model";
 import { EditorState } from "./reactivity";
 import { ArrowTool, EllipseTool, LineTool, RectTool, SelectTool, TextTool } from "./tools";
 
 describe("SelectTool", () => {
   let tool: SelectTool;
   let initialState: EditorState;
-  let page: PageRecord;
-  let shape1: ShapeRecord;
-  let shape2: ShapeRecord;
-  let shape3: ShapeRecord;
+  let page: EditorPageRecord;
+  let shape1: EditorShapeRecord;
+  let shape2: EditorShapeRecord;
+  let shape3: EditorShapeRecord;
 
   beforeEach(() => {
     tool = new SelectTool();
-    page = PageRecord.create("Test Page");
-    shape1 = ShapeRecord.createRect(page.id, 0, 0, { w: 100, h: 100, fill: "#ff0000", stroke: "#000000", radius: 0 });
-    shape2 = ShapeRecord.createRect(page.id, 200, 0, { w: 100, h: 100, fill: "#00ff00", stroke: "#000000", radius: 0 });
-    shape3 = ShapeRecord.createEllipse(page.id, 0, 200, { w: 80, h: 80, fill: "#0000ff", stroke: "#000000" });
+    page = EditorPageRecord.create("Test Page");
+    shape1 = EditorShapeRecord.createRect(page.id, 0, 0, { w: 100, h: 100, fill: "#ff0000", stroke: "#000000", radius: 0 });
+    shape2 = EditorShapeRecord.createRect(page.id, 200, 0, { w: 100, h: 100, fill: "#00ff00", stroke: "#000000", radius: 0 });
+    shape3 = EditorShapeRecord.createEllipse(page.id, 0, 200, { w: 80, h: 80, fill: "#0000ff", stroke: "#000000" });
 
     page.shapeIds = [shape1.id, shape2.id, shape3.id];
 
@@ -484,11 +484,11 @@ describe("SelectTool", () => {
 describe("RectTool", () => {
   let tool: RectTool;
   let initialState: EditorState;
-  let page: PageRecord;
+  let page: EditorPageRecord;
 
   beforeEach(() => {
     tool = new RectTool();
-    page = PageRecord.create("Test Page");
+    page = EditorPageRecord.create("Test Page");
 
     initialState = {
       ...EditorState.create(),
@@ -700,11 +700,11 @@ describe("RectTool", () => {
 describe("EllipseTool", () => {
   let tool: EllipseTool;
   let initialState: EditorState;
-  let page: PageRecord;
+  let page: EditorPageRecord;
 
   beforeEach(() => {
     tool = new EllipseTool();
-    page = PageRecord.create("Test Page");
+    page = EditorPageRecord.create("Test Page");
 
     initialState = {
       ...EditorState.create(),
@@ -838,11 +838,11 @@ describe("EllipseTool", () => {
 describe("LineTool", () => {
   let tool: LineTool;
   let initialState: EditorState;
-  let page: PageRecord;
+  let page: EditorPageRecord;
 
   beforeEach(() => {
     tool = new LineTool();
-    page = PageRecord.create("Test Page");
+    page = EditorPageRecord.create("Test Page");
 
     initialState = {
       ...EditorState.create(),
@@ -980,11 +980,11 @@ describe("LineTool", () => {
 describe("ArrowTool", () => {
   let tool: ArrowTool;
   let initialState: EditorState;
-  let page: PageRecord;
+  let page: EditorPageRecord;
 
   beforeEach(() => {
     tool = new ArrowTool();
-    page = PageRecord.create("Test Page");
+    page = EditorPageRecord.create("Test Page");
 
     initialState = {
       ...EditorState.create(),
@@ -1117,11 +1117,11 @@ describe("ArrowTool", () => {
 describe("TextTool", () => {
   let tool: TextTool;
   let initialState: EditorState;
-  let page: PageRecord;
+  let page: EditorPageRecord;
 
   beforeEach(() => {
     tool = new TextTool();
-    page = PageRecord.create("Test Page");
+    page = EditorPageRecord.create("Test Page");
 
     initialState = {
       ...EditorState.create(),
@@ -1202,14 +1202,14 @@ describe("TextTool", () => {
 describe("Arrow Bindings", () => {
   let tool: ArrowTool;
   let initialState: EditorState;
-  let page: PageRecord;
-  let targetShape: ShapeRecord;
+  let page: EditorPageRecord;
+  let targetShape: EditorShapeRecord;
 
   beforeEach(() => {
     tool = new ArrowTool();
-    page = PageRecord.create("Test Page");
+    page = EditorPageRecord.create("Test Page");
 
-    targetShape = ShapeRecord.createRect(page.id, 100, 100, {
+    targetShape = EditorShapeRecord.createRect(page.id, 100, 100, {
       w: 100,
       h: 100,
       fill: "#ff0000",
@@ -1305,7 +1305,7 @@ describe("Arrow Bindings", () => {
   });
 
   it("should create bindings for both ends when both hit shapes", () => {
-    const targetShape2 = ShapeRecord.createRect(page.id, 300, 300, {
+    const targetShape2 = EditorShapeRecord.createRect(page.id, 300, 300, {
       w: 100,
       h: 100,
       fill: "#00ff00",

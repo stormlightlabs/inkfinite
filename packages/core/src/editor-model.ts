@@ -1,8 +1,17 @@
+/**
+ * Interactive editor state owned by `@inkfinite/core`.
+ *
+ * These records deliberately use editor-facing names and coordinate fields. They
+ * are not the Rust-owned records from `@inkfinite/bindings/model`; conversion
+ * between the two representations lives in `persistence/canonical.ts`.
+ */
+
 import type {
 	EditorTransform as GeneratedEditorTransform,
 	PathCurveKind,
 	PathTopologyOperation
 } from '@inkfinite/bindings/editor';
+import type { BuiltinShapeKind } from '@inkfinite/bindings';
 import type {
 	FilterEffect as NativeFilterEffect,
 	FilterPrimitive as NativeFilterPrimitive,
@@ -29,7 +38,7 @@ export function createId(prefix?: string): string {
 	return prefix ? `${prefix}:${id}` : id;
 }
 
-export type PageRecord = {
+export type EditorPageRecord = {
 	id: string;
 	name: string;
 	/** Flat draw-order projection. Layer order and each layer's shape order are authoritative. */
@@ -38,18 +47,18 @@ export type PageRecord = {
 	layerIds?: string[];
 };
 
-export const PageRecord = {
+export const EditorPageRecord = {
 	/**
 	 * Create a new page record
 	 */
-	create(name: string, id?: string): PageRecord {
+	create(name: string, id?: string): EditorPageRecord {
 		return { id: id ?? createId('page'), name, shapeIds: [], layerIds: [] };
 	},
 
 	/**
 	 * Clone a page record
 	 */
-	clone(page: PageRecord): PageRecord {
+	clone(page: EditorPageRecord): EditorPageRecord {
 		return {
 			id: page.id,
 			name: page.name,
@@ -60,7 +69,7 @@ export const PageRecord = {
 };
 
 /** Ordered visual layer owned by one page. */
-export type LayerRecord = {
+export type EditorLayerRecord = {
 	id: string;
 	pageId: string;
 	name: string;
@@ -70,14 +79,14 @@ export type LayerRecord = {
 	opacity: number;
 };
 
-export const LayerRecord = {
+export const EditorLayerRecord = {
 	/** Creates an empty, visible layer. */
-	create(pageId: string, name = 'Layer', id?: string): LayerRecord {
+	create(pageId: string, name = 'Layer', id?: string): EditorLayerRecord {
 		return { id: id ?? createId('layer'), pageId, name, shapeIds: [], visible: true, locked: false, opacity: 1 };
 	},
 
 	/** Clones a layer without sharing its child-order array. */
-	clone(layer: LayerRecord): LayerRecord {
+	clone(layer: EditorLayerRecord): EditorLayerRecord {
 		return { ...layer, shapeIds: [...layer.shapeIds] };
 	}
 };
@@ -345,18 +354,8 @@ export type ShapeMetadata = {
 	};
 };
 
-export type ShapeType =
-	| 'rect'
-	| 'ellipse'
-	| 'line'
-	| 'arrow'
-	| 'text'
-	| 'stroke'
-	| 'path'
-	| 'markdown'
-	| 'image'
-	| 'reference'
-	| 'container';
+/** Built-in shape kinds accepted by the interactive editor model. */
+export type ShapeType = BuiltinShapeKind;
 
 /** Full projected transform shared with the Rust editor projection. */
 export type EditorTransform = GeneratedEditorTransform;
@@ -403,7 +402,7 @@ export type PathShape = BaseShape & { type: 'path'; props: PathProps };
 export type MarkdownShape = BaseShape & { type: 'markdown'; props: MarkdownProps };
 export type ContainerShape = BaseShape & { type: 'container'; props: ContainerProps };
 
-export type ShapeRecord =
+export type EditorShapeRecord =
 	| RectShape
 	| EllipseShape
 	| LineShape
@@ -416,7 +415,7 @@ export type ShapeRecord =
 	| MarkdownShape
 	| ContainerShape;
 
-export const ShapeRecord = {
+export const EditorShapeRecord = {
 	/**
 	 * Create a rectangle shape
 	 */
@@ -489,7 +488,7 @@ export const ShapeRecord = {
 	/**
 	 * Clone a shape record
 	 */
-	clone(shape: ShapeRecord): ShapeRecord {
+	clone(shape: EditorShapeRecord): EditorShapeRecord {
 		const metadata = shape.metadata
 			? {
 					...shape.metadata,
@@ -604,7 +603,7 @@ export const ShapeRecord = {
 			...shape,
 			...(metadata ? { metadata } : {}),
 			props: { ...shape.props, ...cloneShapeEffects(shape.props) }
-		} as ShapeRecord;
+		} as EditorShapeRecord;
 	}
 };
 
@@ -618,7 +617,7 @@ export type BindingHandle = 'start' | 'end';
  */
 export type BindingAnchor = { kind: 'center' } | { kind: 'edge'; nx: number; ny: number };
 
-export type BindingRecord = {
+export type EditorBindingRecord = {
 	id: string;
 	type: BindingType;
 	fromShapeId: string;
@@ -629,7 +628,7 @@ export type BindingRecord = {
 	relationType?: string;
 };
 
-export const BindingRecord = {
+export const EditorBindingRecord = {
 	/**
 	 * Create a binding record for arrow endpoints
 	 */
@@ -640,7 +639,7 @@ export const BindingRecord = {
 		anchor?: BindingAnchor,
 		id?: string,
 		relationType?: string
-	): BindingRecord {
+	): EditorBindingRecord {
 		if (!anchor) {
 			anchor = { kind: 'center' };
 		}
@@ -656,7 +655,7 @@ export const BindingRecord = {
 	},
 
 	/** Creates a typed relationship that does not participate in arrow routing. */
-	createRelation(fromShapeId: string, toShapeId: string, relationType: string, id?: string): BindingRecord {
+	createRelation(fromShapeId: string, toShapeId: string, relationType: string, id?: string): EditorBindingRecord {
 		return {
 			id: id ?? createId('binding'),
 			type: 'relation',
@@ -671,7 +670,7 @@ export const BindingRecord = {
 	/**
 	 * Clone a binding record
 	 */
-	clone(binding: BindingRecord): BindingRecord {
+	clone(binding: EditorBindingRecord): EditorBindingRecord {
 		return { ...binding, anchor: binding.anchor.kind === 'edge' ? { ...binding.anchor } : { kind: 'center' } };
 	}
 };
@@ -679,34 +678,42 @@ export const BindingRecord = {
 /** A retained binary asset imported from an external document. */
 export type ImportedAsset = { id: string; name: string; mediaType: string; digest: string; bytes: number[] };
 
-export type Document = {
-	pages: Record<string, PageRecord>;
+/**
+ * Mutable document state consumed by editor tools and renderers.
+ *
+ * This is an interactive projection, not the serialized Rust document. Use the
+ * canonical persistence adapter when crossing into generated native contracts.
+ */
+export type EditorDocument = {
+	pages: Record<string, EditorPageRecord>;
 	/** Layers indexed by stable ID. */
-	layers?: Record<string, LayerRecord>;
+	layers?: Record<string, EditorLayerRecord>;
 	/** Binary assets retained by interchange imports. */
 	assets?: Record<string, ImportedAsset>;
-	shapes: Record<string, ShapeRecord>;
-	bindings: Record<string, BindingRecord>;
+	shapes: Record<string, EditorShapeRecord>;
+	bindings: Record<string, EditorBindingRecord>;
 };
 
-export const Document = {
+export const EditorDocument = {
 	/**
 	 * Create an empty document
 	 */
-	create(): Document {
+	create(): EditorDocument {
 		return { pages: {}, layers: {}, shapes: {}, bindings: {} };
 	},
 
 	/**
 	 * Clone a document
 	 */
-	clone(document: Document): Document {
+	clone(document: EditorDocument): EditorDocument {
 		return {
-			pages: Object.fromEntries(Object.entries(document.pages).map(([id, page]) => [id, PageRecord.clone(page)])),
+			pages: Object.fromEntries(
+				Object.entries(document.pages).map(([id, page]) => [id, EditorPageRecord.clone(page)])
+			),
 			...(document.layers
 				? {
 						layers: Object.fromEntries(
-							Object.entries(document.layers).map(([id, layer]) => [id, LayerRecord.clone(layer)])
+							Object.entries(document.layers).map(([id, layer]) => [id, EditorLayerRecord.clone(layer)])
 						)
 					}
 				: {}),
@@ -721,10 +728,10 @@ export const Document = {
 					}
 				: {}),
 			shapes: Object.fromEntries(
-				Object.entries(document.shapes).map(([id, shape]) => [id, ShapeRecord.clone(shape)])
+				Object.entries(document.shapes).map(([id, shape]) => [id, EditorShapeRecord.clone(shape)])
 			),
 			bindings: Object.fromEntries(
-				Object.entries(document.bindings).map(([id, binding]) => [id, BindingRecord.clone(binding)])
+				Object.entries(document.bindings).map(([id, binding]) => [id, EditorBindingRecord.clone(binding)])
 			)
 		};
 	}
@@ -737,13 +744,15 @@ export const Document = {
  * preserved exactly in a stable default layer, while layered documents retain
  * their layer and child order.
  */
-export function ensureDocumentLayers(document: Document): Document {
-	const pages = Object.fromEntries(Object.entries(document.pages).map(([id, page]) => [id, PageRecord.clone(page)]));
+export function ensureDocumentLayers(document: EditorDocument): EditorDocument {
+	const pages = Object.fromEntries(
+		Object.entries(document.pages).map(([id, page]) => [id, EditorPageRecord.clone(page)])
+	);
 	const layers = Object.fromEntries(
-		Object.entries(document.layers ?? {}).map(([id, layer]) => [id, LayerRecord.clone(layer)])
+		Object.entries(document.layers ?? {}).map(([id, layer]) => [id, EditorLayerRecord.clone(layer)])
 	);
 	const shapes = Object.fromEntries(
-		Object.entries(document.shapes).map(([id, shape]) => [id, ShapeRecord.clone(shape)])
+		Object.entries(document.shapes).map(([id, shape]) => [id, EditorShapeRecord.clone(shape)])
 	);
 
 	for (const page of Object.values(pages)) {
@@ -805,7 +814,7 @@ export type ValidationResult = { ok: true } | { ok: false; errors: string[] };
  * @param doc - The document to validate
  * @returns ValidationResult with ok status and any errors found
  */
-export function validateDoc(document: Document): ValidationResult {
+export function validateDoc(document: EditorDocument): ValidationResult {
 	const errors: string[] = [];
 
 	if (Object.keys(document.pages).length === 0 && Object.keys(document.shapes).length > 0) {

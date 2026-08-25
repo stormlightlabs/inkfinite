@@ -8,7 +8,7 @@ import type {
 	RectProps,
 	StrokeStyle,
 	TextProps
-} from './model';
+} from './editor-model';
 
 /** Canvas appearance used to resolve explicit creation-time document colors. */
 export type CanvasAppearance = 'light' | 'dark';

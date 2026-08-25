@@ -1,6 +1,6 @@
 import { shapeBoundsForState } from './geom';
 import { Box2, type Box2 as Box2Type, type Vec2 } from './math';
-import { createId, ShapeRecord, type ContainerShape, type ShapeRecord as Shape } from './model';
+import { createId, EditorShapeRecord, type ContainerShape, type EditorShapeRecord as Shape } from './editor-model';
 import type { EditorState } from './reactivity';
 
 /** Axis used to distribute selected shapes. */
@@ -224,7 +224,7 @@ export function groupShapes(state: EditorState, shapeIds: readonly string[]): Ed
 	const containerId = createId('shape');
 	const firstLayerId = roots.find((shape) => shape.layerId)?.layerId;
 	const layerId = firstLayerId ?? state.ui.activeLayerId ?? page.layerIds?.[0];
-	const container = ShapeRecord.createContainer(
+	const container = EditorShapeRecord.createContainer(
 		pageId,
 		bounds.min.x,
 		bounds.min.y,

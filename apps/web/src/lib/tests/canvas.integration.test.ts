@@ -4,9 +4,9 @@ import {
 	duplicateAndConnectSelection,
 	EditorState,
 	Modifiers,
-	PageRecord,
+	EditorPageRecord,
 	PointerButtons,
-	ShapeRecord,
+	EditorShapeRecord,
 	Store,
 	SelectTool
 } from '@inkfinite/core';
@@ -18,15 +18,15 @@ const down = PointerButtons.create(true, false, false);
 const up = PointerButtons.create();
 
 function overlappingState(): EditorState {
-	const page = PageRecord.create('Canvas quality', 'page:quality');
-	const back = ShapeRecord.createRect(
+	const page = EditorPageRecord.create('Canvas quality', 'page:quality');
+	const back = EditorShapeRecord.createRect(
 		page.id,
 		0,
 		0,
 		{ w: 80, h: 50, fill: '#fff', stroke: '#111', radius: 4 },
 		'shape:back'
 	);
-	const front = ShapeRecord.createRect(
+	const front = EditorShapeRecord.createRect(
 		page.id,
 		0,
 		0,
