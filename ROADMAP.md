@@ -34,10 +34,11 @@ The supported syntax and fallback rules are documented in
 
 ### Clipboard interoperability
 
-Treat the clipboard as another interchange surface. Selections and documents
-should be copyable as canonical SVG markup. Raster exports should be copyable
-as PNG when platform clipboard APIs permit it, with predictable browser
-fallbacks.
+Selections and current-page documents can be copied as canonical SVG markup.
+Inkfinite writes vector and plain-text clipboard representations when the
+browser supports them and shows the markup when it cannot access the clipboard.
+Raster exports should be copyable as PNG when platform clipboard APIs permit it,
+with predictable browser fallbacks.
 
 ### PWA and offline operation
 

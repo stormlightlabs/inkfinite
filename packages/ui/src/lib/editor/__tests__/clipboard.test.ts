@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	BindingRecord,
 	LayerRecord,
@@ -6,7 +6,7 @@ import {
 	ShapeRecord,
 	type EditorState
 } from '@inkfinite/core';
-import { createClipboardPayload, pasteClipboard, pasteText } from '../clipboard';
+import { copySvgMarkup, createClipboardPayload, pasteClipboard, pasteText } from '../clipboard';
 
 function state(): EditorState {
 	const page = PageRecord.create('Page 1', 'page:test');
@@ -39,6 +39,44 @@ function state(): EditorState {
 }
 
 describe('clipboard selections', () => {
+	afterEach(() => vi.unstubAllGlobals());
+
+	it('writes SVG as rich clipboard data for vector tools and text editors', async () => {
+		const write = vi.fn().mockResolvedValue(undefined);
+		class TestClipboardItem {
+			constructor(readonly data: Record<string, Blob>) {}
+		}
+		vi.stubGlobal('navigator', { clipboard: { write } });
+		vi.stubGlobal('ClipboardItem', TestClipboardItem);
+
+		const result = await copySvgMarkup('<svg><rect /></svg>');
+
+		expect(result).toBe('rich');
+		expect(write).toHaveBeenCalledOnce();
+		const item = write.mock.calls[0][0][0] as TestClipboardItem;
+		expect(Object.keys(item.data)).toEqual(['image/svg+xml', 'text/plain']);
+		expect(await item.data['image/svg+xml'].text()).toContain('<rect');
+		expect(await item.data['text/plain'].text()).toContain('<rect');
+	});
+
+	it('reports the plain-text fallback when rich clipboard writes are unavailable', async () => {
+		const writeText = vi.fn().mockResolvedValue(undefined);
+		vi.stubGlobal('navigator', { clipboard: { writeText } });
+		vi.stubGlobal('ClipboardItem', undefined);
+
+		const result = await copySvgMarkup('<svg />');
+
+		expect(result).toBe('text');
+		expect(writeText).toHaveBeenCalledWith('<svg />');
+	});
+
+	it('returns a manual-copy result when no clipboard API is available', async () => {
+		vi.stubGlobal('navigator', {});
+		vi.stubGlobal('ClipboardItem', undefined);
+
+		expect(await copySvgMarkup('<svg />')).toBe('manual');
+	});
+
 	it('keeps hierarchy, assets, bindings, and root selection on paste', () => {
 		const before = state();
 		const pageId = before.ui.currentPageId!;

@@ -22,11 +22,11 @@
 
 ### SVG as code
 
-- [ ] Add "Copy as SVG" for the current selection and document
-- [ ] Generate the SVG through the same canonical exporter used by file export
-- [ ] Write SVG markup as `text/plain` and `image/svg+xml` where supported
-- [ ] Provide a visible fallback when rich clipboard MIME types are unavailable
-- [ ] Verify copied SVG can be pasted into a text editor and common vector tools
+- [x] Add "Copy as SVG" for the current selection and document
+- [x] Generate the SVG through the same canonical exporter used by file export
+- [x] Write SVG markup as `text/plain` and `image/svg+xml` where supported
+- [x] Provide a visible fallback when rich clipboard MIME types are unavailable
+- [x] Verify copied SVG can be pasted into a text editor and common vector tools
 
 ### PNG clipboard export
 

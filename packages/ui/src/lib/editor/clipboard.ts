@@ -68,6 +68,67 @@ export function createClipboardPayload(state: EditorState): ClipboardPayload | n
 	return { kind: CLIPBOARD_KIND, version: 2, shapes, bindings, rootIds: [...rootIds], assets };
 }
 
+/** Result of copying SVG markup to the system clipboard. */
+export type SvgClipboardResult = 'rich' | 'text' | 'manual';
+
+/**
+ * Writes SVG markup with both vector and plain-text clipboard representations.
+ *
+ * Browsers that do not expose rich clipboard writes receive the markup as plain
+ * text. When no clipboard API is available, the caller can show the markup for
+ * manual copying.
+ */
+export async function copySvgMarkup(svg: string): Promise<SvgClipboardResult> {
+	if (!svg) throw new Error('SVG markup must not be empty.');
+
+	const clipboard = typeof navigator !== 'undefined' ? navigator.clipboard : undefined;
+	if (clipboard?.write && typeof ClipboardItem !== 'undefined') {
+		try {
+			await clipboard.write([
+				new ClipboardItem({
+					'image/svg+xml': new Blob([svg], { type: 'image/svg+xml' }),
+					'text/plain': new Blob([svg], { type: 'text/plain' })
+				})
+			]);
+			return 'rich';
+		} catch {
+			// Permission and support errors can still allow a plain-text write.
+		}
+	}
+
+	if (clipboard?.writeText) {
+		try {
+			await clipboard.writeText(svg);
+			return 'text';
+		} catch {
+			// Try the legacy browser path before asking the user to copy manually.
+		}
+	}
+
+	if (
+		typeof document !== 'undefined' &&
+		document.body &&
+		typeof document.execCommand === 'function'
+	) {
+		const textarea = document.createElement('textarea');
+		textarea.value = svg;
+		textarea.setAttribute('readonly', '');
+		textarea.style.position = 'fixed';
+		textarea.style.opacity = '0';
+		document.body.appendChild(textarea);
+		try {
+			textarea.select();
+			if (document.execCommand('copy')) return 'text';
+		} catch {
+			// The visible manual-copy fallback handles browsers that reject this path.
+		} finally {
+			textarea.remove();
+		}
+	}
+
+	return 'manual';
+}
+
 /** Writes a native selection to the system clipboard when available. */
 export async function copySelection(state: EditorState): Promise<boolean> {
 	const payload = createClipboardPayload(state);

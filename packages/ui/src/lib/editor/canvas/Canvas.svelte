@@ -13,6 +13,7 @@
 	import { Button, ContextMenu, Dialog, type ContextMenuEntry } from '../../index';
 	import {
 		copySelection,
+		copySvgMarkup,
 		pasteClipboard,
 		pasteImage,
 		pasteText,
@@ -57,6 +58,12 @@
 	let svgMarkup = $state('');
 	let svgMarkupError = $state<string | null>(null);
 	let svgMarkupSubmitting = $state(false);
+	let svgClipboardFallbackOpen = $state(false);
+	let svgClipboardFallbackMarkup = $state('');
+	let svgClipboardFallbackMessage = $state('');
+	let svgClipboardFallbackEl = $state<HTMLTextAreaElement | null>(null);
+	let clipboardStatus = $state<string | null>(null);
+	let clipboardStatusTimer: ReturnType<typeof setTimeout> | null = null;
 	let editorError = $state<string | null>(null);
 	let editorErrorTitle = $state('Editor error');
 
@@ -151,22 +158,47 @@
 		}
 	}
 
-	async function copySelectionAsSvg() {
+	function announceClipboardStatus(message: string) {
+		clipboardStatus = message;
+		if (clipboardStatusTimer) clearTimeout(clipboardStatusTimer);
+		clipboardStatusTimer = setTimeout(() => {
+			clipboardStatus = null;
+			clipboardStatusTimer = null;
+		}, 5000);
+	}
+
+	async function copySvg(selectedOnly: boolean) {
 		try {
-			const svg = exportToSVG(c.store.getState(), { selectedOnly: true });
-			if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
-				await navigator.clipboard?.writeText(svg);
-				return;
+			const exported = await c.renderSvg(selectedOnly);
+			const result = await copySvgMarkup(exported.contents);
+			if (result === 'rich') {
+				announceClipboardStatus(
+					'SVG copied. It is ready to paste into a vector tool or text editor.'
+				);
+			} else if (result === 'text') {
+				announceClipboardStatus(
+					'SVG copied as plain text. Paste it into a text editor or import it manually into a vector tool.'
+				);
+			} else {
+				svgClipboardFallbackMarkup = exported.contents;
+				svgClipboardFallbackMessage =
+					'This browser could not access the clipboard. Select the markup below and copy it manually.';
+				svgClipboardFallbackOpen = true;
 			}
-			await navigator.clipboard.write([
-				new ClipboardItem({
-					'image/svg+xml': new Blob([svg], { type: 'image/svg+xml' }),
-					'text/plain': new Blob([svg], { type: 'text/plain' })
-				})
-			]);
 		} catch (error) {
 			reportEditorError(error, 'Clipboard error');
 		}
+	}
+
+	function closeSvgClipboardFallback() {
+		svgClipboardFallbackOpen = false;
+		svgClipboardFallbackMarkup = '';
+		svgClipboardFallbackMessage = '';
+	}
+
+	function selectSvgClipboardFallback() {
+		svgClipboardFallbackEl?.focus();
+		svgClipboardFallbackEl?.select();
 	}
 
 	async function copySelectionAsPng() {
@@ -469,7 +501,8 @@
 				shortcut: '⌘/Ctrl C',
 				disabled: selected.length === 0
 			},
-			{ id: 'copy-svg', label: 'Copy as SVG', icon: 'add', disabled: selected.length === 0 },
+			{ id: 'copy-svg', label: 'Copy as SVG', icon: 'svg', disabled: selected.length === 0 },
+			{ id: 'copy-svg-document', label: 'Copy document as SVG', icon: 'svg' },
 			{ id: 'copy-png', label: 'Copy as PNG', icon: 'add', disabled: selected.length === 0 },
 			{
 				id: 'cut',
@@ -697,6 +730,8 @@
 				ui: { ...current.ui, selectionIds: [] }
 			}));
 			contextMenuItems = [
+				{ id: 'copy-svg-document', label: 'Copy document as SVG', icon: 'svg' },
+				{ type: 'separator' },
 				{ id: 'paste', label: 'Paste', icon: 'add', shortcut: '⌘/Ctrl V' },
 				{ id: 'paste-at-cursor', label: 'Paste at cursor', icon: 'add' },
 				{ id: 'paste-in-place', label: 'Paste in place', icon: 'add' },
@@ -721,7 +756,11 @@
 			return;
 		}
 		if (id === 'copy-svg') {
-			await copySelectionAsSvg();
+			await copySvg(true);
+			return;
+		}
+		if (id === 'copy-svg-document') {
+			await copySvg(false);
 			return;
 		}
 		if (id === 'copy-png') {
@@ -809,7 +848,8 @@
 		onImportSvg={c.importSvg}
 		onCreateFromSvg={platformKind === 'web' ? c.createDocumentFromSvg : undefined}
 		onImportSvgMarkup={platformKind === 'web' ? openSvgMarkupDialog : undefined}
-		onExportSvg={platformKind === 'web' ? c.exportSvg : undefined}
+		onExportSvg={c.exportSvg}
+		onCopySvg={copySvg}
 		onExportEditable={c.exportEditableCanvas}
 		interchangeBusy={c.interchangeBusy()} />
 	<div
@@ -926,6 +966,9 @@
 			</div>
 		{/if}
 	</div>
+	{#if clipboardStatus}
+		<div class="clipboard-status" role="status" aria-live="polite">{clipboardStatus}</div>
+	{/if}
 	<ContextMenu
 		items={contextMenuItems}
 		label="Canvas actions"
@@ -973,6 +1016,26 @@
 					>Import SVG</Button>
 			</div>
 		</form>
+	</Dialog>
+	<Dialog
+		bind:open={svgClipboardFallbackOpen}
+		onClose={closeSvgClipboardFallback}
+		title="Copy SVG manually">
+		<div class="svg-clipboard-fallback">
+			<h2>Copy SVG markup</h2>
+			<p>{svgClipboardFallbackMessage}</p>
+			<textarea
+				bind:this={svgClipboardFallbackEl}
+				value={svgClipboardFallbackMarkup}
+				aria-label="SVG markup to copy"
+				readonly
+				spellcheck="false"
+				rows="14"></textarea>
+			<div class="svg-clipboard-fallback__actions">
+				<Button variant="ghost" onclick={selectSvgClipboardFallback}>Select markup</Button>
+				<Button variant="primary" onclick={closeSvgClipboardFallback}>Done</Button>
+			</div>
+		</div>
 	</Dialog>
 	<Dialog
 		open={Boolean(editorError)}
@@ -1092,6 +1155,71 @@
 			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M4 2.75 22.2 16.1l-8.05 1.15 4.2 7.25-4.2 2.4-4.05-7.2-5.35 6.1z' fill='%23171928' stroke='%23a78bfa' stroke-width='2.25' stroke-linejoin='round'/%3E%3C/svg%3E")
 				4 3,
 			default;
+	}
+
+	.clipboard-status {
+		position: fixed;
+		top: 5.5rem;
+		left: 50%;
+		z-index: 120;
+		max-width: min(34rem, calc(100vw - 2rem));
+		padding: var(--ink-space-3) var(--ink-space-4);
+		border: 1px solid var(--ink-border-strong);
+		border-radius: var(--ink-radius-control-small);
+		background: var(--ink-surface-raised);
+		box-shadow: var(--ink-shadow-popover);
+		color: var(--ink-text);
+		font: 600 var(--ink-type-sm) / 1.35 var(--ink-font-body);
+		transform: translateX(-50%);
+	}
+
+	.svg-clipboard-fallback {
+		width: min(48rem, calc(100vw - 2rem));
+		padding: var(--ink-space-6);
+	}
+
+	.svg-clipboard-fallback h2,
+	.svg-clipboard-fallback p {
+		margin: 0;
+	}
+
+	.svg-clipboard-fallback h2 {
+		font: 700 var(--ink-type-xl) / 1.15 var(--ink-font-body);
+	}
+
+	.svg-clipboard-fallback p {
+		margin-top: var(--ink-space-2);
+		color: var(--ink-text-muted);
+		line-height: 1.5;
+	}
+
+	.svg-clipboard-fallback textarea {
+		width: 100%;
+		min-height: 18rem;
+		margin-top: var(--ink-space-5);
+		padding: var(--ink-space-3);
+		resize: vertical;
+		border: var(--ink-line-width) solid var(--ink-border-strong);
+		border-radius: var(--ink-radius-panel-small);
+		background: var(--ink-canvas);
+		color: var(--ink-text);
+		font:
+			450 var(--ink-type-sm) / 1.5 ui-monospace,
+			SFMono-Regular,
+			Menlo,
+			monospace;
+	}
+
+	.svg-clipboard-fallback textarea:focus-visible {
+		outline: 3px solid var(--ink-focus);
+		outline-offset: 2px;
+	}
+
+	.svg-clipboard-fallback__actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: var(--ink-space-3);
+		margin-top: var(--ink-space-5);
 	}
 
 	.editor-error {

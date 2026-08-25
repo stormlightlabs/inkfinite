@@ -24,6 +24,7 @@ import {
 	LineTool,
 	LayerRecord,
 	exportInterchange,
+	exportToSVG,
 	importInterchange,
 	MarkdownTool,
 	PageRecord,
@@ -43,6 +44,7 @@ import type {
 	InterchangeFormat,
 	InterchangeWarning,
 	LoadedDoc,
+	SvgExport,
 	SvgExportOptions,
 	PersistenceSink,
 	PersistentDocRepo,
@@ -882,22 +884,39 @@ export function createCanvasController(
 		}
 	}
 
-	async function exportSvg(selectedOnly: boolean) {
+	/** Renders the current page through the same exporter used by SVG file export. */
+	async function renderSvg(selectedOnly: boolean): Promise<SvgExport> {
+		const state = store.getState();
 		const exportFunction = platformSession?.interchange?.exportSvg;
-		if (!exportFunction || !activeBoardId || !repo || !sink || !platformSession?.interchange) {
-			throw new Error('The browser SVG exporter is not available.');
-		}
-		interchangeBusy = true;
-		try {
+		if (exportFunction && activeBoardId && repo && sink) {
 			await sink.flush();
 			const snapshot = await repo.exportBoard(activeBoardId);
-			const state = store.getState();
 			const options: SvgExportOptions = {
 				pageId: state.ui.currentPageId ?? undefined,
 				selectionIds: selectedOnly ? [...state.ui.selectionIds] : [],
 				selectionOnly: selectedOnly
 			};
-			const exported = await exportFunction(snapshot, options);
+			return exportFunction(snapshot, options);
+		}
+
+		return {
+			format: 'svg',
+			contents: exportToSVG(state, { selectedOnly }),
+			extension: 'svg',
+			mimeType: 'image/svg+xml',
+			warnings: []
+		};
+	}
+
+	async function exportSvg(selectedOnly: boolean) {
+		if (!activeBoardId || !repo || !sink || !platformSession?.interchange) {
+			throw new Error('SVG export is not available in this editor session.');
+		}
+		interchangeBusy = true;
+		try {
+			const exported = await renderSvg(selectedOnly);
+			await sink.flush();
+			const snapshot = await repo.exportBoard(activeBoardId);
 			const saved = await platformSession.interchange.saveExport(
 				exported,
 				snapshot.board.name
@@ -1282,6 +1301,7 @@ export function createCanvasController(
 		importImageFile,
 		replaceImageFile,
 		importDroppedFile,
+		renderSvg,
 		exportSvg,
 		exportEditableCanvas,
 		interchangeBusy: () => interchangeBusy,

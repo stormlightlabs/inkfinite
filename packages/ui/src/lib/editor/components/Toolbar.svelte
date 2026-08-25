@@ -28,6 +28,7 @@
 		onCreateFromSvg?: () => void;
 		onImportSvgMarkup?: () => void;
 		onExportSvg?: (selectedOnly: boolean) => Promise<void>;
+		onCopySvg?: (selectedOnly: boolean) => Promise<void>;
 		onExportEditable?: (format: InterchangeFormat) => void;
 		interchangeBusy?: boolean;
 	};
@@ -47,6 +48,7 @@
 		onCreateFromSvg,
 		onImportSvgMarkup,
 		onExportSvg,
+		onCopySvg,
 		onExportEditable,
 		interchangeBusy = false
 	}: Props = $props();
@@ -251,7 +253,23 @@
 				id: 'svg-selection',
 				label: 'SVG (Selection)',
 				accessibleLabel: 'Export selected shapes as SVG'
-			}
+			},
+			...(onCopySvg
+				? [
+						{ type: 'separator' as const },
+						{
+							id: 'copy-svg-all',
+							label: 'Copy as SVG (All)',
+							accessibleLabel: 'Copy all shapes as SVG'
+						},
+						{
+							id: 'copy-svg-selection',
+							label: 'Copy as SVG (Selection)',
+							accessibleLabel: 'Copy selected shapes as SVG',
+							disabled: editorState.ui.selectionIds.length === 0
+						}
+					]
+				: [])
 		];
 	}
 
@@ -269,6 +287,12 @@
 				break;
 			case 'svg-selection':
 				void exportSVGSelection();
+				break;
+			case 'copy-svg-all':
+				void onCopySvg?.(false);
+				break;
+			case 'copy-svg-selection':
+				void onCopySvg?.(true);
 				break;
 		}
 	}

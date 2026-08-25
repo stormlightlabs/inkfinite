@@ -22,8 +22,11 @@ want an editable interchange file or a presentation copy for another application
 | D2                     | Yes         | No     | Editable cards, frames, and arrows   |
 
 The editor also accepts pasted plain text, Markdown, SVG markup, and images. Native clipboard copy
-preserves hierarchy, assets, and connections. **Paste in place** keeps copied coordinates. Ordinary
-paste places content near the pointer.
+preserves hierarchy, assets, and connections. Use **Copy as SVG** to copy the current selection as
+SVG code, or use **Copy document as SVG** to copy the current page. Inkfinite writes both SVG and
+plain-text clipboard representations when the browser supports rich clipboard data. If it does not,
+the editor copies the markup as text and reports that fallback. **Paste in place** keeps copied
+coordinates. Ordinary paste places content near the pointer.
 
 ## Import files
 
