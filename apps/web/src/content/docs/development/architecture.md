@@ -74,6 +74,20 @@ Rust owns the canonical document and all operations that can change it. `inkfini
 `Document`, `ShapeRecord`, `PageRecord`, `LayerRecord`, and `BindingRecord`, validates them, applies
 transactions, and owns Automerge state, native files, sessions, and headless rendering.
 
+Its source layout follows the same ownership split:
+
+- `src/model/` contains canonical IDs, value types, shape registry types, records, snapshots, and
+  shape-property validation. `lib.rs` re-exports the existing root model names.
+- `src/geometry/` contains boolean operations, connector resolution, graph layout, path topology,
+  path metrics, and routing. Existing root module paths remain available as re-exports; the engine's
+  world-transform and bounds helpers remain under `engine::geometry` because the transaction engine
+  owns those document traversals.
+- `src/editor/` contains editor-facing projection data, canonical-to-editor projection, and editor
+  patch reconciliation. `inkfinite_core::editor` keeps the public editor API while its implementation
+  is split into model, projection, and reconciliation modules.
+- `src/wasm.rs`, the CLI, MCP, and Tauri code are adapters. They call the core APIs and do not define
+  parallel canonical records or transaction semantics.
+
 The binding generator is the only path from those Rust contracts to TypeScript contract types:
 
 ```text
@@ -96,16 +110,30 @@ editor changes into generated `EditorPatch` requests. Browser and desktop adapte
 instead of translating records themselves. The adapter preserves native property names and
 hierarchy only at the Rust boundary; it does not write `.inkfinite` bytes.
 
-The package dependency direction is:
+The package and adapter dependency direction is:
 
 ```text
-@inkfinite/bindings ──> @inkfinite/core/editor-model + canonical adapter
-                                  │
-                                  └──> @inkfinite/editor ──> @inkfinite/ui ──> web and desktop apps
+Rust model ──> Rust geometry and transaction engine ──> Rust editor projection/reconciliation
+      │                         │                              │
+      └── generate-bindings ────┴──────────────────────────────┘
+                                      │
+                              @inkfinite/bindings
+                                      │
+                         @inkfinite/core/canonical adapter
+                                      │
+                    @inkfinite/editor ──> @inkfinite/ui
+                                      │             │
+                           web and desktop apps ───┘
 
-Rust inkfinite-wasm ──> web app persistence adapter
-Rust Tauri commands ──> desktop app persistence adapter
+Rust inkfinite-wasm ──> web persistence adapter
+Rust Tauri commands ──> desktop persistence adapter
+CLI and MCP ──> inkfinite-core
 ```
+
+Core model code does not import UI, editor runtime, applications, or platform services. Core
+geometry and transaction code may use the model, while the editor projection and reconciliation
+layer may use canonical geometry and transaction APIs. Applications and adapters depend on the core;
+the core does not depend on them.
 
 `@inkfinite/editor` owns normalized input, interaction state, commands, Canvas rendering, and
 browser Canvas export adapters. The UI package owns Svelte presentation, inspector controls, file

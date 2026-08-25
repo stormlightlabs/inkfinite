@@ -423,7 +423,7 @@ mod tests {
     #[test]
     fn shared_connector_fixture_matches_native_resolution() {
         let fixture: serde_json::Value =
-            serde_json::from_str(include_str!("../../../fixtures/native/connector-geometry.json"))
+            serde_json::from_str(include_str!("../../../../fixtures/native/connector-geometry.json"))
                 .expect("connector fixture should decode");
         for case in fixture["cases"].as_array().expect("connector cases") {
             let mut document = document_with_arrow(case["points"].clone());

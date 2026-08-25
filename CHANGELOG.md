@@ -19,6 +19,13 @@
 - SVG import and export with editable native geometry, hierarchy, transforms, compound fills,
   gradients, effects, text paths, embedded images, sanitized fallbacks, and deterministic workflows.
 - Excalidraw and Obsidian Canvas import and export, plus deterministic SVG and PNG rendering.
+- JSON Canvas round-trips for cards, frames, references, assets, and relationships, plus editable
+  Mermaid and D2 flowchart imports with shared graph layout and documented fallbacks.
+- SVG and PNG clipboard export for selections and pages, including transparent PNGs and visible or
+  downloadable fallbacks when clipboard APIs are unavailable.
+- An installable offline web app with cached editor assets, persistent local storage requests,
+  explicit update prompts, and offline editing and export coverage.
+- Web metadata and generated Open Graph images for the landing page, docs, and editor.
 - CLI workflows for inspection, queries, validation, structured mutations, dry runs, rendering,
   schemas, live desktop sessions, and machine-readable output.
 - Permissioned local MCP access with scoped reads and mutations, SVG import, layout, causal heads,
@@ -32,6 +39,12 @@
 
 - Consolidated the web and desktop editors into shared UI, runtime, DOM input, renderer, and core
   packages.
+- Separated generated canonical contracts from the interactive TypeScript editor model and made
+  canonical projection and reconciliation an explicit adapter.
+- Made `@inkfinite/core` headless, reduced its root API, and added focused model, geometry, command,
+  selection, and interchange entry points with import-boundary checks.
+- Split renderer, runtime, inspector, Canvas, and Rust model, editor, and geometry responsibilities
+  into focused modules while preserving public APIs and serialized documents.
 - Unified creation styles across editor, CLI, MCP, stencils, and starter documents, with neutral
   defaults resolved against light and dark canvases.
 - Moved canonical browser state and committed geometry operations to Rust while keeping interaction

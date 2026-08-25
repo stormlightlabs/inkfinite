@@ -20,6 +20,13 @@
   reviewing the state of your edits.
 - Refrain from using the words "bounded" & "durable" and the phrase "load-bearing"
 
+## Architecture
+
+For source ownership, dependency directions, and adapter boundaries, read the
+[architecture guide](apps/web/src/content/docs/development/architecture.md) before reorganizing
+internals. Keep `inkfinite-core` as one crate and follow that guide when deciding where new code
+belongs.
+
 ## Verification
 
 For affected editor surfaces, run the relevant Playwright visual tests (or add new ones) and
