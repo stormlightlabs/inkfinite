@@ -551,13 +551,6 @@ export function boundsFromOutline(outline: Vec2[]): Box2 {
 }
 
 /**
- * Rotate a point around the origin
- *
- * @param p - Point to rotate
- * @param theta - Rotation angle in radians
- * @returns Rotated point
- */
-/**
  * Check if a point is inside a rectangle shape
  *
  * @param p - Point in world coordinates
