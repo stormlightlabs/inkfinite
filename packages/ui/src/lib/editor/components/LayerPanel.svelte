@@ -14,6 +14,8 @@
 	import { tick, untrack } from 'svelte';
 
 	import { Button, ContextMenu, Icon, IconButton, type ContextMenuEntry } from '../../index';
+	import { clampFloatingPosition } from './floating-position';
+	import { deleteLayerDestinations, nearestWritableDestination } from './layer-policy';
 
 	let {
 		store,
@@ -95,18 +97,12 @@
 	function clampPanelPosition(left: number, top: number) {
 		const parent = panelParent();
 		if (!parent || !panelEl) return { left, top };
-
-		const gutter = 8;
-		return {
-			left: Math.min(
-				Math.max(gutter, left),
-				Math.max(gutter, parent.clientWidth - panelEl.offsetWidth - gutter)
-			),
-			top: Math.min(
-				Math.max(gutter, top),
-				Math.max(gutter, parent.clientHeight - panelEl.offsetHeight - gutter)
-			)
-		};
+		return clampFloatingPosition(left, top, {
+			width: panelEl.offsetWidth,
+			height: panelEl.offsetHeight,
+			availableWidth: parent.clientWidth,
+			availableHeight: parent.clientHeight
+		});
 	}
 
 	function currentPanelPosition() {
@@ -198,20 +194,7 @@
 
 	function beginDelete(layer: EditorLayerRecord) {
 		deletingLayerId = layer.id;
-		deleteDestinationId = nearestWritableDestination(layer.id)?.id ?? null;
-	}
-
-	function nearestWritableDestination(sourceId: string): EditorLayerRecord | null {
-		const sourceIndex = layers.findIndex((layer) => layer.id === sourceId);
-		return (
-			[...layers]
-				.filter((layer) => layer.id !== sourceId && isWritableLayer(layer))
-				.sort(
-					(a, b) =>
-						Math.abs(layers.findIndex((layer) => layer.id === a.id) - sourceIndex) -
-						Math.abs(layers.findIndex((layer) => layer.id === b.id) - sourceIndex)
-				)[0] ?? null
-		);
+		deleteDestinationId = nearestWritableDestination(layers, layer.id)?.id ?? null;
 	}
 
 	function handleMenuAction(id: string) {
@@ -400,7 +383,7 @@
 						<select
 							aria-label="Move contents destination"
 							bind:value={deleteDestinationId}>
-							{#each layers.filter((candidate) => candidate.id !== deletingLayer.id && isWritableLayer(candidate)) as destination}
+							{#each deleteLayerDestinations(layers, deletingLayer.id) as destination}
 								<option value={destination.id}>{destination.name}</option>
 							{/each}
 						</select>

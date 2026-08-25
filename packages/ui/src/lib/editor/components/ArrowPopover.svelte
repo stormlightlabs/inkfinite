@@ -1,6 +1,15 @@
 <script lang="ts">
-	import type { ArrowShape, EditorState as EditorStateType, Store } from '@inkfinite/core';
-	import { EditorState, getSelectedShapes, SnapshotCommand } from '@inkfinite/core';
+	import type { Store } from '@inkfinite/core';
+	import {
+		disconnectSelectedArrowEndpoints,
+		getArrowInspectorState,
+		setSelectedArrowHead,
+		setSelectedArrowLabel,
+		setSelectedArrowRouting,
+		setSelectedArrowStrokeWidth
+	} from '@inkfinite/core';
+	import { executeEditorStateCommand } from '../commands';
+	import { untrack } from 'svelte';
 
 	type Props = { store: Store; disabled?: boolean };
 	type ArrowHandle = 'start' | 'end';
@@ -14,40 +23,18 @@
 	let endHeadEl = $state<HTMLInputElement | null>(null);
 	let restoreFocus = false;
 	let menuPosition = $state({ left: 8, top: 8 });
-	let editorState = $derived<EditorStateType>(store.getState());
-
-	let selectedArrows = $derived<ArrowShape[]>(
-		getSelectedShapes(editorState).filter(
-			(shape): shape is ArrowShape => shape.type === 'arrow'
-		)
+	let editorState = $state<import('@inkfinite/core').EditorState>(
+		untrack(() => store.getState())
 	);
-
-	let routingKind = $derived.by((): 'straight' | 'curved' | 'orthogonal' | 'mixed' => {
-		if (selectedArrows.length === 0) return 'straight';
-		const first = selectedArrows[0].props.routing?.kind ?? 'straight';
-		return selectedArrows.every((arrow) => (arrow.props.routing?.kind ?? 'straight') === first)
-			? first
-			: 'mixed';
-	});
-
-	let labelState = $derived.by(() => {
-		const shared = getSharedValue(
-			selectedArrows.map((arrow) => arrow.props.label?.text ?? '')
-		);
-		return { value: shared ?? '', mixed: selectedArrows.length > 1 && shared === null };
-	});
-	let strokeWidthState = $derived.by(() => {
-		const shared = getSharedValue(selectedArrows.map((arrow) => arrow.props.style.width));
-		return { value: shared ?? 2, mixed: selectedArrows.length > 1 && shared === null };
-	});
-	let startHeadState = $derived(
-		getBooleanState(selectedArrows.map((arrow) => arrow.props.style.headStart === true))
-	);
-	let endHeadState = $derived(
-		getBooleanState(selectedArrows.map((arrow) => arrow.props.style.headEnd !== false))
-	);
-	let startConnectionState = $derived(getConnectionState('start'));
-	let endConnectionState = $derived(getConnectionState('end'));
+	let arrowState = $derived(getArrowInspectorState(editorState));
+	let selectedArrows = $derived(arrowState.arrows);
+	let routingKind = $derived(arrowState.routingKind);
+	let labelState = $derived(arrowState.label);
+	let strokeWidthState = $derived(arrowState.strokeWidth);
+	let startHeadState = $derived(arrowState.startHead);
+	let endHeadState = $derived(arrowState.endHead);
+	let startConnectionState = $derived(arrowState.startConnection);
+	let endConnectionState = $derived(arrowState.endConnection);
 
 	$effect(() => {
 		const unsubscribe = store.subscribe((state) => {
@@ -117,27 +104,6 @@
 		};
 	});
 
-	function getSharedValue<T>(values: T[]): T | null {
-		if (values.length === 0) return null;
-		const first = values[0];
-		return values.every((value) => Object.is(value, first)) ? first : null;
-	}
-
-	function getBooleanState(values: boolean[]) {
-		const shared = getSharedValue(values);
-		return { value: shared ?? false, mixed: values.length > 1 && shared === null };
-	}
-
-	function getConnectionState(handle: ArrowHandle) {
-		const connected = selectedArrows.map((arrow) => arrow.props[handle].kind === 'bound');
-		const shared = getSharedValue(connected);
-		return {
-			connected: shared === true,
-			mixed: connected.length > 1 && shared === null,
-			anyConnected: connected.some(Boolean)
-		};
-	}
-
 	function portal(node: HTMLElement) {
 		if (typeof document !== 'undefined') document.body.appendChild(node);
 		return {
@@ -165,92 +131,37 @@
 		else openPopover();
 	}
 
-	function updateSelectedArrows(label: string, update: (arrow: ArrowShape) => ArrowShape) {
-		const state = store.getState();
-		const arrows = getSelectedShapes(state).filter(
-			(shape): shape is ArrowShape => shape.type === 'arrow'
-		);
-		if (arrows.length === 0) return;
-		const before = EditorState.clone(state);
-		const shapes = { ...state.doc.shapes };
-		for (const arrow of arrows) shapes[arrow.id] = update(arrow);
-		store.executeCommand(
-			new SnapshotCommand(label, 'doc', before, { ...state, doc: { ...state.doc, shapes } })
-		);
-	}
-
 	function setRouting(kind: 'straight' | 'curved' | 'orthogonal') {
-		updateSelectedArrows('Set arrow routing', (arrow) => ({
-			...arrow,
-			props: { ...arrow.props, routing: { ...arrow.props.routing, kind } }
-		}));
+		executeEditorStateCommand(store, 'Set arrow routing', (state) =>
+			setSelectedArrowRouting(state, kind)
+		);
 	}
 
 	function setStrokeWidth(event: Event) {
 		const value = (event.currentTarget as HTMLInputElement).valueAsNumber;
-		if (!Number.isFinite(value) || value <= 0) return;
-		updateSelectedArrows('Set arrow stroke width', (arrow) => ({
-			...arrow,
-			props: { ...arrow.props, style: { ...arrow.props.style, width: value } }
-		}));
+		if (Number.isFinite(value) && value > 0) {
+			executeEditorStateCommand(store, 'Set arrow stroke width', (state) =>
+				setSelectedArrowStrokeWidth(state, value)
+			);
+		}
 	}
 
 	function setArrowHead(handle: ArrowHandle, value: boolean) {
-		updateSelectedArrows(`Set ${handle} arrowhead`, (arrow) => ({
-			...arrow,
-			props: {
-				...arrow.props,
-				style: {
-					...arrow.props.style,
-					[handle === 'start' ? 'headStart' : 'headEnd']: value
-				}
-			}
-		}));
+		executeEditorStateCommand(store, `Set ${handle} arrowhead`, (state) =>
+			setSelectedArrowHead(state, handle, value)
+		);
 	}
 
 	function handleLabelChange(event: Event) {
 		const text = (event.currentTarget as HTMLInputElement).value;
-		updateSelectedArrows('Set arrow label', (arrow) => ({
-			...arrow,
-			props: {
-				...arrow.props,
-				label: text.trim()
-					? {
-							text,
-							align: arrow.props.label?.align ?? 'center',
-							offset: arrow.props.label?.offset ?? 0,
-							...(arrow.props.label?.distance === undefined
-								? {}
-								: { distance: arrow.props.label.distance })
-						}
-					: undefined
-			}
-		}));
+		executeEditorStateCommand(store, 'Set arrow label', (state) =>
+			setSelectedArrowLabel(state, text)
+		);
 	}
 
 	function disconnect(handle: ArrowHandle) {
-		const state = store.getState();
-		const arrows = getSelectedShapes(state).filter(
-			(shape): shape is ArrowShape => shape.type === 'arrow'
-		);
-		if (arrows.length === 0) return;
-		const before = EditorState.clone(state);
-		const shapes = { ...state.doc.shapes };
-		const bindings = { ...state.doc.bindings };
-		let changed = false;
-		for (const arrow of arrows) {
-			const endpoint = arrow.props[handle];
-			if (endpoint.kind !== 'bound') continue;
-			if (endpoint.bindingId) delete bindings[endpoint.bindingId];
-			shapes[arrow.id] = { ...arrow, props: { ...arrow.props, [handle]: { kind: 'free' } } };
-			changed = true;
-		}
-		if (!changed) return;
-		store.executeCommand(
-			new SnapshotCommand(`Disconnect ${handle} arrow endpoint`, 'doc', before, {
-				...state,
-				doc: { ...state.doc, shapes, bindings }
-			})
+		executeEditorStateCommand(store, `Disconnect ${handle} arrow endpoint`, (state) =>
+			disconnectSelectedArrowEndpoints(state, handle)
 		);
 	}
 </script>

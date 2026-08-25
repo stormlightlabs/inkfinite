@@ -170,6 +170,19 @@ export function applySelectionCommand(state: EditorState, command: SelectionComm
 	}
 }
 
+/** Applies a pure editor-state operation as one undoable editor command. */
+export function executeEditorStateCommand(
+	store: Store,
+	label: string,
+	apply: (state: EditorState) => EditorState
+): boolean {
+	const before = store.getState();
+	const after = apply(before);
+	if (after === before) return false;
+	store.executeCommand(new SnapshotCommand(label, 'doc', before, after));
+	return true;
+}
+
 /** Applies a selection command as one undoable editor command. */
 export function executeSelectionCommand(store: Store, command: SelectionCommand): boolean {
 	const before = store.getState();

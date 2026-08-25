@@ -6,20 +6,13 @@
 		getSelectedShapes,
 		hitTestPoint,
 		selectionTarget,
+		setSelectedImageSquareCrop,
+		enterSelectedFrame,
 		stencils
 	} from '@inkfinite/core';
 	import { untrack } from 'svelte';
 	import { Button, ContextMenu, Dialog, type ContextMenuEntry } from '../../index';
-	import {
-		copyPngBlob,
-		copySelection,
-		copySvgMarkup,
-		pasteClipboard,
-		pasteImage,
-		pasteText,
-		renderSvgToPng,
-		readClipboardContent
-	} from '../clipboard';
+	import { createClipboardActions } from './clipboard-actions';
 	import type { SelectionCommand } from '../commands';
 	import {
 		executeSelectionCommand,
@@ -40,6 +33,7 @@
 	import type { EditorPlatformAdapter } from '../platform';
 	import { createCanvasController } from './canvas-store.svelte';
 	import NavigationControls from './NavigationControls.svelte';
+	import { handleCanvasDrop } from './drop-handler';
 
 	let { platform: platformAdapter }: { platform: EditorPlatformAdapter } = $props();
 
@@ -74,89 +68,19 @@
 	}
 
 	async function copyCurrentSelection() {
-		try {
-			await copySelection(c.store.getState());
-		} catch (error) {
-			reportEditorError(error, 'Clipboard error');
-		}
+		await clipboardActions.copyCurrentSelection();
 	}
 
 	async function cutCurrentSelection() {
-		try {
-			await copySelection(c.store.getState());
-			c.handleAction(
-				Action.keyDown('Delete', 'Delete', {
-					ctrl: false,
-					shift: false,
-					alt: false,
-					meta: false
-				})
-			);
-		} catch (error) {
-			reportEditorError(error, 'Clipboard error');
-		}
+		await clipboardActions.cutCurrentSelection();
 	}
 
 	async function pasteFromClipboard(options: { inPlace?: boolean; atCursor?: boolean } = {}) {
-		try {
-			const content = await readClipboardContent();
-			if (!content)
-				throw new Error('The clipboard is empty or contains unsupported content.');
-			const position = options.atCursor ? c.cursorStore.getState().cursorWorld : undefined;
-			if (content.type === 'native') {
-				c.commitLayerState(
-					options.inPlace ? 'Paste in place' : 'Paste',
-					pasteClipboard(c.store.getState(), content.payload, {
-						inPlace: options.inPlace,
-						position: options.inPlace ? undefined : position
-					})
-				);
-			} else if (content.type === 'text') {
-				c.commitLayerState(
-					'Paste text',
-					pasteText(c.store.getState(), content.text, content.markdown, position)
-				);
-			} else if (content.type === 'image') {
-				c.commitLayerState(
-					'Paste image',
-					await pasteImage(c.store.getState(), content, position)
-				);
-			} else {
-				await c.importSvgMarkup(content.contents);
-			}
-		} catch (error) {
-			reportEditorError(error, 'Clipboard error');
-		}
+		await clipboardActions.pasteFromClipboard(options);
 	}
 
 	async function handlePaste(event: ClipboardEvent) {
-		event.preventDefault();
-		try {
-			const content = await readClipboardContent(event.clipboardData ?? undefined);
-			if (!content)
-				throw new Error('The clipboard is empty or contains unsupported content.');
-			const position = c.cursorStore.getState().cursorWorld;
-			if (content.type === 'native') {
-				c.commitLayerState(
-					'Paste',
-					pasteClipboard(c.store.getState(), content.payload, { position })
-				);
-			} else if (content.type === 'text') {
-				c.commitLayerState(
-					'Paste text',
-					pasteText(c.store.getState(), content.text, content.markdown, position)
-				);
-			} else if (content.type === 'image') {
-				c.commitLayerState(
-					'Paste image',
-					await pasteImage(c.store.getState(), content, position)
-				);
-			} else {
-				await c.importSvgMarkup(content.contents);
-			}
-		} catch (error) {
-			reportEditorError(error, 'Clipboard error');
-		}
+		await clipboardActions.handlePaste(event);
 	}
 
 	function announceClipboardStatus(message: string) {
@@ -169,26 +93,7 @@
 	}
 
 	async function copySvg(selectedOnly: boolean) {
-		try {
-			const exported = await c.renderSvg(selectedOnly);
-			const result = await copySvgMarkup(exported.contents);
-			if (result === 'rich') {
-				announceClipboardStatus(
-					'SVG copied. It is ready to paste into a vector tool or text editor.'
-				);
-			} else if (result === 'text') {
-				announceClipboardStatus(
-					'SVG copied as plain text. Paste it into a text editor or import it manually into a vector tool.'
-				);
-			} else {
-				svgClipboardFallbackMarkup = exported.contents;
-				svgClipboardFallbackMessage =
-					'This browser could not access the clipboard. Select the markup below and copy it manually.';
-				svgClipboardFallbackOpen = true;
-			}
-		} catch (error) {
-			reportEditorError(error, 'Clipboard error');
-		}
+		await clipboardActions.copySvg(selectedOnly);
 	}
 
 	function closeSvgClipboardFallback() {
@@ -203,20 +108,10 @@
 	}
 
 	async function copyPng(selectedOnly: boolean, transparentBackground = false) {
-		try {
-			const exported = await c.renderSvg(selectedOnly, { transparentBackground });
-			const blob = await renderSvgToPng(exported.contents, { transparentBackground });
-			const filename = selectedOnly ? 'selection.png' : 'drawing.png';
-			const result = await copyPngBlob(blob, filename);
-			announceClipboardStatus(
-				result === 'rich'
-					? `${selectedOnly ? 'Selection' : 'Document'} PNG copied to the clipboard${transparentBackground ? ' with transparency' : ''}.`
-					: `PNG clipboard access is unavailable. Downloaded ${filename} instead.`
-			);
-		} catch (error) {
-			reportEditorError(error, 'Clipboard error');
-		}
+		await clipboardActions.copyPng(selectedOnly, transparentBackground);
 	}
+
+	let clipboardActions: ReturnType<typeof createClipboardActions>;
 
 	// The composition root fixes the platform adapter for this component's lifetime.
 	const c = untrack(() =>
@@ -237,15 +132,32 @@
 		})
 	);
 
+	clipboardActions = createClipboardActions({
+		getState: () => c.store.getState(),
+		getCursorWorld: () => c.cursorStore.getState().cursorWorld,
+		commit: c.commitLayerState,
+		deleteSelection: () =>
+			c.handleAction(
+				Action.keyDown('Delete', 'Delete', {
+					ctrl: false,
+					shift: false,
+					alt: false,
+					meta: false
+				})
+			),
+		importSvgMarkup: c.importSvgMarkup,
+		renderSvg: c.renderSvg,
+		reportError: reportEditorError,
+		announceStatus: announceClipboardStatus,
+		showSvgFallback: (markup, message) => {
+			svgClipboardFallbackMarkup = markup;
+			svgClipboardFallbackMessage = message;
+			svgClipboardFallbackOpen = true;
+		}
+	});
+
 	function enterFrame(frameId: string) {
-		c.store.setState((state) => ({
-			...state,
-			ui: {
-				...state.ui,
-				containerPath: [...(state.ui.containerPath ?? []), frameId],
-				selectionIds: []
-			}
-		}));
+		c.store.setState((state) => enterSelectedFrame(state, frameId));
 	}
 
 	let platformKind = $derived(c.platform());
@@ -286,58 +198,19 @@
 	});
 
 	function handleDrop(e: DragEvent) {
-		e.preventDefault();
 		svgDragActive = false;
-
-		const droppedFile = e.dataTransfer?.files?.[0];
-		if (!draggingStencil.current && droppedFile) {
-			const rect = canvasEl?.getBoundingClientRect();
-			const screen = rect
-				? { x: e.clientX - rect.left, y: e.clientY - rect.top }
-				: { x: 0, y: 0 };
-			const world = Camera.screenToWorld(c.store.getState().camera, screen, c.getViewport());
-			const name = droppedFile.name.toLowerCase();
-			if (name.endsWith('.svg') || droppedFile.type === 'image/svg+xml') {
-				void c.importSvgFile(droppedFile);
-				return;
-			}
-			if (
-				droppedFile.type.startsWith('image/') ||
-				/\.(?:png|jpe?g|gif|webp|bmp|avif)$/i.test(name)
-			) {
-				void c.importImageFile(droppedFile, world);
-				return;
-			}
-			if (
-				name.endsWith('.excalidraw') ||
-				name.endsWith('.canvas') ||
-				name.endsWith('.inkfinite')
-			) {
-				void c.importDroppedFile(droppedFile);
-				return;
-			}
-		}
-
-		let stencil = draggingStencil.current;
-
-		if (!stencil && e.dataTransfer) {
-			const stencilId = e.dataTransfer.getData('application/x-inkfinite-stencil');
-			if (stencilId) {
-				stencil = stencils.registry.get(stencilId) ?? null;
-			}
-		}
-
-		if (!stencil || !canvasEl) {
-			return;
-		}
-
-		const rect = canvasEl.getBoundingClientRect();
-		const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-		const viewport = c.getViewport();
-		const world = Camera.screenToWorld(c.store.getState().camera, screen, viewport);
-
-		c.insertStencil(stencil, world);
-		endDrag();
+		handleCanvasDrop(e, {
+			canvas: canvasEl,
+			getState: () => c.store.getState(),
+			getViewport: () => c.getViewport(),
+			getDraggedStencil: () => draggingStencil.current,
+			findStencil: (id) => stencils.registry.get(id) ?? null,
+			clearStencilDrag: endDrag,
+			importSvgFile: (file) => void c.importSvgFile(file),
+			importImageFile: (file, world) => void c.importImageFile(file, world),
+			importDroppedFile: (file) => void c.importDroppedFile(file),
+			insertStencil: (stencil, world) => c.insertStencil(stencil, world)
+		});
 	}
 
 	function handleStencilsClick() {
@@ -350,27 +223,8 @@
 
 	function cropSelectedImage(square: boolean) {
 		const state = c.store.getState();
-		const selected =
-			state.ui.selectionIds.length === 1
-				? state.doc.shapes[state.ui.selectionIds[0]]
-				: undefined;
-		if (!selected || selected.type !== 'image') return;
-		const ratio = selected.props.w / Math.max(selected.props.h, 1);
-		const crop = square
-			? ratio > 1
-				? { top: 0, right: (1 - 1 / ratio) / 2, bottom: 0, left: (1 - 1 / ratio) / 2 }
-				: { top: (1 - ratio) / 2, right: 0, bottom: (1 - ratio) / 2, left: 0 }
-			: undefined;
-		c.commitLayerState(square ? 'Crop image' : 'Reset image crop', {
-			...state,
-			doc: {
-				...state.doc,
-				shapes: {
-					...state.doc.shapes,
-					[selected.id]: { ...selected, props: { ...selected.props, crop } }
-				}
-			}
-		});
+		const next = setSelectedImageSquareCrop(state, square);
+		if (next !== state) c.commitLayerState(square ? 'Crop image' : 'Reset image crop', next);
 	}
 
 	async function handleImageReplacement(event: Event) {

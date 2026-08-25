@@ -3,6 +3,7 @@
 // and ./persistence so platform concerns remain visible at import sites.
 export * from './actions';
 export * from './arrow-geometry';
+export * from './arrow-operations';
 export * from './boolean-paths';
 export * from './camera';
 export * from './cards';
@@ -11,6 +12,7 @@ export * from './export';
 export * from './geom';
 export * from './history';
 export * from './interchange';
+export * from './inspector';
 export * from './layers';
 export * from './layout';
 export * from './math';

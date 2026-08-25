@@ -12,6 +12,11 @@
 	import { TOOLS } from '../constants';
 	import type { BrushSettings, BrushStore } from '../status';
 	import SelectionControls from './SelectionControls.svelte';
+	import { clampFloatingPosition } from './floating-position';
+	import {
+		getExportMenuItems as deriveExportMenuItems,
+		getImportMenuItems as deriveImportMenuItems
+	} from './toolbar-menu';
 
 	type Props = {
 		currentTool: ToolId;
@@ -120,11 +125,13 @@
 	}
 
 	function moveToolbar(x: number, y: number) {
-		const width = toolbarEl?.offsetWidth ?? 0;
-		const height = toolbarEl?.offsetHeight ?? 0;
-		const maxX = Math.max(8, window.innerWidth - width - 8);
-		const maxY = Math.max(8, window.innerHeight - height - 8);
-		position = { x: Math.min(maxX, Math.max(8, x)), y: Math.min(maxY, Math.max(8, y)) };
+		const next = clampFloatingPosition(x, y, {
+			width: toolbarEl?.offsetWidth ?? 0,
+			height: toolbarEl?.offsetHeight ?? 0,
+			availableWidth: window.innerWidth,
+			availableHeight: window.innerHeight
+		});
+		position = { x: next.left, y: next.top };
 	}
 
 	function handleDragEnd(event: PointerEvent) {
@@ -238,72 +245,11 @@
 	}
 
 	function getExportMenuItems(): ContextMenuEntry[] {
-		return [
-			{
-				id: 'excalidraw',
-				label: 'Excalidraw',
-				accessibleLabel: 'Export as Excalidraw editable document'
-			},
-			{
-				id: 'json-canvas',
-				label: 'Obsidian Canvas',
-				accessibleLabel: 'Export as Obsidian Canvas editable document'
-			},
-			{ type: 'separator' },
-			{ id: 'png', label: 'PNG (Viewport)', accessibleLabel: 'Export current view as PNG' },
-			{ id: 'svg-all', label: 'SVG (All)', accessibleLabel: 'Export all shapes as SVG' },
-			{
-				id: 'svg-selection',
-				label: 'SVG (Selection)',
-				accessibleLabel: 'Export selected shapes as SVG'
-			},
-			...(onCopySvg || onCopyPng
-				? [
-						{ type: 'separator' as const },
-						...(onCopySvg
-							? [
-									{
-										id: 'copy-svg-all',
-										label: 'Copy as SVG (All)',
-										accessibleLabel: 'Copy all shapes as SVG'
-									},
-									{
-										id: 'copy-svg-selection',
-										label: 'Copy as SVG (Selection)',
-										accessibleLabel: 'Copy selected shapes as SVG',
-										disabled: editorState.ui.selectionIds.length === 0
-									}
-								]
-							: []),
-						...(onCopyPng
-							? [
-									{
-										id: 'copy-png-all',
-										label: 'Copy as PNG (All)',
-										accessibleLabel: 'Copy all shapes as PNG'
-									},
-									{
-										id: 'copy-png-selection',
-										label: 'Copy as PNG (Selection)',
-										accessibleLabel: 'Copy selected shapes as PNG',
-										disabled: editorState.ui.selectionIds.length === 0
-									},
-									{
-										id: 'copy-png-all-transparent',
-										label: 'Copy as PNG (All, Transparent)',
-										accessibleLabel: 'Copy all shapes as transparent PNG'
-									},
-									{
-										id: 'copy-png-selection-transparent',
-										label: 'Copy as PNG (Selection, Transparent)',
-										accessibleLabel: 'Copy selected shapes as transparent PNG',
-										disabled: editorState.ui.selectionIds.length === 0
-									}
-								]
-							: [])
-					]
-				: [])
-		];
+		return deriveExportMenuItems({
+			selectionCount: editorState.ui.selectionIds.length,
+			canCopySvg: Boolean(onCopySvg),
+			canCopyPng: Boolean(onCopyPng)
+		});
 	}
 
 	function handleExportMenuAction(id: string) {
@@ -354,27 +300,12 @@
 	}
 
 	function getImportMenuItems(): ContextMenuEntry[] {
-		const items: ContextMenuEntry[] = [];
-		if (onImportEditable) {
-			items.push({ id: 'import-document', label: 'Editable document', icon: 'layers' });
-		}
-		if (onImportSvg || onCreateFromSvg || onImportSvgMarkup) {
-			if (items.length > 0) items.push({ type: 'separator' });
-		}
-		if (onImportSvg) {
-			items.push({
-				id: 'import-svg-file',
-				label: 'Add SVG to current document',
-				icon: 'folder'
-			});
-		}
-		if (onCreateFromSvg) {
-			items.push({ id: 'create-from-svg', label: 'New document from SVG', icon: 'svg' });
-		}
-		if (onImportSvgMarkup) {
-			items.push({ id: 'import-svg-markup', label: 'Add SVG code / markup', icon: 'svg' });
-		}
-		return items;
+		return deriveImportMenuItems({
+			canImportEditable: Boolean(onImportEditable),
+			canImportSvg: Boolean(onImportSvg),
+			canCreateFromSvg: Boolean(onCreateFromSvg),
+			canImportSvgMarkup: Boolean(onImportSvgMarkup)
+		});
 	}
 
 	function handleImportMenuAction(id: string) {

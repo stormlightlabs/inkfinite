@@ -105,8 +105,12 @@ adapter are independently tested. Keyboard, menu, command-palette, and
 context-menu entry points use the shared editor document operations rather than
 runtime-local copies.
 
-Break large inspector components into capability-focused sections without
-moving domain behavior into Svelte components.
+Large inspectors are split into capability-focused Svelte sections for
+appearance, text, vector/path, effects, images, containers, transforms, and
+metadata. Selection-derived state and document mutations live in shared editor
+operations, while Canvas, proposal previews, floating positioning, and menu
+models use focused helpers. StatusBar, ProposalReview, and the remaining small
+editor components were reviewed and do not need further splits.
 
 ### Rust module organization
 

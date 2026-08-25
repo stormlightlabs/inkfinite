@@ -1,5 +1,6 @@
 import {
 	CursorStore,
+	contentObjectToCard,
 	EditorState,
 	EditorPageRecord,
 	EditorShapeRecord,
@@ -11,6 +12,7 @@ import type { BoardMeta, DocRepo } from '@inkfinite/core/persistence';
 
 import type { EditorPlatformAdapter } from '../platform';
 import { createBrushStore, createSnapStore, createStatusStore } from '../status';
+import { getSelectionInspectorState, type SelectionInspectorState } from '../selection-inspector';
 
 export const storyBoards: BoardMeta[] = [
 	{
@@ -71,6 +73,93 @@ export function createStoryStore(): Store {
 }
 
 /** Props shared by editor toolbar and status stories. */
+export type InspectorStoryVariant = 'appearance' | 'text' | 'image' | 'card' | 'layout';
+
+/** Creates a small selected document for focused inspector stories. */
+export function createStoryInspectorStore(variant: InspectorStoryVariant): Store {
+	const state = EditorState.create();
+	const page = EditorPageRecord.create('Inspector story', `page:inspector-${variant}`);
+	state.doc.pages[page.id] = page;
+	state.ui.currentPageId = page.id;
+
+	if (variant === 'text') {
+		const text = EditorShapeRecord.createText(
+			page.id,
+			24,
+			24,
+			{
+				text: 'Inspector headline',
+				fontSize: 28,
+				fontFamily: 'Newsreader Variable',
+				color: '#302c2a'
+			},
+			'shape:inspector-text'
+		);
+		page.shapeIds = [text.id];
+		state.doc.shapes[text.id] = text;
+		state.ui.selectionIds = [text.id];
+	} else if (variant === 'image') {
+		const image = EditorShapeRecord.createImage(
+			page.id,
+			24,
+			24,
+			{ w: 240, h: 160, assetId: 'asset:inspector', caption: 'Sample asset' },
+			'shape:inspector-image'
+		);
+		page.shapeIds = [image.id];
+		state.doc.shapes[image.id] = image;
+		state.doc.assets = {
+			'asset:inspector': {
+				id: 'asset:inspector',
+				name: 'Inspector image',
+				mediaType: 'image/png',
+				digest: 'sha256:inspector',
+				bytes: [0]
+			}
+		};
+		state.ui.selectionIds = [image.id];
+	} else if (variant === 'card') {
+		const card = contentObjectToCard(
+			page.id,
+			{ x: 24, y: 24 },
+			{ title: 'Inspector card', body: 'Card body', role: 'note' }
+		);
+		page.shapeIds = card.map((shape) => shape.id);
+		for (const shape of card) state.doc.shapes[shape.id] = shape;
+		state.ui.selectionIds = [card[0].id];
+	} else {
+		const first = EditorShapeRecord.createRect(
+			page.id,
+			24,
+			24,
+			{ w: 120, h: 80, fill: '#e7d9ff', stroke: '#6f42c1', radius: 12 },
+			'shape:inspector-first'
+		);
+		const second = EditorShapeRecord.createRect(
+			page.id,
+			190,
+			24,
+			{ w: 120, h: 80, fill: '#d8f1e8', stroke: '#347a5a', radius: 12 },
+			'shape:inspector-second'
+		);
+		page.shapeIds = [first.id, second.id];
+		state.doc.shapes[first.id] = first;
+		state.doc.shapes[second.id] = second;
+		state.ui.selectionIds = variant === 'layout' ? [first.id, second.id] : [first.id];
+	}
+
+	return new Store(state);
+}
+
+/** Creates the derived selection data passed to focused inspector stories. */
+export function createStoryInspectorSelection(variant: InspectorStoryVariant): {
+	store: Store;
+	selection: SelectionInspectorState;
+} {
+	const store = createStoryInspectorStore(variant);
+	return { store, selection: getSelectionInspectorState(store.getState()) };
+}
+
 export function createStoryEditorControls() {
 	return {
 		store: createStoryStore(),

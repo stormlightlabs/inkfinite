@@ -1,195 +1,32 @@
 <script lang="ts">
-	import { Camera, type Camera as CameraState, type Viewport } from '@inkfinite/core';
-
-	import type { LiveProposal, ProposalObjectPreview } from '../platform';
-
-	type NativeRecord = Record<string, unknown>;
-	type PreviewSide = 'before' | 'after';
-	type PreviewSegment = {
-		id: string;
-		recordId: string;
-		change: ProposalObjectPreview['change'];
-		side: PreviewSide;
-		bounds: NonNullable<ProposalObjectPreview['before_bounds']>;
-		record: NativeRecord;
-	};
-
-	type LegacyShape = {
-		id: string;
-		kind: string;
-		transform: {
-			translation: { x: number; y: number };
-			rotation: number;
-			scale_x: number;
-			scale_y: number;
-		};
-		properties: Record<string, unknown>;
-	};
+	import { Camera } from '@inkfinite/core';
+	import type { LiveProposal } from '../platform';
+	import {
+		bindingBox,
+		bindingClass,
+		fill,
+		numberProperty,
+		proposalSegments,
+		recordLabel,
+		screenBounds,
+		stringProperty,
+		stroke
+	} from './proposal-ghost';
 
 	let {
 		proposal,
 		camera,
 		viewport
-	}: { proposal: LiveProposal; camera: CameraState; viewport: Viewport } = $props();
-
-	function isRecordPreview(preview: ProposalObjectPreview, kind: string): boolean {
-		return preview.record_id.kind === kind;
-	}
-
-	function recordFor(preview: ProposalObjectPreview, side: PreviewSide): NativeRecord | null {
-		return side === 'before'
-			? (preview.before?.record ?? null)
-			: (preview.after?.record ?? null);
-	}
-
-	function shapeSegmentsFor(preview: ProposalObjectPreview): PreviewSegment[] {
-		const segments: PreviewSegment[] = [];
-		const add = (side: PreviewSide, bounds: ProposalObjectPreview['before_bounds']) => {
-			const record = recordFor(preview, side);
-			if (!bounds || !record) return;
-			segments.push({
-				id: `${preview.record_id.id}:${side}`,
-				recordId: preview.record_id.id,
-				change: preview.change,
-				side,
-				bounds,
-				record
-			});
-		};
-
-		if (preview.change === 'removed') add('before', preview.before_bounds);
-		else if (preview.change === 'added' || preview.change === 'modified') {
-			add('after', preview.after_bounds);
-		} else {
-			add('before', preview.before_bounds);
-			add('after', preview.after_bounds);
-		}
-		return segments;
-	}
-
-	let objectPreviews = $derived(proposal.object_previews ?? []);
-	let shapePreviews = $derived(
-		objectPreviews.filter((preview) => isRecordPreview(preview, 'shape'))
-	);
-	let bindingPreviews = $derived(
-		objectPreviews.filter((preview) => isRecordPreview(preview, 'binding'))
-	);
-	let shapeSegments = $derived(shapePreviews.flatMap(shapeSegmentsFor));
+	}: {
+		proposal: LiveProposal;
+		camera: import('@inkfinite/core').Camera;
+		viewport: import('@inkfinite/core').Viewport;
+	} = $props();
+	let { bindingPreviews, shapeSegments, legacyShapes } = $derived(proposalSegments(proposal));
 	let hasStructuredVisualPreview = $derived(
 		shapeSegments.length > 0 || bindingPreviews.length > 0
 	);
-
-	function legacyShape(operation: unknown): LegacyShape | null {
-		if (typeof operation !== 'object' || operation === null) return null;
-		const candidate = operation as { type?: unknown; shape?: unknown };
-		if (
-			candidate.type !== 'create_shape' ||
-			typeof candidate.shape !== 'object' ||
-			!candidate.shape
-		) {
-			return null;
-		}
-
-		const shape = candidate.shape as Partial<LegacyShape>;
-		const translation = shape.transform?.translation;
-		const width = shape.properties?.width;
-		const height = shape.properties?.height;
-		if (
-			typeof shape.id !== 'string' ||
-			typeof shape.kind !== 'string' ||
-			!translation ||
-			![
-				translation.x,
-				translation.y,
-				shape.transform?.rotation,
-				shape.transform?.scale_x,
-				shape.transform?.scale_y
-			].every((value) => typeof value === 'number' && Number.isFinite(value)) ||
-			typeof width !== 'number' ||
-			!Number.isFinite(width) ||
-			typeof height !== 'number' ||
-			!Number.isFinite(height)
-		) {
-			return null;
-		}
-
-		return shape as LegacyShape;
-	}
-
-	let legacyShapes = $derived(
-		proposal.object_previews
-			? []
-			: proposal.transaction.operations
-					.map(legacyShape)
-					.filter((shape): shape is LegacyShape => shape !== null)
-	);
 	let needsRegionFallback = $derived(!hasStructuredVisualPreview && legacyShapes.length === 0);
-
-	function screenBounds(bounds: NonNullable<ProposalObjectPreview['before_bounds']>) {
-		const topLeft = Camera.worldToScreen(camera, { x: bounds.x, y: bounds.y }, viewport);
-		const bottomRight = Camera.worldToScreen(
-			camera,
-			{ x: bounds.x + bounds.width, y: bounds.y + bounds.height },
-			viewport
-		);
-		return {
-			x: Math.min(topLeft.x, bottomRight.x),
-			y: Math.min(topLeft.y, bottomRight.y),
-			width: Math.abs(bottomRight.x - topLeft.x),
-			height: Math.abs(bottomRight.y - topLeft.y)
-		};
-	}
-
-	function properties(record: NativeRecord): Record<string, unknown> {
-		return typeof record.properties === 'object' && record.properties !== null
-			? (record.properties as Record<string, unknown>)
-			: {};
-	}
-
-	function numberProperty(record: NativeRecord, key: string, fallback: number): number {
-		const value = properties(record)[key];
-		return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-	}
-
-	function stringProperty(record: NativeRecord, key: string): string | null {
-		const value = properties(record)[key];
-		return typeof value === 'string' && value.length > 0 ? value : null;
-	}
-
-	function fill(record: NativeRecord): string {
-		return stringProperty(record, 'fill') ?? 'var(--ink-accent)';
-	}
-
-	function stroke(record: NativeRecord): string {
-		return stringProperty(record, 'stroke') ?? 'var(--ink-accent)';
-	}
-
-	function recordLabel(preview: ProposalObjectPreview): string {
-		const record = recordFor(preview, preview.change === 'removed' ? 'before' : 'after');
-		if (preview.record_id.kind === 'binding') {
-			const relation = record?.relation_type;
-			return typeof relation === 'string' && relation
-				? `Relationship · ${relation}`
-				: 'Relationship';
-		}
-		const metadata = record?.metadata;
-		if (typeof metadata === 'object' && metadata !== null) {
-			const name = (metadata as Record<string, unknown>).name;
-			if (typeof name === 'string' && name) return name;
-			const role = (metadata as Record<string, unknown>).role;
-			if (typeof role === 'string' && role) return role;
-		}
-		return `${preview.record_id.kind} · ${preview.record_id.id}`;
-	}
-
-	function bindingBox(preview: ProposalObjectPreview) {
-		const bounds = preview.change === 'removed' ? preview.before_bounds : preview.after_bounds;
-		return bounds ? screenBounds(bounds) : null;
-	}
-
-	function bindingClass(change: ProposalObjectPreview['change']): string {
-		return `proposal-binding proposal-binding--${change}`;
-	}
 </script>
 
 <svg
@@ -198,7 +35,7 @@
 	preserveAspectRatio="none"
 	aria-hidden="true">
 	{#each shapeSegments as segment (segment.id)}
-		{@const box = screenBounds(segment.bounds)}
+		{@const box = screenBounds(camera, viewport, segment.bounds)}
 		{@const kind = typeof segment.record.kind === 'string' ? segment.record.kind : 'shape'}
 		<g
 			class={`proposal-object proposal-object--${segment.change} proposal-object--${segment.side}`}
@@ -245,7 +82,7 @@
 	{/each}
 
 	{#each bindingPreviews as preview (preview.record_id.id)}
-		{@const box = bindingBox(preview)}
+		{@const box = bindingBox(camera, viewport, preview)}
 		{#if box}
 			<g
 				class={bindingClass(preview.change)}
@@ -295,7 +132,7 @@
 	{#if needsRegionFallback}
 		{#each proposal.affected_regions as region}
 			{@const bounds = region.bounds}
-			{@const box = screenBounds(bounds)}
+			{@const box = screenBounds(camera, viewport, bounds)}
 			<rect
 				class="affected-region"
 				data-testid="proposal-affected-region"
