@@ -18,7 +18,7 @@ use crate::proto::Bounds;
 use crate::{
     AssetId, AssetSource, BuiltinShapeKind, Document, DocumentSnapshot, FilterEffect, FilterPrimitive, GradientSpread,
     GradientUnits, LayerId, MaskEffect, MaskMode, PageId, Paint, PaintValue, PathFillRule, PathGeometry, PathSegment,
-    PathSubpath, ShapeId, ShapeRecord, Vec2,
+    PathSubpath, ShapeId, ShapeParent, ShapeRecord, Vec2,
 };
 
 const DEFAULT_PADDING: f64 = 20.0;
@@ -148,7 +148,9 @@ impl Renderer<'_> {
 
         let matrix = parent_matrix.then(Affine::from_transform(shape.transform));
         let local_bounds = shape_local_bounds(self.document, shape)?;
-        let world_bounds = matrix.transform_bounds(local_bounds);
+        let world_bounds = self
+            .attached_text_bounds(shape, matrix)
+            .unwrap_or_else(|| matrix.transform_bounds(local_bounds));
         let bound_arrow = shape.kind.as_str() == crate::ARROW_KIND
             && self
                 .document
@@ -202,6 +204,30 @@ impl Renderer<'_> {
         output.push_str(&inner);
         output.push_str("    </g>\n");
         Ok(())
+    }
+
+    fn shape_matrix(&self, shape_id: &ShapeId) -> Option<Affine> {
+        let shape = self.document.shapes.get(shape_id)?;
+        let local = Affine::from_transform(shape.transform);
+        match &shape.parent {
+            ShapeParent::Layer(_) => Some(local),
+            ShapeParent::Shape(parent_id) => self.shape_matrix(parent_id).map(|parent| parent.then(local)),
+        }
+    }
+
+    fn attached_text_bounds(&self, shape: &ShapeRecord, _matrix: Affine) -> Option<Bounds> {
+        if shape.kind.as_str() != crate::TEXT_KIND {
+            return None;
+        }
+        let props: TextProps = properties(shape).ok()?;
+        let text_path = props.text_path?;
+        let path = self.document.shapes.get(&text_path.path_id)?;
+        if path.kind.as_str() != crate::PATH_KIND {
+            return None;
+        }
+        let geometry = crate::path_geometry_from_properties(&path.properties).ok()?;
+        let path_matrix = self.shape_matrix(&path.id)?;
+        Some(path_matrix.transform_bounds(path_bounds(&geometry)))
     }
 
     fn shape_element(&mut self, shape: &ShapeRecord, matrix: Affine) -> Result<String, SvgRenderError> {
@@ -396,7 +422,8 @@ impl Renderer<'_> {
                 })?;
                 writeln!(
                     output,
-                    "      <path transform=\"{transform}\" d=\"{}\" fill=\"{}\" fill-rule=\"{}\" fill-opacity=\"{fill_opacity}\" stroke=\"{}\" stroke-opacity=\"{stroke_opacity}\" stroke-width=\"{}\"/>",
+                    "      <path id=\"inkfinite-path-{}\" transform=\"{transform}\" d=\"{}\" fill=\"{}\" fill-rule=\"{}\" fill-opacity=\"{fill_opacity}\" stroke=\"{}\" stroke-opacity=\"{stroke_opacity}\" stroke-width=\"{}\"/>",
+                    shape.id.as_str().replace(|character: char| !character.is_ascii_alphanumeric(), "-"),
                     path_data(&geometry),
                     paint(props.fill.as_ref(), &shape.id, "fill", &mut gradient_defs),
                     path_fill_rule(props.fill_rule),
@@ -482,6 +509,51 @@ impl Renderer<'_> {
     ) -> Result<(), SvgRenderError> {
         let props: TextProps = properties(shape)?;
         let font = self.font(shape, &props.font_family);
+        if let Some(text_path) = &props.text_path
+            && let Some(path) = self.document.shapes.get(&text_path.path_id)
+            && path.kind.as_str() == crate::PATH_KIND
+        {
+            let geometry = crate::path_geometry_from_properties(&path.properties).map_err(|error| {
+                SvgRenderError::InvalidShapeProperties {
+                    shape_id: path.id.clone(),
+                    kind: path.kind.to_string(),
+                    message: error.to_string(),
+                }
+            })?;
+            let geometry = if text_path.direction == "reverse" { reverse_path_geometry(&geometry) } else { geometry };
+            let path_matrix = self
+                .shape_matrix(&path.id)
+                .ok_or_else(|| SvgRenderError::InvalidShapeProperties {
+                    shape_id: shape.id.clone(),
+                    kind: shape.kind.to_string(),
+                    message: "supporting path has no valid parent transform".into(),
+                })?;
+            let base_path_id = format!(
+                "inkfinite-path-{}",
+                path.id
+                    .as_str()
+                    .replace(|character: char| !character.is_ascii_alphanumeric(), "-")
+            );
+            let path_id =
+                if text_path.direction == "reverse" { format!("{base_path_id}-reverse") } else { base_path_id };
+            if text_path.direction == "reverse" {
+                writeln!(
+                    output,
+                    "      <defs><path id=\"{path_id}\" d=\"{}\" transform=\"{}\" fill=\"none\" stroke=\"none\"/></defs>",
+                    path_data(&geometry),
+                    affine_svg(path_matrix)
+                )
+                .expect("writing to a String cannot fail");
+            }
+            let anchor = match text_path.align.as_str() {
+                "center" => "middle",
+                "end" => "end",
+                _ => "start",
+            };
+            let color = paint(Some(&props.color), &shape.id, "fill", gradient_defs);
+            writeln!(output, "      <text font-family=\"{}\" font-size=\"{}\" fill=\"{color}\" fill-opacity=\"{fill_opacity}\"><textPath href=\"#{path_id}\" startOffset=\"{}\" text-anchor=\"{anchor}\" side=\"{}\" direction=\"{}\">{}</textPath></text>", escape_xml(font), number(props.font_size), number(text_path.offset), text_path.side, if text_path.direction == "reverse" { "rtl" } else { "ltr" }, escape_xml(&props.text)).expect("writing to a String cannot fail");
+            return Ok(());
+        }
         let lines = props.width.map_or_else(
             || vec![props.text.clone()],
             |width| wrap_text(&props.text, width, props.font_size),
@@ -658,6 +730,19 @@ struct TextProps {
     color: PaintValue,
     #[serde(alias = "w")]
     width: Option<f64>,
+    #[serde(default, alias = "text_path")]
+    text_path: Option<TextPathProps>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TextPathProps {
+    #[serde(alias = "path_id")]
+    path_id: ShapeId,
+    offset: f64,
+    align: String,
+    side: String,
+    direction: String,
 }
 
 #[derive(Deserialize)]
@@ -1080,6 +1165,46 @@ fn image_mask_path(mask: &ImageMask, width: f64, height: f64) -> String {
         ),
         _ => format!("<rect width=\"{}\" height=\"{}\"/>", number(width), number(height)),
     }
+}
+
+fn reverse_path_geometry(geometry: &PathGeometry) -> PathGeometry {
+    let subpaths = geometry
+        .subpaths
+        .iter()
+        .map(|subpath| {
+            let first = subpath.segments.first();
+            if !matches!(first, Some(PathSegment::Move { .. })) || subpath.segments.len() < 2 {
+                return subpath.clone();
+            }
+            let points: Vec<Vec2> = subpath
+                .segments
+                .iter()
+                .map(|segment| match segment {
+                    PathSegment::Move { to }
+                    | PathSegment::Line { to }
+                    | PathSegment::Quadratic { to, .. }
+                    | PathSegment::Cubic { to, .. } => *to,
+                })
+                .collect();
+            let mut segments = vec![PathSegment::Move { to: *points.last().unwrap_or(&Vec2 { x: 0.0, y: 0.0 }) }];
+            for index in (1..subpath.segments.len()).rev() {
+                let segment = &subpath.segments[index];
+                let to = points[index - 1];
+                match segment {
+                    PathSegment::Move { .. } => {}
+                    PathSegment::Line { .. } => segments.push(PathSegment::Line { to }),
+                    PathSegment::Quadratic { control, .. } => {
+                        segments.push(PathSegment::Quadratic { control: *control, to })
+                    }
+                    PathSegment::Cubic { control_1, control_2, .. } => {
+                        segments.push(PathSegment::Cubic { control_1: *control_2, control_2: *control_1, to })
+                    }
+                }
+            }
+            PathSubpath { segments, closed: subpath.closed, handle_modes: None }
+        })
+        .collect();
+    PathGeometry { subpaths, fill_rule: geometry.fill_rule }
 }
 
 fn path_data(geometry: &PathGeometry) -> String {

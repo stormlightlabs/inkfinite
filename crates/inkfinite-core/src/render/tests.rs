@@ -599,6 +599,74 @@ fn renders_image_masks_captions_and_reference_cards() {
 }
 
 #[test]
+fn renders_text_on_path_with_a_native_text_path_reference() {
+    let mut snapshot = fixture_snapshot();
+    let layer_id = LayerId::from("layer:page:fixtures:default");
+    let path_id = ShapeId::from("shape:text-path-support");
+    let text_id = ShapeId::from("shape:text-path-label");
+    add_shape(
+        &mut snapshot.document.shapes,
+        shape(
+            path_id.as_str(),
+            "path",
+            ShapeParent::Layer(layer_id.clone()),
+            40.0,
+            520.0,
+            0.0,
+            props([
+                (
+                    "subpaths",
+                    serde_json::json!([{"segments":[{"type":"move","to":{"x":0.0,"y":0.0}},{"type":"line","to":{"x":220.0,"y":0.0}}],"closed":false}]),
+                ),
+                ("fill_rule", serde_json::json!("nonzero")),
+                ("fill", serde_json::Value::Null),
+                ("stroke", serde_json::json!("#111111")),
+                ("stroke_width", serde_json::json!(2.0)),
+            ]),
+            Vec::new(),
+        ),
+    );
+    add_shape(
+        &mut snapshot.document.shapes,
+        shape(
+            text_id.as_str(),
+            "text",
+            ShapeParent::Layer(layer_id.clone()),
+            0.0,
+            0.0,
+            0.0,
+            props([
+                ("text", serde_json::json!("Label")),
+                ("font_size", serde_json::json!(16.0)),
+                ("font_family", serde_json::json!("sans-serif")),
+                ("color", serde_json::json!("#111111")),
+                (
+                    "text_path",
+                    serde_json::json!({"pathId": path_id, "offset": 100.0, "align": "center", "side": "left", "direction": "reverse"}),
+                ),
+            ]),
+            Vec::new(),
+        ),
+    );
+    snapshot
+        .document
+        .layers
+        .get_mut(&layer_id)
+        .unwrap()
+        .shape_ids
+        .extend([path_id, text_id]);
+    let rendered = render_svg(
+        &snapshot,
+        &SvgRenderOptions { page_id: Some(PageId::from("page:fixtures")), ..Default::default() },
+    )
+    .expect("text path fixture renders");
+    assert!(rendered.svg.contains("<textPath"));
+    assert!(rendered.svg.contains("startOffset=\"100\""));
+    assert!(rendered.svg.contains("side=\"left\""));
+    assert!(rendered.svg.contains("inkfinite-path-shape-text-path-support"));
+}
+
+#[test]
 fn renders_object_metadata_attributes() {
     let mut snapshot = fixture_snapshot();
     let shape = snapshot

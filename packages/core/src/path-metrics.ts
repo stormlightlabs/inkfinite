@@ -1,6 +1,6 @@
-import type { Mat3 } from './math';
-import { Mat3 as Mat3Ops } from './math';
-import type { PathGeometry, PathSegment, PathSubpath } from './model';
+import type { Mat3, Box2 } from './math';
+import { Box2 as Box2Ops, Mat3 as Mat3Ops } from './math';
+import type { PathGeometry, PathSegment, PathSubpath, TextPath } from './model';
 import type { Vec2 } from './math';
 
 /** Default geometric error used by interactive path measurements. */
@@ -114,6 +114,79 @@ export function tangentAtPathDistance(
 	tolerance = DEFAULT_PATH_METRIC_TOLERANCE
 ): Vec2 | null {
 	return pointAtPathDistance(geometry, distance, tolerance)?.tangent ?? null;
+}
+
+/** A glyph positioned against a supporting path. */
+export type TextPathGlyph = { character: string; point: Vec2; angle: number; advance: number; bounds: Box2 };
+
+/** Layout result shared by the canvas renderer, hit testing, and SVG export. */
+export type TextPathLayout = { glyphs: TextPathGlyph[]; anchor: PathMetricPoint | null; bounds: Box2; length: number };
+
+/**
+ * Lay out a single-line text run along native path geometry.
+ *
+ * Distances and font size use the geometry's local coordinate system. Callers
+ * can transform the resulting positions with the supporting shape's transform,
+ * which keeps path attachments stable when that shape is moved or edited.
+ */
+export function layoutTextOnPath(
+	geometry: PathGeometry,
+	text: string,
+	fontSize: number,
+	attachment: Pick<TextPath, 'offset' | 'align' | 'side' | 'direction'>,
+	measureText: (value: string) => number = (value) => fontSize * (value === ' ' ? 0.33 : 0.6)
+): TextPathLayout {
+	const length = pathLength(geometry);
+	const safeFontSize = Number.isFinite(fontSize) && fontSize > 0 ? fontSize : 1;
+	const safeOffset = Number.isFinite(attachment.offset) ? attachment.offset : 0;
+	const characters = Array.from(text.replaceAll(/\r?\n/g, ' '));
+	const advances = characters.map((character) => {
+		const measured = measureText(character);
+		return Number.isFinite(measured) && measured > 0 ? measured : safeFontSize * 0.6;
+	});
+	const textWidth = advances.reduce((total, advance) => total + advance, 0);
+	const start =
+		attachment.align === 'center'
+			? safeOffset - textWidth / 2
+			: attachment.align === 'end'
+				? safeOffset - textWidth
+				: safeOffset;
+	const orientedAnchorDistance = Math.max(0, Math.min(length, safeOffset));
+	const anchorDistance =
+		attachment.direction === 'reverse' ? length - orientedAnchorDistance : orientedAnchorDistance;
+	const anchor = length > 0 ? pointAtPathDistance(geometry, anchorDistance) : null;
+	const glyphs: TextPathGlyph[] = [];
+	let advanceOffset = 0;
+	for (const [index, character] of characters.entries()) {
+		const advance = advances[index]!;
+		const orientedDistance = start + advanceOffset + advance / 2;
+		advanceOffset += advance;
+		if (length <= 0 || orientedDistance < 0 || orientedDistance > length) continue;
+		const distance = attachment.direction === 'reverse' ? length - orientedDistance : orientedDistance;
+		const metric = pointAtPathDistance(geometry, distance);
+		if (!metric) continue;
+		const tangent =
+			attachment.direction === 'reverse' ? { x: -metric.tangent.x, y: -metric.tangent.y } : metric.tangent;
+		const angle = Math.atan2(tangent.y, tangent.x);
+		const leftNormal = { x: tangent.y, y: -tangent.x };
+		const normal = attachment.side === 'left' ? leftNormal : { x: -leftNormal.x, y: -leftNormal.y };
+		const baseline = {
+			x: metric.point.x + normal.x * (attachment.side === 'right' ? safeFontSize : 0),
+			y: metric.point.y + normal.y * (attachment.side === 'right' ? safeFontSize : 0)
+		};
+		const top = { x: Math.sin(angle) * safeFontSize * 0.9, y: -Math.cos(angle) * safeFontSize * 0.9 };
+		const axis = { x: (tangent.x * advance) / 2, y: (tangent.y * advance) / 2 };
+		const corners = [
+			{ x: baseline.x - axis.x, y: baseline.y - axis.y },
+			{ x: baseline.x + axis.x, y: baseline.y + axis.y },
+			{ x: baseline.x - axis.x + top.x, y: baseline.y - axis.y + top.y },
+			{ x: baseline.x + axis.x + top.x, y: baseline.y + axis.y + top.y }
+		];
+		glyphs.push({ character, point: baseline, angle, advance, bounds: Box2Ops.fromPoints(corners) });
+	}
+	const points = glyphs.flatMap((glyph) => [glyph.bounds.min, glyph.bounds.max]);
+	if (anchor) points.push(anchor.point);
+	return { glyphs, anchor, bounds: Box2Ops.fromPoints(points), length };
 }
 
 /** Find the closest point on a flattened path and its distance along the path. */

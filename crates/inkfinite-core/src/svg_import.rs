@@ -21,6 +21,7 @@ use thiserror::Error;
 use ts_rs::TS;
 
 use crate::engine::geometry::{Affine, path_bounds, union};
+use crate::path_metrics::{DEFAULT_PATH_METRIC_TOLERANCE, path_length};
 use crate::proto::Bounds;
 use crate::{
     AssetId, AssetRecord, AssetSource, FilterEffect, FilterPrimitive, GradientSpread, GradientStop, GradientTransform,
@@ -419,6 +420,8 @@ struct ImportParser {
     view_box: Option<SvgViewBox>,
     gradients: BTreeMap<String, Paint>,
     effects: SvgEffects,
+    text_path_ids: BTreeSet<String>,
+    text_path_lengths: BTreeMap<String, f64>,
 }
 
 impl ImportParser {
@@ -440,12 +443,12 @@ impl ImportParser {
         if !style.visible {
             return Ok(None);
         }
-        let source_id = source_id(node);
+        let node_source_id = source_id(node);
         match element.as_str() {
             "g" => {
                 let children = self.children(node, &style)?;
                 let group = SvgGroup {
-                    source_id,
+                    source_id: node_source_id,
                     transform: self.transform(node)?,
                     style: style.native_style()?,
                     properties: styled_group_properties(&style, &children),
@@ -464,7 +467,44 @@ impl ImportParser {
             "image" => self.image(node, &style).map(|image| image.map(SvgImportNode::Image)),
             "defs" => {
                 self.warn_definition_features(node);
-                Ok(None)
+                let mut paths = Vec::new();
+                for definition in node
+                    .descendants()
+                    .filter(|candidate| candidate.is_element() && local_name(*candidate) == "path")
+                {
+                    let Some(definition_id) = source_id(definition) else { continue };
+                    if !self.text_path_ids.contains(&definition_id) {
+                        continue;
+                    }
+                    let definition_style = resolve_style(
+                        parent_style,
+                        definition,
+                        &mut self.warnings,
+                        &self.gradients,
+                        &self.effects,
+                    )?;
+                    let mut shape = self.path(definition, &definition_style)?;
+                    shape.properties.insert("fill".into(), Value::Null);
+                    shape.properties.insert("stroke".into(), Value::Null);
+                    shape.style.opacity = Opacity::new(0.0).expect("zero is a valid opacity");
+                    paths.push(SvgImportNode::Shape(shape));
+                }
+                Ok((!paths.is_empty()).then_some(SvgImportNode::Group(Box::new(SvgGroup {
+                    source_id: Some("text-path-definitions".into()),
+                    transform: Transform {
+                        translation: Vec2 { x: 0.0, y: 0.0 },
+                        rotation: 0.0,
+                        scale_x: 1.0,
+                        scale_y: 1.0,
+                    },
+                    style: ShapeStyle {
+                        opacity: Opacity::new(1.0).expect("one is a valid opacity"),
+                        fill_opacity: None,
+                        stroke_opacity: None,
+                    },
+                    properties: properties([("width", json!(0.0)), ("height", json!(0.0))]),
+                    children: paths,
+                }))))
             }
             "metadata" | "title" | "desc" => Ok(None),
             "style" => {
@@ -702,19 +742,81 @@ impl ImportParser {
         // alphabetic baseline at `y`. Shift by the font size so imported labels
         // retain their expected vertical placement.
         let transform = self.transformed_geometry(node, x, y - style.font_size)?;
+        let mut properties = styled_properties(
+            style,
+            [
+                ("text", json!(text)),
+                ("font_size", json!(style.font_size)),
+                ("font_family", json!(style.font_family.clone())),
+                ("color", paint_value(Some(color))),
+            ],
+        );
+        if let Some(text_path) = node
+            .descendants()
+            .find(|descendant| descendant.is_element() && local_name(*descendant) == "textPath")
+        {
+            let href = text_path
+                .attribute("href")
+                .or_else(|| text_path.attribute(("http://www.w3.org/1999/xlink", "href")));
+            if let Some(path_id) = href
+                .and_then(|value| value.strip_prefix('#'))
+                .filter(|value| !value.trim().is_empty())
+            {
+                let offset = text_path
+                    .attribute("startOffset")
+                    .map(|value| {
+                        if value.trim().ends_with('%') {
+                            let fraction = parse_length(value, Some(1.0))
+                                .map_err(|_| invalid_attribute(text_path, "startOffset", value))?;
+                            self.text_path_lengths
+                                .get(path_id)
+                                .map(|length| fraction * length)
+                                .ok_or_else(|| invalid_attribute(text_path, "startOffset", value))
+                        } else {
+                            parse_length(value, None).map_err(|_| invalid_attribute(text_path, "startOffset", value))
+                        }
+                    })
+                    .transpose()?
+                    .unwrap_or(0.0);
+                let align = match text_path
+                    .attribute("text-anchor")
+                    .or_else(|| node.attribute("text-anchor"))
+                {
+                    Some("middle") => "center",
+                    Some("end") => "end",
+                    _ => "start",
+                };
+                let side = match text_path.attribute("side") {
+                    Some("right") => "right",
+                    _ => "left",
+                };
+                let direction = match text_path
+                    .attribute("direction")
+                    .or_else(|| node.attribute("direction"))
+                    .or_else(|| text_path.attribute("dir"))
+                {
+                    Some(value) if value.eq_ignore_ascii_case("rtl") || value.eq_ignore_ascii_case("reverse") => {
+                        "reverse"
+                    }
+                    _ => "forward",
+                };
+                properties.insert(
+                    "text_path".into(),
+                    json!({
+                        "pathId": path_id,
+                        "offset": offset,
+                        "align": align,
+                        "side": side,
+                        "direction": direction
+                    }),
+                );
+            }
+        }
         Ok(SvgShape {
             source_id: source_id(node),
             kind: ShapeKind::from(crate::TEXT_KIND),
             transform,
-            properties: styled_properties(
-                style,
-                [
-                    ("text", json!(text)),
-                    ("font_size", json!(style.font_size)),
-                    ("font_family", json!(style.font_family.clone())),
-                    ("color", paint_value(Some(color))),
-                ],
-            ),
+            properties,
             style: style.native_style()?,
         })
     }
@@ -924,7 +1026,17 @@ pub fn parse_svg(source: &str) -> Result<SvgImport, SvgImportError> {
     let source_asset = make_source_asset(source.as_bytes());
     let gradients = collect_gradients(root, view_box)?;
     let effects = collect_svg_effects(root, view_box)?;
-    let mut parser = ImportParser { assets: Vec::new(), warnings: Vec::new(), view_box, gradients, effects };
+    let text_path_ids = collect_text_path_ids(root);
+    let text_path_lengths = collect_text_path_lengths(root);
+    let mut parser = ImportParser {
+        assets: Vec::new(),
+        warnings: Vec::new(),
+        view_box,
+        gradients,
+        effects,
+        text_path_ids,
+        text_path_lengths,
+    };
     parser.warn_event_handlers(root);
     let root_style = resolve_style(
         &SvgStyle::default(),
@@ -1348,6 +1460,31 @@ struct ResolvedGradient {
     attributes: BTreeMap<String, String>,
     transform: Affine,
     stops: Vec<GradientStop>,
+}
+
+fn collect_text_path_ids(root: Node<'_, '_>) -> BTreeSet<String> {
+    root.descendants()
+        .filter(|node| node.is_element() && local_name(*node) == "textPath")
+        .filter_map(|node| {
+            node.attribute("href")
+                .or_else(|| node.attribute(("http://www.w3.org/1999/xlink", "href")))
+                .and_then(|value| value.strip_prefix('#'))
+                .filter(|value| !value.trim().is_empty())
+                .map(str::to_owned)
+        })
+        .collect()
+}
+
+fn collect_text_path_lengths(root: Node<'_, '_>) -> BTreeMap<String, f64> {
+    root.descendants()
+        .filter(|node| node.is_element() && local_name(*node) == "path")
+        .filter_map(|node| {
+            let id = node.attribute("id")?.trim();
+            let data = node.attribute("d")?;
+            let geometry = normalize_path(data, PathFillRule::NonZero).ok()?;
+            Some((id.to_owned(), path_length(&geometry, DEFAULT_PATH_METRIC_TOLERANCE)))
+        })
+        .collect()
 }
 
 fn collect_gradients(

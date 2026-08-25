@@ -182,14 +182,14 @@ selection, labels, and arrowheads.
 Build text-on-path behavior on the shared path metrics introduced for
 path-aware connectors rather than creating a second path-placement system.
 
-- [ ] Define the relationship between a text object and its supporting path
-- [ ] Represent text position as an offset along the supporting path
-- [ ] Reuse shared path length, point, tangent, and normal queries for layout
-- [ ] Support direction, alignment, side, and path reversal
-- [ ] Keep the path independently editable without destroying attached text
-- [ ] Add direct manipulation for text offset along the path
-- [ ] Import and export representative SVG `textPath` content
-- [ ] Add undo/redo and round-trip fixtures
+- [x] Define the relationship between a text object and its supporting path
+- [x] Represent text position as an offset along the supporting path
+- [x] Reuse shared path length, point, tangent, and normal queries for layout
+- [x] Support direction, alignment, side, and path reversal
+- [x] Keep the path independently editable without destroying attached text
+- [x] Add direct manipulation for text offset along the path
+- [x] Import and export representative SVG `textPath` content
+- [x] Add undo/redo and round-trip fixtures
 
 ## Clipboard and export workflows
 

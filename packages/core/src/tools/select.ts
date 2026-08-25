@@ -10,11 +10,14 @@ import {
 	localToWorld,
 	resolveArrowEndpoints,
 	shapeBounds,
+	shapeBoundsForState,
 	localShapeBounds,
+	supportingPathForText,
+	textPathAnchorForShape,
 	shapeTransform,
 	worldToLocal
 } from '../geom';
-import { nearestPointOnPath } from '../path-metrics';
+import { nearestPointOnPath, pathLength } from '../path-metrics';
 import { Box2, clamp, Mat3, type Vec2, Vec2 as Vec2Ops } from '../math';
 import { duplicateAndConnectSelection } from '../selection';
 import { BindingRecord, createId, ShapeRecord } from '../model';
@@ -69,7 +72,8 @@ type HandleKind =
 	| 'line-end'
 	| `arrow-point-${number}`
 	| 'arrow-bend'
-	| 'arrow-label';
+	| 'arrow-label'
+	| 'text-path-offset';
 
 /** Context passed to the selection snapper at each movement preview. */
 export type SelectSnapContext = {
@@ -219,14 +223,12 @@ export class SelectTool implements Tool {
 		// the axis-aligned bounds. Accept that point while the visible handle uses
 		// the shape's transformed local bounds.
 		if (
-			shape.type === 'rect' ||
-			shape.type === 'ellipse' ||
-			shape.type === 'text' ||
+			(shape.type === 'text' ? !shape.props.textPath : shape.type === 'rect' || shape.type === 'ellipse') ||
 			shape.type === 'markdown' ||
 			shape.type === 'image' ||
 			shape.type === 'container'
 		) {
-			const bounds = shapeBounds(shape);
+			const bounds = shapeBoundsForState(state, shape);
 			const legacyRotate = { x: (bounds.min.x + bounds.max.x) / 2, y: bounds.min.y - ROTATE_HANDLE_OFFSET };
 			if (Vec2Ops.dist(point, legacyRotate) <= HANDLE_HIT_RADIUS) return { handle: 'rotate', shape };
 		}
@@ -431,6 +433,8 @@ export class SelectTool implements Tool {
 			updated = this.rotateShape(state, initialShape, snappedPoint, action.modifiers.shift);
 		} else if (this.toolState.activeHandle === 'arrow-label') {
 			updated = this.adjustArrowLabel(state, initialShape, snappedPoint);
+		} else if (this.toolState.activeHandle === 'text-path-offset') {
+			updated = this.adjustTextPath(state, initialShape, snappedPoint);
 		} else if (
 			this.toolState.activeHandle === 'line-start' ||
 			this.toolState.activeHandle === 'line-end' ||
@@ -509,6 +513,15 @@ export class SelectTool implements Tool {
 	 */
 	private handleDragMove(state: EditorState, action: Action): EditorState {
 		if (action.type !== 'pointer-move' || !this.toolState.dragStartWorld) return state;
+		if (state.ui.selectionIds.length === 1) {
+			const selectedId = state.ui.selectionIds[0];
+			const initial = selectedId ? this.toolState.initialShapes.get(selectedId) : undefined;
+			if (initial?.type === 'text' && initial.props.textPath) {
+				const updated = this.adjustTextPath(state, initial, action.world);
+				if (updated)
+					return { ...state, doc: { ...state.doc, shapes: { ...state.doc.shapes, [updated.id]: updated } } };
+			}
+		}
 
 		let delta = Vec2Ops.sub(action.world, this.toolState.dragStartWorld);
 		if (action.modifiers.shift) {
@@ -631,7 +644,7 @@ export class SelectTool implements Tool {
 
 		const selectedIds: string[] = [];
 		for (const shape of getSelectionScopeShapes(state)) {
-			const bounds = shapeBounds(shape);
+			const bounds = shapeBoundsForState(state, shape);
 			if (Box2.intersectsBox(marqueeBox, bounds)) selectedIds.push(shape.id);
 		}
 
@@ -709,6 +722,12 @@ export class SelectTool implements Tool {
 
 		for (const shapeId of shapesToDelete) {
 			delete newShapes[shapeId];
+		}
+		for (const shape of Object.values(newShapes)) {
+			if (shape.type !== 'text' || !shape.props.textPath) continue;
+			if (shapesToDelete.has(shape.props.textPath.pathId)) {
+				newShapes[shape.id] = { ...shape, props: { ...shape.props, textPath: undefined } };
+			}
 		}
 
 		for (const [bindingId, binding] of Object.entries(newBindings)) {
@@ -809,7 +828,10 @@ export class SelectTool implements Tool {
 
 	private getHandlePositions(state: EditorState, shape: ShapeRecord): Array<{ id: HandleKind; position: Vec2 }> {
 		const handles: Array<{ id: HandleKind; position: Vec2 }> = [];
-		if (
+		if (shape.type === 'text' && shape.props.textPath) {
+			const position = textPathAnchorForShape(state, shape);
+			if (position) handles.push({ id: 'text-path-offset', position });
+		} else if (
 			shape.type === 'rect' ||
 			shape.type === 'ellipse' ||
 			shape.type === 'text' ||
@@ -999,6 +1021,19 @@ export class SelectTool implements Tool {
 				label: { ...initial.props.label, distance: nearest.distance, offset: normalOffset }
 			}
 		};
+	}
+
+	private adjustTextPath(state: EditorState, initial: ShapeRecord, pointer: Vec2): ShapeRecord | null {
+		if (initial.type !== 'text' || !initial.props.textPath) return null;
+		const path = supportingPathForText(state, initial);
+		if (!path) return null;
+		const localPointer = worldToLocal(pointer, path);
+		const nearest = nearestPointOnPath(path.props, localPointer);
+		if (!nearest) return null;
+		const total = pathLength(path.props);
+		const offset =
+			initial.props.textPath.direction === 'reverse' ? Math.max(0, total - nearest.distance) : nearest.distance;
+		return { ...initial, props: { ...initial.props, textPath: { ...initial.props.textPath, offset } } };
 	}
 
 	private resizeLineShape(

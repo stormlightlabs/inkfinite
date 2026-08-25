@@ -13,6 +13,7 @@ import type {
 	PathGeometry,
 	PathShape,
 	RectShape,
+	TextPathLayout,
 	ShapeRecord,
 	Store,
 	StrokeShape,
@@ -40,7 +41,10 @@ import {
 	pathControlHandles,
 	resolveArrowEndpoints,
 	shapeBounds,
+	shapeBoundsForState,
 	shapeTransform,
+	textPathAnchorForShape,
+	textPathLayoutForShape,
 	worldToLocal,
 	pathAnchorHandleId,
 	pathControlHandleId,
@@ -346,7 +350,7 @@ function isShapeVisible(
 		}
 	}
 
-	const bounds = shapeBounds(shape);
+	const bounds = shapeBoundsForState(state, shape);
 	return (
 		bounds.max.x >= viewport.minX &&
 		bounds.min.x <= viewport.maxX &&
@@ -550,8 +554,17 @@ function drawShape(
 	context.save();
 	context.globalAlpha *= shape.opacity ?? 1;
 
-	applyShapeTransform(context, shape);
-	applyShapeEffects(context, shape);
+	const attachedText =
+		shape.type === 'text' && shape.props.textPath
+			? (() => {
+					context.font = `${shape.props.fontSize}px ${shape.props.fontFamily}`;
+					return textPathLayoutForShape(state, shape, (value) => context.measureText(value).width);
+				})()
+			: null;
+	if (!attachedText) {
+		applyShapeTransform(context, shape);
+		applyShapeEffects(context, shape);
+	}
 
 	switch (shape.type) {
 		case 'rect': {
@@ -571,7 +584,8 @@ function drawShape(
 			break;
 		}
 		case 'text': {
-			drawText(context, shape, textLayoutCache, textMetricCache);
+			if (attachedText) drawTextOnPath(context, shape, attachedText.path, attachedText.layout);
+			else drawText(context, shape, textLayoutCache, textMetricCache);
 			break;
 		}
 		case 'markdown': {
@@ -1058,6 +1072,37 @@ function drawText(
 	}
 }
 
+/** Draw attached text in the supporting path's local coordinate system. */
+function drawTextOnPath(
+	context: CanvasRenderingContext2D,
+	shape: TextShape,
+	path: PathShape,
+	layout: TextPathLayout
+): void {
+	const matrix = shapeTransform(path);
+	context.save();
+	context.globalAlpha *= shape.fillOpacity ?? 1;
+	context.transform(matrix[0], matrix[1], matrix[3], matrix[4], matrix[6], matrix[7]);
+	context.font = `${shape.props.fontSize}px ${shape.props.fontFamily}`;
+	context.fillStyle =
+		paintForCanvas(context, shape.props.color, {
+			x: layout.bounds.min.x,
+			y: layout.bounds.min.y,
+			width: layout.bounds.max.x - layout.bounds.min.x,
+			height: layout.bounds.max.y - layout.bounds.min.y
+		}) ?? '#000000';
+	context.textAlign = 'center';
+	context.textBaseline = 'alphabetic';
+	for (const glyph of layout.glyphs) {
+		context.save();
+		context.translate(glyph.point.x, glyph.point.y);
+		context.rotate(glyph.angle);
+		context.fillText(glyph.character, 0, 0);
+		context.restore();
+	}
+	context.restore();
+}
+
 /**
  * Parse and render markdown to canvas
  *
@@ -1454,7 +1499,7 @@ function drawSelection(
 	const singleSelectionId = state.ui.selectionIds.length === 1 ? state.ui.selectionIds[0] : null;
 	const hovered = state.ui.hoveredShapeId ? state.doc.shapes[state.ui.hoveredShapeId] : undefined;
 	if (hovered && !selectedIds.has(hovered.id)) {
-		const bounds = shapeBounds(hovered);
+		const bounds = shapeBoundsForState(state, hovered);
 		context.save();
 		context.setLineDash([5 / state.camera.zoom, 4 / state.camera.zoom]);
 		context.strokeStyle = 'rgba(37, 99, 235, 0.65)';
@@ -1467,7 +1512,8 @@ function drawSelection(
 		if (!selectedIds.has(shape.id)) continue;
 
 		context.save();
-		applyShapeTransform(context, shape);
+		const attachedText = shape.type === 'text' && shape.props.textPath && textPathLayoutForShape(state, shape);
+		if (!attachedText) applyShapeTransform(context, shape);
 
 		const strokeSelectionBounds = () => {
 			switch (shape.type) {
@@ -1520,6 +1566,16 @@ function drawSelection(
 					break;
 				}
 				case 'text': {
+					if (attachedText) {
+						const bounds = shapeBoundsForState(state, shape);
+						context.strokeRect(
+							bounds.min.x,
+							bounds.min.y,
+							bounds.max.x - bounds.min.x,
+							bounds.max.y - bounds.min.y
+						);
+						break;
+					}
 					const { fontSize, fontFamily, text, w } = shape.props;
 					context.font = `${fontSize}px ${fontFamily}`;
 					const width = w ?? context.measureText(text).width;
@@ -1715,6 +1771,11 @@ function drawStrokeEditingHandles(
 
 function getHandlesForShape(state: EditorState, shape: ShapeRecord, bindingsBySource?: BindingIndex): HandleVisual[] {
 	const handles: HandleVisual[] = [];
+	if (shape.type === 'text' && shape.props.textPath) {
+		const position = textPathAnchorForShape(state, shape);
+		if (position) handles.push({ id: 'text-path-offset', position });
+		return handles;
+	}
 	if (
 		shape.type === 'rect' ||
 		shape.type === 'ellipse' ||

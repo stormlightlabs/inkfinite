@@ -364,6 +364,9 @@ pub enum ShapePropertyError {
         property: String,
         message: String,
     },
+    /// Text-on-path properties do not decode or fail attachment validation.
+    #[error("shape kind {kind} has invalid text path properties: {message}")]
+    InvalidText { kind: String, message: String },
     /// Native path properties do not decode or fail path geometry validation.
     #[error("shape kind {kind} has invalid path geometry: {message}")]
     InvalidPath { kind: String, message: String },
@@ -1427,7 +1430,10 @@ pub fn validate_shape_properties(kind: &str, properties: &ShapeProperties) -> Re
             }
         }
     }
-    if kind == PATH_KIND {
+    if kind == TEXT_KIND {
+        validate_text_properties(properties)
+            .map_err(|message| ShapePropertyError::InvalidText { kind: kind.to_owned(), message })?;
+    } else if kind == PATH_KIND {
         let geometry = path_geometry_from_properties(properties)
             .map_err(|error| ShapePropertyError::InvalidPath { kind: kind.to_owned(), message: error.to_string() })?;
         validate_path_geometry(&geometry)
@@ -1517,6 +1523,44 @@ pub fn normalize_shape_properties(
         }
     }
     Ok(normalized)
+}
+
+fn validate_text_properties(properties: &ShapeProperties) -> Result<(), String> {
+    let Some(text_path) = properties.get("textPath").or_else(|| properties.get("text_path")) else {
+        return Ok(());
+    };
+    let object = text_path
+        .as_object()
+        .ok_or_else(|| "text path attachment must be an object".to_owned())?;
+    object
+        .get("pathId")
+        .or_else(|| object.get("path_id"))
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "text path attachment needs a path ID".to_owned())?;
+    let offset = object
+        .get("offset")
+        .and_then(Value::as_f64)
+        .ok_or_else(|| "text path offset must be a finite number".to_owned())?;
+    if !offset.is_finite() {
+        return Err("text path offset must be a finite number".into());
+    }
+    if !matches!(
+        object.get("align").and_then(Value::as_str),
+        Some("start" | "center" | "end")
+    ) {
+        return Err("text path alignment must be start, center, or end".into());
+    }
+    if !matches!(object.get("side").and_then(Value::as_str), Some("left" | "right")) {
+        return Err("text path side must be left or right".into());
+    }
+    if !matches!(
+        object.get("direction").and_then(Value::as_str),
+        Some("forward" | "reverse")
+    ) {
+        return Err("text path direction must be forward or reverse".into());
+    }
+    Ok(())
 }
 
 fn validate_vector_effects(properties: &ShapeProperties) -> Result<(), String> {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Mat3 } from '../src/math';
 import {
 	flattenPath,
+	layoutTextOnPath,
 	nearestPointOnPath,
 	pathLength,
 	pointAtPathDistance,
@@ -67,6 +68,32 @@ describe('native path metrics', () => {
 		expect(
 			trimmed?.subpaths[0]?.segments.some((segment) => segment.type === 'quadratic' || segment.type === 'cubic')
 		).toBe(true);
+	});
+
+	it('lays out text with shared distances, alignment, and path reversal', () => {
+		const centered = layoutTextOnPath(
+			line,
+			'AB',
+			10,
+			{ offset: 50, align: 'center', side: 'left', direction: 'forward' },
+			() => 10
+		);
+		expect(centered.anchor?.point).toEqual({ x: 50, y: 0 });
+		expect(centered.glyphs[0]?.point.x).toBeCloseTo(45);
+		expect(centered.glyphs[1]?.point.x).toBeCloseTo(55);
+		expect(centered.glyphs[0]?.angle).toBe(0);
+
+		const reversed = layoutTextOnPath(
+			line,
+			'AB',
+			10,
+			{ offset: 20, align: 'start', side: 'right', direction: 'reverse' },
+			() => 10
+		);
+		expect(reversed.anchor?.point).toEqual({ x: 80, y: 0 });
+		expect(reversed.glyphs[0]?.point.x).toBe(75);
+		expect(Math.abs(reversed.glyphs[0]?.angle ?? 0)).toBeCloseTo(Math.PI);
+		expect(reversed.glyphs[0]?.point.y).toBe(-10);
 	});
 
 	it('measures transformed and degenerate paths deterministically', () => {

@@ -124,9 +124,16 @@ outline as a filled path when a variable profile is present.
 
 ### Text on path
 
-Allow text to reference editable vector geometry while retaining independent
-text and path semantics. Support the useful subset of SVG text-path
-interoperability.
+Text shapes can reference native path shapes without copying their geometry.
+The attachment stores a local distance, alignment, side, and forward or reverse
+direction, then uses the shared path metrics for glyph placement, bounds, hit
+testing, and offset handles. Editing the path updates the attached text while
+preserving the text record; the selection controls can attach, detach, and
+change its layout settings.
+
+The SVG pipeline imports `textPath` references, including paths declared in
+`defs`, and exports native references with the supported alignment, side,
+offset, and reversal settings.
 
 ## Next: web installation and export workflows
 

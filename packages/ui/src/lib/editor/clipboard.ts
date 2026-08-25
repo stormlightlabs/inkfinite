@@ -191,6 +191,18 @@ export function pasteClipboard(
 			...(parentId ? { groupId: parentId } : { groupId: undefined }),
 			...(activeLayerId ? { layerId: activeLayerId } : {})
 		};
+		if (translated.type === 'text' && translated.props.textPath) {
+			const pathId = mapping.get(translated.props.textPath.pathId);
+			if (pathId) {
+				shapes[id] = {
+					...shapes[id],
+					props: {
+						...translated.props,
+						textPath: { ...translated.props.textPath, pathId }
+					}
+				} as ShapeRecord;
+			}
+		}
 		if (payload.rootIds.includes(source.id)) pastedIds.push(id);
 	}
 	const bindings = { ...state.doc.bindings };

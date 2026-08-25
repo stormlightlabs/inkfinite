@@ -30,7 +30,7 @@ import {
 	PenTool,
 	RectTool,
 	SelectTool,
-	shapeBounds,
+	shapeBoundsForState,
 	snapPoint,
 	snapTranslation,
 	SnapshotCommand,
@@ -982,7 +982,7 @@ export function createCanvasController(
 		for (let index = shapes.length - 1; index >= 0; index--) {
 			const shape = shapes[index];
 			if (shape.type === 'text') {
-				const bounds = shapeBounds(shape);
+				const bounds = shapeBoundsForState(state, shape);
 				if (
 					world.x >= bounds.min.x &&
 					world.x <= bounds.max.x &&
@@ -994,7 +994,7 @@ export function createCanvasController(
 				}
 			}
 			if (shape.type === 'arrow') {
-				const bounds = shapeBounds(shape);
+				const bounds = shapeBoundsForState(state, shape);
 				if (
 					world.x >= bounds.min.x &&
 					world.x <= bounds.max.x &&
@@ -1006,7 +1006,7 @@ export function createCanvasController(
 				}
 			}
 			if (shape.type === 'markdown') {
-				const bounds = shapeBounds(shape);
+				const bounds = shapeBoundsForState(state, shape);
 				if (
 					world.x >= bounds.min.x &&
 					world.x <= bounds.max.x &&
@@ -1020,7 +1020,7 @@ export function createCanvasController(
 		}
 
 		const clickedShape = shapes.some((shape) => {
-			const bounds = shapeBounds(shape);
+			const bounds = shapeBoundsForState(state, shape);
 			return (
 				world.x >= bounds.min.x &&
 				world.x <= bounds.max.x &&

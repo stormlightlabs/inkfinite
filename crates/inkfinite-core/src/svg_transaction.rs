@@ -6,7 +6,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde_json::json;
+use serde_json::{Value, json};
 use thiserror::Error;
 
 use crate::proto::{Operation, TransactionDraft, TransactionId};
@@ -111,6 +111,9 @@ pub fn build_svg_import_transaction(
 
     let mut ids = ShapeIdAllocator::new(&snapshot.document.shapes, &import.source_asset.id);
     let root_id = ids.next();
+    let mut node_ids = BTreeMap::new();
+    let mut source_ids = BTreeMap::new();
+    allocate_group_ids(&mut ids, &mut node_ids, &mut source_ids, &import.root, "");
     let root_name = options
         .source_name
         .as_deref()
@@ -133,10 +136,11 @@ pub fn build_svg_import_transaction(
     append_group(
         &mut operations,
         &mut shape_ids,
-        &mut ids,
         &import.root,
         &root_id,
         &options,
+        &SvgNodeIds { node_ids: &node_ids, source_ids: &source_ids },
+        "",
     );
 
     Ok(SvgImportTransaction {
@@ -155,14 +159,37 @@ pub fn build_svg_import_transaction(
     })
 }
 
-fn append_group(
-    operations: &mut Vec<Operation>, shape_ids: &mut Vec<ShapeId>, ids: &mut ShapeIdAllocator, group: &SvgGroup,
-    parent_id: &ShapeId, options: &SvgImportTransactionOptions,
+fn allocate_group_ids(
+    ids: &mut ShapeIdAllocator, node_ids: &mut BTreeMap<String, ShapeId>, source_ids: &mut BTreeMap<String, ShapeId>,
+    group: &SvgGroup, prefix: &str,
 ) {
-    for node in &group.children {
+    for (index, node) in group.children.iter().enumerate() {
+        let key = format!("{prefix}/{index}");
+        let id = ids.next();
+        node_ids.insert(key.clone(), id.clone());
+        if let Some(source_id) = node.source_id() {
+            source_ids.insert(source_id.to_owned(), id);
+        }
+        if let SvgImportNode::Group(child) = node {
+            allocate_group_ids(ids, node_ids, source_ids, child, &key);
+        }
+    }
+}
+
+struct SvgNodeIds<'a> {
+    node_ids: &'a BTreeMap<String, ShapeId>,
+    source_ids: &'a BTreeMap<String, ShapeId>,
+}
+
+fn append_group(
+    operations: &mut Vec<Operation>, shape_ids: &mut Vec<ShapeId>, group: &SvgGroup, parent_id: &ShapeId,
+    options: &SvgImportTransactionOptions, ids: &SvgNodeIds<'_>, prefix: &str,
+) {
+    for (index, node) in group.children.iter().enumerate() {
+        let key = format!("{prefix}/{index}");
+        let id = ids.node_ids[&key].clone();
         match node {
             SvgImportNode::Group(child) => {
-                let id = ids.next();
                 let name = child
                     .source_id
                     .clone()
@@ -172,10 +199,32 @@ fn append_group(
                     anchor: SiblingAnchor::Last,
                 });
                 shape_ids.push(id.clone());
-                append_group(operations, shape_ids, ids, child, &id, options);
+                append_group(operations, shape_ids, child, &id, options, ids, &key);
             }
             SvgImportNode::Shape(shape) => {
-                let id = ids.next();
+                let mut properties = shape.properties.clone();
+                if shape.kind.as_str() == crate::TEXT_KIND {
+                    let path_id = properties
+                        .get("text_path")
+                        .and_then(Value::as_object)
+                        .and_then(|value| value.get("pathId").or_else(|| value.get("path_id")))
+                        .and_then(Value::as_str)
+                        .and_then(|source_id| {
+                            let base_source_id = source_id.strip_suffix("-reverse");
+                            base_source_id
+                                .filter(|value| value.starts_with("inkfinite-path-"))
+                                .and_then(|value| ids.source_ids.get(value))
+                                .or_else(|| ids.source_ids.get(source_id))
+                        });
+                    if let Some(path_id) = path_id {
+                        if let Some(value) = properties.get_mut("text_path").and_then(Value::as_object_mut) {
+                            value.insert("pathId".into(), json!(path_id));
+                            value.remove("path_id");
+                        }
+                    } else {
+                        properties.remove("text_path");
+                    }
+                }
                 operations.push(Operation::CreateShape {
                     shape: ShapeRecord {
                         id: id.clone(),
@@ -184,7 +233,7 @@ fn append_group(
                         transform: shape.transform,
                         child_ids: Vec::new(),
                         layout: None,
-                        properties: shape.properties.clone(),
+                        properties,
                         metadata: metadata(
                             shape.source_id.clone().unwrap_or_else(|| "Imported SVG shape".into()),
                             options,
@@ -197,7 +246,6 @@ fn append_group(
                 shape_ids.push(id);
             }
             SvgImportNode::Image(image) => {
-                let id = ids.next();
                 let mut properties = image.properties.clone();
                 properties.insert("asset_id".into(), json!(image.asset_id));
                 operations.push(Operation::CreateShape {
@@ -363,6 +411,52 @@ mod tests {
                 .iter()
                 .all(|operation| matches!(operation, Operation::CreateAsset { .. } | Operation::CreateShape { .. }))
         );
+    }
+
+    #[test]
+    fn resolves_svg_text_path_source_ids_to_created_shape_ids() {
+        let source = r##"<svg><defs><path id="curve" d="M 0 0 L 200 0"/></defs><text><textPath href="#curve" startOffset="40%" text-anchor="middle">Label</textPath></text></svg>"##;
+        let import = import_svg(source).expect("SVG text path should import");
+        let current = snapshot();
+        let page_id = current.document.page_ids[0].clone();
+        let layer_id = current.document.pages[&page_id].layer_ids[0].clone();
+        let transaction = build_svg_import_transaction(
+            &current,
+            &import,
+            SvgImportTransactionOptions {
+                actor_id: ActorId::from("actor:test"),
+                origin: Origin::Human,
+                page_id,
+                layer_id,
+                transaction_id: TransactionId("transaction:text-path".into()),
+                description: "Import SVG text path".into(),
+                source_name: Some("text-path.svg".into()),
+                timestamp: Timestamp(1),
+            },
+        )
+        .expect("transaction should build");
+        let path_id = transaction
+            .transaction
+            .operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::CreateShape { shape, .. } if shape.kind.as_str() == crate::PATH_KIND => {
+                    Some(shape.id.clone())
+                }
+                _ => None,
+            })
+            .expect("path should be created");
+        let text = transaction
+            .transaction
+            .operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::CreateShape { shape, .. } if shape.kind.as_str() == crate::TEXT_KIND => Some(shape),
+                _ => None,
+            })
+            .expect("text should be created");
+        assert_eq!(text.properties["text_path"]["pathId"], json!(path_id));
+        assert_eq!(text.properties["text_path"]["offset"], json!(80.0));
     }
 
     #[test]

@@ -419,7 +419,7 @@ function duplicateSelection(state: EditorState): EditorState | null {
 		const copy = ShapeRecord.clone(source);
 		const id = mapping.get(source.id)!;
 		const parentId = source.groupId ? mapping.get(source.groupId) : undefined;
-		shapes[id] = {
+		const copied = {
 			...copy,
 			id,
 			x: copy.x + 12,
@@ -429,6 +429,11 @@ function duplicateSelection(state: EditorState): EditorState | null {
 				: undefined,
 			...(parentId ? { groupId: parentId } : { groupId: undefined })
 		};
+		shapes[id] = copied;
+		if (copied.type === 'text' && copied.props.textPath) {
+			const pathId = mapping.get(copied.props.textPath.pathId);
+			if (pathId) copied.props = { ...copied.props, textPath: { ...copied.props.textPath, pathId } };
+		}
 	}
 	const pages = { ...state.doc.pages };
 	const layers = state.doc.layers ? { ...state.doc.layers } : undefined;

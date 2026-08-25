@@ -50,6 +50,17 @@ exports from the same stored properties.
 SVG filters and mask forms outside this subset stay in a sanitized static fallback asset, with an
 import warning. They are not silently dropped.
 
+## Text on a path
+
+Select one text shape and one path, then choose **Attach text to path** in the selection controls. The
+text keeps its own content and style while the path remains an ordinary editable shape. Select the
+attached text to change its alignment, side, or direction. Drag the handle on the path to change the
+text offset. Choose **Detach text** to restore ordinary text placement.
+
+Text-on-path attachments use the path's local distance, so moving or editing the path keeps the text
+attached. SVG import and export support `textPath` references, including supporting paths declared in
+`defs`.
+
 ## Imported SVG paths
 
 SVG paths and supported vector primitives become native Inkfinite geometry during import. Their

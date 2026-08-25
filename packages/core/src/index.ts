@@ -21,6 +21,7 @@ export type {
 } from '@inkfinite/bindings/model';
 export * from './path-topology';
 export * from './path-metrics';
+export * from './text-path';
 export * from './paint';
 export * from './persistence/desktop';
 export * from './persistence/canonical';

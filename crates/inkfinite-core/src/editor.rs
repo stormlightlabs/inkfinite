@@ -530,6 +530,7 @@ pub fn native_properties(properties: &ShapeProperties) -> ShapeProperties {
         ("fontFamily", "font_family"),
         ("assetId", "asset_id"),
         ("referenceType", "reference_type"),
+        ("textPath", "text_path"),
     ] {
         if let Some(value) = result.remove(editor) {
             result.entry(native.into()).or_insert(value);
@@ -549,6 +550,7 @@ fn editor_properties(properties: &ShapeProperties) -> ShapeProperties {
         ("font_family", "fontFamily"),
         ("asset_id", "assetId"),
         ("reference_type", "referenceType"),
+        ("text_path", "textPath"),
     ] {
         if let Some(value) = result.remove(native) {
             result.entry(editor.into()).or_insert(value);

@@ -2,7 +2,7 @@ import {
 	Camera,
 	getSelectedShapes,
 	getShapesOnCurrentPage,
-	shapeBounds,
+	shapeBoundsForState,
 	type Action,
 	type Box2,
 	type Store,
@@ -198,8 +198,9 @@ export class CameraController {
 	}
 
 	private getCombinedBounds(shapes: ReturnType<typeof getShapesOnCurrentPage>): Box2 | null {
+		const state = this.store.getState();
 		return shapes.reduce<Box2 | null>((combined, shape) => {
-			const bounds = shapeBounds(shape);
+			const bounds = shapeBoundsForState(state, shape);
 			if (!combined) return bounds;
 			return {
 				min: {

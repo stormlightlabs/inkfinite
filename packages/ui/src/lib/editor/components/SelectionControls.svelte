@@ -14,6 +14,7 @@
 	import {
 		canBooleanPathSelection,
 		canClipSelection,
+		canTextPathSelection,
 		cardChildren,
 		EditorState,
 		getSelectedShapes,
@@ -208,8 +209,19 @@
 	);
 	let booleanPathSelection = $derived(canBooleanPathSelection(editorState));
 	let clipSelectionAvailable = $derived(canClipSelection(editorState));
+	let textPathSelectionAvailable = $derived(canTextPathSelection(editorState));
+	let textPathTarget = $derived(
+		selectionCount === 1 &&
+			selectedShapes[0]?.type === 'text' &&
+			selectedShapes[0].props.textPath
+			? selectedShapes[0]
+			: undefined
+	);
+	let textPathAttachment = $derived(textPathTarget?.props.textPath);
 	let selectedClipCount = $derived(
-		selectedShapes.filter((shape) => Boolean('clipPath' in shape.props && shape.props.clipPath)).length
+		selectedShapes.filter((shape) =>
+			Boolean('clipPath' in shape.props && shape.props.clipPath)
+		).length
 	);
 	let effectTarget = $derived(selectionCount === 1 ? selectedShapes[0] : undefined);
 
@@ -307,19 +319,26 @@
 		const filter: FilterEffect | undefined =
 			preset === 'blur'
 				? { primitives: [{ type: 'blur', radius: 4 }] }
-			: preset === 'grayscale'
-				? { primitives: [{ type: 'grayscale', amount: 1 }] }
-				: preset === 'drop_shadow'
-					? {
-							primitives: [
-								{ type: 'drop_shadow', dx: 3, dy: 3, radius: 4, color: '#000000', opacity: 0.35 }
-							]
-						}
-					: undefined;
-		updateSelectedShapes('Set filter', (shape) => ({
-			...shape,
-			props: { ...shape.props, filter }
-		}) as ShapeRecord);
+				: preset === 'grayscale'
+					? { primitives: [{ type: 'grayscale', amount: 1 }] }
+					: preset === 'drop_shadow'
+						? {
+								primitives: [
+									{
+										type: 'drop_shadow',
+										dx: 3,
+										dy: 3,
+										radius: 4,
+										color: '#000000',
+										opacity: 0.35
+									}
+								]
+							}
+						: undefined;
+		updateSelectedShapes(
+			'Set filter',
+			(shape) => ({ ...shape, props: { ...shape.props, filter } }) as ShapeRecord
+		);
 	}
 
 	function metadataForShape(shape: ShapeRecord): ShapeMetadata {
@@ -540,6 +559,29 @@
 	function handleFontFamilyChange(event: Event) {
 		const value = (event.currentTarget as HTMLInputElement).value.trim();
 		if (value) applyTypography('fontFamily', value);
+	}
+
+	function applyTextPathField(field: 'align' | 'side' | 'direction', value: string) {
+		updateSelectedShapes('Set text path ' + field, (shape) =>
+			shape.type === 'text' && shape.props.textPath
+				? ({
+						...shape,
+						props: {
+							...shape.props,
+							textPath: { ...shape.props.textPath, [field]: value }
+						}
+					} as ShapeRecord)
+				: shape
+		);
+	}
+
+	function detachSelectedTextPath() {
+		if (!textPathTarget) return;
+		updateSelectedShapes('Detach text from path', (shape) =>
+			shape.type === 'text'
+				? { ...shape, props: { ...shape.props, textPath: undefined } }
+				: shape
+		);
 	}
 
 	function updateSemanticFields(label: string, fields: Partial<ShapeMetadata>) {
@@ -863,707 +905,827 @@
 		</header>
 
 		{#if !collapsed}
-		<div
-			bind:this={sectionsViewport}
-			class="selection-controls__sections"
-			onscroll={updateSectionsScrollState}>
-			{#if fillTargets.length > 0 || strokeTargets.length > 0 || fillOpacityTargets.length > 0 || strokeOpacityTargets.length > 0}
-				<section
-					class="selection-controls__section"
-					aria-labelledby="selection-appearance-label">
-					<h2 id="selection-appearance-label">Appearance</h2>
-					<div class="selection-controls__controls">
-						{#if fillTargets.length > 0}
-							<div class="selection-controls__color-control">
-								<span>Fill</span>
-								<PaintPicker
-									label="Fill color"
-									value={fillColorState.value}
-									mixed={fillColorState.mixed}
-									onchange={applyFillPaint} />
-							</div>
-						{/if}
-						{#if strokeTargets.length > 0}
-							<div class="selection-controls__color-control">
-								<span>Stroke</span>
-								<PaintPicker
-									label="Stroke color"
-									value={strokeColorState.value}
-									mixed={strokeColorState.mixed}
-									onchange={applyStrokePaint} />
-							</div>
-						{/if}
-						{#if fillOpacityTargets.length > 0}
-							<label class="selection-controls__range-control">
-								<span>Fill opacity</span>
-								<input
-									type="range"
-									min="0"
-									max="1"
-									step="0.05"
-									value={fillOpacityState.value}
-									onchange={(event) => handleOpacityChange(event, 'fillOpacity')}
-									aria-label="Fill opacity"
-									aria-valuetext={fillOpacityState.mixed
-										? 'Mixed values'
-										: `${Math.round(fillOpacityState.value * 100)}%`} />
-								<output
-									>{fillOpacityState.mixed
-										? 'Mixed'
-										: `${Math.round(fillOpacityState.value * 100)}%`}</output>
-							</label>
-						{/if}
-						{#if strokeOpacityTargets.length > 0}
-							<label class="selection-controls__range-control">
-								<span>Stroke opacity</span>
-								<input
-									type="range"
-									min="0"
-									max="1"
-									step="0.05"
-									value={strokeOpacityState.value}
-									onchange={(event) =>
-										handleOpacityChange(event, 'strokeOpacity')}
-									aria-label="Stroke opacity"
-									aria-valuetext={strokeOpacityState.mixed
-										? 'Mixed values'
-										: `${Math.round(strokeOpacityState.value * 100)}%`} />
-								<output
-									>{strokeOpacityState.mixed
-										? 'Mixed'
-										: `${Math.round(strokeOpacityState.value * 100)}%`}</output>
-							</label>
-						{/if}
-						{#if selectionCount > 0}
-							<label class="selection-controls__range-control">
-								<span>Opacity</span>
-								<input
-									type="range"
-									min="0"
-									max="1"
-									step="0.05"
-									value={opacityState.value}
-									onchange={(event) => handleOpacityChange(event, 'opacity')}
-									aria-label="Opacity"
-									aria-valuetext={opacityState.mixed
-										? 'Mixed values'
-										: `${Math.round(opacityState.value * 100)}%`} />
-								<output
-									>{opacityState.mixed
-										? 'Mixed'
-										: `${Math.round(opacityState.value * 100)}%`}</output>
-							</label>
-						{/if}
-					</div>
-				</section>
-			{/if}
-
-			{#if selectionCount > 0}
-				<section
-					class="selection-controls__section selection-controls__section--metadata"
-					aria-labelledby="selection-metadata-label">
-					<h2 id="selection-metadata-label">Object metadata</h2>
-					<div class="selection-controls__metadata-summary">
-						<span
-							class="selection-controls__metadata-name"
-							title={semanticNameState.mixed
-								? 'Mixed names'
-								: semanticNameState.value || 'Unnamed object'}>
-							{semanticNameState.mixed
-								? 'Mixed names'
-								: semanticNameState.value || 'Unnamed object'}
-						</span>
-						<Button size="small" onclick={() => (metadataOpen = true)}
-							>Edit metadata</Button>
-					</div>
-				</section>
-			{/if}
-
-			{#if metadataOpen && selectionCount > 0}
-				<Dialog
-					bind:open={metadataOpen}
-					title="Object metadata"
-					class="object-metadata-dialog">
-					<div class="selection-controls__metadata-drawer">
-						<header class="selection-controls__metadata-header">
-							<div>
-								<span>Selected object</span>
-								<h2>Object metadata</h2>
-							</div>
-							<Button size="small" onclick={() => (metadataOpen = false)}
-								>Done</Button>
-						</header>
-						<div class="selection-controls__metadata-fields">
-							<label class="selection-controls__field">
-								<span>Name</span>
-								<input
-									type="text"
-									value={semanticNameState.mixed ? '' : semanticNameState.value}
-									placeholder={semanticNameState.mixed ? 'Mixed' : 'Object name'}
-									onchange={(event) => handleSemanticTextChange(event, 'name')}
-									aria-label="Object name" />
-							</label>
-							<label class="selection-controls__field">
-								<span>Role</span>
-								<input
-									type="text"
-									value={semanticRoleState.mixed ? '' : semanticRoleState.value}
-									placeholder={semanticRoleState.mixed
-										? 'Mixed'
-										: 'Semantic role'}
-									onchange={(event) => handleSemanticTextChange(event, 'role')}
-									aria-label="Object role" />
-							</label>
-							<label
-								class="selection-controls__field selection-controls__field--wide">
-								<span>Tags</span>
-								<input
-									type="text"
-									value={semanticTagsState.mixed ? '' : semanticTagsState.value}
-									placeholder={semanticTagsState.mixed
-										? 'Mixed'
-										: 'Comma-separated tags'}
-									onchange={handleSemanticTagsChange}
-									aria-label="Object tags" />
-							</label>
-							<label
-								class="selection-controls__field selection-controls__field--wide">
-								<span>Description</span>
-								<textarea
-									value={semanticDescriptionState.mixed
-										? ''
-										: semanticDescriptionState.value}
-									placeholder={semanticDescriptionState.mixed
-										? 'Mixed'
-										: 'Description'}
-									onchange={(event) =>
-										handleSemanticTextChange(event, 'description')}
-									aria-label="Object description"></textarea>
-							</label>
-							<label class="selection-controls__field">
-								<span>Source</span>
-								<input
-									type="text"
-									value={semanticSourceState.mixed
-										? ''
-										: semanticSourceState.value}
-									placeholder={semanticSourceState.mixed
-										? 'Mixed'
-										: 'Citation or file'}
-									onchange={(event) => handleSemanticTextChange(event, 'source')}
-									aria-label="Object source" />
-							</label>
-							<label class="selection-controls__field">
-								<span>Link</span>
-								<input
-									type="url"
-									value={semanticLinkState.mixed ? '' : semanticLinkState.value}
-									placeholder={semanticLinkState.mixed ? 'Mixed' : 'https://'}
-									onchange={(event) => handleSemanticTextChange(event, 'link')}
-									aria-label="Object link" />
-							</label>
-							<label
-								class="selection-controls__field selection-controls__field--wide">
-								<span>Structured metadata</span>
-								<textarea
-									value={semanticCustomMetadataState.mixed
-										? ''
-										: semanticCustomMetadataState.value}
-									placeholder={semanticCustomMetadataState.mixed
-										? 'Mixed'
-										: '{ }'}
-									onchange={handleSemanticMetadataChange}
-									aria-label="Object structured metadata"></textarea>
-							</label>
+			<div
+				bind:this={sectionsViewport}
+				class="selection-controls__sections"
+				onscroll={updateSectionsScrollState}>
+				{#if fillTargets.length > 0 || strokeTargets.length > 0 || fillOpacityTargets.length > 0 || strokeOpacityTargets.length > 0}
+					<section
+						class="selection-controls__section"
+						aria-labelledby="selection-appearance-label">
+						<h2 id="selection-appearance-label">Appearance</h2>
+						<div class="selection-controls__controls">
+							{#if fillTargets.length > 0}
+								<div class="selection-controls__color-control">
+									<span>Fill</span>
+									<PaintPicker
+										label="Fill color"
+										value={fillColorState.value}
+										mixed={fillColorState.mixed}
+										onchange={applyFillPaint} />
+								</div>
+							{/if}
+							{#if strokeTargets.length > 0}
+								<div class="selection-controls__color-control">
+									<span>Stroke</span>
+									<PaintPicker
+										label="Stroke color"
+										value={strokeColorState.value}
+										mixed={strokeColorState.mixed}
+										onchange={applyStrokePaint} />
+								</div>
+							{/if}
+							{#if fillOpacityTargets.length > 0}
+								<label class="selection-controls__range-control">
+									<span>Fill opacity</span>
+									<input
+										type="range"
+										min="0"
+										max="1"
+										step="0.05"
+										value={fillOpacityState.value}
+										onchange={(event) =>
+											handleOpacityChange(event, 'fillOpacity')}
+										aria-label="Fill opacity"
+										aria-valuetext={fillOpacityState.mixed
+											? 'Mixed values'
+											: `${Math.round(fillOpacityState.value * 100)}%`} />
+									<output
+										>{fillOpacityState.mixed
+											? 'Mixed'
+											: `${Math.round(fillOpacityState.value * 100)}%`}</output>
+								</label>
+							{/if}
+							{#if strokeOpacityTargets.length > 0}
+								<label class="selection-controls__range-control">
+									<span>Stroke opacity</span>
+									<input
+										type="range"
+										min="0"
+										max="1"
+										step="0.05"
+										value={strokeOpacityState.value}
+										onchange={(event) =>
+											handleOpacityChange(event, 'strokeOpacity')}
+										aria-label="Stroke opacity"
+										aria-valuetext={strokeOpacityState.mixed
+											? 'Mixed values'
+											: `${Math.round(strokeOpacityState.value * 100)}%`} />
+									<output
+										>{strokeOpacityState.mixed
+											? 'Mixed'
+											: `${Math.round(strokeOpacityState.value * 100)}%`}</output>
+								</label>
+							{/if}
+							{#if selectionCount > 0}
+								<label class="selection-controls__range-control">
+									<span>Opacity</span>
+									<input
+										type="range"
+										min="0"
+										max="1"
+										step="0.05"
+										value={opacityState.value}
+										onchange={(event) => handleOpacityChange(event, 'opacity')}
+										aria-label="Opacity"
+										aria-valuetext={opacityState.mixed
+											? 'Mixed values'
+											: `${Math.round(opacityState.value * 100)}%`} />
+									<output
+										>{opacityState.mixed
+											? 'Mixed'
+											: `${Math.round(opacityState.value * 100)}%`}</output>
+								</label>
+							{/if}
 						</div>
-						{#if semanticTarget?.provenance}
-							<dl
-								class="selection-controls__provenance"
-								aria-label="Object provenance">
+					</section>
+				{/if}
+
+				{#if selectionCount > 0}
+					<section
+						class="selection-controls__section selection-controls__section--metadata"
+						aria-labelledby="selection-metadata-label">
+						<h2 id="selection-metadata-label">Object metadata</h2>
+						<div class="selection-controls__metadata-summary">
+							<span
+								class="selection-controls__metadata-name"
+								title={semanticNameState.mixed
+									? 'Mixed names'
+									: semanticNameState.value || 'Unnamed object'}>
+								{semanticNameState.mixed
+									? 'Mixed names'
+									: semanticNameState.value || 'Unnamed object'}
+							</span>
+							<Button size="small" onclick={() => (metadataOpen = true)}
+								>Edit metadata</Button>
+						</div>
+					</section>
+				{/if}
+
+				{#if metadataOpen && selectionCount > 0}
+					<Dialog
+						bind:open={metadataOpen}
+						title="Object metadata"
+						class="object-metadata-dialog">
+						<div class="selection-controls__metadata-drawer">
+							<header class="selection-controls__metadata-header">
 								<div>
-									<dt>Actor</dt>
-									<dd>{semanticTarget.provenance.actorId}</dd>
+									<span>Selected object</span>
+									<h2>Object metadata</h2>
 								</div>
-								<div>
-									<dt>Origin</dt>
-									<dd>{semanticTarget.provenance.origin}</dd>
-								</div>
-								<div>
-									<dt>Recorded</dt>
-									<dd>{semanticTarget.provenance.timestamp}</dd>
-								</div>
-								{#if semanticTarget.provenance.source}
+								<Button size="small" onclick={() => (metadataOpen = false)}
+									>Done</Button>
+							</header>
+							<div class="selection-controls__metadata-fields">
+								<label class="selection-controls__field">
+									<span>Name</span>
+									<input
+										type="text"
+										value={semanticNameState.mixed
+											? ''
+											: semanticNameState.value}
+										placeholder={semanticNameState.mixed
+											? 'Mixed'
+											: 'Object name'}
+										onchange={(event) =>
+											handleSemanticTextChange(event, 'name')}
+										aria-label="Object name" />
+								</label>
+								<label class="selection-controls__field">
+									<span>Role</span>
+									<input
+										type="text"
+										value={semanticRoleState.mixed
+											? ''
+											: semanticRoleState.value}
+										placeholder={semanticRoleState.mixed
+											? 'Mixed'
+											: 'Semantic role'}
+										onchange={(event) =>
+											handleSemanticTextChange(event, 'role')}
+										aria-label="Object role" />
+								</label>
+								<label
+									class="selection-controls__field selection-controls__field--wide">
+									<span>Tags</span>
+									<input
+										type="text"
+										value={semanticTagsState.mixed
+											? ''
+											: semanticTagsState.value}
+										placeholder={semanticTagsState.mixed
+											? 'Mixed'
+											: 'Comma-separated tags'}
+										onchange={handleSemanticTagsChange}
+										aria-label="Object tags" />
+								</label>
+								<label
+									class="selection-controls__field selection-controls__field--wide">
+									<span>Description</span>
+									<textarea
+										value={semanticDescriptionState.mixed
+											? ''
+											: semanticDescriptionState.value}
+										placeholder={semanticDescriptionState.mixed
+											? 'Mixed'
+											: 'Description'}
+										onchange={(event) =>
+											handleSemanticTextChange(event, 'description')}
+										aria-label="Object description"></textarea>
+								</label>
+								<label class="selection-controls__field">
+									<span>Source</span>
+									<input
+										type="text"
+										value={semanticSourceState.mixed
+											? ''
+											: semanticSourceState.value}
+										placeholder={semanticSourceState.mixed
+											? 'Mixed'
+											: 'Citation or file'}
+										onchange={(event) =>
+											handleSemanticTextChange(event, 'source')}
+										aria-label="Object source" />
+								</label>
+								<label class="selection-controls__field">
+									<span>Link</span>
+									<input
+										type="url"
+										value={semanticLinkState.mixed
+											? ''
+											: semanticLinkState.value}
+										placeholder={semanticLinkState.mixed
+											? 'Mixed'
+											: 'https://'}
+										onchange={(event) =>
+											handleSemanticTextChange(event, 'link')}
+										aria-label="Object link" />
+								</label>
+								<label
+									class="selection-controls__field selection-controls__field--wide">
+									<span>Structured metadata</span>
+									<textarea
+										value={semanticCustomMetadataState.mixed
+											? ''
+											: semanticCustomMetadataState.value}
+										placeholder={semanticCustomMetadataState.mixed
+											? 'Mixed'
+											: '{ }'}
+										onchange={handleSemanticMetadataChange}
+										aria-label="Object structured metadata"></textarea>
+								</label>
+							</div>
+							{#if semanticTarget?.provenance}
+								<dl
+									class="selection-controls__provenance"
+									aria-label="Object provenance">
 									<div>
-										<dt>Provenance source</dt>
-										<dd>{semanticTarget.provenance.source}</dd>
+										<dt>Actor</dt>
+										<dd>{semanticTarget.provenance.actorId}</dd>
 									</div>
-								{/if}
-							</dl>
-						{/if}
-					</div>
-				</Dialog>
-			{/if}
+									<div>
+										<dt>Origin</dt>
+										<dd>{semanticTarget.provenance.origin}</dd>
+									</div>
+									<div>
+										<dt>Recorded</dt>
+										<dd>{semanticTarget.provenance.timestamp}</dd>
+									</div>
+									{#if semanticTarget.provenance.source}
+										<div>
+											<dt>Provenance source</dt>
+											<dd>{semanticTarget.provenance.source}</dd>
+										</div>
+									{/if}
+								</dl>
+							{/if}
+						</div>
+					</Dialog>
+				{/if}
 
-			{#if imageTarget}
-				<section
-					class="selection-controls__section selection-controls__section--image"
-					aria-labelledby="selection-image-label">
-					<h2 id="selection-image-label">Image</h2>
-					<div class="selection-controls__image-fields">
-						<label class="selection-controls__field selection-controls__field--wide">
-							<span>Asset</span>
-							<select
-								value={imageTarget.props.assetId}
-								onchange={(event) =>
-									updateImageFields('Reuse image asset', {
-										assetId: (event.currentTarget as HTMLSelectElement).value
-									})}
-								aria-label="Image asset">
-								{#each Object.values(editorState.doc.assets ?? {}).filter( (asset) => asset.mediaType.startsWith('image/') ) as asset}
-									<option value={asset.id}>{asset.name}</option>
-								{/each}
-							</select>
-						</label>
-						<label class="selection-controls__field selection-controls__field--wide">
-							<span>Caption</span>
-							<input
-								type="text"
-								value={imageTarget.props.caption ?? ''}
-								onchange={(event) =>
-									updateImageFields('Set image caption', {
-										caption:
-											(event.currentTarget as HTMLInputElement).value ||
-											undefined
-									})}
-								aria-label="Image caption" />
-						</label>
-						<label class="selection-controls__field">
-							<span>Mask</span>
-							<select
-								value={imageTarget.props.mask?.kind ?? 'rectangle'}
-								onchange={(event) => {
-									const kind = (event.currentTarget as HTMLSelectElement)
-										.value as 'rectangle' | 'ellipse' | 'rounded';
-									updateImageFields('Set image mask', {
-										mask: kind === 'rectangle' ? undefined : { kind }
-									});
-								}}
-								aria-label="Image mask">
-								<option value="rectangle">Rectangle</option>
-								<option value="ellipse">Ellipse</option>
-								<option value="rounded">Rounded</option>
-							</select>
-						</label>
-						{#if imageTarget.props.mask?.kind === 'rounded'}
-							<label
-								class="selection-controls__field selection-controls__field--small">
-								<span>Radius</span>
-								<input
-									type="number"
-									min="0"
-									max={Math.min(imageTarget.props.w, imageTarget.props.h) / 2}
-									value={imageTarget.props.mask.radius ?? 16}
-									onchange={(event) =>
-										updateImageFields('Set image mask radius', {
-											mask: {
-												kind: 'rounded',
-												radius: Math.max(
-													0,
-													(event.currentTarget as HTMLInputElement)
-														.valueAsNumber || 0
-												)
-											}
-										})}
-									aria-label="Image mask radius" />
-							</label>
-						{/if}
-					</div>
-					<div class="selection-controls__image-sampling">
-						<button
-							class="selection-controls__action"
-							type="button"
-							disabled={samplingColors || !imageAsset}
-							onclick={() => void sampleSelectedImage()}>
-							<span>{samplingColors ? 'Sampling…' : 'Sample colors'}</span>
-						</button>
-						{#each sampledColors as sampled}
-							<button
-								class="selection-controls__sample"
-								type="button"
-								style={`--sample-color: ${sampled.color}`}
-								title={`Copy ${sampled.color}`}
-								aria-label={`Copy sampled color ${sampled.color}`}
-								onclick={() => void copySampledColor(sampled.color)}></button>
-						{/each}
-						{#if sampledColorMessage}<small>{sampledColorMessage}</small>{/if}
-					</div>
-				</section>
-			{/if}
-
-			{#if referenceTarget}
-				<section
-					class="selection-controls__section"
-					aria-labelledby="selection-reference-label">
-					<h2 id="selection-reference-label">Reference</h2>
-					<div class="selection-controls__card-fields">
-						<label class="selection-controls__field">
-							<span>Type</span>
-							<select
-								value={referenceTarget.props.referenceType}
-								onchange={(event) =>
-									updateReferenceFields({
-										referenceType: (event.currentTarget as HTMLSelectElement)
-											.value as 'url' | 'file' | 'page'
-									})}
-								aria-label="Reference type">
-								<option value="url">URL</option>
-								<option value="file">File</option>
-								<option value="page">Page</option>
-							</select>
-						</label>
-						{#if referenceTarget.props.referenceType === 'page'}
+				{#if imageTarget}
+					<section
+						class="selection-controls__section selection-controls__section--image"
+						aria-labelledby="selection-image-label">
+						<h2 id="selection-image-label">Image</h2>
+						<div class="selection-controls__image-fields">
 							<label
 								class="selection-controls__field selection-controls__field--wide">
-								<span>Target page</span>
+								<span>Asset</span>
 								<select
-									value={referenceTarget.props.value}
+									value={imageTarget.props.assetId}
 									onchange={(event) =>
-										updateReferenceFields({
-											value: (event.currentTarget as HTMLSelectElement).value
+										updateImageFields('Reuse image asset', {
+											assetId: (event.currentTarget as HTMLSelectElement)
+												.value
 										})}
-									aria-label="Reference target">
-									{#each Object.values(editorState.doc.pages) as page}
-										<option value={page.id}>{page.name}</option>
+									aria-label="Image asset">
+									{#each Object.values(editorState.doc.assets ?? {}).filter( (asset) => asset.mediaType.startsWith('image/') ) as asset}
+										<option value={asset.id}>{asset.name}</option>
 									{/each}
 								</select>
 							</label>
-						{:else}
 							<label
 								class="selection-controls__field selection-controls__field--wide">
-								<span>Target</span>
+								<span>Caption</span>
 								<input
 									type="text"
-									value={referenceTarget.props.value}
+									value={imageTarget.props.caption ?? ''}
 									onchange={(event) =>
-										updateReferenceFields({
-											value: (event.currentTarget as HTMLInputElement).value
+										updateImageFields('Set image caption', {
+											caption:
+												(event.currentTarget as HTMLInputElement).value ||
+												undefined
 										})}
-									aria-label="Reference target" />
+									aria-label="Image caption" />
 							</label>
-						{/if}
-						<label class="selection-controls__field selection-controls__field--wide">
-							<span>Label</span>
-							<input
-								type="text"
-								value={referenceTarget.props.label ?? ''}
-								onchange={(event) =>
-									updateReferenceFields({
-										label:
-											(event.currentTarget as HTMLInputElement).value ||
-											undefined
-									})}
-								aria-label="Reference label" />
-						</label>
-					</div>
-				</section>
-			{/if}
-
-			{#if cardTarget && cardMetadata}
-				<section
-					class="selection-controls__section selection-controls__section--card"
-					aria-labelledby="selection-card-label">
-					<h2 id="selection-card-label">Card</h2>
-					<div class="selection-controls__card-summary">
-						<span title={cardMetadata.title ?? 'Untitled card'}
-							>{cardMetadata.title ?? 'Untitled card'}</span>
-						<Button size="small" onclick={() => (cardOpen = true)}>Edit card</Button>
-					</div>
-				</section>
-			{/if}
-
-			{#if cardOpen && cardTarget && cardMetadata}
-				<Dialog bind:open={cardOpen} title="Card details" class="card-details-dialog">
-					<div class="selection-controls__card-dialog">
-						<header class="selection-controls__metadata-header">
-							<div>
-								<span>Selected object</span>
-								<h2>Card details</h2>
-							</div>
-							<Button size="small" onclick={() => (cardOpen = false)}>Done</Button>
-						</header>
-						<div class="selection-controls__card-fields">
-							<label
-								class="selection-controls__field selection-controls__field--wide">
-								<span>Title</span>
-								<input
-									type="text"
-									value={cardMetadata.title ?? ''}
-									onchange={(event) => handleCardTextChange(event, 'title')}
-									aria-label="Card title" />
-							</label>
-							<label
-								class="selection-controls__field selection-controls__field--wide">
-								<span>Body</span>
-								<textarea
-									value={cardMetadata.body ?? ''}
-									onchange={(event) => handleCardTextChange(event, 'body')}
-									aria-label="Card body"></textarea>
-							</label>
-						</div>
-					</div>
-				</Dialog>
-			{/if}
-
-			{#if typographyTargets.length > 0}
-				<section
-					class="selection-controls__section"
-					aria-labelledby="selection-type-label">
-					<h2 id="selection-type-label">Typography</h2>
-					<div class="selection-controls__controls selection-controls__typography">
-						<label class="selection-controls__field">
-							<span>Font</span>
-							<select
-								value={fontFamilyState.mixed ? '' : fontFamilyState.value}
-								onchange={handleFontFamilyChange}
-								aria-label="Font family">
-								{#if fontFamilyState.mixed}
-									<option value="" disabled>Mixed</option>
-								{:else if !EDITOR_FONT_GROUPS.some( (group) => group.fonts.some((font) => font.family === fontFamilyState.value) )}
-									<option value={fontFamilyState.value}
-										>{fontFamilyState.value}</option>
-								{/if}
-								{#each EDITOR_FONT_GROUPS as group}
-									<optgroup label={group.label}>
-										{#each group.fonts as font}
-											<option
-												value={font.family}
-												style:font-family={font.family}>
-												{font.label}
-											</option>
-										{/each}
-									</optgroup>
-								{/each}
-							</select>
-						</label>
-						<label class="selection-controls__field selection-controls__field--small">
-							<span>Size</span>
-							<input
-								type="number"
-								min="1"
-								step="1"
-								value={fontSizeState.mixed ? '' : fontSizeState.value}
-								placeholder={fontSizeState.mixed ? 'Mixed' : undefined}
-								onchange={handleFontSizeChange}
-								aria-label="Font size" />
-						</label>
-					</div>
-				</section>
-			{/if}
-
-			{#if frameTarget}
-				<section
-					class="selection-controls__section"
-					aria-labelledby="selection-frame-label">
-					<h2 id="selection-frame-label">Frame</h2>
-					<div class="selection-controls__actions">
-						<button
-							class="selection-controls__action"
-							type="button"
-							onclick={() => onEnterFrame?.(frameTarget.id)}
-							aria-label="Enter selected frame">
-							<Icon name="layers" size={15} />
-							<span>Enter</span>
-						</button>
-						<button
-							class="selection-controls__action"
-							type="button"
-							onclick={() => onFitSelection?.()}
-							aria-label="Fit selected frame">
-							<Icon name="expand" size={15} />
-							<span>Fit</span>
-						</button>
-					</div>
-				</section>
-			{/if}
-
-			{#if arrowTargets.length > 0}
-				<section
-					class="selection-controls__section selection-controls__section--arrow"
-					aria-labelledby="selection-arrow-label">
-					<h2 id="selection-arrow-label">Arrow</h2>
-					<ArrowPopover {store} />
-				</section>
-			{/if}
-
-			{#if effectTarget}
-				<section
-					class="selection-controls__section"
-					aria-labelledby="selection-effects-label">
-					<h2 id="selection-effects-label">Effects</h2>
-					<div class="selection-controls__fields">
-						{#if effectTarget.props.maskEffect}
 							<label class="selection-controls__field">
-								<span>Mask mode</span>
-								<select value={effectTarget.props.maskEffect.mode} onchange={applyMaskMode} aria-label="Mask mode">
-									<option value="alpha">Alpha</option>
-									<option value="luminance">Luminance</option>
+								<span>Mask</span>
+								<select
+									value={imageTarget.props.mask?.kind ?? 'rectangle'}
+									onchange={(event) => {
+										const kind = (event.currentTarget as HTMLSelectElement)
+											.value as 'rectangle' | 'ellipse' | 'rounded';
+										updateImageFields('Set image mask', {
+											mask: kind === 'rectangle' ? undefined : { kind }
+										});
+									}}
+									aria-label="Image mask">
+									<option value="rectangle">Rectangle</option>
+									<option value="ellipse">Ellipse</option>
+									<option value="rounded">Rounded</option>
 								</select>
 							</label>
-						{/if}
-						<label class="selection-controls__field">
-							<span>Filter</span>
-							<select value={filterPreset(effectTarget)} onchange={applyFilterPreset} aria-label="Filter">
-								<option value="none">None</option>
-								<option value="blur">Blur</option>
-								<option value="grayscale">Grayscale</option>
-								<option value="drop_shadow">Drop shadow</option>
-							</select>
-						</label>
-					</div>
-				</section>
-			{/if}
-
-			{#if clipSelectionAvailable || selectedClipCount > 0}
-				<section
-					class="selection-controls__section"
-					aria-labelledby="selection-clip-label">
-					<h2 id="selection-clip-label">Clipping</h2>
-					<div class="selection-controls__actions">
-						{#if clipSelectionAvailable}
+							{#if imageTarget.props.mask?.kind === 'rounded'}
+								<label
+									class="selection-controls__field selection-controls__field--small">
+									<span>Radius</span>
+									<input
+										type="number"
+										min="0"
+										max={Math.min(imageTarget.props.w, imageTarget.props.h) /
+											2}
+										value={imageTarget.props.mask.radius ?? 16}
+										onchange={(event) =>
+											updateImageFields('Set image mask radius', {
+												mask: {
+													kind: 'rounded',
+													radius: Math.max(
+														0,
+														(event.currentTarget as HTMLInputElement)
+															.valueAsNumber || 0
+													)
+												}
+											})}
+										aria-label="Image mask radius" />
+								</label>
+							{/if}
+						</div>
+						<div class="selection-controls__image-sampling">
 							<button
 								class="selection-controls__action"
 								type="button"
-								onclick={() => executeSelectionCommand(store, 'clip-selection')}>Use path as clip</button>
-						{/if}
-						{#if selectedClipCount > 0}
+								disabled={samplingColors || !imageAsset}
+								onclick={() => void sampleSelectedImage()}>
+								<span>{samplingColors ? 'Sampling…' : 'Sample colors'}</span>
+							</button>
+							{#each sampledColors as sampled}
+								<button
+									class="selection-controls__sample"
+									type="button"
+									style={`--sample-color: ${sampled.color}`}
+									title={`Copy ${sampled.color}`}
+									aria-label={`Copy sampled color ${sampled.color}`}
+									onclick={() => void copySampledColor(sampled.color)}></button>
+							{/each}
+							{#if sampledColorMessage}<small>{sampledColorMessage}</small>{/if}
+						</div>
+					</section>
+				{/if}
+
+				{#if referenceTarget}
+					<section
+						class="selection-controls__section"
+						aria-labelledby="selection-reference-label">
+						<h2 id="selection-reference-label">Reference</h2>
+						<div class="selection-controls__card-fields">
+							<label class="selection-controls__field">
+								<span>Type</span>
+								<select
+									value={referenceTarget.props.referenceType}
+									onchange={(event) =>
+										updateReferenceFields({
+											referenceType: (
+												event.currentTarget as HTMLSelectElement
+											).value as 'url' | 'file' | 'page'
+										})}
+									aria-label="Reference type">
+									<option value="url">URL</option>
+									<option value="file">File</option>
+									<option value="page">Page</option>
+								</select>
+							</label>
+							{#if referenceTarget.props.referenceType === 'page'}
+								<label
+									class="selection-controls__field selection-controls__field--wide">
+									<span>Target page</span>
+									<select
+										value={referenceTarget.props.value}
+										onchange={(event) =>
+											updateReferenceFields({
+												value: (event.currentTarget as HTMLSelectElement)
+													.value
+											})}
+										aria-label="Reference target">
+										{#each Object.values(editorState.doc.pages) as page}
+											<option value={page.id}>{page.name}</option>
+										{/each}
+									</select>
+								</label>
+							{:else}
+								<label
+									class="selection-controls__field selection-controls__field--wide">
+									<span>Target</span>
+									<input
+										type="text"
+										value={referenceTarget.props.value}
+										onchange={(event) =>
+											updateReferenceFields({
+												value: (event.currentTarget as HTMLInputElement)
+													.value
+											})}
+										aria-label="Reference target" />
+								</label>
+							{/if}
+							<label
+								class="selection-controls__field selection-controls__field--wide">
+								<span>Label</span>
+								<input
+									type="text"
+									value={referenceTarget.props.label ?? ''}
+									onchange={(event) =>
+										updateReferenceFields({
+											label:
+												(event.currentTarget as HTMLInputElement).value ||
+												undefined
+										})}
+									aria-label="Reference label" />
+							</label>
+						</div>
+					</section>
+				{/if}
+
+				{#if cardTarget && cardMetadata}
+					<section
+						class="selection-controls__section selection-controls__section--card"
+						aria-labelledby="selection-card-label">
+						<h2 id="selection-card-label">Card</h2>
+						<div class="selection-controls__card-summary">
+							<span title={cardMetadata.title ?? 'Untitled card'}
+								>{cardMetadata.title ?? 'Untitled card'}</span>
+							<Button size="small" onclick={() => (cardOpen = true)}
+								>Edit card</Button>
+						</div>
+					</section>
+				{/if}
+
+				{#if cardOpen && cardTarget && cardMetadata}
+					<Dialog bind:open={cardOpen} title="Card details" class="card-details-dialog">
+						<div class="selection-controls__card-dialog">
+							<header class="selection-controls__metadata-header">
+								<div>
+									<span>Selected object</span>
+									<h2>Card details</h2>
+								</div>
+								<Button size="small" onclick={() => (cardOpen = false)}
+									>Done</Button>
+							</header>
+							<div class="selection-controls__card-fields">
+								<label
+									class="selection-controls__field selection-controls__field--wide">
+									<span>Title</span>
+									<input
+										type="text"
+										value={cardMetadata.title ?? ''}
+										onchange={(event) => handleCardTextChange(event, 'title')}
+										aria-label="Card title" />
+								</label>
+								<label
+									class="selection-controls__field selection-controls__field--wide">
+									<span>Body</span>
+									<textarea
+										value={cardMetadata.body ?? ''}
+										onchange={(event) => handleCardTextChange(event, 'body')}
+										aria-label="Card body"></textarea>
+								</label>
+							</div>
+						</div>
+					</Dialog>
+				{/if}
+
+				{#if typographyTargets.length > 0}
+					<section
+						class="selection-controls__section"
+						aria-labelledby="selection-type-label">
+						<h2 id="selection-type-label">Typography</h2>
+						<div class="selection-controls__controls selection-controls__typography">
+							<label class="selection-controls__field">
+								<span>Font</span>
+								<select
+									value={fontFamilyState.mixed ? '' : fontFamilyState.value}
+									onchange={handleFontFamilyChange}
+									aria-label="Font family">
+									{#if fontFamilyState.mixed}
+										<option value="" disabled>Mixed</option>
+									{:else if !EDITOR_FONT_GROUPS.some( (group) => group.fonts.some((font) => font.family === fontFamilyState.value) )}
+										<option value={fontFamilyState.value}
+											>{fontFamilyState.value}</option>
+									{/if}
+									{#each EDITOR_FONT_GROUPS as group}
+										<optgroup label={group.label}>
+											{#each group.fonts as font}
+												<option
+													value={font.family}
+													style:font-family={font.family}>
+													{font.label}
+												</option>
+											{/each}
+										</optgroup>
+									{/each}
+								</select>
+							</label>
+							<label
+								class="selection-controls__field selection-controls__field--small">
+								<span>Size</span>
+								<input
+									type="number"
+									min="1"
+									step="1"
+									value={fontSizeState.mixed ? '' : fontSizeState.value}
+									placeholder={fontSizeState.mixed ? 'Mixed' : undefined}
+									onchange={handleFontSizeChange}
+									aria-label="Font size" />
+							</label>
+						</div>
+					</section>
+				{/if}
+
+				{#if textPathSelectionAvailable}
+					<section
+						class="selection-controls__section"
+						aria-labelledby="selection-text-path-attach-label">
+						<h2 id="selection-text-path-attach-label">Text on path</h2>
+						<div class="selection-controls__actions">
 							<button
 								class="selection-controls__action"
 								type="button"
-								onclick={() => executeSelectionCommand(store, 'remove-clip')}>Remove clip</button>
+								onclick={() => executeSelectionCommand(store, 'attach-text-path')}
+								>Attach text to path</button>
+						</div>
+					</section>
+				{/if}
+
+				{#if textPathTarget && textPathAttachment}
+					<section
+						class="selection-controls__section"
+						aria-labelledby="selection-text-path-label">
+						<h2 id="selection-text-path-label">Text on path</h2>
+						<div class="selection-controls__fields">
+							<label class="selection-controls__field">
+								<span>Align</span>
+								<select
+									value={textPathAttachment.align}
+									onchange={(event) =>
+										applyTextPathField(
+											'align',
+											(event.currentTarget as HTMLSelectElement).value
+										)}
+									aria-label="Text path alignment">
+									<option value="start">Start</option>
+									<option value="center">Center</option>
+									<option value="end">End</option>
+								</select>
+							</label>
+							<label class="selection-controls__field">
+								<span>Side</span>
+								<select
+									value={textPathAttachment.side}
+									onchange={(event) =>
+										applyTextPathField(
+											'side',
+											(event.currentTarget as HTMLSelectElement).value
+										)}
+									aria-label="Text path side">
+									<option value="left">Left</option>
+									<option value="right">Right</option>
+								</select>
+							</label>
+							<label class="selection-controls__field">
+								<span>Direction</span>
+								<select
+									value={textPathAttachment.direction}
+									onchange={(event) =>
+										applyTextPathField(
+											'direction',
+											(event.currentTarget as HTMLSelectElement).value
+										)}
+									aria-label="Text path direction">
+									<option value="forward">Forward</option>
+									<option value="reverse">Reverse path</option>
+								</select>
+							</label>
+						</div>
+						<div class="selection-controls__actions">
+							<button
+								class="selection-controls__action"
+								type="button"
+								onclick={detachSelectedTextPath}>Detach text</button>
+						</div>
+					</section>
+				{/if}
+
+				{#if frameTarget}
+					<section
+						class="selection-controls__section"
+						aria-labelledby="selection-frame-label">
+						<h2 id="selection-frame-label">Frame</h2>
+						<div class="selection-controls__actions">
+							<button
+								class="selection-controls__action"
+								type="button"
+								onclick={() => onEnterFrame?.(frameTarget.id)}
+								aria-label="Enter selected frame">
+								<Icon name="layers" size={15} />
+								<span>Enter</span>
+							</button>
+							<button
+								class="selection-controls__action"
+								type="button"
+								onclick={() => onFitSelection?.()}
+								aria-label="Fit selected frame">
+								<Icon name="expand" size={15} />
+								<span>Fit</span>
+							</button>
+						</div>
+					</section>
+				{/if}
+
+				{#if arrowTargets.length > 0}
+					<section
+						class="selection-controls__section selection-controls__section--arrow"
+						aria-labelledby="selection-arrow-label">
+						<h2 id="selection-arrow-label">Arrow</h2>
+						<ArrowPopover {store} />
+					</section>
+				{/if}
+
+				{#if effectTarget}
+					<section
+						class="selection-controls__section"
+						aria-labelledby="selection-effects-label">
+						<h2 id="selection-effects-label">Effects</h2>
+						<div class="selection-controls__fields">
+							{#if effectTarget.props.maskEffect}
+								<label class="selection-controls__field">
+									<span>Mask mode</span>
+									<select
+										value={effectTarget.props.maskEffect.mode}
+										onchange={applyMaskMode}
+										aria-label="Mask mode">
+										<option value="alpha">Alpha</option>
+										<option value="luminance">Luminance</option>
+									</select>
+								</label>
+							{/if}
+							<label class="selection-controls__field">
+								<span>Filter</span>
+								<select
+									value={filterPreset(effectTarget)}
+									onchange={applyFilterPreset}
+									aria-label="Filter">
+									<option value="none">None</option>
+									<option value="blur">Blur</option>
+									<option value="grayscale">Grayscale</option>
+									<option value="drop_shadow">Drop shadow</option>
+								</select>
+							</label>
+						</div>
+					</section>
+				{/if}
+
+				{#if clipSelectionAvailable || selectedClipCount > 0}
+					<section
+						class="selection-controls__section"
+						aria-labelledby="selection-clip-label">
+						<h2 id="selection-clip-label">Clipping</h2>
+						<div class="selection-controls__actions">
+							{#if clipSelectionAvailable}
+								<button
+									class="selection-controls__action"
+									type="button"
+									onclick={() =>
+										executeSelectionCommand(store, 'clip-selection')}
+									>Use path as clip</button>
+							{/if}
+							{#if selectedClipCount > 0}
+								<button
+									class="selection-controls__action"
+									type="button"
+									onclick={() => executeSelectionCommand(store, 'remove-clip')}
+									>Remove clip</button>
+							{/if}
+						</div>
+					</section>
+				{/if}
+
+				{#if booleanPathSelection}
+					<section
+						class="selection-controls__section"
+						aria-labelledby="selection-boolean-label">
+						<h2 id="selection-boolean-label">Boolean paths</h2>
+						<div class="selection-controls__actions">
+							<button
+								class="selection-controls__action"
+								type="button"
+								onclick={() => executeSelectionCommand(store, 'boolean-union')}
+								>Union</button>
+							<button
+								class="selection-controls__action"
+								type="button"
+								onclick={() =>
+									executeSelectionCommand(store, 'boolean-intersection')}
+								>Intersect</button>
+							<button
+								class="selection-controls__action"
+								type="button"
+								onclick={() =>
+									executeSelectionCommand(store, 'boolean-difference')}
+								>Subtract</button>
+							<button
+								class="selection-controls__action"
+								type="button"
+								onclick={() => executeSelectionCommand(store, 'boolean-exclusion')}
+								>Exclude</button>
+						</div>
+					</section>
+				{/if}
+
+				{#if selectionCount >= 2}
+					<section
+						class="selection-controls__section"
+						aria-labelledby="selection-layout-label">
+						<h2 id="selection-layout-label">Arrange selection</h2>
+						<div class="selection-controls__actions">
+							<button
+								class="selection-controls__action"
+								type="button"
+								onclick={(event) =>
+									toggleLayoutMenu(
+										'align',
+										event.currentTarget as HTMLButtonElement
+									)}
+								aria-haspopup="menu"
+								aria-expanded={layoutMenuOpen && layoutMenuMode === 'align'}>
+								<Icon name="select" size={15} />
+								<span>Align</span>
+							</button>
+							<button
+								class="selection-controls__action"
+								type="button"
+								onclick={(event) =>
+									toggleLayoutMenu(
+										'arrange',
+										event.currentTarget as HTMLButtonElement
+									)}
+								aria-haspopup="menu"
+								aria-expanded={layoutMenuOpen && layoutMenuMode === 'arrange'}>
+								<Icon name="settings" size={15} />
+								<span>Arrange</span>
+							</button>
+						</div>
+					</section>
+				{/if}
+
+				<section
+					class="selection-controls__section selection-controls__section--actions"
+					aria-labelledby="selection-actions-label">
+					<h2 id="selection-actions-label">Selection</h2>
+					<div class="selection-controls__actions">
+						{#if selectionCount >= 2}
+							<button
+								class="selection-controls__action"
+								type="button"
+								onclick={() => executeSelectionCommand(store, 'group')}
+								aria-label="Group selected objects">
+								<Icon name="layers" size={15} />
+								<span>Group</span>
+							</button>
+						{/if}
+						<button
+							class="selection-controls__action"
+							type="button"
+							onclick={() =>
+								executeSelectionCommand(
+									store,
+									allSelectedLocked ? 'unlock' : 'lock'
+								)}
+							aria-label={allSelectedLocked
+								? 'Unlock selected objects'
+								: 'Lock selected objects'}>
+							<Icon name={allSelectedLocked ? 'lock-open' : 'lock'} size={15} />
+							<span>{allSelectedLocked ? 'Unlock' : 'Lock'}</span>
+						</button>
+						{#if showAgentControl}
+							<label
+								class="selection-controls__agent-control"
+								title="Allow agents to edit the selection">
+								<input
+									bind:this={agentInputEl}
+									type="checkbox"
+									checked={agentEditableState.value}
+									onchange={handleAgentEditableChange}
+									aria-label="Agent editable" />
+								<span>Agents</span>
+							</label>
 						{/if}
 					</div>
 				</section>
-			{/if}
+			</div>
 
-			{#if booleanPathSelection}
-				<section
-					class="selection-controls__section"
-					aria-labelledby="selection-boolean-label">
-					<h2 id="selection-boolean-label">Boolean paths</h2>
-					<div class="selection-controls__actions">
-						<button
-							class="selection-controls__action"
-							type="button"
-							onclick={() => executeSelectionCommand(store, 'boolean-union')}
-							>Union</button>
-						<button
-							class="selection-controls__action"
-							type="button"
-							onclick={() => executeSelectionCommand(store, 'boolean-intersection')}
-							>Intersect</button>
-						<button
-							class="selection-controls__action"
-							type="button"
-							onclick={() => executeSelectionCommand(store, 'boolean-difference')}
-							>Subtract</button>
-						<button
-							class="selection-controls__action"
-							type="button"
-							onclick={() => executeSelectionCommand(store, 'boolean-exclusion')}
-							>Exclude</button>
-					</div>
-				</section>
-			{/if}
-
-			{#if selectionCount >= 2}
-				<section
-					class="selection-controls__section"
-					aria-labelledby="selection-layout-label">
-					<h2 id="selection-layout-label">Arrange selection</h2>
-					<div class="selection-controls__actions">
-						<button
-							class="selection-controls__action"
-							type="button"
-							onclick={(event) =>
-								toggleLayoutMenu(
-									'align',
-									event.currentTarget as HTMLButtonElement
-								)}
-							aria-haspopup="menu"
-							aria-expanded={layoutMenuOpen && layoutMenuMode === 'align'}>
-							<Icon name="select" size={15} />
-							<span>Align</span>
-						</button>
-						<button
-							class="selection-controls__action"
-							type="button"
-							onclick={(event) =>
-								toggleLayoutMenu(
-									'arrange',
-									event.currentTarget as HTMLButtonElement
-								)}
-							aria-haspopup="menu"
-							aria-expanded={layoutMenuOpen && layoutMenuMode === 'arrange'}>
-							<Icon name="settings" size={15} />
-							<span>Arrange</span>
-						</button>
-					</div>
-				</section>
-			{/if}
-
-			<section
-				class="selection-controls__section selection-controls__section--actions"
-				aria-labelledby="selection-actions-label">
-				<h2 id="selection-actions-label">Selection</h2>
-				<div class="selection-controls__actions">
-					{#if selectionCount >= 2}
-						<button
-							class="selection-controls__action"
-							type="button"
-							onclick={() => executeSelectionCommand(store, 'group')}
-							aria-label="Group selected objects">
-							<Icon name="layers" size={15} />
-							<span>Group</span>
-						</button>
-					{/if}
-					<button
-						class="selection-controls__action"
-						type="button"
-						onclick={() =>
-							executeSelectionCommand(store, allSelectedLocked ? 'unlock' : 'lock')}
-						aria-label={allSelectedLocked
-							? 'Unlock selected objects'
-							: 'Lock selected objects'}>
-						<Icon name={allSelectedLocked ? 'lock-open' : 'lock'} size={15} />
-						<span>{allSelectedLocked ? 'Unlock' : 'Lock'}</span>
-					</button>
-					{#if showAgentControl}
-						<label
-							class="selection-controls__agent-control"
-							title="Allow agents to edit the selection">
-							<input
-								bind:this={agentInputEl}
-								type="checkbox"
-								checked={agentEditableState.value}
-								onchange={handleAgentEditableChange}
-								aria-label="Agent editable" />
-							<span>Agents</span>
-						</label>
-					{/if}
-				</div>
-			</section>
-		</div>
-
-		<div class="selection-controls__scroll-actions" aria-label="Browse contextual controls">
-			<button
-				aria-label="Show previous contextual controls"
-				disabled={!canScrollSectionsBack}
-				onclick={() => shiftSections(-1)}><Icon name="chevron-left" size={16} /></button>
-			<button
-				aria-label="Show more contextual controls"
-				disabled={!canScrollSectionsForward}
-				onclick={() => shiftSections(1)}><Icon name="chevron-right" size={16} /></button>
-		</div>
+			<div
+				class="selection-controls__scroll-actions"
+				aria-label="Browse contextual controls">
+				<button
+					aria-label="Show previous contextual controls"
+					disabled={!canScrollSectionsBack}
+					onclick={() => shiftSections(-1)}
+					><Icon name="chevron-left" size={16} /></button>
+				<button
+					aria-label="Show more contextual controls"
+					disabled={!canScrollSectionsForward}
+					onclick={() => shiftSections(1)}
+					><Icon name="chevron-right" size={16} /></button>
+			</div>
 		{/if}
 	</div>
 

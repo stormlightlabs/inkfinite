@@ -1,4 +1,4 @@
-import { shapeBounds } from './geom';
+import { shapeBoundsForState } from './geom';
 import { Box2, type Box2 as Box2Type, type Vec2 } from './math';
 import { createId, ShapeRecord, type ContainerShape, type ShapeRecord as Shape } from './model';
 import type { EditorState } from './reactivity';
@@ -19,22 +19,25 @@ export function alignShapes(state: EditorState, shapeIds: readonly string[], ali
 	const items = layoutItems(state, shapeIds, 2);
 	if (items.length === 0) return state;
 
-	const target = alignmentTarget(items.map((item) => item.bounds), alignment);
+	const target = alignmentTarget(
+		items.map((item) => item.bounds),
+		alignment
+	);
 	const deltas = new Map<string, Vec2>();
 	for (const item of items) deltas.set(item.shape.id, alignmentDelta(item.bounds, alignment, target));
-	return translateSelectedRoots(state, items.map((item) => item.shape), deltas);
+	return translateSelectedRoots(
+		state,
+		items.map((item) => item.shape),
+		deltas
+	);
 }
 
 /** Places at least two selected shapes into a deterministic row-major grid. */
-export function gridShapes(
-	state: EditorState,
-	shapeIds: readonly string[],
-	gap = 24,
-	columns?: number
-): EditorState {
+export function gridShapes(state: EditorState, shapeIds: readonly string[], gap = 24, columns?: number): EditorState {
 	const items = layoutItems(state, shapeIds, 2);
 	if (items.length === 0) return state;
-	const requestedColumns = columns !== undefined && Number.isFinite(columns) ? Math.floor(columns) : Math.ceil(Math.sqrt(items.length));
+	const requestedColumns =
+		columns !== undefined && Number.isFinite(columns) ? Math.floor(columns) : Math.ceil(Math.sqrt(items.length));
 	const columnCount = Math.max(1, Math.min(items.length, requestedColumns));
 	return arrangeGrid(state, items, columnCount, gap, gap);
 }
@@ -90,11 +93,7 @@ export function graphLayout(
 		if (source && target && source !== target) edges.add(`${source}\\u0000${target}`);
 	}
 	const positions = layoutGraphPositions(
-		items.map(({ shape, bounds }) => ({
-			id: shape.id,
-			width: Box2.width(bounds),
-			height: Box2.height(bounds)
-		})),
+		items.map(({ shape, bounds }) => ({ id: shape.id, width: Box2.width(bounds), height: Box2.height(bounds) })),
 		[...edges].map((edge) => {
 			const [source, target] = edge.split('\\u0000');
 			return { source: source!, target: target! };
@@ -117,16 +116,15 @@ export function graphLayout(
 			y: origin.y + position.y - item.bounds.min.y
 		});
 	}
-	return translateSelectedRoots(state, items.map((item) => item.shape), deltas);
+	return translateSelectedRoots(
+		state,
+		items.map((item) => item.shape),
+		deltas
+	);
 }
 
 /** Stacks at least two selected shapes along one axis and centers the cross-axis bounds. */
-export function stackShapes(
-	state: EditorState,
-	shapeIds: readonly string[],
-	axis: LayoutAxis,
-	gap = 24
-): EditorState {
+export function stackShapes(state: EditorState, shapeIds: readonly string[], axis: LayoutAxis, gap = 24): EditorState {
 	const items = layoutItems(state, shapeIds, 2);
 	if (items.length === 0) return state;
 	const ordered = items.slice().sort((left, right) => layoutOrder(left, right, axis));
@@ -140,7 +138,11 @@ export function stackShapes(
 		deltas.set(item.shape.id, combineAxisDelta(axis, axisDelta, crossDelta));
 		cursor += axisSize(item.bounds, axis) + spacing(gap);
 	}
-	return translateSelectedRoots(state, items.map((item) => item.shape), deltas);
+	return translateSelectedRoots(
+		state,
+		items.map((item) => item.shape),
+		deltas
+	);
 }
 
 /** Distributes at least three selected shapes with equal gaps on one axis. */
@@ -158,7 +160,11 @@ export function distributeShapes(state: EditorState, shapeIds: readonly string[]
 		deltas.set(item.shape.id, axisDelta(axis, cursor - axisPosition(item.bounds, axis)));
 		cursor += axisSize(item.bounds, axis) + gap;
 	}
-	return translateSelectedRoots(state, items.map((item) => item.shape), deltas);
+	return translateSelectedRoots(
+		state,
+		items.map((item) => item.shape),
+		deltas
+	);
 }
 
 function arrangeGrid(
@@ -168,12 +174,14 @@ function arrangeGrid(
 	columnGap: number,
 	rowGap: number
 ): EditorState {
-	const ordered = items.slice().sort(
-		(left, right) =>
-			left.bounds.min.y - right.bounds.min.y ||
-			left.bounds.min.x - right.bounds.min.x ||
-			left.shape.id.localeCompare(right.shape.id)
-	);
+	const ordered = items
+		.slice()
+		.sort(
+			(left, right) =>
+				left.bounds.min.y - right.bounds.min.y ||
+				left.bounds.min.x - right.bounds.min.x ||
+				left.shape.id.localeCompare(right.shape.id)
+		);
 	const cellWidth = Math.max(...ordered.map((item) => Box2.width(item.bounds)));
 	const cellHeight = Math.max(...ordered.map((item) => Box2.height(item.bounds)));
 	const rowCount = Math.ceil(ordered.length / columns);
@@ -190,12 +198,13 @@ function arrangeGrid(
 	for (const [index, item] of ordered.entries()) {
 		const column = index % columns;
 		const row = Math.floor(index / columns);
-		deltas.set(item.shape.id, {
-			x: columnX[column] - item.bounds.min.x,
-			y: rowY[row] - item.bounds.min.y
-		});
+		deltas.set(item.shape.id, { x: columnX[column] - item.bounds.min.x, y: rowY[row] - item.bounds.min.y });
 	}
-	return translateSelectedRoots(state, items.map((item) => item.shape), deltas);
+	return translateSelectedRoots(
+		state,
+		items.map((item) => item.shape),
+		deltas
+	);
 }
 
 /** Groups selected root shapes in a new frame without changing their world positions. */
@@ -210,7 +219,7 @@ export function groupShapes(state: EditorState, shapeIds: readonly string[]): Ed
 	const rootLayerIds = new Set(roots.map((shape) => shape.layerId).filter((id): id is string => Boolean(id)));
 	if (rootLayerIds.size > 1) return state;
 
-	const bounds = combineBounds(roots.map(shapeBounds));
+	const bounds = combineBounds(roots.map((shape) => shapeBoundsForState(state, shape)));
 	if (!bounds) return state;
 	const containerId = createId('shape');
 	const firstLayerId = roots.find((shape) => shape.layerId)?.layerId;
@@ -422,7 +431,11 @@ function layoutItems(state: EditorState, shapeIds: readonly string[], minimum: n
 		})
 		.sort((left, right) => left.id.localeCompare(right.id));
 	if (roots.length < minimum) return [];
-	return roots.map((shape) => ({ shape, bounds: shapeBounds(shape), locked: shapeIsLocked(state, shape) }));
+	return roots.map((shape) => ({
+		shape,
+		bounds: shapeBoundsForState(state, shape),
+		locked: shapeIsLocked(state, shape)
+	}));
 }
 
 function shapeIsLocked(state: EditorState, shape: Shape): boolean {
@@ -470,9 +483,7 @@ function axisDelta(axis: LayoutAxis, delta: number): Vec2 {
 }
 
 function combineAxisDelta(axis: LayoutAxis, axisDeltaValue: number, crossDelta: number): Vec2 {
-	return axis === 'horizontal'
-		? { x: axisDeltaValue, y: crossDelta }
-		: { x: crossDelta, y: axisDeltaValue };
+	return axis === 'horizontal' ? { x: axisDeltaValue, y: crossDelta } : { x: crossDelta, y: axisDeltaValue };
 }
 
 function spacing(value: number): number {
@@ -612,7 +623,9 @@ function layoutGraphPositions(
 			const group = grouped.get(rank)!;
 			group.sort((left, right) => ordered[left]!.id.localeCompare(ordered[right]!.id));
 			const rankExtent = Math.max(
-				...group.map((index) => (direction === 'top-to-bottom' ? ordered[index]!.height : ordered[index]!.width)),
+				...group.map((index) =>
+					direction === 'top-to-bottom' ? ordered[index]!.height : ordered[index]!.width
+				),
 				0
 			);
 			let crossCursor = 0;

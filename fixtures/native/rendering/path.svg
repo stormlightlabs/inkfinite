@@ -4,7 +4,7 @@
     <g data-layer-id="layer:page:fixtures:default" opacity="1">
       <g data-shape-id="group:path" opacity="1">
       <g data-shape-id="shape:path" opacity="1">
-        <path transform="matrix(1 0 0 1 15 26)" d="M 0 0 L 40 0 Q 50 10 40 20 C 40 30 0 30 0 20 Z" fill="#fef08a" fill-rule="evenodd" fill-opacity="1" stroke="#854d0e" stroke-opacity="1" stroke-width="3"/>
+        <path id="inkfinite-path-shape-path" transform="matrix(1 0 0 1 15 26)" d="M 0 0 L 40 0 Q 50 10 40 20 C 40 30 0 30 0 20 Z" fill="#fef08a" fill-rule="evenodd" fill-opacity="1" stroke="#854d0e" stroke-opacity="1" stroke-width="3"/>
       </g>
       </g>
     </g>

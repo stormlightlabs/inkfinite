@@ -209,12 +209,27 @@ export type ArrowProps = ShapeEffects & {
 	label?: ArrowLabel;
 };
 
+/** Attachment settings for text laid out along a native path.
+ *
+ * `offset` is measured in the supporting path's local coordinate system. For
+ * centered and end-aligned text it identifies the corresponding text anchor;
+ * `direction: 'reverse'` traverses the path from its end to its start.
+ */
+export type TextPath = {
+	pathId: string;
+	offset: number;
+	align: 'start' | 'center' | 'end';
+	side: 'left' | 'right';
+	direction: 'forward' | 'reverse';
+};
+
 export type TextProps = ShapeEffects & {
 	text: string;
 	fontSize: number;
 	fontFamily: string;
 	color: PaintValue;
 	w?: number;
+	textPath?: TextPath;
 };
 
 /** Shape used to clip an image while it is rendered. */
@@ -523,6 +538,17 @@ export const ShapeRecord = {
 					},
 					routing: shape.props.routing ? { ...shape.props.routing } : undefined,
 					label: shape.props.label ? { ...shape.props.label } : undefined
+				}
+			};
+		}
+		if (shape.type === 'text') {
+			return {
+				...shape,
+				...(metadata ? { metadata } : {}),
+				props: {
+					...shape.props,
+					...cloneShapeEffects(shape.props),
+					textPath: shape.props.textPath ? { ...shape.props.textPath } : undefined
 				}
 			};
 		}
@@ -877,6 +903,27 @@ export function validateDoc(document: Document): ValidationResult {
 				if (shape.props.fontSize <= 0) errors.push(`Text shape '${shapeId}' has invalid fontSize`);
 				if (shape.props.w !== undefined && shape.props.w < 0) {
 					errors.push(`Text shape '${shapeId}' has negative width`);
+				}
+				if (shape.props.textPath) {
+					const attachment = shape.props.textPath;
+					const path = document.shapes[attachment.pathId];
+					if (!path || path.type !== 'path') {
+						errors.push(
+							`Text shape '${shapeId}' references a missing supporting path '${attachment.pathId}'`
+						);
+					}
+					if (!Number.isFinite(attachment.offset)) {
+						errors.push(`Text shape '${shapeId}' has a non-finite path offset`);
+					}
+					if (!['start', 'center', 'end'].includes(attachment.align)) {
+						errors.push(`Text shape '${shapeId}' has invalid path alignment`);
+					}
+					if (!['left', 'right'].includes(attachment.side)) {
+						errors.push(`Text shape '${shapeId}' has invalid path side`);
+					}
+					if (!['forward', 'reverse'].includes(attachment.direction)) {
+						errors.push(`Text shape '${shapeId}' has invalid path direction`);
+					}
 				}
 
 				break;

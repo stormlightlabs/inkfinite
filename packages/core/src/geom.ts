@@ -25,7 +25,13 @@ import type {
 } from './model';
 import type { EditorState } from './reactivity';
 import { getInteractiveShapesOnCurrentPage, getShapesOnCurrentPage } from './reactivity';
-import { flattenPath, nearestPointOnPath, transformPathGeometry } from './path-metrics';
+import {
+	flattenPath,
+	layoutTextOnPath,
+	nearestPointOnPath,
+	transformPathGeometry,
+	type TextPathLayout
+} from './path-metrics';
 
 const strokeOutlineCache = new WeakMap<StrokeShape, Vec2[]>();
 
@@ -137,6 +143,57 @@ function transformLocalBounds(shape: ShapeRecord, bounds: Box2): Box2 {
 /** Get the axis-aligned bounding box of a shape in world coordinates. */
 export function shapeBounds(shape: ShapeRecord): Box2 {
 	return transformLocalBounds(shape, localShapeBounds(shape));
+}
+
+/** Return the supporting path for an attached text shape, if it still exists. */
+export function supportingPathForText(state: EditorState, shape: TextShape): PathShape | null {
+	const pathId = shape.props.textPath?.pathId;
+	const path = pathId ? state.doc.shapes[pathId] : undefined;
+	return path?.type === 'path' ? path : null;
+}
+
+/** Return local text-on-path layout using the current supporting path geometry. */
+export function textPathLayoutForShape(
+	state: EditorState,
+	shape: TextShape,
+	measureText?: (value: string) => number
+): { path: PathShape; layout: TextPathLayout } | null {
+	const path = supportingPathForText(state, shape);
+	const attachment = shape.props.textPath;
+	if (!path || !attachment) return null;
+	return {
+		path,
+		layout: layoutTextOnPath(path.props, shape.props.text, shape.props.fontSize, attachment, measureText)
+	};
+}
+
+/** Return the world-space bounds of a shape, resolving attached text through its path. */
+export function shapeBoundsForState(state: EditorState, shape: ShapeRecord): Box2 {
+	if (shape.type !== 'text') return shapeBounds(shape);
+	const attached = textPathLayoutForShape(state, shape);
+	if (!attached) return shapeBounds(shape);
+	return transformLocalBounds(attached.path, attached.layout.bounds);
+}
+
+/** Return the world-space anchor used by a text-path offset handle. */
+export function textPathAnchorForShape(state: EditorState, shape: TextShape): Vec2 | null {
+	const attached = textPathLayoutForShape(state, shape);
+	return attached?.layout.anchor ? localToWorld(attached.path, attached.layout.anchor.point) : null;
+}
+
+/** Test a world point against the approximate glyph bounds of attached text. */
+export function pointInTextPath(point: Vec2, state: EditorState, shape: TextShape, tolerance = 5): boolean {
+	const attached = textPathLayoutForShape(state, shape);
+	if (!attached) return false;
+	const localPoint = worldToLocal(point, attached.path);
+	for (const glyph of attached.layout.glyphs) {
+		const bounds = {
+			min: { x: glyph.bounds.min.x - tolerance, y: glyph.bounds.min.y - tolerance },
+			max: { x: glyph.bounds.max.x + tolerance, y: glyph.bounds.max.y + tolerance }
+		};
+		if (Box2Ops.containsPoint(bounds, localPoint)) return true;
+	}
+	return false;
 }
 
 /** Return exact local bounds for path endpoints and Bézier extrema. */
@@ -794,7 +851,9 @@ function hitTestShape(state: EditorState, shape: ShapeRecord, worldPoint: Vec2, 
 			return false;
 		}
 		case 'text':
-			return pointInText(worldPoint, shape);
+			return shape.props.textPath
+				? pointInTextPath(worldPoint, state, shape, tolerance)
+				: pointInText(worldPoint, shape);
 		case 'markdown':
 			return pointInMarkdown(worldPoint, shape);
 		case 'stroke':
@@ -803,7 +862,7 @@ function hitTestShape(state: EditorState, shape: ShapeRecord, worldPoint: Vec2, 
 			return hitTestPath(worldPoint, shape, tolerance);
 		case 'container':
 		case 'reference':
-			return Box2Ops.containsPoint(shapeBounds(shape), worldPoint);
+			return Box2Ops.containsPoint(shapeBoundsForState(state, shape), worldPoint);
 	}
 	return false;
 }

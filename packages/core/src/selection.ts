@@ -126,7 +126,7 @@ function duplicateState(state: EditorState, offset: DuplicateConnectOffset): Dup
 		const copy = ShapeRecord.clone(source);
 		const id = mapping.get(source.id)!;
 		const parentId = source.groupId ? mapping.get(source.groupId) : undefined;
-		shapes[id] = {
+		const copied = {
 			...copy,
 			id,
 			x: copy.x + offset.x,
@@ -140,6 +140,11 @@ function duplicateState(state: EditorState, offset: DuplicateConnectOffset): Dup
 				: undefined,
 			...(parentId ? { groupId: parentId } : { groupId: undefined })
 		};
+		shapes[id] = copied;
+		if (copied.type === 'text' && copied.props.textPath) {
+			const pathId = mapping.get(copied.props.textPath.pathId);
+			if (pathId) copied.props = { ...copied.props, textPath: { ...copied.props.textPath, pathId } };
+		}
 	}
 
 	const pages = { ...state.doc.pages };

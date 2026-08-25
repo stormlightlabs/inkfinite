@@ -610,6 +610,7 @@ function editorProperties(properties: ShapeProperties): ShapeProperties {
 		['reference_type', 'referenceType'],
 		['clip_path', 'clipPath'],
 		['mask_effect', 'maskEffect'],
+		['text_path', 'textPath'],
 		['width_profile', 'widthProfile']
 	] as const) {
 		if (native in result && !(editor in result)) result[editor] = result[native];
@@ -804,6 +805,10 @@ function nativePropertiesForShape(shape: ShapeRecord): ShapeProperties {
 	if ('maskEffect' in properties) {
 		properties.mask_effect = properties.maskEffect;
 		delete properties.maskEffect;
+	}
+	if ('textPath' in properties) {
+		properties.text_path = properties.textPath;
+		delete properties.textPath;
 	}
 	if (shape.type !== 'container' && !shape.groupId) return properties;
 	if ('w' in properties) {
