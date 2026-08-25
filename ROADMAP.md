@@ -30,7 +30,7 @@ rectangular cards; unsupported directives and assets are omitted with a warning.
 The supported syntax and fallback rules are documented in
 [Interoperability](/docs/reference/interoperability/) and covered by fixtures.
 
-## Next: web installation and export workflows
+## Current: web installation and export workflows
 
 ### Clipboard interoperability
 
@@ -43,16 +43,15 @@ unavailable, Inkfinite downloads the PNG instead.
 
 ### PWA and offline operation
 
-Make the existing local-first web editor installable rather than creating a
-separate offline product.
+The web editor is installable and keeps using Inkfinite's normal local document
+repository. Its service worker caches the application shell, WebAssembly
+runtime, and required static assets. Creating, editing, reopening, and exporting
+local documents works without a network connection.
 
-The PWA should cache the application shell, WebAssembly runtime, and required
-static assets while continuing to use Inkfinite's normal local document
-repository. Creating, editing, reopening, and exporting local documents should
-continue to work without a network connection.
-
-Application updates must be explicit enough that cached application code does
-not become an invisible second deployment state.
+The app requests persistent browser storage when the platform supports it. A
+waiting service worker shows an update prompt and activates only when the user
+chooses to reload, so cached application code does not become an invisible
+second deployment state.
 
 ## Distribution
 

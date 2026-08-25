@@ -1,0 +1,28 @@
+{
+	"name": "Inkfinite",
+	"short_name": "Inkfinite",
+	"description": "A local-first infinite canvas for drawing, diagramming, and vector editing.",
+	"start_url": "/app",
+	"scope": "/",
+	"display": "standalone",
+	"background_color": "#f7f8fb",
+	"theme_color": "#8a69f7",
+	"icons": [
+		{
+			"src": "/pwa-192x192.png",
+			"sizes": "192x192",
+			"type": "image/png"
+		},
+		{
+			"src": "/pwa-512x512.png",
+			"sizes": "512x512",
+			"type": "image/png"
+		},
+		{
+			"src": "/maskable-icon-512x512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	]
+}

@@ -271,8 +271,9 @@ export function resetWasmModuleForTests() {
 async function loadModule(): Promise<GeneratedWasmModule> {
 	modulePromise ??= (async () => {
 		const generatedUrl = new URL('../dist/inkfinite_wasm.js', import.meta.url);
+		const wasmUrl = new URL('../dist/inkfinite_wasm_bg.wasm', import.meta.url);
 		const generated = (await import(/* @vite-ignore */ generatedUrl.href)) as GeneratedWasmModule;
-		await generated.default();
+		await generated.default(wasmUrl);
 		return generated;
 	})();
 	return modulePromise;

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import favicon from '$editor/assets/favicon.svg';
+	import PwaStatus from '$lib/PwaStatus.svelte';
 	import { themeStore } from '@inkfinite/ui/editor';
 	import '@inkfinite/ui/styles.css';
 
@@ -9,8 +9,8 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} type="image/svg+xml" />
 	<title>Inkfinite - Infinite Canvas</title>
 </svelte:head>
 
 {@render children()}
+<PwaStatus />

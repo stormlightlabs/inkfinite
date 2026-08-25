@@ -1,12 +1,14 @@
 packages:
-    - packages/*
-    - apps/*
+  - packages/*
+  - apps/*
 
 overrides:
-    jsdom: 27.3.0
+  jsdom: 27.3.0
 
 allowBuilds:
-    esbuild: true
+  esbuild: true
+  sharp: true
+  workerd: true
 
 onlyBuiltDependencies:
-    - esbuild
+  - esbuild

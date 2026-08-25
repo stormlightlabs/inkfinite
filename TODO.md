@@ -39,17 +39,17 @@
 
 ## PWA and offline web app
 
-- [ ] Add a web app manifest with name, icons, start URL, display mode, and
+- [x] Add a web app manifest with name, icons, start URL, display mode, and
       light/dark theme metadata
-- [ ] Add installable application icons at the required sizes
-- [ ] Add a service worker for the application shell and versioned static assets
-- [ ] Cache the WASM runtime and other editor-critical assets for offline startup
-- [ ] Keep documents in the existing local persistence layer rather than
+- [x] Add installable application icons at the required sizes
+- [x] Add a service worker for the application shell and versioned static assets
+- [x] Cache the WASM runtime and other editor-critical assets for offline startup
+- [x] Keep documents in the existing local persistence layer rather than
       introducing a second PWA-specific store
-- [ ] Verify create, edit, save, close, reopen, and export while offline
-- [ ] Define service-worker update behavior so stale application code cannot
+- [x] Verify create, edit, save, close, reopen, and export while offline
+- [x] Define service-worker update behavior so stale application code cannot
       silently remain active indefinitely
-- [ ] Add Playwright coverage for first load, installation eligibility, cached
+- [x] Add Playwright coverage for first load, installation eligibility, cached
       reload, offline reload, and application updates
 
 ## Release and distribution
