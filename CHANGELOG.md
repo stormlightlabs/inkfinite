@@ -10,10 +10,14 @@
   TypeScript contracts and a common editor projection.
 - Native shapes, paths, groups, frames, cards, images, layers, assets, semantic metadata,
   relationships, built-in stencils, and deterministic layout operations.
-- Canvas editing with snapping, constraints, nested selection, path anchors and handles, connection
-  routing, duplicate-and-connect, typography controls, and a searchable command palette.
-- Static SVG import and export with native geometry, hierarchy, transforms, compound fills,
-  embedded images, retained source assets, and warnings for omitted features.
+- Canvas editing with snapping, constraints, nested selection, path anchors and handles,
+  duplicate-and-connect, typography controls, and a searchable command palette.
+- Shared path metrics and straight, curved, and orthogonal connectors with tangent-aware
+  arrowheads, path-relative labels, hit testing, and deterministic export.
+- Boolean paths, gradient paints, clips, masks, filters, variable-width strokes, and text on path,
+  with editor controls and SVG round-trip coverage.
+- SVG import and export with editable native geometry, hierarchy, transforms, compound fills,
+  gradients, effects, text paths, embedded images, sanitized fallbacks, and deterministic workflows.
 - Excalidraw and Obsidian Canvas import and export, plus deterministic SVG and PNG rendering.
 - CLI workflows for inspection, queries, validation, structured mutations, dry runs, rendering,
   schemas, live desktop sessions, and machine-readable output.
@@ -28,6 +32,8 @@
 
 - Consolidated the web and desktop editors into shared UI, runtime, DOM input, renderer, and core
   packages.
+- Unified creation styles across editor, CLI, MCP, stencils, and starter documents, with neutral
+  defaults resolved against light and dark canvases.
 - Moved canonical browser state and committed geometry operations to Rust while keeping interaction
   previews in TypeScript.
 - Unified SVG parsing, transactions, and rendering across desktop, web, CLI, and MCP.

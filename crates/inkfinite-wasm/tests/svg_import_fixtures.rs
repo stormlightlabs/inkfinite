@@ -15,6 +15,10 @@ const FIXTURES: &[(&str, &str)] = &[
         include_str!("../../../fixtures/svg-import/compound-paths/ring.svg"),
     ),
     (
+        "night garden illustration",
+        include_str!("../../../fixtures/svg-import/illustrations/night-garden.svg"),
+    ),
+    (
         "unsupported features",
         include_str!("../../../fixtures/svg-import/unsupported/feature-matrix.svg"),
     ),

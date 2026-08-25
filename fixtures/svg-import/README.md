@@ -7,9 +7,14 @@
 - `nested-groups/` checks group-local transforms, inherited paint, and opacity.
 - `compound-paths/` checks repeated subpaths, elliptical arcs, and even-odd
   fill rules.
-- `gradients/` checks transformed linear gradients, radial gradients, inherited
-  stops, spread behavior, and stop opacity.
-- `unsupported/` checks warnings for omitted features and active content.
+- `gradients/` uses a layered twilight landscape to check transformed linear
+  gradients, radial gradients, inherited stops, spread behavior, and stop
+  opacity in a complete composition.
+- `illustrations/` combines ordinary geometry, curves, inherited group styles,
+  local transforms, and opacity in an asset that is useful beyond a single
+  syntax regression.
+- `unsupported/` uses a presentable supported fallback while checking warnings
+  for omitted features and active content.
 - `malformed/` checks that invalid XML, numbers, paths, and transforms fail
   before a partial import is returned.
 

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" role="img" aria-label="Moonlit garden">
+  <rect width="320" height="200" rx="24" fill="#111827"/>
+  <circle cx="250" cy="48" r="24" fill="#fde68a"/>
+  <g id="hills" transform="translate(0 8)" fill="#312e81">
+    <path d="M0 130C44 94 82 101 119 129c33 24 65 20 102-9 36-28 67-23 99 4v68H0Z"/>
+    <path d="M0 157c48-24 91-20 129 7 32 22 68 18 101-6 31-23 60-23 90-5v39H0Z" fill="#1e1b4b"/>
+  </g>
+  <g id="garden" transform="translate(28 20)" fill="#86efac" stroke="#14532d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.92">
+    <path d="M46 156C43 126 49 98 66 72M66 72c-11-7-20-5-28 5m28-5c3-14 11-23 24-27M66 72c11 4 19 12 24 24" fill="none"/>
+    <ellipse cx="38" cy="78" rx="14" ry="7" transform="rotate(24 38 78)"/>
+    <ellipse cx="92" cy="45" rx="15" ry="7" transform="rotate(-28 92 45)"/>
+    <ellipse cx="92" cy="98" rx="14" ry="7" transform="rotate(31 92 98)"/>
+    <path d="M156 156c2-30-4-54-19-73m19 73c-1-42 11-73 35-94m-54 21c-8-9-18-12-29-8m83-13c11-4 21-2 30 6" fill="none"/>
+    <path d="M177 52c0-10 8-18 18-18 0 10-8 18-18 18Zm0 0c0-10-8-18-18-18 0 10 8 18 18 18Zm0 0c10 0 18 8 18 18-10 0-18-8-18-18Zm0 0c-10 0-18 8-18 18 10 0 18-8 18-18Z" fill="#f9a8d4" stroke="#831843"/>
+  </g>
+</svg>

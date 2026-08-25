@@ -44,6 +44,12 @@ const VALID_FIXTURES: &[(&str, &str, usize, usize)] = &[
         0,
         1,
     ),
+    (
+        "night garden illustration",
+        include_str!("../../../fixtures/svg-import/illustrations/night-garden.svg"),
+        2,
+        10,
+    ),
 ];
 
 fn node_counts(group: &inkfinite_core::svg_import::SvgGroup) -> (usize, usize) {

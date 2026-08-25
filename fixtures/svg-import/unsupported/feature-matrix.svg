@@ -1,1 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" onload="alert(1)"><title>Static import warning fixture</title><defs><linearGradient id="gradient"><stop offset="0" stop-color="#c6a0f6"/></linearGradient><pattern id="pattern" width="4" height="4"><rect width="4" height="4"/></pattern><clipPath id="clip"><use href="#unsupported-clip"/></clipPath><mask id="mask"><use href="#unsupported-mask"/></mask><filter id="filter"><feTurbulence baseFrequency=".2"/></filter><style>.unsafe { fill: red; }</style></defs><script>alert(1)</script><animate attributeName="x"/><image href="https://example.com/remote.png" width="32" height="32"/><foreignObject width="32" height="32"><div>unsupported</div></foreignObject><path id="painted" d="M2 2h28v28H2z" fill="url(#gradient)" stroke="url(#pattern)" clip-path="url(#clip)" mask="url(#mask)" filter="url(#filter)" onclick="alert(2)"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Unsupported SVG feature matrix" onload="alert(1)">
+  <title>Static import warning fixture</title>
+  <defs>
+    <linearGradient id="gradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7c3aed"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+    <pattern id="pattern" width="8" height="8" patternUnits="userSpaceOnUse">
+      <path d="M0 8 8 0" stroke="#f8fafc" stroke-width="2"/>
+    </pattern>
+    <path id="unsupported-clip" d="M13 5h38c4.4 0 8 3.6 8 8v38c0 4.4-3.6 8-8 8H13c-4.4 0-8-3.6-8-8V13c0-4.4 3.6-8 8-8Z"/>
+    <rect id="unsupported-mask" width="64" height="64" fill="white"/>
+    <clipPath id="clip"><use href="#unsupported-clip"/></clipPath>
+    <mask id="mask"><use href="#unsupported-mask"/></mask>
+    <filter id="filter">
+      <feTurbulence baseFrequency=".08" numOctaves="2" result="noise"/>
+      <feBlend in="SourceGraphic" in2="noise" mode="soft-light"/>
+    </filter>
+    <style>.unsafe { fill: red; }</style>
+  </defs>
+  <script>alert(1)</script>
+  <animate attributeName="x"/>
+  <image href="https://example.com/remote.png" x="-100" y="-100" width="1" height="1"/>
+  <foreignObject x="-100" y="-100" width="1" height="1"><div>unsupported</div></foreignObject>
+  <path id="painted" d="M13 5h38c4.4 0 8 3.6 8 8v38c0 4.4-3.6 8-8 8H13c-4.4 0-8-3.6-8-8V13c0-4.4 3.6-8 8-8Z" fill="url(#gradient)" stroke="url(#pattern)" stroke-width="3" clip-path="url(#clip)" mask="url(#mask)" filter="url(#filter)" onclick="alert(2)"/>
+</svg>
