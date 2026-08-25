@@ -16,6 +16,7 @@
 	--docs-accent-text: #8de2bc;
 	--docs-on-accent: #101b18;
 	--docs-code-surface: #10131f;
+	--docs-footer-surface: #10131f;
 	--docs-code-line: #646675;
 	--docs-code-text: #d8e6e6;
 	--docs-callout-surface: color-mix(in srgb, var(--docs-accent) 11%, var(--docs-canvas));
@@ -61,9 +62,10 @@ html[data-inkfinite-docs-theme='light'] .docs-site {
 	--docs-accent-hover: #0f7046;
 	--docs-accent-text: #126a45;
 	--docs-on-accent: #ffffff;
-	--docs-code-surface: #202b31;
-	--docs-code-line: #46616c;
-	--docs-code-text: #eef7f8;
+	--docs-code-surface: #f6f8fa;
+	--docs-footer-surface: #e2e6e8;
+	--docs-code-line: #8c959f;
+	--docs-code-text: #24292e;
 	--docs-callout-surface: #e5f5ed;
 	--docs-danger: #fb5b66;
 	--docs-warning: #ffaf4d;
@@ -182,6 +184,16 @@ html[data-inkfinite-docs-theme='light'] .docs-site {
 	color: inherit;
 	font-size: 0.84rem;
 	line-height: 1.65;
+	tab-size: 2;
+	white-space: pre;
+}
+
+.docs-site .doc-content .shiki code span {
+	color: var(--shiki-dark);
+}
+
+html[data-inkfinite-docs-theme='light'] .docs-site .doc-content .shiki code span {
+	color: var(--shiki-light);
 }
 
 .docs-site .doc-content .copy-code {

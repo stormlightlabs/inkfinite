@@ -3,6 +3,7 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import { execFileSync } from 'node:child_process';
 import { mdsvex } from 'mdsvex';
 import { extractTableOfContents } from './src/lib/docs/content/table-of-contents.js';
+import { highlightCode } from './src/lib/docs/highlight.js';
 
 const DEFAULT_VERSION = '0.0.0';
 const buildVersion = getBuildVersion();
@@ -36,7 +37,11 @@ const config = {
 	extensions: ['.svelte', '.svx', '.md'],
 	preprocess: [
 		vitePreprocess(),
-		mdsvex({ extensions: ['.svx', '.md'], rehypePlugins: [extractTableOfContents] })
+		mdsvex({
+			extensions: ['.svx', '.md'],
+			rehypePlugins: [extractTableOfContents],
+			highlight: { highlighter: highlightCode }
+		})
 	],
 	kit: {
 		adapter: adapter(),

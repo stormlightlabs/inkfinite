@@ -128,6 +128,9 @@ describe('StatusBar', () => {
 		const dialog = screen.getByRole('dialog', { name: 'About Inkfinite' });
 		await expect.element(dialog).toBeInTheDocument();
 		await expect.element(screen.getByText('Version v1.2.3-4+gabc1234')).toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('link', { name: 'Changelog' }))
+			.toHaveAttribute('href', 'https://ink.stormlightlabs.org/docs/changelog/');
 		expect(window.getComputedStyle(dialog.element()).borderRadius).toBe('16px');
 	});
 });

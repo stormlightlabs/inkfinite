@@ -2,7 +2,7 @@
 	"name": "@inkfinite/core",
 	"type": "module",
 	"sideEffects": false,
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"description": "A starter for creating a TypeScript package.",
 	"author": "Owais J. <desertthunder.dev@gmail.com>",
 	"license": "Apache-2.0",

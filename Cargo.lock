@@ -2324,7 +2324,7 @@ dependencies = [
 
 [[package]]
 name = "inkfinite-cli"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2341,7 +2341,7 @@ dependencies = [
 
 [[package]]
 name = "inkfinite-core"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "automerge",
  "base64 0.22.1",
@@ -2364,7 +2364,7 @@ dependencies = [
 
 [[package]]
 name = "inkfinite-mcp"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "inkfinite-core",
  "rmcp",
@@ -2378,7 +2378,7 @@ dependencies = [
 
 [[package]]
 name = "inkfinite-wasm"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "inkfinite-core",
  "serde",
@@ -6239,7 +6239,7 @@ checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
 
 [[package]]
 name = "xtask"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",

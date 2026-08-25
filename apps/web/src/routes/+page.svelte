@@ -76,6 +76,27 @@
 						</div>
 						<div class="preview-canvas">
 							<div class="canvas-label">One file, every way in</div>
+							<svg
+								class="diagram-connectors"
+								viewBox="0 0 100 100"
+								preserveAspectRatio="none"
+								aria-hidden="true">
+								<defs>
+									<marker
+										id="diagram-arrowhead"
+										viewBox="0 0 7 7"
+										refX="6"
+										refY="3.5"
+										markerWidth="7"
+										markerHeight="7"
+										orient="auto">
+										<path d="M0 0 7 3.5 0 7Z" />
+									</marker>
+								</defs>
+								<path d="M29 39 C43 39 51 51 68 52" />
+								<path d="M29 72 C44 72 51 59 68 57" />
+								<path d="M56 78 C64 74 62 64 69 60" />
+							</svg>
 							<div class="diagram-shape source">Draw</div>
 							<div class="diagram-shape command">CLI</div>
 							<div class="diagram-shape agent-node">Agent</div>
@@ -495,8 +516,33 @@
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
 	}
+	.diagram-connectors {
+		position: absolute;
+		inset: 0;
+		z-index: 1;
+		width: 100%;
+		height: 100%;
+		overflow: visible;
+		color: var(--docs-text-muted);
+		pointer-events: none;
+	}
+	.diagram-connectors path {
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.35;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		vector-effect: non-scaling-stroke;
+		marker-end: url('#diagram-arrowhead');
+	}
+	.diagram-connectors marker path {
+		fill: currentColor;
+		stroke: none;
+		marker-end: none;
+	}
 	.diagram-shape {
 		position: absolute;
+		z-index: 2;
 		display: grid;
 		place-items: center;
 		width: 5.2rem;
@@ -558,8 +604,8 @@
 	}
 	.preview-cursor {
 		position: absolute;
-		right: 25%;
-		bottom: 17%;
+		top: 36%;
+		left: 27%;
 		z-index: 4;
 		color: var(--docs-accent-text);
 		filter: drop-shadow(0 1px var(--docs-canvas));

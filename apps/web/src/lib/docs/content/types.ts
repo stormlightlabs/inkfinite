@@ -8,7 +8,8 @@ export const docSections = [
 	'Automation',
 	'Concepts',
 	'Reference',
-	'Development'
+	'Development',
+	'Project'
 ] as const;
 
 export type DocSection = (typeof docSections)[number];

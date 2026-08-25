@@ -11,7 +11,8 @@
 	const primaryLinks = [
 		{ label: 'Start', href: '/docs/quickstart/', slug: 'quickstart' },
 		{ label: 'Guide', href: '/docs/guide/editor/', slug: 'guide' },
-		{ label: 'Automation', href: '/docs/automation/cli/', slug: 'automation' }
+		{ label: 'Automation', href: '/docs/automation/cli/', slug: 'automation' },
+		{ label: 'Changelog', href: '/docs/changelog/', slug: 'changelog' }
 	] as const;
 	const githubUrl = 'https://github.com/stormlightlabs/inkfinite';
 

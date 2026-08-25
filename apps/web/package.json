@@ -1,7 +1,7 @@
 {
 	"name": "@inkfinite/web",
 	"private": true,
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"type": "module",
 	"scripts": {
 		"prebuild": "pnpm --filter @inkfinite/wasm build",
@@ -59,6 +59,7 @@
 		"prettier-plugin-svelte": "^3.4.0",
 		"satori": "^0.26.0",
 		"satori-html": "^0.3.2",
+		"shiki": "^4.4.3",
 		"svelte": "^5.45.6",
 		"svelte-check": "^4.3.4",
 		"typescript": "^5.9.3",

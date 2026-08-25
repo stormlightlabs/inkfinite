@@ -51,7 +51,7 @@
 	.site-footer {
 		padding: clamp(3rem, 7vw, 5rem) 2rem 1.5rem;
 		border-top: 1px solid var(--docs-border);
-		background: var(--docs-code-surface);
+		background: var(--docs-footer-surface);
 		color: var(--docs-text-muted);
 	}
 
