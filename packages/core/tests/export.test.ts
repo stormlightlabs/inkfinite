@@ -45,6 +45,18 @@ describe('exportToSVG', () => {
 		expect(svg).not.toContain('<polyline');
 	});
 
+	it('omits the synthetic background when transparent output is requested', () => {
+		const { state, pageId } = createTestState();
+		const rect = ShapeRecord.createRect(pageId, 10, 20, { w: 100, h: 50, fill: 'red', stroke: 'black', radius: 0 });
+		state.doc.shapes[rect.id] = rect;
+		state.doc.pages[pageId].shapeIds.push(rect.id);
+
+		const svg = exportToSVG(state, { background: 'transparent' });
+
+		expect(svg).not.toContain('fill="white"');
+		expect(svg).toContain('fill="red"');
+	});
+
 	it('should export SVG with a rectangle shape', () => {
 		const { state, pageId } = createTestState();
 

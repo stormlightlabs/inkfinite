@@ -25,8 +25,10 @@ The editor also accepts pasted plain text, Markdown, SVG markup, and images. Nat
 preserves hierarchy, assets, and connections. Use **Copy as SVG** to copy the current selection as
 SVG code, or use **Copy document as SVG** to copy the current page. Inkfinite writes both SVG and
 plain-text clipboard representations when the browser supports rich clipboard data. If it does not,
-the editor copies the markup as text and reports that fallback. **Paste in place** keeps copied
-coordinates. Ordinary paste places content near the pointer.
+the editor copies the markup as text and reports that fallback. Use **Copy as PNG** for the
+selection or **Copy document as PNG** for the current page. The transparent PNG actions preserve
+transparent pixels; if image clipboard writes are unavailable, Inkfinite downloads a PNG file
+instead. **Paste in place** keeps copied coordinates. Ordinary paste places content near the pointer.
 
 ## Import files
 
@@ -47,8 +49,10 @@ visuals do not appear on the canvas.
 ## Export a board
 
 Export SVG for vector presentation output or PNG for the current viewport. SVG can include the
-current selection or the current page. Excalidraw and Obsidian Canvas exports map supported editable
-content and report content their formats cannot represent.
+current selection or the current page. PNG clipboard actions render the selection or current page
+without editor overlays. Choose a transparent PNG when the output should retain transparent pixels.
+Excalidraw and Obsidian Canvas exports map supported editable content and report content their
+formats cannot represent.
 
 Export does not change the current desktop document's native path or saved state. Continue saving
 the `.inkfinite` file as the source when you need the complete board and its history.

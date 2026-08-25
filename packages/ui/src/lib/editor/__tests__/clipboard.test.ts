@@ -6,7 +6,13 @@ import {
 	ShapeRecord,
 	type EditorState
 } from '@inkfinite/core';
-import { copySvgMarkup, createClipboardPayload, pasteClipboard, pasteText } from '../clipboard';
+import {
+	copyPngBlob,
+	copySvgMarkup,
+	createClipboardPayload,
+	pasteClipboard,
+	pasteText
+} from '../clipboard';
 
 function state(): EditorState {
 	const page = PageRecord.create('Page 1', 'page:test');
@@ -75,6 +81,51 @@ describe('clipboard selections', () => {
 		vi.stubGlobal('ClipboardItem', undefined);
 
 		expect(await copySvgMarkup('<svg />')).toBe('manual');
+	});
+
+	it('writes PNG data as an image clipboard item', async () => {
+		const write = vi.fn().mockResolvedValue(undefined);
+		class TestClipboardItem {
+			constructor(readonly data: Record<string, Blob>) {}
+		}
+		vi.stubGlobal('navigator', { clipboard: { write } });
+		vi.stubGlobal('ClipboardItem', TestClipboardItem);
+
+		const result = await copyPngBlob(
+			new Blob(['png'], { type: 'image/png' }),
+			'selection.png'
+		);
+
+		expect(result).toBe('rich');
+		expect(write).toHaveBeenCalledOnce();
+		const item = write.mock.calls[0][0][0] as TestClipboardItem;
+		expect(Object.keys(item.data)).toEqual(['image/png']);
+		expect(item.data['image/png'].type).toBe('image/png');
+	});
+
+	it('downloads PNG data when image clipboard writes are unavailable', async () => {
+		const click = vi.fn();
+		const remove = vi.fn();
+		const anchor = { href: '', download: '', hidden: false, click, remove };
+		const append = vi.fn();
+		vi.stubGlobal('navigator', {});
+		vi.stubGlobal('ClipboardItem', undefined);
+		vi.stubGlobal('document', {
+			body: { appendChild: append },
+			createElement: vi.fn(() => anchor)
+		});
+		vi.stubGlobal('URL', {
+			createObjectURL: vi.fn(() => 'blob:test'),
+			revokeObjectURL: vi.fn()
+		});
+
+		const result = await copyPngBlob(new Blob(['png'], { type: 'image/png' }), 'drawing.png');
+
+		expect(result).toBe('download');
+		expect(anchor.download).toBe('drawing.png');
+		expect(click).toHaveBeenCalledOnce();
+		expect(append).toHaveBeenCalledWith(anchor);
+		expect(remove).toHaveBeenCalledOnce();
 	});
 
 	it('keeps hierarchy, assets, bindings, and root selection on paste', () => {

@@ -29,6 +29,7 @@
 		onImportSvgMarkup?: () => void;
 		onExportSvg?: (selectedOnly: boolean) => Promise<void>;
 		onCopySvg?: (selectedOnly: boolean) => Promise<void>;
+		onCopyPng?: (selectedOnly: boolean, transparentBackground?: boolean) => Promise<void>;
 		onExportEditable?: (format: InterchangeFormat) => void;
 		interchangeBusy?: boolean;
 	};
@@ -49,6 +50,7 @@
 		onImportSvgMarkup,
 		onExportSvg,
 		onCopySvg,
+		onCopyPng,
 		onExportEditable,
 		interchangeBusy = false
 	}: Props = $props();
@@ -254,20 +256,50 @@
 				label: 'SVG (Selection)',
 				accessibleLabel: 'Export selected shapes as SVG'
 			},
-			...(onCopySvg
+			...(onCopySvg || onCopyPng
 				? [
 						{ type: 'separator' as const },
-						{
-							id: 'copy-svg-all',
-							label: 'Copy as SVG (All)',
-							accessibleLabel: 'Copy all shapes as SVG'
-						},
-						{
-							id: 'copy-svg-selection',
-							label: 'Copy as SVG (Selection)',
-							accessibleLabel: 'Copy selected shapes as SVG',
-							disabled: editorState.ui.selectionIds.length === 0
-						}
+						...(onCopySvg
+							? [
+									{
+										id: 'copy-svg-all',
+										label: 'Copy as SVG (All)',
+										accessibleLabel: 'Copy all shapes as SVG'
+									},
+									{
+										id: 'copy-svg-selection',
+										label: 'Copy as SVG (Selection)',
+										accessibleLabel: 'Copy selected shapes as SVG',
+										disabled: editorState.ui.selectionIds.length === 0
+									}
+								]
+							: []),
+						...(onCopyPng
+							? [
+									{
+										id: 'copy-png-all',
+										label: 'Copy as PNG (All)',
+										accessibleLabel: 'Copy all shapes as PNG'
+									},
+									{
+										id: 'copy-png-selection',
+										label: 'Copy as PNG (Selection)',
+										accessibleLabel: 'Copy selected shapes as PNG',
+										disabled: editorState.ui.selectionIds.length === 0
+									},
+									{
+										id: 'copy-png-all-transparent',
+										label: 'Copy as PNG (All, Transparent)',
+										accessibleLabel: 'Copy all shapes as transparent PNG'
+									},
+									{
+										id: 'copy-png-selection-transparent',
+										label: 'Copy as PNG (Selection, Transparent)',
+										accessibleLabel: 'Copy selected shapes as transparent PNG',
+										disabled: editorState.ui.selectionIds.length === 0
+									}
+								]
+							: [])
 					]
 				: [])
 		];
@@ -293,6 +325,18 @@
 				break;
 			case 'copy-svg-selection':
 				void onCopySvg?.(true);
+				break;
+			case 'copy-png-all':
+				void onCopyPng?.(false);
+				break;
+			case 'copy-png-selection':
+				void onCopyPng?.(true);
+				break;
+			case 'copy-png-all-transparent':
+				void onCopyPng?.(false, true);
+				break;
+			case 'copy-png-selection-transparent':
+				void onCopyPng?.(true, true);
 				break;
 		}
 	}

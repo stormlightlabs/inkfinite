@@ -40,5 +40,11 @@ test('arrow connection controls in dark theme', { tag: '@visual' }, async ({ edi
 	await editor.selectAt({ x: 520, y: 500 });
 	await page.getByRole('button', { name: 'Arrow settings' }).click();
 	await expect(page.getByRole('heading', { name: 'Connections' })).toBeVisible();
+	const arrowMenu = await page.getByRole('dialog', { name: 'Arrow settings' }).boundingBox();
+	const viewport = page.viewportSize();
+	expect(arrowMenu).not.toBeNull();
+	expect(viewport).not.toBeNull();
+	expect(arrowMenu!.x).toBeGreaterThanOrEqual(0);
+	expect(arrowMenu!.x + arrowMenu!.width).toBeLessThanOrEqual(viewport!.width);
 	await expect(page).toHaveScreenshot('arrow.png');
 });

@@ -71,6 +71,95 @@ export function createClipboardPayload(state: EditorState): ClipboardPayload | n
 /** Result of copying SVG markup to the system clipboard. */
 export type SvgClipboardResult = 'rich' | 'text' | 'manual';
 
+/** Result of copying a PNG, including the download fallback. */
+export type PngClipboardResult = 'rich' | 'download';
+
+/** Options for rasterizing an SVG export. */
+export type PngRenderOptions = { transparentBackground?: boolean };
+
+/**
+ * Rasterizes canonical SVG markup without including editor overlays or the canvas grid.
+ *
+ * The canvas is left transparent when requested. A white background is otherwise
+ * painted before the SVG is drawn so clipboard and downloaded PNGs are predictable.
+ */
+export async function renderSvgToPng(
+	svg: string,
+	{ transparentBackground = false }: PngRenderOptions = {}
+): Promise<Blob> {
+	if (!svg) throw new Error('SVG markup must not be empty.');
+	if (
+		typeof document === 'undefined' ||
+		typeof Image === 'undefined' ||
+		typeof URL === 'undefined'
+	) {
+		throw new Error('PNG export is not available in this environment.');
+	}
+
+	const image = new Image();
+	const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+	try {
+		await new Promise<void>((resolve, reject) => {
+			image.onload = () => resolve();
+			image.onerror = () => reject(new Error('Could not render the drawing as PNG.'));
+			image.src = url;
+		});
+
+		const canvas = document.createElement('canvas');
+		canvas.width = Math.max(1, image.naturalWidth || image.width);
+		canvas.height = Math.max(1, image.naturalHeight || image.height);
+		const context = canvas.getContext('2d');
+		if (!context) throw new Error('Could not create a PNG rendering context.');
+		if (!transparentBackground) {
+			context.fillStyle = '#ffffff';
+			context.fillRect(0, 0, canvas.width, canvas.height);
+		}
+		context.drawImage(image, 0, 0);
+
+		return await new Promise<Blob>((resolve, reject) => {
+			canvas.toBlob((blob) => {
+				if (blob) resolve(blob);
+				else reject(new Error('Could not encode the drawing as PNG.'));
+			}, 'image/png');
+		});
+	} finally {
+		URL.revokeObjectURL(url);
+	}
+}
+
+/**
+ * Writes PNG data to the system clipboard and downloads it when image clipboard
+ * support is missing or rejected by the platform.
+ */
+export async function copyPngBlob(blob: Blob, filename: string): Promise<PngClipboardResult> {
+	const clipboard = typeof navigator !== 'undefined' ? navigator.clipboard : undefined;
+	if (clipboard?.write && typeof ClipboardItem !== 'undefined') {
+		try {
+			await clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+			return 'rich';
+		} catch {
+			// Permission and platform support errors use the file fallback below.
+		}
+	}
+
+	downloadBlob(blob, filename);
+	return 'download';
+}
+
+/** Downloads a blob through the browser's normal save flow. */
+export function downloadBlob(blob: Blob, filename: string): void {
+	if (typeof document === 'undefined' || typeof URL === 'undefined') return;
+	const url = URL.createObjectURL(blob);
+	const anchor = document.createElement('a');
+	anchor.href = url;
+	anchor.download = filename;
+	anchor.hidden = true;
+	document.body.appendChild(anchor);
+	anchor.click();
+	anchor.remove();
+	setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 /**
  * Writes SVG markup with both vector and plain-text clipboard representations.
  *

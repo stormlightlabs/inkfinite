@@ -38,6 +38,8 @@ export type SvgExportOptions = {
 	selectionIds?: string[];
 	/** Preserve selected-only semantics when no shape is selected. */
 	selectionOnly?: boolean;
+	/** Request an opaque or transparent rasterization background from fallback exporters. */
+	background?: 'white' | 'transparent';
 };
 
 /** Deterministic SVG output returned by a browser platform adapter. */

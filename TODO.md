@@ -30,12 +30,12 @@
 
 ### PNG clipboard export
 
-- [ ] Render the current selection or document through the existing raster
+- [x] Render the current selection or document through the existing raster
       export path
-- [ ] Write PNG data to the system clipboard where the platform supports it
-- [ ] Preserve transparent backgrounds when requested
-- [ ] Provide file-download fallback where image clipboard APIs are unavailable
-- [ ] Add browser capability tests and desktop integration coverage
+- [x] Write PNG data to the system clipboard where the platform supports it
+- [x] Preserve transparent backgrounds when requested
+- [x] Provide file-download fallback where image clipboard APIs are unavailable
+- [x] Add browser capability tests and desktop integration coverage
 
 ## PWA and offline web app
 

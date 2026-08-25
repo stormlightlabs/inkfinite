@@ -138,6 +138,15 @@
 		};
 	}
 
+	function portal(node: HTMLElement) {
+		if (typeof document !== 'undefined') document.body.appendChild(node);
+		return {
+			destroy() {
+				node.remove();
+			}
+		};
+	}
+
 	function openPopover() {
 		if (!disabled) {
 			restoreFocus = false;
@@ -262,6 +271,7 @@
 
 	{#if isOpen}
 		<div
+			use:portal
 			class="arrow-popover__menu"
 			bind:this={popoverEl}
 			style:left={`${menuPosition.left}px`}

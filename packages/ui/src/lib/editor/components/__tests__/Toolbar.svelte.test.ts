@@ -130,6 +130,7 @@ describe('Editor Toolbar', () => {
 		const onCreateFromSvg = vi.fn();
 		const onImportSvgMarkup = vi.fn();
 		const onExportEditable = vi.fn();
+		const onCopyPng = vi.fn().mockResolvedValue(undefined);
 		const screen = render(Toolbar, {
 			currentTool: 'select',
 			onToolChange: vi.fn(),
@@ -139,7 +140,8 @@ describe('Editor Toolbar', () => {
 			onImportSvg,
 			onCreateFromSvg,
 			onImportSvgMarkup,
-			onExportEditable
+			onExportEditable,
+			onCopyPng
 		});
 
 		(screen.getByRole('button', { name: 'Import' }).element() as HTMLButtonElement).click();
@@ -208,6 +210,29 @@ describe('Editor Toolbar', () => {
 				.element() as HTMLButtonElement
 		).click();
 		expect(onExportEditable).toHaveBeenCalledWith('json-canvas');
+
+		(
+			screen.getByRole('button', { name: 'Export drawing' }).element() as HTMLButtonElement
+		).click();
+		await expect
+			.element(screen.getByRole('menuitem', { name: 'Copy all shapes as PNG' }))
+			.toBeInTheDocument();
+		(
+			screen
+				.getByRole('menuitem', { name: 'Copy all shapes as PNG' })
+				.element() as HTMLButtonElement
+		).click();
+		expect(onCopyPng).toHaveBeenCalledWith(false);
+
+		(
+			screen.getByRole('button', { name: 'Export drawing' }).element() as HTMLButtonElement
+		).click();
+		(
+			screen
+				.getByRole('menuitem', { name: 'Copy all shapes as transparent PNG' })
+				.element() as HTMLButtonElement
+		).click();
+		expect(onCopyPng).toHaveBeenCalledWith(false, true);
 	});
 
 	it('anchors pen settings directly below the pen tool', async () => {

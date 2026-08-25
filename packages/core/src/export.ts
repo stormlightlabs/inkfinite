@@ -25,6 +25,12 @@ export type ExportOptions = {
 	selectedOnly?: boolean;
 
 	/**
+	 * Paint an opaque background or preserve transparent pixels in the SVG.
+	 * Defaults to an opaque white background for compatibility with file exports.
+	 */
+	background?: 'white' | 'transparent';
+
+	/**
 	 * Include camera transform in the SVG (default: false - export in world coordinates)
 	 *
 	 * When false, shapes are exported in their natural world coordinates.
@@ -139,9 +145,10 @@ export function exportToSVG(state: EditorState, options: ExportOptions = {}): st
 	const offsetX = bounds.min.x - padding;
 	const offsetY = bounds.min.y - padding;
 
-	const elements: string[] = [
-		`<rect x="${offsetX}" y="${offsetY}" width="${width}" height="${height}" fill="white"/>`
-	];
+	const elements: string[] =
+		options.background === 'transparent'
+			? []
+			: [`<rect x="${offsetX}" y="${offsetY}" width="${width}" height="${height}" fill="white"/>`];
 	const definitions: string[] = [];
 
 	for (const shape of shapes) {

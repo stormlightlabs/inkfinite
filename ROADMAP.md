@@ -37,8 +37,9 @@ The supported syntax and fallback rules are documented in
 Selections and current-page documents can be copied as canonical SVG markup.
 Inkfinite writes vector and plain-text clipboard representations when the
 browser supports them and shows the markup when it cannot access the clipboard.
-Raster exports should be copyable as PNG when platform clipboard APIs permit it,
-with predictable browser fallbacks.
+Selections and current-page documents can also be rasterized as PNG, with an
+explicit transparent-background option. When platform image clipboard APIs are
+unavailable, Inkfinite downloads the PNG instead.
 
 ### PWA and offline operation
 

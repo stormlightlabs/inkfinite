@@ -885,23 +885,28 @@ export function createCanvasController(
 	}
 
 	/** Renders the current page through the same exporter used by SVG file export. */
-	async function renderSvg(selectedOnly: boolean): Promise<SvgExport> {
+	async function renderSvg(
+		selectedOnly: boolean,
+		options: { transparentBackground?: boolean } = {}
+	): Promise<SvgExport> {
 		const state = store.getState();
 		const exportFunction = platformSession?.interchange?.exportSvg;
+		const background = options.transparentBackground ? 'transparent' : 'white';
 		if (exportFunction && activeBoardId && repo && sink) {
 			await sink.flush();
 			const snapshot = await repo.exportBoard(activeBoardId);
-			const options: SvgExportOptions = {
+			const exportOptions: SvgExportOptions = {
 				pageId: state.ui.currentPageId ?? undefined,
 				selectionIds: selectedOnly ? [...state.ui.selectionIds] : [],
-				selectionOnly: selectedOnly
+				selectionOnly: selectedOnly,
+				background
 			};
-			return exportFunction(snapshot, options);
+			return exportFunction(snapshot, exportOptions);
 		}
 
 		return {
 			format: 'svg',
-			contents: exportToSVG(state, { selectedOnly }),
+			contents: exportToSVG(state, { selectedOnly, background }),
 			extension: 'svg',
 			mimeType: 'image/svg+xml',
 			warnings: []

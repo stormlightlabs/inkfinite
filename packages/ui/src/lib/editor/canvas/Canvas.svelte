@@ -3,7 +3,6 @@
 		Action,
 		Camera,
 		canBooleanPathSelection,
-		exportToSVG,
 		getSelectedShapes,
 		hitTestPoint,
 		selectionTarget,
@@ -12,11 +11,13 @@
 	import { untrack } from 'svelte';
 	import { Button, ContextMenu, Dialog, type ContextMenuEntry } from '../../index';
 	import {
+		copyPngBlob,
 		copySelection,
 		copySvgMarkup,
 		pasteClipboard,
 		pasteImage,
 		pasteText,
+		renderSvgToPng,
 		readClipboardContent
 	} from '../clipboard';
 	import type { SelectionCommand } from '../commands';
@@ -201,29 +202,17 @@
 		svgClipboardFallbackEl?.select();
 	}
 
-	async function copySelectionAsPng() {
+	async function copyPng(selectedOnly: boolean, transparentBackground = false) {
 		try {
-			const svg = exportToSVG(c.store.getState(), { selectedOnly: true });
-			const image = new Image();
-			const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
-			await new Promise<void>((resolve, reject) => {
-				image.onload = () => resolve();
-				image.onerror = () => reject(new Error('Could not render the selection as PNG.'));
-				image.src = url;
-			});
-			URL.revokeObjectURL(url);
-			const canvas = document.createElement('canvas');
-			canvas.width = Math.max(1, image.naturalWidth);
-			canvas.height = Math.max(1, image.naturalHeight);
-			canvas.getContext('2d')?.drawImage(image, 0, 0);
-			const blob = await new Promise<Blob | null>((resolve) =>
-				canvas.toBlob(resolve, 'image/png')
+			const exported = await c.renderSvg(selectedOnly, { transparentBackground });
+			const blob = await renderSvgToPng(exported.contents, { transparentBackground });
+			const filename = selectedOnly ? 'selection.png' : 'drawing.png';
+			const result = await copyPngBlob(blob, filename);
+			announceClipboardStatus(
+				result === 'rich'
+					? `${selectedOnly ? 'Selection' : 'Document'} PNG copied to the clipboard${transparentBackground ? ' with transparency' : ''}.`
+					: `PNG clipboard access is unavailable. Downloaded ${filename} instead.`
 			);
-			if (!blob) throw new Error('Could not encode the selection as PNG.');
-			if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
-				throw new Error('PNG clipboard access is not available in this browser.');
-			}
-			await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
 		} catch (error) {
 			reportEditorError(error, 'Clipboard error');
 		}
@@ -505,6 +494,18 @@
 			{ id: 'copy-svg-document', label: 'Copy document as SVG', icon: 'svg' },
 			{ id: 'copy-png', label: 'Copy as PNG', icon: 'add', disabled: selected.length === 0 },
 			{
+				id: 'copy-png-transparent',
+				label: 'Copy as PNG (Transparent)',
+				icon: 'add',
+				disabled: selected.length === 0
+			},
+			{ id: 'copy-png-document', label: 'Copy document as PNG', icon: 'add' },
+			{
+				id: 'copy-png-document-transparent',
+				label: 'Copy document as PNG (Transparent)',
+				icon: 'add'
+			},
+			{
 				id: 'cut',
 				label: 'Cut',
 				icon: 'delete',
@@ -731,6 +732,12 @@
 			}));
 			contextMenuItems = [
 				{ id: 'copy-svg-document', label: 'Copy document as SVG', icon: 'svg' },
+				{ id: 'copy-png-document', label: 'Copy document as PNG', icon: 'add' },
+				{
+					id: 'copy-png-document-transparent',
+					label: 'Copy document as PNG (Transparent)',
+					icon: 'add'
+				},
 				{ type: 'separator' },
 				{ id: 'paste', label: 'Paste', icon: 'add', shortcut: '⌘/Ctrl V' },
 				{ id: 'paste-at-cursor', label: 'Paste at cursor', icon: 'add' },
@@ -764,7 +771,19 @@
 			return;
 		}
 		if (id === 'copy-png') {
-			await copySelectionAsPng();
+			await copyPng(true);
+			return;
+		}
+		if (id === 'copy-png-transparent') {
+			await copyPng(true, true);
+			return;
+		}
+		if (id === 'copy-png-document') {
+			await copyPng(false);
+			return;
+		}
+		if (id === 'copy-png-document-transparent') {
+			await copyPng(false, true);
 			return;
 		}
 		if (id === 'cut') {
@@ -850,6 +869,7 @@
 		onImportSvgMarkup={platformKind === 'web' ? openSvgMarkupDialog : undefined}
 		onExportSvg={c.exportSvg}
 		onCopySvg={copySvg}
+		onCopyPng={copyPng}
 		onExportEditable={c.exportEditableCanvas}
 		interchangeBusy={c.interchangeBusy()} />
 	<div
