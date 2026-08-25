@@ -1,0 +1,13 @@
+direction: right
+network: {
+  api: {
+    label: API server
+    shape: rectangle
+    style.fill: "#dbeafe"
+    style.stroke: "#2563eb"
+  }
+  db: Database
+  api -> db: reads
+}
+client: Client
+client -> network.api: requests

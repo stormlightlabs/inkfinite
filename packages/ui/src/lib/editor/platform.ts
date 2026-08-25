@@ -81,7 +81,7 @@ export type NativeFileMenuAction =
 	| 'export-excalidraw'
 	| 'export-json-canvas';
 
-/** User-selected external editable document. */
+/** User-selected external editable document or diagram source. */
 export type InterchangeSourceFile = { name: string; contents: string };
 
 /** User-selected SVG bytes kept out of the main-thread parser. */

@@ -1,13 +1,17 @@
 import type { BoardExport } from './persistence/document';
 import { exportExcalidraw, importExcalidraw } from './interchange/excalidraw';
 import { exportJsonCanvas, importJsonCanvas } from './interchange/json-canvas';
+import { importD2, importMermaid } from './interchange/diagram';
 import { object } from './interchange/shared';
+
+export { importD2, importMermaid } from './interchange/diagram';
+export type { DiagramFormat } from './interchange/diagram';
 
 /** External editable document formats supported by Inkfinite. */
 export type InterchangeFormat = 'excalidraw' | 'json-canvas';
 
 /** Formats accepted by the import boundary. */
-export type InterchangeImportFormat = InterchangeFormat;
+export type InterchangeImportFormat = InterchangeFormat | 'mermaid' | 'd2';
 
 /** A non-fatal loss or compatibility decision made during conversion. */
 export type InterchangeWarning = { code: string; message: string; count: number };
@@ -52,20 +56,25 @@ export function importInterchange(contents: string, fileName: string): Interchan
 	if (byteLength(contents) > MAX_IMPORT_BYTES) {
 		throw new Error('The selected file is larger than the 16 MB import limit.');
 	}
+	const lowerName = fileName.toLowerCase();
+	if (lowerName.endsWith('.mmd') || lowerName.endsWith('.mermaid')) return importMermaid(contents, fileName);
+	if (lowerName.endsWith('.d2')) return importD2(contents, fileName);
+
 	let value: unknown;
 	try {
 		value = JSON.parse(contents);
 	} catch {
-		throw new Error('The selected file does not contain valid JSON.');
+		if (/^\s*(?:%%[^\n]*\n\s*)*(?:flowchart|graph)\b/i.test(contents)) return importMermaid(contents, fileName);
+		throw new Error('The selected file does not contain valid JSON or a supported Mermaid diagram.');
 	}
 	const root = object(value, 'document');
-	if (root.type === 'excalidraw' || fileName.toLowerCase().endsWith('.excalidraw')) {
+	if (root.type === 'excalidraw' || lowerName.endsWith('.excalidraw')) {
 		return importExcalidraw(root, fileName);
 	}
-	if (Array.isArray(root.nodes) || Array.isArray(root.edges) || fileName.toLowerCase().endsWith('.canvas')) {
+	if (Array.isArray(root.nodes) || Array.isArray(root.edges) || lowerName.endsWith('.canvas')) {
 		return importJsonCanvas(root, fileName);
 	}
-	throw new Error('Choose an Excalidraw (.excalidraw) or Obsidian Canvas (.canvas) file.');
+	throw new Error('Choose an Excalidraw (.excalidraw), Obsidian Canvas (.canvas), Mermaid (.mmd), or D2 (.d2) file.');
 }
 
 function byteLength(contents: string) {

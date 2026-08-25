@@ -1,0 +1,9 @@
+flowchart LR
+  subgraph services [Services]
+    API[API server]:::service -->|fetches| DB[(Database)]
+    API -.-> Cache[Cache]
+  end
+  Client((Client)) --> API
+  classDef service fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:2px
+  style DB fill:#fef3c7,stroke:#d97706
+  click API "https://example.com/api"

@@ -2,20 +2,20 @@
 
 ## Richer interoperability and embeds
 
-- [ ] Extend the existing TypeScript JSON Canvas round-trip for new card,
+- [x] Extend the existing TypeScript JSON Canvas round-trip for new card,
       relationship, frame, and asset fields where the format supports them
-- [ ] Add integration fixtures that combine native objects, imported SVG,
+- [x] Add integration fixtures that combine native objects, imported SVG,
       raster assets, and external links
-- [ ] Define the initial editable Mermaid and D2 import subset, mapping graph
+- [x] Define the initial editable Mermaid and D2 import subset, mapping graph
       nodes, edges, labels, groups, and supported styling to canonical shapes
       and relationships
-- [ ] Import supported Mermaid and D2 diagrams as ordinary editable Inkfinite
+- [x] Import supported Mermaid and D2 diagrams as ordinary editable Inkfinite
       objects and run them through the shared graph-layout pipeline
-- [ ] Define warning and fallback behavior for diagram constructs that cannot
+- [x] Define warning and fallback behavior for diagram constructs that cannot
       be represented natively
-- [ ] Add Mermaid and D2 import fixtures covering representative flowcharts,
+- [x] Add Mermaid and D2 import fixtures covering representative flowcharts,
       labels, edge directions, groups, and unsupported constructs
-- [ ] Add end-to-end import, edit, and export comparisons for representative
+- [x] Add end-to-end import, edit, and export comparisons for representative
       mixed-format documents
 
 ## Clipboard and export workflows

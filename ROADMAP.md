@@ -15,16 +15,20 @@ performance before large libraries of templates or format-specific content.
 
 ## Current: richer interoperability
 
-JSON Canvas support should continue to map external data onto ordinary
-Inkfinite objects, relationships, frames, cards, and assets. Mixed-document
-fixtures should exercise native geometry, imported SVG, raster assets, links,
-cards, frames, and relationships together.
+JSON Canvas support maps external data onto ordinary Inkfinite objects,
+relationships, frames, cards, references, and assets. The TypeScript converter
+follows JSON Canvas 1.0: file and link nodes remain editable references, group
+labels and background paths become frame fields, and native image assets export
+as file nodes with a warning because the format stores paths rather than bytes.
+Mixed-document fixtures cover frames, cards, imported raster assets, external
+links, and bound relationships.
 
-Mermaid and D2 are candidates for structured import where their graphs map
-cleanly onto Inkfinite's native objects and relationships. Imported nodes,
-edges, labels, groups, and supported styles should remain editable and use the
-shared graph-layout pipeline. Unsupported constructs need clear warnings and a
-predictable fallback rather than a separate format-specific renderer.
+Mermaid and D2 flowchart imports map their supported nodes, edges, labels,
+groups, and styles to ordinary Markdown cards, frames, and bound arrows. Each
+import runs through the shared flow-layout pipeline. Unsupported shapes become
+rectangular cards; unsupported directives and assets are omitted with a warning.
+The supported syntax and fallback rules are documented in
+[Interoperability](/docs/reference/interoperability/) and covered by fixtures.
 
 ## Next: web installation and export workflows
 

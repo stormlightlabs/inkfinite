@@ -13,7 +13,7 @@ the browser and as a desktop app, with the same editor and document model in bot
 
 Use shapes, arrows, text, Markdown, cards, images, freehand strokes, layers, and stencils to sketch
 an idea or build a structured diagram. Inkfinite also supports graph layout, native vector path
-editing, and SVG, Excalidraw, and Obsidian Canvas interchange.
+editing, SVG and Excalidraw interchange, JSON Canvas references, and Mermaid and D2 diagram import.
 
 ## Where documents live
 

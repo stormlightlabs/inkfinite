@@ -6,7 +6,7 @@ group: Reference
 order: 17
 ---
 
-Inkfinite uses `.inkfinite` as its native document format. The editor can also import and export Excalidraw and Obsidian Canvas files when you need to move editable content between applications.
+Inkfinite uses `.inkfinite` as its native document format. The editor can also import and export Excalidraw and Obsidian Canvas files, and import Mermaid and D2 source when you need to move editable content between applications.
 
 ## Native files
 
@@ -46,7 +46,7 @@ Invalid bytes, stale heads, missing references, and invalid record properties ar
 
 ## Editable interchange
 
-Use **Import** in the editor toolbar to select an Excalidraw `.excalidraw` file or an Obsidian Canvas `.canvas` file. Use **Export** to write the current page in either format. The desktop app offers the same commands in its File menu.
+Use **Import** in the editor toolbar to select an Excalidraw `.excalidraw`, Obsidian Canvas `.canvas`, Mermaid `.mmd` or `.mermaid`, or D2 `.d2` file. Use **Export** to write the current page as Excalidraw or Obsidian Canvas. The desktop app offers the same commands in its File menu.
 
 Imports are limited to 16 MB of UTF-8 JSON. Inkfinite rejects malformed geometry and duplicate identifiers instead of guessing at corrupt data. It omits edges and bindings that refer to missing or unsupported shapes and includes them in the conversion notes.
 
@@ -69,23 +69,29 @@ Inkfinite reads and writes Excalidraw v2 scene JSON. The converter handles recta
 
 Excalidraw's rough rendering, fill patterns, canvas settings, nested group hierarchy, some arrowhead styles, and exact font metrics do not have Inkfinite equivalents. Inkfinite converts rotation around Excalidraw's center-based origin into its own top-left transform so rotated supported shapes keep their placement.
 
-Embedded Excalidraw images remain unsupported until Inkfinite has an editable image shape. The importer reports both omitted image elements and embedded file data.
+Embedded Excalidraw raster images become editable Inkfinite image shapes when their file data is present. Images without file data are omitted with a conversion note.
 
 ## Obsidian Canvas
 
 Inkfinite implements the JSON Canvas 1.0 structure used by Obsidian `.canvas` files.
 
-| JSON Canvas content | Inkfinite result                                    |
-| ------------------- | --------------------------------------------------- |
-| Text node           | Markdown card                                       |
-| File node           | Markdown wiki link                                  |
-| Link node           | Markdown link                                       |
-| Group node          | Flat Inkfinite group. Label and background are lost |
-| Edge between nodes  | Bound Inkfinite arrow                               |
+| JSON Canvas content | Inkfinite result                                       |
+| ------------------- | ------------------------------------------------------ |
+| Text node           | Markdown card                                          |
+| File node           | Editable file reference, including an optional subpath |
+| Link node           | Editable URL reference                                 |
+| Group node          | Inkfinite frame with label, color, and source metadata |
+| Edge between nodes  | Bound Inkfinite arrow                                  |
 
-JSON Canvas does not represent general drawing primitives, freehand strokes, layers, rotation, or free-floating arrows. When exporting, Inkfinite writes text and Markdown as cards, bound arrows as edges, and groups around supported cards. Other drawing shapes are omitted and listed in the conversion notes. Rotated cards use their axis-aligned bounds.
+JSON Canvas does not represent general drawing primitives, freehand strokes, layers, rotation, or free-floating arrows. When exporting, Inkfinite writes text and Markdown as cards, file and URL references as file or link nodes, bound arrows as edges, and containers as groups. Native image assets become file nodes because JSON Canvas stores paths rather than embedded bytes. Other drawing shapes are omitted and listed in the conversion notes. Rotated objects use axis-aligned bounds.
 
-File nodes refer to paths in an Obsidian vault. Inkfinite preserves those references as Markdown links but does not copy or resolve the target attachments.
+File nodes refer to paths in an Obsidian vault. Inkfinite preserves those paths as editable file references but does not copy or resolve the target attachments. Group background paths are kept in frame source metadata; the importer cannot read the referenced file from JSON Canvas text alone.
+
+## Mermaid and D2 imports
+
+Mermaid imports flowcharts declared with `flowchart` or `graph`. The supported subset includes directions, common node labels and shapes, subgraphs, arrow labels, `classDef`, `class`, `style`, `linkStyle`, and `click` URLs. D2 imports shape declarations, nested groups, labels, common fills and strokes, directions, and `--`, `->`, `<-`, and `<->` connections. Both importers create ordinary cards, frames, and bound arrows and run the nodes through the shared flow layout.
+
+The importers report unsupported constructs instead of silently treating them as native equivalents. Unsupported Mermaid and D2 node shapes use rectangular Markdown cards. D2 icons, images, tooltips, classes, scenarios, and advanced layout directives are omitted with warnings. These imports are one-way; export to Mermaid or D2 is not part of the current interchange surface.
 
 ## Image and SVG exports
 

@@ -1,0 +1,65 @@
+{
+  "nodes": [
+    {
+      "id": "frame",
+      "type": "group",
+      "x": 0,
+      "y": 0,
+      "width": 640,
+      "height": 360,
+      "label": "Imported references",
+      "color": "6",
+      "background": "assets/board-background.png",
+      "backgroundStyle": "cover"
+    },
+    {
+      "id": "card",
+      "type": "text",
+      "x": 48,
+      "y": 72,
+      "width": 220,
+      "height": 100,
+      "text": "# Native card\nImported from JSON Canvas",
+      "color": "4"
+    },
+    {
+      "id": "file",
+      "type": "file",
+      "x": 330,
+      "y": 72,
+      "width": 220,
+      "height": 100,
+      "file": "notes/architecture.md",
+      "subpath": "#Overview"
+    },
+    {
+      "id": "link",
+      "type": "link",
+      "x": 190,
+      "y": 220,
+      "width": 220,
+      "height": 100,
+      "url": "https://ink.stormlightlabs.org"
+    }
+  ],
+  "edges": [
+    {
+      "id": "reads",
+      "fromNode": "card",
+      "fromSide": "right",
+      "toNode": "file",
+      "toSide": "left",
+      "label": "reads",
+      "color": "2"
+    },
+    {
+      "id": "opens",
+      "fromNode": "file",
+      "fromSide": "bottom",
+      "toNode": "link",
+      "toSide": "top",
+      "toEnd": "none",
+      "label": "opens"
+    }
+  ]
+}

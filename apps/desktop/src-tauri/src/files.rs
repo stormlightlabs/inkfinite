@@ -14,12 +14,12 @@ pub struct FileEntry {
     pub modified_at: Option<u64>,
 }
 
-/// UTF-8 contents selected from an external editable canvas file.
+/// UTF-8 contents selected from an external editable canvas or diagram file.
 #[derive(serde::Serialize)]
 pub struct InterchangeFile {
     /// File name shown to the user.
     pub name: String,
-    /// Complete JSON source.
+    /// Complete source text.
     pub contents: String,
 }
 
@@ -179,7 +179,10 @@ pub async fn pick_interchange_document(app: AppHandle) -> Result<Option<Intercha
     let Some(selected) = app
         .dialog()
         .file()
-        .add_filter("Editable Canvas Files", &["excalidraw", "canvas"])
+        .add_filter(
+            "Editable Canvas and Diagram Files",
+            &["excalidraw", "canvas", "mmd", "mermaid", "d2"],
+        )
         .blocking_pick_file()
     else {
         return Ok(None);

@@ -404,7 +404,8 @@ export function createBrowserInterchangeFiles(
 	}
 
 	return {
-		pickImport: () => pickTextFile('.excalidraw,.canvas,application/json'),
+		pickImport: () =>
+			pickTextFile('.excalidraw,.canvas,.mmd,.mermaid,.d2,application/json,text/plain'),
 		pickSvg: pickSvgFile,
 		async exportSvg(
 			snapshot: BoardExport,

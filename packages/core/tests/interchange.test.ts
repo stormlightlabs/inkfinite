@@ -97,7 +97,8 @@ describe('JSON Canvas interchange', () => {
 
 		expect(result.format).toBe('json-canvas');
 		expect(result.snapshot.board.name).toBe('Notes');
-		expect(Object.values(result.snapshot.doc.shapes).filter((shape) => shape.type === 'markdown')).toHaveLength(3);
+		expect(Object.values(result.snapshot.doc.shapes).filter((shape) => shape.type === 'markdown')).toHaveLength(1);
+		expect(Object.values(result.snapshot.doc.shapes).filter((shape) => shape.type === 'reference')).toHaveLength(2);
 		expect(Object.values(result.snapshot.doc.shapes).filter((shape) => shape.type === 'arrow')).toHaveLength(1);
 		expect(Object.values(result.snapshot.doc.bindings)).toHaveLength(2);
 		expect(result.warnings.map((warning) => warning.code)).toEqual(

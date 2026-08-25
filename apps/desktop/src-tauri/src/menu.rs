@@ -24,7 +24,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     if let Some(file_menu) = file_menu {
         let new_board = MenuItem::with_id(app, NEW_BOARD, "New Board", true, Some("CmdOrCtrl+N"))?;
         let open_board = MenuItem::with_id(app, OPEN_BOARD, "Open…", true, Some("CmdOrCtrl+O"))?;
-        let import_canvas = MenuItem::with_id(app, IMPORT_CANVAS, "Import Editable Canvas…", true, None::<&str>)?;
+        let import_canvas = MenuItem::with_id(app, IMPORT_CANVAS, "Import Canvas or Diagram…", true, None::<&str>)?;
         let import_svg = MenuItem::with_id(app, IMPORT_SVG, "Import SVG…", true, None::<&str>)?;
         let save_board_as = MenuItem::with_id(app, SAVE_BOARD_AS, "Save As…", true, Some("CmdOrCtrl+Shift+S"))?;
         let export_excalidraw = MenuItem::with_id(app, EXPORT_EXCALIDRAW, "Export as Excalidraw…", true, None::<&str>)?;

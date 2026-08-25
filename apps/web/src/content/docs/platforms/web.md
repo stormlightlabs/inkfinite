@@ -26,5 +26,6 @@ remove a profile, or use private browsing. Use the desktop app when you want a c
 `.inkfinite` file that can be copied, versioned, or changed by the CLI.
 
 Excalidraw and Obsidian Canvas exports preserve supported editable content but may omit features
-that the target format cannot represent. PNG and SVG exports are presentation copies. See
+that the target format cannot represent. Mermaid and D2 files can be imported as editable cards,
+frames, and arrows. PNG and SVG exports are presentation copies. See
 [File format](/docs/reference/file-format/) before relying on an export as a backup.

@@ -42,6 +42,8 @@ export function importJsonCanvas(root: JsonObject, fileName: string): Interchang
 		height: number;
 		label?: string;
 		color?: string;
+		background?: string;
+		backgroundStyle?: string;
 	}> = [];
 	const sourceIds = new Set<string>();
 
@@ -58,6 +60,7 @@ export function importJsonCanvas(root: JsonObject, fileName: string): Interchang
 		const width = positiveNumber(node.width, `nodes[${index}].width`);
 		const height = positiveNumber(node.height, `nodes[${index}].height`);
 		if (type === 'group') {
+			const background = typeof node.background === 'string' ? node.background : undefined;
 			groupNodes.push({
 				id,
 				x,
@@ -65,58 +68,100 @@ export function importJsonCanvas(root: JsonObject, fileName: string): Interchang
 				width,
 				height,
 				...(typeof node.label === 'string' ? { label: node.label } : {}),
-				...(typeof node.color === 'string' ? { color: canvasColor(node.color) } : {})
+				...(typeof node.color === 'string' ? { color: canvasColor(node.color) } : {}),
+				...(background ? { background } : {}),
+				...(typeof node.backgroundStyle === 'string' ? { backgroundStyle: node.backgroundStyle } : {})
 			});
 			if (typeof node.label === 'string' && node.label.trim()) {
 				warnings.add('json-canvas-group-label', 'Group labels were imported as frame titles.');
 			}
-			if (node.background !== undefined) {
-				warnings.add('json-canvas-group-background', 'Group backgrounds were imported as frame fills.');
+			if (background) {
+				warnings.add(
+					'json-canvas-group-background',
+					'Group background paths were retained as frame source metadata; file bytes were not available.'
+				);
+			}
+			if (
+				node.backgroundStyle !== undefined &&
+				node.backgroundStyle !== 'cover' &&
+				node.backgroundStyle !== 'ratio' &&
+				node.backgroundStyle !== 'repeat'
+			) {
+				warnings.add(
+					'json-canvas-group-background-style',
+					'Unsupported JSON Canvas background styles were ignored.'
+				);
 			}
 			continue;
 		}
 
-		let markdown: string;
+		let shape: Shape;
 		switch (type) {
-			case 'text':
-				if (typeof node.text !== 'string') {
-					throw new Error(`nodes[${index}].text must be a string.`);
-				}
-				markdown = node.text;
+			case 'text': {
+				if (typeof node.text !== 'string') throw new Error(`nodes[${index}].text must be a string.`);
+				shape = ShapeRecord.createMarkdown(
+					pageId,
+					x,
+					y,
+					markdownProps(node.text, width, height, node.color),
+					inkId('json-canvas', id)
+				);
 				break;
+			}
 			case 'file': {
 				const path = requiredString(node.file, `nodes[${index}].file`);
 				const subpath = typeof node.subpath === 'string' ? node.subpath : '';
-				markdown = `[[${path}${subpath}]]`;
-				warnings.add('json-canvas-file-card', 'File cards were imported as Markdown links.');
+				if (subpath && !subpath.startsWith('#'))
+					warnings.add('json-canvas-file-subpath', 'File subpaths must start with # and were ignored.');
+				shape = ShapeRecord.createReference(
+					pageId,
+					x,
+					y,
+					{
+						w: width,
+						h: height,
+						referenceType: 'file',
+						value: `${path}${subpath.startsWith('#') ? subpath : ''}`,
+						label: path
+					},
+					inkId('json-canvas', id)
+				);
+				warnings.add(
+					'json-canvas-file-card',
+					'File cards remain references because JSON Canvas stores a path, not file bytes.'
+				);
 				break;
 			}
 			case 'link': {
 				const url = requiredString(node.url, `nodes[${index}].url`);
-				markdown = `[${url}](${url})`;
-				warnings.add('json-canvas-link-card', 'Link cards were imported as Markdown links.');
+				if (!/^https?:\/\//i.test(url)) {
+					warnings.add(
+						'json-canvas-link-card',
+						'Non-http JSON Canvas links were imported as Markdown cards.'
+					);
+					shape = ShapeRecord.createMarkdown(
+						pageId,
+						x,
+						y,
+						markdownProps(`[${url}](${url})`, width, height, node.color),
+						inkId('json-canvas', id)
+					);
+				} else {
+					shape = ShapeRecord.createReference(
+						pageId,
+						x,
+						y,
+						{ w: width, h: height, referenceType: 'url', value: url, label: url },
+						inkId('json-canvas', id)
+					);
+					warnings.add('json-canvas-link-card', 'Link cards remain editable URL references.');
+				}
 				break;
 			}
 			default:
 				warnings.add('json-canvas-node-type', `Unsupported JSON Canvas ${type} nodes were omitted.`);
 				continue;
 		}
-		const shape = ShapeRecord.createMarkdown(
-			pageId,
-			x,
-			y,
-			{
-				md: markdown,
-				w: width,
-				h: height,
-				fontSize: 16,
-				fontFamily: DEFAULT_FONT,
-				color: '#1e1e1e',
-				bg: canvasColor(node.color),
-				border: canvasColor(node.color)
-			},
-			inkId('json-canvas', id)
-		);
 		shape.layerId = layerId;
 		nodeShapes.set(id, shape);
 	}
@@ -126,10 +171,25 @@ export function importJsonCanvas(root: JsonObject, fileName: string): Interchang
 			pageId,
 			group.x,
 			group.y,
-			{ w: group.width, h: group.height, title: group.label || 'Frame', fill: group.color },
+			{ w: group.width, h: group.height, title: group.label || 'Frame', fill: group.color, stroke: group.color },
 			inkId('json-canvas-group', group.id)
 		);
 		frame.layerId = layerId;
+		if (group.background) {
+			frame.metadata = {
+				name: group.id,
+				title: group.label || 'Frame',
+				role: 'canvas.frame',
+				description: null,
+				body: null,
+				tags: ['json-canvas'],
+				source: group.background,
+				link: null,
+				customMetadata: { backgroundStyle: group.backgroundStyle ?? 'cover' },
+				locked: false,
+				agentEditable: true
+			};
+		}
 		nodeShapes.set(group.id, frame);
 		addShape(snapshot.doc, pageId, layerId, frame);
 	}
@@ -161,7 +221,9 @@ export function importJsonCanvas(root: JsonObject, fileName: string): Interchang
 		}
 	}
 
-	for (const shape of nodeShapes.values()) addShape(snapshot.doc, pageId, layerId, shape);
+	for (const shape of nodeShapes.values()) {
+		if (shape.type !== 'container') addShape(snapshot.doc, pageId, layerId, shape);
+	}
 
 	for (const [index, value] of edges.entries()) {
 		const edge = object(value, `edges[${index}]`);
@@ -235,6 +297,7 @@ export function exportJsonCanvas(snapshot: BoardExport, requestedPageId?: string
 	const shapeIds = page.layerIds?.flatMap((id) => document.layers?.[id]?.shapeIds ?? []) ?? page.shapeIds;
 	const exportable = new Map<string, JsonObject>();
 	const groups = new Map<string, Shape[]>();
+	const groupNodes = new Map<string, JsonObject>();
 
 	for (const id of shapeIds) {
 		const shape = document.shapes[id];
@@ -244,37 +307,99 @@ export function exportJsonCanvas(snapshot: BoardExport, requestedPageId?: string
 			warnings.add('hidden-layer', 'Shapes on hidden layers were omitted.');
 			continue;
 		}
-		if (shape.type !== 'text' && shape.type !== 'markdown') {
-			if (shape.type !== 'arrow') {
+		const bounds = shapeBounds(shape);
+		if (shape.rot !== 0)
+			warnings.add('json-canvas-rotation', 'Rotated objects were exported using axis-aligned bounds.');
+		const geometry = {
+			id: shape.id,
+			x: Math.round(bounds.min.x),
+			y: Math.round(bounds.min.y),
+			width: Math.max(1, Math.round(bounds.max.x - bounds.min.x)),
+			height: Math.max(1, Math.round(bounds.max.y - bounds.min.y))
+		};
+		let node: JsonObject | null = null;
+		switch (shape.type) {
+			case 'text':
+			case 'markdown':
+				node = {
+					...geometry,
+					type: 'text',
+					text: shape.type === 'text' ? shape.props.text : shape.props.md,
+					...(paintColor(nodeColor(shape)) ? { color: paintColor(nodeColor(shape)) } : {})
+				};
+				break;
+			case 'reference':
+				if (shape.props.referenceType === 'url') node = { ...geometry, type: 'link', url: shape.props.value };
+				else if (shape.props.referenceType === 'file') {
+					const subpath = /#[^#]*$/.exec(shape.props.value)?.[0];
+					node = {
+						...geometry,
+						type: 'file',
+						file: subpath ? shape.props.value.slice(0, -subpath.length) : shape.props.value,
+						...(subpath ? { subpath } : {})
+					};
+				} else
+					warnings.add(
+						'json-canvas-page-reference',
+						'Page references have no JSON Canvas node type and were omitted.'
+					);
+				break;
+			case 'image': {
+				const asset = document.assets?.[shape.props.assetId];
+				if (!asset) {
+					warnings.add('json-canvas-asset', 'Images without an embedded asset were omitted.');
+					break;
+				}
+				node = { ...geometry, type: 'file', file: asset.name };
+				warnings.add(
+					'json-canvas-asset',
+					'Embedded images were exported as file nodes because JSON Canvas stores paths, not bytes.'
+				);
+				break;
+			}
+			case 'container': {
+				const background =
+					shape.metadata?.role === 'canvas.frame' && shape.metadata.source
+						? shape.metadata.source
+						: undefined;
+				const backgroundStyle =
+					shape.metadata?.role === 'canvas.frame' &&
+					typeof shape.metadata.customMetadata.backgroundStyle === 'string' &&
+					['cover', 'ratio', 'repeat'].includes(shape.metadata.customMetadata.backgroundStyle)
+						? shape.metadata.customMetadata.backgroundStyle
+						: undefined;
+				const group = {
+					...geometry,
+					type: 'group',
+					...(shape.props.title ? { label: shape.props.title } : {}),
+					...(paintColor(shape.props.fill) ? { color: paintColor(shape.props.fill) } : {}),
+					...(background ? { background } : {}),
+					...(backgroundStyle ? { backgroundStyle } : {})
+				};
+				groupNodes.set(shape.id, group);
+				node = group;
+				break;
+			}
+			case 'arrow':
+				break;
+			default:
 				warnings.add(
 					'json-canvas-drawing-shape',
 					'Drawing shapes that JSON Canvas cannot represent were omitted.'
 				);
-			}
-			continue;
 		}
-		const bounds = shapeBounds(shape);
-		if (shape.rot !== 0)
-			warnings.add('json-canvas-rotation', 'Rotated cards were exported using axis-aligned bounds.');
-		exportable.set(shape.id, {
-			id: shape.id,
-			type: 'text',
-			x: Math.round(bounds.min.x),
-			y: Math.round(bounds.min.y),
-			width: Math.max(1, Math.round(bounds.max.x - bounds.min.x)),
-			height: Math.max(1, Math.round(bounds.max.y - bounds.min.y)),
-			text: shape.type === 'text' ? shape.props.text : shape.props.md,
-			...(paintColor(nodeColor(shape)) ? { color: paintColor(nodeColor(shape)) } : {})
-		});
-		if (shape.groupId) {
+		if (node) exportable.set(shape.id, node);
+		if (shape.groupId && node && shape.type !== 'container') {
 			const members = groups.get(shape.groupId) ?? [];
 			members.push(shape);
 			groups.set(shape.groupId, members);
 		}
 	}
 
-	const nodes: JsonObject[] = [];
+	const nodes: JsonObject[] = [...groupNodes.values()];
 	for (const [id, members] of groups) {
+		if (groupNodes.has(id)) continue;
+		if (members.length === 0) continue;
 		const memberBounds = members.map(shapeBounds);
 		const bounds = {
 			min: {
@@ -286,18 +411,20 @@ export function exportJsonCanvas(snapshot: BoardExport, requestedPageId?: string
 				y: Math.max(...memberBounds.map((member) => member.max.y))
 			}
 		};
-		nodes.push({
+		const group = {
 			id,
 			type: 'group',
 			x: Math.floor(bounds.min.x - 20),
 			y: Math.floor(bounds.min.y - 20),
 			width: Math.max(1, Math.ceil(bounds.max.x - bounds.min.x + 40)),
 			height: Math.max(1, Math.ceil(bounds.max.y - bounds.min.y + 40))
-		});
+		};
+		groupNodes.set(id, group);
+		nodes.push(group);
 	}
 	for (const id of shapeIds) {
 		const node = exportable.get(id);
-		if (node) nodes.push(node);
+		if (node && node.type !== 'group') nodes.push(node);
 	}
 
 	const edges: JsonObject[] = [];
@@ -319,7 +446,32 @@ export function exportJsonCanvas(snapshot: BoardExport, requestedPageId?: string
 			toSide: sideForAnchor(end.anchor),
 			toEnd: shape.props.style.headEnd === false ? 'none' : 'arrow',
 			color: paintColor(shape.props.style.stroke) ?? '#000000',
-			...(shape.props.label?.text ? { label: shape.props.label.text } : {})
+			...(shape.props.label?.text
+				? { label: shape.props.label.text }
+				: start.relationType
+					? { label: start.relationType }
+					: {})
+		});
+	}
+	for (const binding of Object.values(document.bindings).filter((candidate) => candidate.type === 'relation')) {
+		if (!exportable.has(binding.fromShapeId) || !exportable.has(binding.toShapeId)) continue;
+		if (
+			edges.some(
+				(edge) =>
+					edge.id === binding.id ||
+					(edge.fromNode === binding.fromShapeId && edge.toNode === binding.toShapeId)
+			)
+		)
+			continue;
+		edges.push({
+			id: binding.id,
+			fromNode: binding.fromShapeId,
+			fromSide: 'right',
+			fromEnd: 'none',
+			toNode: binding.toShapeId,
+			toSide: 'left',
+			toEnd: 'none',
+			...(binding.relationType ? { label: binding.relationType } : {})
 		});
 	}
 
@@ -376,6 +528,19 @@ function sideForAnchor(anchor: BindingAnchor): CanvasSide {
 	return anchor.ny < 0 ? 'top' : 'bottom';
 }
 
+function markdownProps(text: string, width: number, height: number, color: unknown) {
+	const paint = canvasColor(color);
+	return {
+		md: text,
+		w: width,
+		h: height,
+		fontSize: 16,
+		fontFamily: DEFAULT_FONT,
+		color: '#1e1e1e',
+		...(paint ? { bg: paint, border: paint } : {})
+	};
+}
+
 function nodeColor(shape: Shape) {
 	if (shape.type === 'markdown') return shape.props.bg || shape.props.border;
 	if (shape.type === 'text') return shape.props.color;
@@ -392,7 +557,7 @@ function canvasColor(value: unknown): string | undefined {
 		'5': '#53dfdd',
 		'6': '#a882ff'
 	};
-	return presets[value] ?? (/^#[\da-f]{6}$/i.test(value) ? value : undefined);
+	return presets[value] ?? (/^#[\da-f]{3,8}$/i.test(value) ? value : undefined);
 }
 
 function positiveNumber(value: unknown, name: string) {
