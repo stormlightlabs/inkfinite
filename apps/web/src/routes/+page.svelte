@@ -4,6 +4,7 @@
 	import Seo from '$lib/Seo.svelte';
 	import { site } from '$lib/site';
 	import '$lib/docs/docs.css';
+	import SiteFooter from '$lib/docs/SiteFooter.svelte';
 	import SiteHeader from '$lib/docs/SiteHeader.svelte';
 	import { Icon } from '$ui';
 
@@ -287,6 +288,7 @@
 			</section>
 		</div>
 	</main>
+	<SiteFooter />
 </div>
 
 <style>

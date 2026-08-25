@@ -6,6 +6,7 @@
 	import DocsPageNavigation from './DocsPageNavigation.svelte';
 	import DocsSeo from './DocsSeo.svelte';
 	import DocsSidebar from './DocsSidebar.svelte';
+	import SiteFooter from './SiteFooter.svelte';
 	import SiteHeader from './SiteHeader.svelte';
 	import DocsToc from './DocsToc.svelte';
 	import { getAdjacentDocs } from './content';
@@ -52,6 +53,8 @@
 			<DocsToc headings={doc.toc} />
 		</aside>
 	</div>
+
+	<SiteFooter />
 </div>
 
 <style>

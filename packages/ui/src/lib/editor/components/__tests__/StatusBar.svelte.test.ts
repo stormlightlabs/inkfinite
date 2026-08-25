@@ -114,6 +114,7 @@ describe('StatusBar', () => {
 				pendingWrites: 0
 			}),
 			snap: createSnapStore(),
+			version: 'v1.2.3-4+gabc1234',
 			onOpenBrowser,
 			onHistoryClick
 		});
@@ -126,6 +127,7 @@ describe('StatusBar', () => {
 		expect(onHistoryClick).toHaveBeenCalledOnce();
 		const dialog = screen.getByRole('dialog', { name: 'About Inkfinite' });
 		await expect.element(dialog).toBeInTheDocument();
+		await expect.element(screen.getByText('Version v1.2.3-4+gabc1234')).toBeInTheDocument();
 		expect(window.getComputedStyle(dialog.element()).borderRadius).toBe('16px');
 	});
 });

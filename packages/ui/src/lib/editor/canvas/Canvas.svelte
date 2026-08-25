@@ -35,7 +35,10 @@
 	import NavigationControls from './NavigationControls.svelte';
 	import { handleCanvasDrop } from './drop-handler';
 
-	let { platform: platformAdapter }: { platform: EditorPlatformAdapter } = $props();
+	let {
+		platform: platformAdapter,
+		version = 'v0.0.0'
+	}: { platform: EditorPlatformAdapter; version?: string } = $props();
 
 	let canvasEl = $state<HTMLCanvasElement | null>(null);
 	let replaceImageInput = $state<HTMLInputElement | null>(null);
@@ -931,6 +934,7 @@
 		viewport={c.viewport()}
 		platform={platformKind}
 		draft={c.desktop.isDraft}
+		{version}
 		onOpenBrowser={c.fileBrowser.handleOpen}
 		onShortcutsClick={() => (shortcutsOpen = true)}
 		onHistoryClick={c.history.handleClick} />

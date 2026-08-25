@@ -17,6 +17,7 @@
 		viewport?: Viewport;
 		platform?: EditorPlatform;
 		draft?: boolean;
+		version?: string;
 		onOpenBrowser?: () => void;
 		onShortcutsClick?: () => void;
 		onHistoryClick?: () => void;
@@ -30,6 +31,7 @@
 		viewport = { width: 1, height: 1 },
 		platform = 'web',
 		draft = false,
+		version = 'v0.0.0',
 		onOpenBrowser,
 		onShortcutsClick,
 		onHistoryClick
@@ -337,6 +339,7 @@
 			Inkfinite is an open canvas for sketching, diagramming, and working with coding agents.
 			The web and desktop apps share the same editor and document model.
 		</p>
+		<p class="about__version">Version {version}</p>
 		<div class="about__section">
 			<h2>Quick Tips</h2>
 			<ul>
@@ -550,6 +553,13 @@
 
 	.about h1 {
 		margin-top: 0;
+	}
+
+	.about__version {
+		color: var(--ink-text-muted);
+		font-family: var(--ink-font-mono);
+		font-size: var(--ink-type-sm);
+		font-variant-numeric: tabular-nums;
 	}
 
 	.about__section {

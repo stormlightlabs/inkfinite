@@ -33,6 +33,24 @@ test('installs the app shell and requests persistent storage', async ({ page }) 
 	expect(await page.evaluate(() => Reflect.get(globalThis, '__inkfinitePersistRequested'))).toBe(
 		true
 	);
+
+	await page.getByRole('button', { name: 'About Inkfinite' }).click();
+	const displayedVersion = (await page.getByText(/^Version v/).textContent())?.replace(
+		'Version ',
+		''
+	);
+	const cachedVersions = await page.evaluate(async () =>
+		(await caches.keys())
+			.filter((name) => name.startsWith('inkfinite-'))
+			.flatMap((name) => {
+				try {
+					return [JSON.parse(name.slice('inkfinite-'.length)).display as string];
+				} catch {
+					return [];
+				}
+			})
+	);
+	expect(cachedVersions).toContain(displayedVersion);
 });
 
 test('creates, reopens, and exports a board while offline', async ({ editor, page, context }) => {
