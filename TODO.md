@@ -52,6 +52,102 @@
 - [x] Add Playwright coverage for first load, installation eligibility, cached
       reload, offline reload, and application updates
 
+## Architecture consolidation
+
+### Clarify model ownership
+
+- [ ] Document the dependency direction between the canonical Rust document,
+      generated bindings, TypeScript editor model, editor runtime, UI, and apps
+- [ ] Rename or reorganize TypeScript editor-model types so they cannot be
+      confused with canonical Rust records; update affected tests and public
+      imports without changing serialized document behavior
+- [ ] Put canonical-to-editor projection and editor-to-canonical reconciliation
+      adapters behind an explicit TypeScript module boundary, with round-trip
+      coverage for projection -> edit -> canonical transaction
+- [ ] Keep generated bindings generated; remove hand-maintained duplicates of
+      Rust-owned contract types where unnecessary and verify binding generation
+      remains reproducible
+
+### Make TypeScript core headless
+
+- [ ] Audit `@inkfinite/core` exports and classify them as domain, editor,
+      browser/platform, persistence, or UI concerns
+- [ ] Move DOM and `HTMLCanvasElement`-dependent raster export helpers out of
+      `@inkfinite/core`; preserve existing SVG/PNG behavior in browser and
+      desktop integration tests
+- [ ] Move UI-specific file-browser and status-bar contracts out of
+      `@inkfinite/core` and update consumers without introducing circular
+      package dependencies
+- [ ] Keep browser and desktop persistence adapters at application/platform
+      boundaries rather than exposing them through the core root barrel;
+      verify create, save, reopen, and export workflows in both hosts
+- [ ] Add explicit `@inkfinite/core` subpath exports for stable capability
+      groups such as model, geometry, commands, selection, and interchange,
+      with package-consumer typecheck coverage
+- [ ] Reduce the root `@inkfinite/core` export surface to the intentionally
+      supported convenience API
+- [ ] Add an import-boundary lint rule or test preventing core from depending
+      on DOM, Svelte, application, or platform-specific modules
+
+### Decompose the editor implementation
+
+- [ ] Split `packages/editor/src/renderer.ts` into renderer lifecycle, scene
+      traversal, shape rendering, text/assets, and overlay responsibilities
+      without changing its public API or rendering fixtures
+- [ ] Keep one exhaustive shape-render dispatch point and require existing
+      rendering coverage to pass for every supported shape kind
+- [ ] Centralize Canvas path, transform, effect, and paint helpers shared by
+      shape renderers; verify Canvas and SVG output remain consistent for the
+      supported effects subset
+- [ ] Move renderer caches and image-loading behavior behind focused helpers
+      with explicit lifetimes and preserve redraw behavior for asynchronously
+      loaded assets
+- [ ] Extract keyboard shortcut resolution from `EditorRuntime` into a pure,
+      independently tested module
+- [ ] Define a small host-request boundary for clipboard, board-browser,
+      command-palette, shortcut-panel, undo, and redo requests, with tests for
+      browser-host dispatch
+- [ ] Move reusable document operations out of the runtime so keyboard
+      shortcuts, menus, context menus, and the command palette dispatch the same
+      editor commands
+- [ ] Keep `EditorRuntime` focused on gestures, interaction state, command
+      routing, previews, and transaction boundaries; preserve gesture and undo
+      transaction semantics in runtime tests
+- [ ] Keep the DOM input adapter limited to browser-event normalization and
+      dispatch, retaining pointer-capture, pressure, wheel, and keyboard
+      coverage
+
+### Decompose large UI inspectors
+
+- [ ] Split `SelectionControls.svelte` into capability-focused inspector
+      sections for transform, appearance, text, path/vector, effects, image,
+      container/layout, and metadata controls while preserving current
+      inspector behavior
+- [ ] Move reusable selection-derived state and mutation helpers out of Svelte
+      components and add focused unit tests for the extracted behavior
+- [ ] Keep inspector sections driven by shared editor commands rather than
+      introducing component-specific document mutations
+- [ ] Review other large editor components for the same presentation-versus-
+      behavior boundary; split only where a coherent responsibility can be
+      extracted and covered independently
+
+### Organize Rust internals
+
+- [ ] Move canonical document types and supporting value types out of
+      `inkfinite-core/src/lib.rs` into focused model modules while preserving
+      existing public re-exports and serialization/schema tests
+- [ ] Split Rust editor projection types, projection logic, and reconciliation
+      logic into focused modules under the existing editor boundary, preserving
+      projection and transaction reconciliation fixtures
+- [ ] Group related path, routing, boolean, layout, and geometry modules under a
+      coherent geometry namespace where doing so improves navigation; preserve
+      existing public paths where they are part of the intended API
+- [ ] Keep WASM, CLI, and MCP as adapters over `inkfinite-core`; do not create
+      additional crates solely to subdivide implementation files
+- [ ] Update architecture documentation and `AGENTS.md` with allowed dependency
+      directions and guidance for where new models, commands, renderers, UI,
+      and platform integrations belong
+
 ## Release and distribution
 
 - [ ] Decide which Rust crates are public API and which remain workspace-only

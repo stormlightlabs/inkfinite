@@ -10,8 +10,9 @@ primitives should support diagramming, sketching, spatial thinking, visual
 collection, and agent-assisted editing without separate internal systems for
 each workflow.
 
-The roadmap prioritizes interoperability, editor usability, distribution, and
-performance before large libraries of templates or format-specific content.
+The roadmap prioritizes interoperability, editor usability, architectural
+clarity, distribution, and performance before large libraries of templates or
+format-specific content.
 
 ## Current: richer interoperability
 
@@ -52,6 +53,70 @@ The app requests persistent browser storage when the platform supports it. A
 waiting service worker shows an update prompt and activates only when the user
 chooses to reload, so cached application code does not become an invisible
 second deployment state.
+
+## Current: architecture consolidation
+
+Recent interoperability, vector-editing, rendering, and WASM work has expanded
+the editor without requiring a new architecture. Before growing the public API
+and release surface further, consolidate the existing boundaries so each layer
+has one clear responsibility.
+
+Rust remains the owner of the canonical document model, validation,
+transactions, geometry, projection, and reconciliation. TypeScript provides the
+ergonomic interactive editor model and pure editor operations. The editor
+package owns input, interaction state, and Canvas rendering. The UI package
+owns presentation, while applications own browser, desktop, filesystem, and
+other platform effects.
+
+### Document and editor model boundaries
+
+Make the distinction between the canonical Rust document, the generated Rust
+editor projection, and the ergonomic TypeScript editor model explicit in names,
+modules, and documentation.
+
+Keep conversion between canonical and interactive representations behind a
+small projection/reconciliation boundary. Generated bindings remain generated
+contracts rather than a second hand-maintained model.
+
+### Core package boundaries
+
+Keep `@inkfinite/core` headless and platform-independent. Move browser-specific
+canvas rasterization, clipboard, filesystem, and UI contracts to the editor,
+UI, or application packages that own those concerns.
+
+Expose intentional package entry points for major capabilities rather than
+using one broad root barrel as the primary internal dependency surface.
+
+### Editor decomposition
+
+Keep the existing editor architecture while splitting large implementation
+modules by responsibility.
+
+Separate renderer lifecycle and scene traversal from shape drawing, text and
+asset rendering, effects, and editor overlays. Keep shape dispatch exhaustive
+and centralized rather than introducing a renderer class hierarchy.
+
+Reduce the editor runtime to interaction state, command routing, and transaction
+boundaries. Keyboard shortcuts, host requests, and reusable document commands
+should be independently testable and shared by keyboard, menu, command-palette,
+and context-menu entry points.
+
+Break large inspector components into capability-focused sections without
+moving domain behavior into Svelte components.
+
+### Rust module organization
+
+Keep `inkfinite-core` as one cohesive crate rather than introducing additional
+crates solely for organization.
+
+Move canonical contract definitions out of `lib.rs` into focused model modules
+while preserving stable public re-exports. Split editor projection and
+reconciliation internally while retaining their existing public boundary.
+
+This work should remain behavior-preserving. Refactoring is complete when the
+dependency direction is easier to explain, package imports communicate intent,
+and adding a new shape, command, renderer behavior, or platform feature has an
+obvious home.
 
 ## Distribution
 
