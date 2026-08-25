@@ -8,9 +8,5 @@
 	const _ = themeStore;
 </script>
 
-<svelte:head>
-	<title>Inkfinite - Infinite Canvas</title>
-</svelte:head>
-
 {@render children()}
 <PwaStatus />

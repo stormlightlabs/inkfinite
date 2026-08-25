@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { getDocs } from '$lib/docs/content';
+	import Seo from '$lib/Seo.svelte';
+	import { site } from '$lib/site';
 	import '$lib/docs/docs.css';
 	import SiteHeader from '$lib/docs/SiteHeader.svelte';
 	import { Icon } from '$ui';
@@ -24,12 +26,7 @@
 		.filter((doc): doc is (typeof docs)[number] => doc !== undefined);
 </script>
 
-<svelte:head>
-	<title>Inkfinite</title>
-	<meta
-		name="description"
-		content="A local-first infinite canvas for drawing, diagramming, and vector editing, with open files and first-class tools for agents." />
-</svelte:head>
+<Seo title={site.title} description={site.description} pathname="/" />
 
 <div class="docs-site">
 	<SiteHeader {docs} />

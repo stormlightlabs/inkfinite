@@ -127,9 +127,30 @@
       components and add focused unit tests for the extracted behavior
 - [ ] Keep inspector sections driven by shared editor commands rather than
       introducing component-specific document mutations
-- [ ] Review other large editor components for the same presentation-versus-
-      behavior boundary; split only where a coherent responsibility can be
-      extracted and covered independently
+- [ ] Move arrow selection derivation and arrow mutations out of
+      `ArrowPopover.svelte`; expose shared editor operations for routing,
+      labels, styling, arrowheads, and endpoint disconnection, with focused
+      unit tests
+- [ ] Continue reducing `Canvas.svelte` to a composition root by extracting
+      clipboard/drop orchestration and replacing remaining direct document
+      mutations such as frame entry and image cropping with shared editor
+      operations
+- [ ] Extract proposal preview normalization/projection from
+      `ProposalGhostLayer.svelte` into independently tested pure helpers;
+      leave SVG rendering in the component
+- [ ] Deduplicate Toolbar/LayerPanel floating-position behavior, starting with
+      pure clamping and movement helpers; introduce a shared stateful
+      controller only if the resulting interface is simpler for both callers
+- [ ] Extract Toolbar import/export menu derivation into a tested menu model
+      while keeping UI event dispatch in the component
+- [ ] Move LayerPanel delete/rehome policy out of the component where it
+      represents editor semantics rather than presentation
+- [ ] Record `StatusBar.svelte`, `ProposalReview.svelte`, and the remaining
+      small editor components as reviewed/no-split unless a new independently
+      testable responsibility emerges
+- [ ] Preserve existing component-level regression tests and add unit tests
+      for every extracted behavior module; do not refactor solely to reduce
+      component line counts
 
 ### Organize Rust internals
 
