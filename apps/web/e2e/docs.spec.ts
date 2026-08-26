@@ -15,6 +15,23 @@ const policyExample = `{
 	}
 }`;
 
+test('keeps documentation scrollable after client-side navigation from the landing page', async ({
+	page
+}) => {
+	await page.goto('/');
+	await page.getByRole('link', { name: 'Start', exact: true }).click();
+	await expect(page).toHaveURL(/\/docs\/quickstart\/?$/);
+
+	expect(
+		await page
+			.locator('html')
+			.evaluate((element) => getComputedStyle(element).overscrollBehavior)
+	).toBe('none');
+	await page.mouse.move(1200, 700);
+	await page.mouse.wheel(0, 700);
+	await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+});
+
 test('highlights documentation code without changing its whitespace', async ({ page }) => {
 	await page.goto('/docs/automation/agents/');
 

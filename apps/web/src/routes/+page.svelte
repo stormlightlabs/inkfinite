@@ -49,8 +49,8 @@
 						</a>
 						<a
 							class="secondary-action"
-							href="https://github.com/stormlightlabs/inkfinite/releases">
-							Download desktop <Icon name="github" size={18} />
+							href={resolve('/docs/development/building-from-source/')}>
+							Build desktop from source <Icon name="github" size={18} />
 						</a>
 					</div>
 					<nav class="quiet-links" aria-label="Project links">

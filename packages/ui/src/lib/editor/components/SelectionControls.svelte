@@ -97,6 +97,7 @@
 				>{selection.selectionCount}
 				{selection.selectionCount === 1 ? 'object' : 'objects'} selected</strong>
 			<IconButton
+				class="selection-controls__collapse"
 				label={collapsed ? 'Expand contextual actions' : 'Collapse contextual actions'}
 				name={collapsed ? 'chevron-down' : 'chevron-up'}
 				onclick={() => (collapsed = !collapsed)} />

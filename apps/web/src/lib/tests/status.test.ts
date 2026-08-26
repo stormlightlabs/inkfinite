@@ -132,6 +132,7 @@ describe('Dexie editor adapter', () => {
 
 		await expect(manager.sink.flush()).rejects.toThrow('failed');
 		expect(manager.status.get().state).toBe('error');
+		expect(manager.status.get().pendingWrites).toBe(0);
 		expect(manager.status.get().errorMsg).toBe('failed');
 	});
 

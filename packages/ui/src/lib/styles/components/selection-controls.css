@@ -5,16 +5,16 @@
 	z-index: 95;
 	display: flex;
 	align-items: center;
-	gap: var(--ink-space-3);
-	width: min(81rem, calc(100vw - 9rem));
-	max-width: calc(100vw - 9rem);
-	padding: var(--ink-space-2) var(--ink-space-3);
-	border: 1px solid color-mix(in srgb, var(--ink-border) 68%, transparent);
+	gap: var(--ink-space-2);
+	width: fit-content;
+	max-width: min(72rem, calc(100vw - 9rem));
+	padding: var(--ink-space-1) var(--ink-space-2);
+	border: 1px solid color-mix(in srgb, var(--ink-border) 72%, transparent);
 	border-radius: var(--ink-radius-panel-small);
 	color: var(--ink-text);
 	background: color-mix(in srgb, var(--ink-surface-raised) 97%, transparent);
 	box-shadow:
-		0 0 0 1px color-mix(in srgb, var(--ink-border) 18%, transparent),
+		0 1px 0 color-mix(in srgb, white 16%, transparent) inset,
 		var(--ink-shadow-panel);
 	translate: -50% 0;
 	backdrop-filter: blur(14px);
@@ -37,11 +37,18 @@
 	flex: 0 0 auto;
 	min-width: max-content;
 	align-items: center;
-	gap: var(--ink-space-2);
+	gap: var(--ink-space-1);
+	padding-inline-end: var(--ink-space-2);
+	border-inline-end: 1px solid color-mix(in srgb, var(--ink-border) 48%, transparent);
 }
 
 .selection-controls__header strong {
 	white-space: nowrap;
+}
+
+.selection-controls__collapse.ink-icon-button {
+	width: var(--ink-control-height-sm);
+	height: var(--ink-control-height-sm);
 }
 
 .selection-controls__section h2 {
@@ -62,7 +69,7 @@
 	min-width: 0;
 	align-items: stretch;
 	flex-wrap: nowrap;
-	gap: var(--ink-space-3);
+	gap: var(--ink-space-2);
 	overflow-x: auto;
 	scrollbar-width: none;
 }
@@ -109,8 +116,8 @@
 	flex: 0 0 auto;
 	min-width: max-content;
 	align-content: start;
-	gap: var(--ink-space-2);
-	padding-inline-end: var(--ink-space-3);
+	gap: var(--ink-space-1);
+	padding-inline-end: var(--ink-space-2);
 	border-inline-end: 1px solid color-mix(in srgb, var(--ink-border) 48%, transparent);
 }
 
@@ -126,7 +133,7 @@
 .selection-controls__controls,
 .selection-controls__actions {
 	display: flex;
-	min-height: 2.5rem;
+	min-height: var(--ink-control-height-sm);
 	align-items: center;
 	gap: var(--ink-space-2);
 }
@@ -144,7 +151,7 @@
 
 .selection-controls__range-control {
 	display: grid;
-	grid-template-columns: auto 5.5rem 3.25rem;
+	grid-template-columns: auto 5rem 3rem;
 }
 
 .selection-controls__range-control input {

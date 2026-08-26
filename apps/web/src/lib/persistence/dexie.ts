@@ -76,9 +76,23 @@ export function createDexieSession(
 	function markError(error: unknown) {
 		status.update((current) => ({
 			...current,
+			pendingWrites: 0,
 			state: 'error',
 			errorMsg: error instanceof Error ? error.message : String(error)
 		}));
+	}
+
+	function completeCanonicalWrite() {
+		status.update((current) => {
+			const pendingWrites = Math.max(0, (current.pendingWrites ?? 0) - 1);
+			return {
+				...current,
+				pendingWrites,
+				state: pendingWrites === 0 ? 'saved' : 'saving',
+				lastSavedAt: pendingWrites === 0 ? Date.now() : current.lastSavedAt,
+				errorMsg: undefined
+			};
+		});
 	}
 
 	function ensureDocumentWorker() {
@@ -246,6 +260,7 @@ export function createDexieSession(
 		documentQueue = documentQueue
 			.catch(() => {})
 			.then(run)
+			.then(completeCanonicalWrite)
 			.catch((error) => {
 				markError(error);
 				throw error;
@@ -297,7 +312,8 @@ export function createDexieSession(
 
 			subscription = liveQueryFactory(() => database.boards.get(boardId)).subscribe({
 				next(board) {
-					if (board?.updatedAt !== undefined) markSaved(board.updatedAt);
+					if (!canonicalEnabled && board?.updatedAt !== undefined)
+						markSaved(board.updatedAt);
 				},
 				error: markError
 			});

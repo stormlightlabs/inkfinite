@@ -24,6 +24,30 @@ describe('StatusBar', () => {
 		await expect.element(screen.getByText('-100, 50')).toBeInTheDocument();
 	});
 
+	it('keeps changing coordinate segments at a fixed width', async () => {
+		const cursor = new CursorStore();
+		const screen = render(StatusBar, {
+			store: new Store(),
+			cursor,
+			persistence: createStatusStore({
+				backend: 'indexeddb',
+				state: 'saved',
+				pendingWrites: 0
+			}),
+			snap: createSnapStore()
+		});
+		const segment = screen
+			.getByText('Cursor')
+			.element()
+			.closest<HTMLElement>('.status-bar__section--coordinates');
+		if (!segment) throw new Error('Expected a coordinate status segment');
+		const initialWidth = segment.getBoundingClientRect().width;
+
+		cursor.updateCursor({ x: -123456, y: 987654 });
+		await expect.element(screen.getByText('-123456, 987654')).toBeInTheDocument();
+		expect(segment.getBoundingClientRect().width).toBe(initialWidth);
+	});
+
 	it('updates snapping preferences from accessible controls', async () => {
 		const snap = createSnapStore();
 		const screen = render(StatusBar, {

@@ -36,6 +36,15 @@ test('menus stay in the viewport and restore focus', async ({ editor, page }) =>
 	await expect(zoomButton).toBeFocused();
 });
 
+test('save status settles after an editor change', async ({ editor, page }) => {
+	await editor.open();
+	await editor.createSelectedRectangle();
+
+	await expect(page.locator('.status-bar__section--persistence')).toContainText('Saved', {
+		timeout: 5_000
+	});
+});
+
 test('tool and menu changes do not move the canvas', async ({ editor, page }) => {
 	await editor.open();
 	const canvas = page.locator('canvas').first();

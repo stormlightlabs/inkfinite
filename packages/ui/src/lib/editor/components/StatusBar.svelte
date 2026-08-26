@@ -202,13 +202,13 @@
 		<Icon name="chevron-left" size={16} />
 	</button>
 	<div bind:this={statusViewport} class="status-bar__viewport" onscroll={updateScrollState}>
-		<div class="status-bar__section">
+		<div class="status-bar__section status-bar__section--tool">
 			<span class="status-bar__label">Tool</span>
 			<span class="status-bar__value">{statusVm.toolId}</span>
 			<span class="status-bar__mode">{statusVm.mode}</span>
 		</div>
 
-		<div class="status-bar__section">
+		<div class="status-bar__section status-bar__section--coordinates">
 			<span class="status-bar__label">Cursor</span>
 			<span class="status-bar__value">
 				{formatCursorCoord(statusVm.cursorWorld.x)}, {formatCursorCoord(
@@ -218,7 +218,7 @@
 		</div>
 
 		<div
-			class="status-bar__section"
+			class="status-bar__section status-bar__section--coordinates"
 			title="World-space viewport origin. Pan with a trackpad, middle-drag, or Space-drag.">
 			<span class="status-bar__label">Viewport</span>
 			<span class="status-bar__value">
@@ -226,7 +226,7 @@
 			</span>
 		</div>
 
-		<div class="status-bar__section">
+		<div class="status-bar__section status-bar__section--selection">
 			<span class="status-bar__label">Selection</span>
 			<span class="status-bar__value">{formatSelection()}</span>
 		</div>
@@ -468,6 +468,29 @@
 		align-items: center;
 		gap: 0.75rem;
 		position: relative;
+	}
+
+	.status-bar__section--tool {
+		width: 8.5rem;
+	}
+
+	.status-bar__section--coordinates {
+		width: 9.5rem;
+	}
+
+	.status-bar__section--selection {
+		width: 11rem;
+	}
+
+	.status-bar__section--persistence {
+		width: 10rem;
+	}
+
+	.status-bar__section--coordinates .status-bar__value,
+	.status-bar__section--selection .status-bar__value,
+	.status-bar__section--persistence .status-bar__value {
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.status-bar__toggle-row {

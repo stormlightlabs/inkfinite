@@ -1,10 +1,12 @@
 html {
 	font-family: var(--ink-font-body);
 	background: var(--ink-canvas);
+	overscroll-behavior: none;
 }
 
 body {
 	margin: 0;
+	overscroll-behavior: none;
 	color: var(--ink-text);
 	background: var(--ink-canvas);
 	font-family: var(--ink-font-body);
