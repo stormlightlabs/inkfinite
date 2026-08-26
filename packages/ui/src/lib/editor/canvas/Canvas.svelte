@@ -32,6 +32,7 @@
 	import FileBrowser from '../filebrowser/FileBrowser.svelte';
 	import type { EditorPlatformAdapter } from '../platform';
 	import { createCanvasController } from './canvas-store.svelte';
+	import HistoryControls from './HistoryControls.svelte';
 	import NavigationControls from './NavigationControls.svelte';
 	import { handleCanvasDrop } from './drop-handler';
 
@@ -765,6 +766,7 @@
 				viewport={c.getViewport()} />
 		{/if}
 		<NavigationControls store={c.store} camera={c.camera} />
+		<HistoryControls store={c.store} />
 		<LayerPanel store={c.store} onCommit={c.commitLayerState} />
 		{#if textEditorCurrent}
 			{@const layout = c.textEditor.getLayout()}
