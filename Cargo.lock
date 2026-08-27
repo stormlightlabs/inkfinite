@@ -6246,6 +6246,7 @@ dependencies = [
  "clap_complete",
  "clap_mangen",
  "inkfinite-cli",
+ "sha2 0.10.9",
 ]
 
 [[package]]

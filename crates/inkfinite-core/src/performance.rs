@@ -13,7 +13,7 @@ use crate::{
     ShapeId, ShapeKind, ShapeParent, ShapeRecord, ShapeStyle, Timestamp, Transform, Vec2,
 };
 
-const CORPUS: &str = include_str!("../../../fixtures/native/performance/corpus.json");
+const CORPUS: &str = include_str!("../fixtures/performance-corpus.json");
 /// Actor used to create deterministic benchmark fixtures.
 pub const ACTOR: &str = "actor:criterion";
 
@@ -376,5 +376,15 @@ pub fn patch_transaction(snapshot: &crate::DocumentSnapshot, shape_id: ShapeId, 
             expected_version: None,
         }],
         timestamp: Timestamp(i64::from(offset)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CORPUS;
+
+    #[test]
+    fn packaged_manifest_matches_shared_performance_corpus() {
+        assert_eq!(CORPUS, include_str!("../../../fixtures/native/performance/corpus.json"));
     }
 }

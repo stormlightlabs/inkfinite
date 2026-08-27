@@ -1,9 +1,11 @@
 [package]
 name = "desktop"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "Native desktop application for Inkfinite"
+authors = ["Owais Jamil"]
 edition = "2021"
+license.workspace = true
+publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

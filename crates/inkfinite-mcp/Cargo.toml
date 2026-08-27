@@ -1,7 +1,15 @@
 [package]
 name = "inkfinite-mcp"
+description = "Permissioned MCP server for Inkfinite documents and desktop sessions"
+authors.workspace = true
+categories = ["command-line-utilities", "graphics"]
 edition.workspace = true
+homepage.workspace = true
+keywords = ["canvas", "diagramming", "local-first", "mcp"]
 license.workspace = true
+publish = true
+readme.workspace = true
+repository.workspace = true
 rust-version.workspace = true
 version.workspace = true
 

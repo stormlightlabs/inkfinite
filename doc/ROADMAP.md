@@ -18,14 +18,13 @@ format-specific content.
 Inkfinite should be releasable before its release process is heavily
 automated.
 
-Define the public Rust package surface, crates.io publication order, desktop
-platform matrix, and CLI/MCP binary distribution. Keep a documented manual
-release checklist and small reproducible build scripts.
+The public Rust package surface, publication order, target matrices, and local
+release commands are defined in the [release guide](RELEASE.md).
 
-GitHub Releases should eventually contain desktop, CLI, and MCP artifacts with
-checksums. Publish the intended Rust packages to crates.io. Add automation where
-manual repetition becomes expensive rather than making it a prerequisite for
-the first useful release candidate.
+The next release candidate needs signed desktop installers, CLI and MCP
+archives, crates.io publication, and clean-system installation checks. Add
+automation where manual repetition becomes expensive rather than making it a
+prerequisite for the first useful release candidate.
 
 ## Later: reusable content
 

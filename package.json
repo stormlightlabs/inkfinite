@@ -30,7 +30,10 @@
 		"bindings:format": "pnpm --filter @inkfinite/bindings format",
 		"bindings:format:check": "pnpm --filter @inkfinite/bindings format:check",
 		"bindings:test": "pnpm --filter @inkfinite/bindings test",
-		"wasm:build": "pnpm --filter @inkfinite/wasm build"
+		"wasm:build": "pnpm --filter @inkfinite/wasm build",
+		"release:check-version": "node scripts/release/check-version.mjs",
+		"release:binaries": "cargo xtask dist",
+		"release:desktop": "node scripts/release/build-desktop.mjs"
 	},
 	"devDependencies": {
 		"prettier": "^3.7.4",

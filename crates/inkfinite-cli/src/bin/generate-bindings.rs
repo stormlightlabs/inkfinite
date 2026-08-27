@@ -161,10 +161,12 @@ fn insert_schema<T: JsonSchema>(
     if let Some(object) = schema.as_object_mut() {
         object.insert("$comment".into(), Value::String(GENERATED_JSON_COMMENT.into()));
     }
-    artifacts.insert(
-        PathBuf::from(relative_path),
-        format!("{}\n", serde_json::to_string_pretty(&schema)?),
-    );
+    let contents = format!("{}\n", serde_json::to_string_pretty(&schema)?);
+    artifacts.insert(PathBuf::from(relative_path), contents.clone());
+    let file_name = Path::new(relative_path)
+        .file_name()
+        .ok_or_else(|| format!("schema path has no file name: {relative_path}"))?;
+    artifacts.insert(PathBuf::from("crates/inkfinite-cli/schemas").join(file_name), contents);
     Ok(())
 }
 

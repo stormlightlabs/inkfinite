@@ -45,7 +45,7 @@ pnpm tauri dev
 
 ## Workspace commands
 
-Build the CLI with Cargo or create its installable release tree:
+Build the CLI with Cargo or create target-named CLI and MCP release archives:
 
 ```sh
 cargo build -p inkfinite-cli

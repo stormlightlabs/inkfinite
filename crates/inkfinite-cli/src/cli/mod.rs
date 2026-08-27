@@ -29,11 +29,11 @@ const EXIT_INPUT: i32 = 3;
 const EXIT_INVALID: i32 = 4;
 const EXIT_CONFLICT: i32 = 5;
 
-const DOCUMENT_SCHEMA: &str = include_str!("../../../../schemas/document-snapshot.schema.json");
-const TRANSACTION_SCHEMA: &str = include_str!("../../../../schemas/transaction-draft.schema.json");
-const PROTOCOL_REQUEST_SCHEMA: &str = include_str!("../../../../schemas/protocol-request.schema.json");
-const PROTOCOL_RESPONSE_SCHEMA: &str = include_str!("../../../../schemas/protocol-response.schema.json");
-const PROTOCOL_ERROR_SCHEMA: &str = include_str!("../../../../schemas/protocol-error.schema.json");
+const DOCUMENT_SCHEMA: &str = include_str!("../../schemas/document-snapshot.schema.json");
+const TRANSACTION_SCHEMA: &str = include_str!("../../schemas/transaction-draft.schema.json");
+const PROTOCOL_REQUEST_SCHEMA: &str = include_str!("../../schemas/protocol-request.schema.json");
+const PROTOCOL_RESPONSE_SCHEMA: &str = include_str!("../../schemas/protocol-response.schema.json");
+const PROTOCOL_ERROR_SCHEMA: &str = include_str!("../../schemas/protocol-error.schema.json");
 
 pub type Result<T> = std::result::Result<T, CliError>;
 

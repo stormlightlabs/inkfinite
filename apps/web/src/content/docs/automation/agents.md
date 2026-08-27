@@ -36,6 +36,16 @@ layers. Permissioned integrations can use that metadata as part of their own pol
 
 ### MCP access
 
+Install the MCP server from crates.io:
+
+```sh
+cargo install inkfinite-mcp --locked --bin inkfinite-mcp
+```
+
+Prebuilt archives are also available from
+[GitHub Releases](https://github.com/stormlightlabs/inkfinite/releases). Verify the archive against
+`SHA256SUMS`, extract it, and put `bin/inkfinite-mcp` on the path used by your MCP client.
+
 Run `inkfinite-mcp` as a local stdio server. It discovers open desktop sessions through authenticated
 local IPC. Pass standalone files as command arguments, or list them in `INKFINITE_MCP_DOCUMENTS`
 using the platform path separator:

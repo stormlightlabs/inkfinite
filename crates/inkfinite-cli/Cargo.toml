@@ -1,8 +1,15 @@
 [package]
 name = "inkfinite-cli"
-description = "Command-line entry point for Inkfinite"
+description = "Inspect, edit, validate, and render Inkfinite documents"
+authors.workspace = true
+categories = ["command-line-utilities", "graphics"]
 edition.workspace = true
+homepage.workspace = true
+keywords = ["canvas", "cli", "diagramming", "local-first"]
 license.workspace = true
+publish = true
+readme.workspace = true
+repository.workspace = true
 rust-version.workspace = true
 version.workspace = true
 

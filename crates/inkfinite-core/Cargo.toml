@@ -1,8 +1,15 @@
 [package]
 name = "inkfinite-core"
-description = "Shared document contracts and services for Inkfinite"
+description = "Canonical document model and transaction engine for Inkfinite"
+authors.workspace = true
+categories = ["data-structures", "graphics"]
 edition.workspace = true
+homepage.workspace = true
+keywords = ["automerge", "canvas", "diagramming", "local-first"]
 license.workspace = true
+publish = true
+readme.workspace = true
+repository.workspace = true
 rust-version.workspace = true
 version.workspace = true
 

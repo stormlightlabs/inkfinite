@@ -6,8 +6,20 @@ use tracing_subscriber::fmt::format::FmtSpan;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
+    let arguments = std::env::args_os().skip(1).collect::<Vec<_>>();
+    if arguments.len() == 1 && matches!(arguments[0].to_str(), Some("--version" | "-V")) {
+        println!("inkfinite-mcp {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+    if arguments.len() == 1 && matches!(arguments[0].to_str(), Some("--help" | "-h")) {
+        println!(
+            "Inkfinite permissioned MCP server\n\nUsage: inkfinite-mcp [DOCUMENT ...]\n\nArguments:\n  [DOCUMENT ...]  Standalone Inkfinite documents to expose\n\nOptions:\n  -h, --help     Print help\n  -V, --version  Print version"
+        );
+        return;
+    }
+
     init_tracing();
-    let paths = std::env::args_os().skip(1).map(PathBuf::from).collect::<Vec<_>>();
+    let paths = arguments.into_iter().map(PathBuf::from).collect::<Vec<_>>();
     let server = if paths.is_empty() {
         InkfiniteMcp::from_environment()
     } else {

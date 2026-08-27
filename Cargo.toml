@@ -10,8 +10,12 @@ members = [
 resolver = "2"
 
 [workspace.package]
+authors = ["Owais Jamil"]
 edition = "2024"
+homepage = "https://github.com/stormlightlabs/inkfinite"
 license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/stormlightlabs/inkfinite"
 rust-version = "1.89"
 version = "0.1.0"
 
@@ -22,7 +26,7 @@ base64 = "0.22.1"
 clap = { version = "4.6.1", features = ["derive"] }
 clap_complete = "4.6.9"
 clap_mangen = "0.2.33"
-inkfinite-core = { path = "crates/inkfinite-core" }
+inkfinite-core = { path = "crates/inkfinite-core", version = "0.1.0" }
 rmcp = { version = "3.1.2", default-features = false, features = ["server", "macros", "transport-io"] }
 perfect_freehand = "=0.1.1"
 resvg = { version = "=0.48.1", default-features = false, features = ["raster-images", "system-fonts", "text"] }

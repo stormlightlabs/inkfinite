@@ -1,8 +1,10 @@
 [package]
 name = "inkfinite-wasm"
 description = "Browser adapter for Inkfinite's Rust-owned SVG importer"
+authors.workspace = true
 edition.workspace = true
 license.workspace = true
+publish = false
 rust-version.workspace = true
 version.workspace = true
 

@@ -53,7 +53,7 @@ To build the CLI used by scripts and live desktop sessions:
 cargo build -p inkfinite-cli --bin inkfinite
 ./target/debug/inkfinite --help
 
-# Build an installable release tree with the binary, man page, and completions.
+# Build target-named CLI and MCP release archives with checksums.
 cargo xtask dist
 ```
 

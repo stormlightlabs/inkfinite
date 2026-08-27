@@ -33,10 +33,20 @@ During development, build the binary with:
 cargo build -p inkfinite-cli --bin inkfinite
 ```
 
-## Build and install the CLI
+## Install the CLI
 
-The workspace includes an `xtask` helper for building the CLI and generating its
-man page and shell completions:
+Download the archive for your operating system and architecture from
+[GitHub Releases](https://github.com/stormlightlabs/inkfinite/releases). Verify it against the
+release's `SHA256SUMS` file before extraction. The archive contains the binary, man page, and Bash,
+Fish, and Zsh completions in an installable directory tree.
+
+Rust users can install the same version from crates.io:
+
+```sh
+cargo install inkfinite-cli --locked --bin inkfinite
+```
+
+To build an archive from a source checkout, run:
 
 ```sh
 cargo xtask man
@@ -44,19 +54,10 @@ cargo xtask completions
 cargo xtask dist
 ```
 
-The first two commands write to `target/man/inkfinite.1` and
-`target/completions/`. `cargo xtask dist` builds the release binary and writes a
-source-built distribution under `target/dist/`:
+The first two commands write to `target/man/inkfinite.1` and `target/completions/`. The distribution
+command writes target-named CLI and MCP archives plus `SHA256SUMS` to `dist/`.
 
-```text
-target/dist/bin/inkfinite
-target/dist/share/man/man1/inkfinite.1
-target/dist/share/bash-completion/completions/inkfinite
-target/dist/share/fish/vendor_completions.d/inkfinite.fish
-target/dist/share/zsh/site-functions/_inkfinite
-```
-
-On a Unix system, install those files with:
+After extracting the CLI archive on a Unix system, install its files with:
 
 ```sh
 sudo mkdir -p /usr/local/bin /usr/local/share/man/man1 \
@@ -64,24 +65,18 @@ sudo mkdir -p /usr/local/bin /usr/local/share/man/man1 \
   /usr/local/share/fish/vendor_completions.d \
   /usr/local/share/zsh/site-functions
 
-sudo install -m 755 target/dist/bin/inkfinite /usr/local/bin/inkfinite
-
-sudo install -m 644 target/dist/share/man/man1/inkfinite.1 \
-  /usr/local/share/man/man1/inkfinite.1
-
-sudo install -m 644 target/dist/share/bash-completion/completions/inkfinite \
+sudo install -m 755 bin/inkfinite /usr/local/bin/inkfinite
+sudo install -m 644 share/man/man1/inkfinite.1 /usr/local/share/man/man1/inkfinite.1
+sudo install -m 644 share/bash-completion/completions/inkfinite \
   /usr/local/share/bash-completion/completions/inkfinite
-
-sudo install -m 644 target/dist/share/fish/vendor_completions.d/inkfinite.fish \
+sudo install -m 644 share/fish/vendor_completions.d/inkfinite.fish \
   /usr/local/share/fish/vendor_completions.d/inkfinite.fish
-
-sudo install -m 644 target/dist/share/zsh/site-functions/_inkfinite \
+sudo install -m 644 share/zsh/site-functions/_inkfinite \
   /usr/local/share/zsh/site-functions/_inkfinite
 ```
 
-Use `inkfinite completions bash`, `inkfinite completions fish`, or
-`inkfinite completions zsh` to print one script directly. `comp` is an alias for
-`completions`.
+Use `inkfinite completions bash`, `inkfinite completions fish`, or `inkfinite completions zsh` to
+print one script directly. `comp` is an alias for `completions`.
 
 ## File mode
 

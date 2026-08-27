@@ -2,20 +2,20 @@
 
 ## Release and distribution
 
-- [ ] Decide which Rust crates are public API and which remain workspace-only
-- [ ] Define crates.io package metadata and publication order for publishable
+See [RELEASE.md](RELEASE.md) for the package decisions, target matrices, and
+manual release procedure.
+
+- [x] Decide which Rust crates are public API and which remain workspace-only
+- [x] Define crates.io package metadata and publication order for publishable
       crates
-- [ ] Decide whether CLI and MCP ship from one crate with multiple binaries or
-      independent packages
-- [ ] Define the desktop release matrix for macOS, Linux, and Windows
-- [ ] Define the CLI and MCP binary release matrix
-- [ ] Add a documented manual release checklist covering version changes,
-      changelog, tests, builds, packaging, checksums, tags, and publication
-- [ ] Add local release scripts for repeatable desktop and CLI/MCP builds
-      without requiring a fully automated release pipeline
+- [x] Ship the CLI and MCP server as independent packages
+- [x] Define the desktop release matrix for macOS, Linux, and Windows
+- [x] Define the CLI and MCP binary release matrix
+- [x] Document the manual release checklist
+- [x] Add local desktop and CLI/MCP release commands
 - [ ] Publish GitHub release artifacts with checksums
-- [ ] Publish intended Rust packages to crates.io
-- [ ] Verify installation instructions against clean machines or containers
+- [ ] Publish `inkfinite-core`, `inkfinite-cli`, and `inkfinite-mcp` to crates.io
+- [ ] Verify installation instructions on the clean target systems
 
 ## Agent skills
 
