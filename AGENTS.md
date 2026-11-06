@@ -61,6 +61,17 @@ that don't touch the desktop app.
 The gate leaves out the Playwright visual tests because they need browsers. Run them
 with `just visual` when a change affects an editor surface.
 
+## Commits and pull requests
+
+- Write commit subjects and pull request titles as
+  [Conventional Commits](https://www.conventionalcommits.org/): `type: summary`, lowercase,
+  imperative, no trailing period. Use `feat`, `fix`, `refactor`, `docs`, `test`, `build`,
+  `ci` or `chore`. Add a scope only when it helps, such as `fix(editor): …`.
+- Keep commit bodies and pull request descriptions short and focused: what changed and
+  why, in a few lines or bullets. Leave out file-by-file narration and restated diffs.
+  Link the Linear issues.
+- Put verification details in a pull request comment, not the description.
+
 ## Tasks
 
 Inkfinite's work is tracked in the Inkfinite team in Linear (issue key `INK`). Use the

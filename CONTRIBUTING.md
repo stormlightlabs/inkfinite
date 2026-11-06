@@ -29,6 +29,10 @@ just visual
 [Testing](apps/web/src/content/docs/development/testing.md) covers focused test
 commands. [AGENTS.md](AGENTS.md) holds the code conventions.
 
+Title commits and pull requests as [Conventional Commits](https://www.conventionalcommits.org/),
+such as `feat: add lasso selection` or `fix: keep arrow bindings after undo`. Keep the
+description to what changed and why.
+
 ## Sign off your commits
 
 Inkfinite uses the [Developer Certificate of Origin](https://developercertificate.org/)
