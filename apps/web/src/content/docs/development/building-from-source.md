@@ -11,8 +11,10 @@ and a Tauri desktop shell.
 
 ## Requirements
 
-Install Node.js 18 or newer, pnpm, and Rust 1.89. Desktop development also requires the
-[Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) for your operating system.
+Install Node.js 18 or newer, pnpm, and Rust 1.89. Install the
+[Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) for your operating system
+too: the repository checks build the desktop crate, so they're needed even if you only work
+on the web app or the CLI.
 
 From the repository root, install JavaScript packages:
 
@@ -58,17 +60,16 @@ Generate TypeScript bindings after changing shared Rust types:
 pnpm bindings:generate
 ```
 
-Run the repository checks from the root:
+Run the repository checks from the root with [just](https://github.com/casey/just):
 
 ```sh
-cargo fmt --all -- --check
-cargo test --workspace --all-features
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-pnpm format:check
-pnpm test
-pnpm check
-pnpm lint
+cargo install just --locked
+just check
 ```
+
+`just check` runs Rust formatting, Clippy with warnings denied, the Rust tests,
+`pnpm format:check`, `pnpm test` and `pnpm check`. It leaves out the Playwright visual
+tests, which need browsers; run those with `just visual`.
 
 See [Testing](/docs/development/testing/) for focused package and Playwright commands. See
 [Performance corpus and profiling](/docs/development/performance-corpus/) for native, process,

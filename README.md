@@ -71,6 +71,11 @@ installation paths and shell completion setup.
 - [Agent workflows](apps/web/src/content/docs/automation/agents.md)
 - [Architecture](apps/web/src/content/docs/development/architecture.md)
 
+## Contributing
+
+Inkfinite isn't accepting outside contributions right now. Maintainers, see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Credits
 
 I was inspired by fantastic apps in the space like [Excalidraw](https://github.com/excalidraw/excalidraw)

@@ -102,16 +102,12 @@ cargo xtask checksums --check
 Run the repository checks from a clean working tree:
 
 ```sh
-cargo fmt --all -- --check
-cargo test --workspace --all-features
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-pnpm format:check
-pnpm bindings:check
-pnpm bindings:test
-pnpm test
-pnpm check
-pnpm lint
+just check
+just visual
 ```
+
+`just check` is the gate described in [AGENTS.md](../AGENTS.md#gate). `just visual` runs
+the Playwright visual tests, which the gate leaves out.
 
 Inspect the crates.io package contents and package the public root crate:
 

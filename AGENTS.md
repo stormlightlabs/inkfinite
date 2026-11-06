@@ -34,16 +34,26 @@ inspect the baselines in `apps/web/e2e/visual/*-snapshots/` at their full captur
 
 `cargo clean` regularly as not to fill up too much space on disk.
 
-### Code Quality
+### Gate
 
-```sh
-cargo fmt --all -- --check
-cargo test --workspace --all-features
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-pnpm format:check
-pnpm bindings:check
-pnpm bindings:test
-pnpm test
-pnpm check
-pnpm lint
-```
+Run `just check` before pushing. The justfile lists its steps: Rust formatting, Clippy and
+tests, then `pnpm format:check`, `pnpm test` and `pnpm check`. It needs the toolchain and
+Tauri packages from the [build guide](apps/web/src/content/docs/development/building-from-source.md).
+Run `just visual` for the Playwright visual tests when a change affects the editor.
+
+## Commits and pull requests
+
+- Titles follow [Conventional Commits](https://www.conventionalcommits.org/), lowercase:
+  `feat: add lasso selection`.
+- Descriptions say what changed and why, briefly. Verification goes in a PR comment.
+
+## Tasks
+
+Work is tracked in the Inkfinite team in Linear (`INK-<n>`), through the Linear connector.
+
+- Start: set In Progress. Only start a task whose blockers are done; otherwise ask.
+- Complete: comment `Done in #<pr> at <sha>: <summary>`, then set Done.
+- Hand off: comment the handoff note, then set Backlog.
+- Breaking work down: projects or milestones, parent issues, sub-issues, blocked-by links.
+- Record bugs found along the way as new issues instead of fixing them in the same change.
+- Finish issues labeled `Before features` before starting feature work.
