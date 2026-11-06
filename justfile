@@ -14,13 +14,15 @@ rust-check:
     cargo clippy --workspace --all-targets --all-features -- -D warnings
     cargo test --workspace --all-features
 
-# Check Prettier formatting, bindings drift, Svelte and TypeScript, and lint, then run
-# the workspace tests. `pnpm check` includes `pnpm bindings:check` and `pnpm lint`;
-# `pnpm test` builds the WebAssembly package and includes `pnpm bindings:test`.
+# `pnpm test` builds the WebAssembly, core and editor packages before testing, and
+# includes `pnpm bindings:test`. `pnpm check` type-checks against those builds, so it
+# runs second; it includes `pnpm bindings:check` and `pnpm lint`.
+
+# Check formatting, run the workspace tests, then check bindings, Svelte, TypeScript and lint.
 js-check:
     pnpm format:check
-    pnpm check
     pnpm test
+    pnpm check
 
 # Run the Playwright visual tests. They need browsers, so the gate leaves them out.
 visual:

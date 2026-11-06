@@ -48,11 +48,16 @@ It runs, in order:
 - `cargo clippy --workspace --all-targets --all-features -- -D warnings`
 - `cargo test --workspace --all-features`
 - `pnpm format:check`
-- `pnpm check`, which includes `pnpm bindings:check` and `pnpm lint`
-- `pnpm test`, which builds the WebAssembly package and includes `pnpm bindings:test`
+- `pnpm test`, which builds the WebAssembly, core and editor packages and includes
+  `pnpm bindings:test`
+- `pnpm check`, which includes `pnpm bindings:check` and `pnpm lint`. It type-checks
+  against the packages `pnpm test` builds, so it has to run after it.
 
-It needs `just`, the `wasm32-unknown-unknown` target and the `wasm-bindgen` CLI from
-the [build guide](apps/web/src/content/docs/development/building-from-source.md).
+It needs `just`, the `wasm32-unknown-unknown` target, the `wasm-bindgen` CLI and the
+Tauri 2 system packages, all listed in the
+[build guide](apps/web/src/content/docs/development/building-from-source.md). Clippy and
+the Rust tests build the desktop crate, so the Tauri packages are needed even for changes
+that don't touch the desktop app.
 The gate leaves out the Playwright visual tests because they need browsers. Run them
 with `just visual` when a change affects an editor surface.
 
