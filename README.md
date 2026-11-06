@@ -71,6 +71,11 @@ installation paths and shell completion setup.
 - [Agent workflows](apps/web/src/content/docs/automation/agents.md)
 - [Architecture](apps/web/src/content/docs/development/architecture.md)
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Run `just check` before opening a pull request,
+and sign off your commits with `git commit -s`.
+
 ## Credits
 
 I was inspired by fantastic apps in the space like [Excalidraw](https://github.com/excalidraw/excalidraw)

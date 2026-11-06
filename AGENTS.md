@@ -34,16 +34,57 @@ inspect the baselines in `apps/web/e2e/visual/*-snapshots/` at their full captur
 
 `cargo clean` regularly as not to fill up too much space on disk.
 
-### Code Quality
+### Gate
+
+Run the gate before pushing:
 
 ```sh
-cargo fmt --all -- --check
-cargo test --workspace --all-features
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-pnpm format:check
-pnpm bindings:check
-pnpm bindings:test
-pnpm test
-pnpm check
-pnpm lint
+just check
 ```
+
+It runs, in order:
+
+- `cargo fmt --all -- --check`
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+- `cargo test --workspace --all-features`
+- `pnpm format:check`
+- `pnpm check`, which includes `pnpm bindings:check` and `pnpm lint`
+- `pnpm test`, which builds the WebAssembly package and includes `pnpm bindings:test`
+
+It needs `just`, the `wasm32-unknown-unknown` target and the `wasm-bindgen` CLI from
+the [build guide](apps/web/src/content/docs/development/building-from-source.md).
+The gate leaves out the Playwright visual tests because they need browsers. Run them
+with `just visual` when a change affects an editor surface.
+
+## Tasks
+
+Inkfinite's work is tracked in the Inkfinite team in Linear (issue key `INK`). Use the
+session's Linear connector for every step; subagents report back to the session and do
+not need their own access.
+
+| Step            | In Linear                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------- |
+| Read a task     | `get_issue INK-<n>`, its comments with `list_comments`, and its project with `get_project`  |
+| Check readiness | Status is Todo and every blocked-by issue is Done or Canceled                               |
+| Start           | `save_issue` with `state: "In Progress"`                                                    |
+| Complete        | `save_comment` with `Done in #<pr> at <sha>: <summary>`, then `save_issue` with `state: "Done"` |
+| Hand off        | `save_comment` with the handoff note, then `save_issue` with `state: "Backlog"`             |
+| Pick up         | Read the latest handoff comment, then `save_issue` with `state: "In Progress"`              |
+| Record new work | `save_issue` with `team: "Inkfinite"` and the project it belongs to                         |
+| Record an idea  | `save_document` on the Inkfinite team                                                       |
+| Record a spec   | `save_document` on the project it belongs to                                                |
+
+When breaking work down, write these records:
+
+| Primitive  | In Linear                                         |
+| ---------- | ------------------------------------------------- |
+| Collection | A project, or a milestone inside one              |
+| Run unit   | A parent issue in that project                    |
+| Task       | A sub-issue (`save_issue` with `parentId`)         |
+| Dependency | A blocked-by link (`save_issue` with `blockedBy`) |
+
+- Don't start a task that isn't ready. Ask the owner first, and say what it waits on.
+- Record bugs and new work found along the way as new issues. Mention them in the pull
+  request; don't fix them in the same change unless the owner asks.
+- Issues labeled `Before features` gate feature work. Finish them before starting
+  feature issues.
