@@ -73,8 +73,8 @@ installation paths and shell completion setup.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Run `just check` before opening a pull request,
-and sign off your commits with `git commit -s`.
+Inkfinite isn't accepting outside contributions right now. Maintainers, see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Credits
 
