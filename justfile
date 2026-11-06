@@ -15,12 +15,15 @@ rust-check:
     cargo test --workspace --all-features
 
 # `pnpm test` builds the WebAssembly, core and editor packages before testing, and
-# includes `pnpm bindings:test`. `pnpm check` type-checks against those builds, so it
-# runs second; it includes `pnpm bindings:check` and `pnpm lint`.
+# includes `pnpm bindings:test`. Core's types import `@inkfinite/bindings` from its
+# `dist/`, which `pnpm test` doesn't build first, so the recipe builds it. `pnpm check`
+# type-checks against those builds, so it runs last; it includes `pnpm bindings:check`
+# and `pnpm lint`.
 
 # Check formatting, run the workspace tests, then check bindings, Svelte, TypeScript and lint.
 js-check:
     pnpm format:check
+    pnpm --filter @inkfinite/bindings build
     pnpm test
     pnpm check
 
